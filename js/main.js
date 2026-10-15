@@ -26,6 +26,7 @@
     // 多出来的高度全部留在警戒线之上（水滴滴落区域拉伸）
     C.dangerY = FLOORY - (646 - 182);      // 警戒线 = 容器底 - 464
     C.containerTop = FLOORY - (646 - 118); // 容器顶开口 = 容器底 - 528
+    C.spawnY = FLOORY - (646 - 120);       // 出生点 = 容器底 - 526（掉落位置相对警戒线固定，游戏区高宽比恒定）
     canvas.width = C.W * dpr;
     canvas.height = Math.round(VH * dpr);
     canvas.style.width = (C.W * view.s) + 'px';
@@ -1762,15 +1763,22 @@
   // ---------- 容器：玻璃质感 + 底部焦散 ----------
   function drawContainer() {
     var floorY = FLOORY, FH = 12;
-    // 床面：圆角横条（两端探出画布，营造开放感）
-    // （危险区渐晕已并入 drawDangerLine，随危险度动态变化）
+    // 海底基色：从床面到画布底一条连续渐变（泡沫白 → 青 → 深海青），先铺满
+    var bed = ctx.createLinearGradient(0, floorY, 0, VH);
+    bed.addColorStop(0, 'rgba(216,236,232,0.95)');
+    bed.addColorStop(0.3, 'rgba(170,208,204,0.95)');
+    bed.addColorStop(0.62, 'rgba(112,158,174,0.95)');
+    bed.addColorStop(1, 'rgba(56,102,130,0.95)');
+    ctx.fillStyle = bed;
+    ctx.fillRect(0, floorY + 4, C.W, VH - floorY - 4);
+    // 床面：圆角横条（半透明玻璃质感，透出海底基色，不再有硬边界）
     var fg = ctx.createLinearGradient(0, floorY, 0, floorY + FH + 6);
-    fg.addColorStop(0, 'rgba(255,255,255,0.92)');
-    fg.addColorStop(0.55, 'rgba(196,228,224,0.92)');
-    fg.addColorStop(1, 'rgba(168,207,203,0.92)');   // 尾色与下方沙床首色一致，无缝衔接
+    fg.addColorStop(0, 'rgba(255,255,255,0.6)');
+    fg.addColorStop(0.55, 'rgba(228,244,240,0.4)');
+    fg.addColorStop(1, 'rgba(200,230,226,0.22)');
     ctx.fillStyle = fg;
     roundRect(-6, floorY, C.W + 12, FH + 6, 6); ctx.fill();
-    ctx.strokeStyle = 'rgba(70,130,180,0.4)';
+    ctx.strokeStyle = 'rgba(90,150,190,0.22)';
     ctx.lineWidth = 1;
     roundRect(-5.5, floorY + 0.5, C.W + 11, FH + 5, 6); ctx.stroke();
 
@@ -1797,14 +1805,8 @@
     ctx.fillStyle = dep;
     ctx.fillRect(0, floorY - 30, C.W, 30);
 
-    // 海底沙床（底栏下方空档，不进游戏区）
+    // 海底装饰（基色已由上面的 bed 连续渐变铺满，这里只画沙丘等点缀）
     var sy0 = floorY + FH + 6;
-    var sand = ctx.createLinearGradient(0, sy0, 0, VH);
-    sand.addColorStop(0, 'rgba(168,207,203,0.95)');    // 与上方床面尾色无缝衔接
-    sand.addColorStop(0.5, 'rgba(126,170,182,0.95)');  // 过渡青
-    sand.addColorStop(1, 'rgba(84,138,160,0.95)');     // 深海青
-    ctx.fillStyle = sand;
-    ctx.fillRect(0, sy0, C.W, VH - sy0);
     // 沙丘
     ctx.fillStyle = 'rgba(238,246,240,0.7)';
     ctx.beginPath(); ctx.ellipse(C.W * 0.2, sy0 + 12, 95, 13, 0, 0, Math.PI * 2); ctx.fill();
@@ -2241,11 +2243,10 @@
   }
 
   function drawSkillBar() {
-    // 渐变底带：沙床色的柔和延续（浅泡沫感），不再用突兀的纯白高光
-    var g = ctx.createLinearGradient(0, VH - 56, 0, VH - 4);
-    g.addColorStop(0, 'rgba(255,255,255,0)');
-    g.addColorStop(0.55, 'rgba(244,251,249,0.28)');
-    g.addColorStop(1, 'rgba(238,248,246,0.5)');
+    // 道具带：海底基色的柔和延续（同色系微加深，方向与渐变一致，不割裂）
+    var g = ctx.createLinearGradient(0, VH - 56, 0, VH);
+    g.addColorStop(0, 'rgba(56,102,130,0)');
+    g.addColorStop(1, 'rgba(36,78,106,0.3)');
     ctx.fillStyle = g;
     ctx.fillRect(0, VH - 56, C.W, 56);
 
@@ -2295,8 +2296,8 @@
         ctx.strokeStyle = '#E24B4A'; ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(btn.cx, btn.cy, btn.r + 3, 0, Math.PI * 2); ctx.stroke();
       }
-      // 名称标签：保持完整可见（底边留 6px 余量）
-      ctx.fillStyle = '#3E6E90';
+      // 名称标签：浅色文字，在变深的道具带上保持可读（底边留 6px 余量）
+      ctx.fillStyle = 'rgba(240,250,252,0.95)';
       ctx.font = '10px system-ui, sans-serif';
       ctx.fillText(cfg.name, btn.cx, btn.cy + btn.r + 6);
     }
