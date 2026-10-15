@@ -1390,6 +1390,23 @@
       ctx.fillRect(LW - edge, 0, edge, VH);
     }
 
+    // 顶部斜射光柱（缓慢摇曳 + 呼吸明暗，营造水下丁达尔效应）
+    for (var bi = 0; bi < 3; bi++) {
+      var bx0 = LW * (0.16 + bi * 0.3) + Math.sin(time * 0.13 + bi * 2.1) * LW * 0.04;
+      var tilt = Math.sin(time * 0.09 + bi * 1.4) * 0.10 + (bi - 1) * 0.06;
+      var bw = 46 + bi * 24;
+      var rayA = 0.05 + 0.035 * (0.5 + 0.5 * Math.sin(time * 0.23 + bi * 2.6));
+      var ray = ctx.createLinearGradient(0, 0, 0, VH * 0.72);
+      ray.addColorStop(0, 'rgba(255,255,255,' + rayA + ')');
+      ray.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.save();
+      ctx.translate(bx0, -10);
+      ctx.rotate(tilt);
+      ctx.fillStyle = ray;
+      ctx.fillRect(-bw / 2, 0, bw, VH * 0.82);
+      ctx.restore();
+    }
+
     // 远处缓慢漂移的水波纹
     ctx.strokeStyle = 'rgba(255,255,255,0.10)';
     ctx.lineWidth = 1.5;
@@ -1509,14 +1526,14 @@
     ctx.strokeStyle = 'rgba(255,255,255,0.85)';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    for (var x = 0; x <= C.W; x += 8) {
+    for (var x = 0; x <= LW; x += 8) {
       var y = 16 + Math.sin(x * 0.05 + time * 1.6) * 3 + Math.sin(x * 0.11 - time * 1.1) * 2;
       if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.stroke();
     ctx.globalAlpha = 0.25;
     ctx.beginPath();
-    for (x = 0; x <= C.W; x += 8) {
+    for (x = 0; x <= LW; x += 8) {
       y = 26 + Math.sin(x * 0.06 - time * 1.2) * 3;
       if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
@@ -1530,6 +1547,46 @@
       var b = bubbles[i];
       var bx = b.x + Math.sin(b.sway * 1.4) * 6;
       ctx.beginPath(); ctx.arc(bx, b.y, b.r, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    // 两侧剪影植被（海草随水流摆动 + 底部礁石；只画在游戏区两侧的延伸海水里）
+    drawFlora(4, BX - 6, 3);
+    drawFlora(BX + C.W + 6, LW - 4, 8);
+  }
+
+  // 一条侧边栏的海草/礁石剪影（x0..x1 为侧边栏范围，seed 区分左右两侧形态）
+  function drawFlora(x0, x1, seed) {
+    var w = x1 - x0;
+    if (w < 24) return; // 手机模式侧边栏宽 0，自动跳过
+    var baseY = VH - 3;
+    var n = Math.max(3, Math.min(9, Math.floor(w / 26)));
+    var k;
+    ctx.lineCap = 'round';
+    for (k = 0; k < n; k++) {
+      var px = x0 + (k + 0.5) * w / n + Math.sin(seed + k * 7.3) * w * 0.12;
+      var h = 36 + ((k * 37 + seed * 13) % 60) + (VH - 720) * 0.12;
+      h = Math.min(h, VH * 0.28);
+      var sway = Math.sin(time * (0.7 + (k % 3) * 0.25) + seed + k) * (6 + h * 0.08);
+      ctx.strokeStyle = 'rgba(16,62,102,' + (0.30 + (k % 2) * 0.10) + ')';
+      ctx.lineWidth = 2.5 + (k % 3);
+      ctx.beginPath();
+      ctx.moveTo(px, baseY);
+      var cx = px, cy = baseY;
+      for (var s2 = 1; s2 <= 3; s2++) {
+        var ny = baseY - (h / 3) * s2;
+        var nx = px + sway * (s2 / 3) * (s2 / 3);
+        ctx.quadraticCurveTo(cx + sway * 0.4, (cy + ny) / 2, nx, ny);
+        cx = nx; cy = ny;
+      }
+      ctx.stroke();
+    }
+    // 底部礁石
+    ctx.fillStyle = 'rgba(12,52,88,0.35)';
+    var rn = Math.max(1, Math.floor(w / 70));
+    for (k = 0; k < rn; k++) {
+      var rx = x0 + (k + 0.5) * w / rn + Math.sin(seed * 3 + k * 5.1) * w * 0.1;
+      var rr = 10 + ((k * 53 + seed * 7) % 14);
+      ctx.beginPath(); ctx.ellipse(rx, baseY + 4, rr, rr * 0.45, 0, 0, Math.PI * 2); ctx.fill();
     }
   }
 
