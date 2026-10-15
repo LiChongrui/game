@@ -49,18 +49,16 @@
     new ResizeObserver(fit).observe(document.documentElement);
   }
 
-  // ---------- 存储（带兜底） ----------
-  function saveNum(key, v) { try { localStorage.setItem(key, String(v)); } catch (e) {} }
-  function loadFlag(key) { try { return localStorage.getItem(key) === '1'; } catch (e) { return false; } }
-  function saveFlag(key, v) { try { localStorage.setItem(key, v ? '1' : '0'); } catch (e) {} }
+  // ---------- 存储（走平台适配层 MG.platform，Web 实现指向 localStorage） ----------
+  function saveNum(key, v) { MG.platform.set(key, String(v)); }
+  function loadFlag(key) { return MG.platform.get(key) === '1'; }
+  function saveFlag(key, v) { MG.platform.set(key, v ? '1' : '0'); }
   function loadDex() {
-    try {
-      var v = JSON.parse(localStorage.getItem('mg_dex') || '{}');
-      return { u: v.u || {}, c: v.c || {}, sp: v.sp || {}, stats: v.stats || {}, ach: v.ach || {} };
-    } catch (e) { return { u: {}, c: {}, sp: {}, stats: {}, ach: {} }; }
+    var v = MG.platform.getJSON('mg_dex', {}) || {};
+    return { u: v.u || {}, c: v.c || {}, sp: v.sp || {}, stats: v.stats || {}, ach: v.ach || {} };
   }
   function saveDex() {
-    try { localStorage.setItem('mg_dex', JSON.stringify({ u: dexUnlocked, c: dexCounts, sp: dexSpecial, stats: lifeStats, ach: achDone })); } catch (e) {}
+    MG.platform.setJSON('mg_dex', { u: dexUnlocked, c: dexCounts, sp: dexSpecial, stats: lifeStats, ach: achDone });
   }
 
   // ---------- 音效（WebAudio 合成，无素材文件） ----------
@@ -384,7 +382,42 @@
   function perkOn(id) { return !!achDone[id]; }
   function perkMult() { return (achDone.tide12 && tide.progress > 0.2) ? 1.1 : 1; }
   // 数值封顶：所有乘区叠乘后总倍率不超过 C.multCap（防成就/海域加成叠乘导致分数膨胀）
-  function cm(m) { return Math.min(m, C.multCap); }
+  // 二周目词缀的得分倍率并入乘区；词缀局上限额外 +3（高危要有高收益）
+  function cm(m) { return Math.min(m * (ng.active ? ng.active.mult : 1), C.multCap + (ng.active ? 3 : 0)); }
+
+  // 技能渐进解锁：按累计得分逐个点亮（换滴开局即有，涟漪/蒸发/水流递进）
+  function skillUnlocked(key) { return totalScore() >= (C.skillUnlock[key] || 0); }
+
+  // ---------- 二周目「深渊回响」（达成最深海域解锁：带词缀的高危高收益无尽局） ----------
+  var ng = { unlocked: loadFlag('mg_ng'), active: null };
+  var ngOpen = false, ngPicks = [];   // 词缀三选一弹窗
+  var ngPickRects = [];               // 三张词缀卡的命中区（draw 时填充）
+  var GRAV0 = C.gravity;              // 基准重力（词缀局按倍率改写，重开恢复）
+  function ngStartRun(affix) {
+    ng.active = affix;
+    C.gravity = GRAV0 * (affix.grav || 1);
+    restart();
+    ng.active = affix;                 // restart 会清 active，重设
+    C.gravity = GRAV0 * (affix.grav || 1);
+    level = 2;                         // 直入无尽（潮汐/宝箱/事件全开）
+    levelBanner = 2.2;
+    addPopup(C.W / 2, 300, '深渊回响 ·「' + affix.name + '」×' + affix.mult, true, 0);
+    ngOpen = false;
+  }
+  function ngEndRun() {
+    if (!ng.active) return;
+    ng.active = null;
+    C.gravity = GRAV0;
+  }
+  // 词缀三选一：从词缀池随机抽 3 张
+  function openNgPick() {
+    var pool = C.ng.affixes.slice(), picks = [];
+    while (picks.length < 3 && pool.length) picks.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]);
+    ngPicks = picks;
+    ngPickRects = [];
+    ngOpen = true;
+    audio.blip(460, 0.12, 'sine', 0.08, 0.6);
+  }
 
   // 海域演进：累计分跨过里程碑改变世界（背景色调随阶段加深 + 称号）
   var stageSeen = -1; // 已提示过的阶段（会话内）
@@ -416,10 +449,8 @@
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
-  function loadDaily() {
-    try { return JSON.parse(localStorage.getItem('mg_daily') || 'null'); } catch (e) { return null; }
-  }
-  function saveDaily() { try { localStorage.setItem('mg_daily', JSON.stringify(daily)); } catch (e) {} }
+  function loadDaily() { return MG.platform.getJSON('mg_daily', null); }
+  function saveDaily() { MG.platform.setJSON('mg_daily', daily); }
   function buildDailyTasks(date, rnd) {
     var pool = [
       { type: 'merge', tier: 1 + Math.floor(rnd() * 3), need: 6 + Math.floor(rnd() * 5) },
@@ -450,7 +481,7 @@
     }
     return d;
   })();
-  function saveDailyFresh(d) { try { localStorage.setItem('mg_daily', JSON.stringify(d)); } catch (e) {} }
+  function saveDailyFresh(d) { MG.platform.setJSON('mg_daily', d); }
   function dailyProgress(type, tier, n) {
     for (var i = 0; i < daily.tasks.length; i++) {
       var t = daily.tasks[i];
@@ -486,14 +517,13 @@
 
   // ---------- 好友榜（本地模拟榜：预留微信 wx 接口位，上线后替换数据源） ----------
   var friends = (function () {
-    var list = null;
-    try { list = JSON.parse(localStorage.getItem('mg_friends') || 'null'); } catch (e) { list = null; }
+    var list = MG.platform.getJSON('mg_friends', null);
     if (!list) {
       var names = ['海风酱', '泡泡鱼', '深蓝船长', '浪里格', '珊瑚酱', '夜航星'];
       var rnd = mulberry(dateSeed('friends-v1'));
       list = [];
       for (var i = 0; i < names.length; i++) list.push({ name: names[i], base: Math.floor(300 + rnd() * 4200) });
-      try { localStorage.setItem('mg_friends', JSON.stringify(list)); } catch (e) {}
+      MG.platform.setJSON('mg_friends', list);
     }
     return list;
   })();
@@ -615,16 +645,22 @@
   }
   function rollIron() {
     if (seaEvent && seaEvent.type === 'storm') return false; // 保底：风暴期间不再落礁石，避免双重失控
-    return level === 2 && Math.random() < C.iron.chance + (C.ramp.ironChanceMax - C.iron.chance) * endlessRamp();
+    var ch = C.iron.chance + (C.ramp.ironChanceMax - C.iron.chance) * endlessRamp();
+    if (ng && ng.active && ng.active.ironX) ch *= ng.active.ironX; // 二周目「暗礁密布」
+    return level === 2 && Math.random() < ch;
   } // 礁石仅无尽模式（概率随渐进加压提升）
-  // 符文：普通水滴随机附带的道具属性，合成时为对应技能充能
+  // 符文：普通水滴随机附带的道具属性，合成时为对应技能充能（只出已解锁的技能符文）
   function rollRune() {
     if (Math.random() >= C.rune.chance) return null;
-    var r = Math.random(), w = C.rune.weights;
-    if (r < w.swap) return 'swap';
-    if (r < w.swap + w.ripple) return 'ripple';
-    if (r < w.swap + w.ripple + w.evap) return 'evap';
-    return 'flow';
+    var keys = [], ws = [], total = 0, k;
+    for (k in C.rune.weights) {
+      if (!C.rune.weights.hasOwnProperty(k) || !skillUnlocked(k)) continue;
+      keys.push(k); ws.push(C.rune.weights[k]); total += C.rune.weights[k];
+    }
+    if (!keys.length) return null;
+    var r = Math.random() * total;
+    for (k = 0; k < keys.length; k++) { r -= ws[k]; if (r <= 0) return keys[k]; }
+    return keys[keys.length - 1];
   }
   function runeName(key) {
     for (var i = 0; i < C.skills.length; i++) if (C.skills[i].key === key) return C.skills[i].name;
@@ -1121,6 +1157,12 @@
         b.vx *= 0.1; b.vy = 0;
         if (b.frozen <= 0) thaw(b);
       }
+      // 二周目「冰封之海」：标记滴落底即冻（临时平台，风险与资源并存）
+      if (b.ngIce && !b.iron && b.y + b.r >= C.floorY - 3) {
+        b.ngIce = false;
+        b.frozen = C.ice.freezeTime;
+        burst(b.x, b.y + b.r * 0.4, 0, false);
+      }
     }
   }
   function updateVortex(b, dt, bs) {
@@ -1224,7 +1266,9 @@
       tide.timer -= dt;
       if (tide.timer <= 0) {
         tide.phase = 'idle';
-        tide.timer = C.tide.cycleInterval - (C.tide.cycleInterval - C.ramp.tideIntervalMin) * endlessRamp(); // 渐进加压：潮汐更频
+        var tiv = C.tide.cycleInterval - (C.tide.cycleInterval - C.ramp.tideIntervalMin) * endlessRamp(); // 渐进加压：潮汐更频
+        if (ng.active && ng.active.tideInt) tiv *= ng.active.tideInt; // 二周目「疾风骤雨」
+        tide.timer = tiv;
         bumpStat('tide');                      // 成就：经历涨潮次数（跨局累计）
         dailyProgress('tide');                 // 每日任务：经历涨潮
         seaEvent.timer = Math.max(seaEvent.timer, 4); // 保底：退潮后至少 4s 再来事件
@@ -1300,6 +1344,10 @@
   }
   function useSkill(key) {
     var i;
+    if (!skillUnlocked(key)) {
+      flashSkill(key, '累计 ' + C.skillUnlock[key] + ' 分解锁');
+      return;
+    }
     if (key === 'evap') {
       if (evapMode) { evapMode = false; return; }
       if (skillCharge.evap < skillCost('evap')) { flashSkill('evap', '符文 ' + skillCharge.evap + '/' + skillCost('evap')); return; }
@@ -1510,7 +1558,20 @@
     tutDone: function () { return tutDone; },
     stage: function () { return { i: seaStage(), name: C.seaStages[seaStage()].name }; },
     setLife: function (n) { lifeScore = n; runCounted = 0; },
-    cm: cm
+    cm: cm,
+    // ---- 蒙特卡洛模拟器钩子（无渲染快进，见 test/simulate.js） ----
+    headless: false,
+    step: function (dt) { update(dt); },
+    drop: function (x) { aimX = clampAim(x == null ? Math.random() * C.W : x); tryDrop(); },
+    reset: function () { restart(); },
+    ngInfo: function () { return { unlocked: ng.unlocked, active: ng.active ? ng.active.id : null }; },
+    ngUnlock: function () { ng.unlocked = true; saveFlag('mg_ng', 1); },
+    ngStart: function (id) {
+      var af = null;
+      for (var i = 0; i < C.ng.affixes.length; i++) if (C.ng.affixes[i].id === id) af = C.ng.affixes[i];
+      if (af) ngStartRun(af);
+      return af ? af.name : null;
+    }
   };
 
   // 第 1 关通过：弹出提示进入无尽模式，不清场、不重置，继续当前局面
@@ -1561,7 +1622,7 @@
       if (score > best) { best = score; saveNum('mg_best', best); }
       addPopup(x, y - 30, '宝箱开启 +' + gain, true, 0);
     } else if (r < 0.75) {
-      var keys = ['swap', 'ripple', 'evap', 'flow'];
+      var keys = ['swap', 'ripple', 'evap', 'flow'].filter(function (k) { return skillUnlocked(k); });
       var k = keys[(Math.random() * keys.length) | 0];
       skillCharge[k] += perkOn('chest5') ? 3 : 2;
       addPopup(x, y - 30, '宝箱开启：' + runeName(k) + ' +2 充能', true, 0);
@@ -1675,9 +1736,12 @@
       }
       ctx.restore();
     } else if (seaEvent.type === 'surge') {
-      var g = ctx.createLinearGradient(0, FLOORY - 90, 0, FLOORY);
-      g.addColorStop(0, 'rgba(160,230,255,0)');
-      g.addColorStop(1, 'rgba(160,230,255,0.18)');
+      var g = grad('surge' + Math.round(FLOORY), function () {
+        var gg = ctx.createLinearGradient(0, FLOORY - 90, 0, FLOORY);
+        gg.addColorStop(0, 'rgba(160,230,255,0)');
+        gg.addColorStop(1, 'rgba(160,230,255,0.18)');
+        return gg;
+      });
       ctx.fillStyle = g;
       ctx.fillRect(0, FLOORY - 90, C.W, 90);
     }
@@ -1713,6 +1777,7 @@
     });
   }
   function restart() {
+    ngEndRun(); // 二周目词缀只在单局内生效（普通重开回到常态）
     phys.bodies.length = 0;
     confirmOpen = false;
     score = 0; displayScore = 0; scoreBump = 0;
@@ -1767,6 +1832,7 @@
   var MUTE = { cx: C.W - 24, cy: 36, r: 13, pressT: 0 };
   var bookBtn = { cx: 46, cy: 688, r: 20, pressT: 0 };
   var restartBtn = { cx: C.W - 24, cy: 688, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
+  var ngBtn = { cx: 349, cy: 688, r: 16, pressT: 0 }; // 二周目「深渊回响」入口（解锁后显示）
   var SKILL_BTNS = [
     { key: 'swap',   cx: 116, cy: 688, r: 20, pressT: 0 },
     { key: 'ripple', cx: 178, cy: 688, r: 20, pressT: 0 },
@@ -1782,7 +1848,7 @@
   var tabRankBtn = { x: DEX_PANEL.x + 230, y: DEX_PANEL.y + 10, w: 66, h: 26 };
   var shareCopyBtn = { x: 0, y: 0, w: 150, h: 42 }; // 分享卡片：复制文案按钮（打开时定位）
   function spCellRect(i) {
-    return { x: DEX_PANEL.x + 12 + i * 50, y: DEX_PANEL.y + 452, w: 48, h: 82 };
+    return { x: DEX_PANEL.x + 12 + i * 50, y: DEX_PANEL.y + 490, w: 48, h: 72 };
   }
 
   // 重开确认弹窗
@@ -1836,6 +1902,7 @@
           addPopup(C.W / 2, 244, '带符文的水滴：合成即可为技能充能', false, 0);
         }
       }
+      if (ng.active && ng.active.ice && Math.random() < ng.active.ice) nb.ngIce = true; // 二周目「冰封之海」
       unlockTier(nextTier);
     }
     cooldown = C.dropCooldown;
@@ -1891,6 +1958,15 @@
     }
     if (inMute(p)) { MUTE.pressT = 0.16; audio.muted = !audio.muted; saveFlag('mg_mute', audio.muted); if (audio.muted) audio.bgm.stop(); else audio.bgm.start(); return; }
     if (inCircle(p, bookBtn)) { bookBtn.pressT = 0.16; dexOpen = true; return; }
+    // 二周目「深渊回响」：词缀三选一弹窗（点卡片开跑，点外关闭）
+    if (ngOpen) {
+      for (var ni = 0; ni < ngPickRects.length; ni++) {
+        if (inRect(p, ngPickRects[ni])) { ngStartRun(ngPicks[ni]); return; }
+      }
+      ngOpen = false;
+      return;
+    }
+    if (ng.unlocked && state === 'play' && inCircle(p, ngBtn)) { ngBtn.pressT = 0.16; openNgPick(); return; }
     if (state === 'play') {
       if (inCircle(p, restartBtn)) { restartBtn.pressT = 0.16; confirmOpen = true; return; }
       for (var i = 0; i < SKILL_BTNS.length; i++) {
@@ -1967,6 +2043,13 @@
     }
     levelElapsed += dt; // 从第 1 关开局起连续累计，进入无尽模式后时间无缝接着走
     checkDexGates();
+    // 二周目解锁：累计分抵达最深海域门槛
+    if (!ng.unlocked && totalScore() >= C.ng.unlockScore) {
+      ng.unlocked = true;
+      saveFlag('mg_ng', 1);
+      addPopup(C.W / 2, 260, '解锁「深渊回响」：右下角入口开启二周目', true, 0);
+      audio.quest();
+    }
     // 海域演进：累计分跨过里程碑 → 世界换色 + 弹报
     var stg = seaStage();
     if (stageSeen < 0) stageSeen = stg;
@@ -2077,61 +2160,92 @@
   }
 
   // ---------- 背景：深海渐变（全窗口宽） + 顶部柔光 + 波光 + 气泡 ----------
+  // ---------- 渐变缓存（性能：每帧 create 渐变产生对象 churn + GC 压力，按 key 复用） ----------
+  // Canvas 渐变坐标在"绘制时"才被 CTM 变换，因此同一局部坐标定义的渐变可跨帧/跨对象复用。
+  var _gradCache = {};
+  function grad(key, make) {
+    var g = _gradCache[key];
+    if (!g) {
+      if (Object.keys(_gradCache).length > 96) _gradCache = {}; // 简单防膨胀（罕见：pop 缩放等动态 key）
+      g = make();
+      _gradCache[key] = g;
+    }
+    return g;
+  }
+
   function drawBackground() {
     // 深海渐变（铺满整个窗口，两侧即延伸海水）；色调随海域里程碑逐级加深
     var st = C.seaStages[seaStage()];
-    var bg = ctx.createLinearGradient(0, 0, 0, VH);
-    bg.addColorStop(0, st.bg[0]);
-    bg.addColorStop(0.4, st.bg[1]);
-    bg.addColorStop(0.75, st.bg[2]);
-    bg.addColorStop(1, st.bg[3]);
+    var vk = Math.round(VH), lk = Math.round(LW);
+    var bg = grad('bg' + seaStage() + '_' + vk, function () {
+      var gg = ctx.createLinearGradient(0, 0, 0, VH);
+      gg.addColorStop(0, st.bg[0]);
+      gg.addColorStop(0.4, st.bg[1]);
+      gg.addColorStop(0.75, st.bg[2]);
+      gg.addColorStop(1, st.bg[3]);
+      return gg;
+    });
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, LW, VH);
 
-    // 顶部阳光光晕
-    var sun = ctx.createRadialGradient(LW * 0.5, -30, 20, LW * 0.5, -30, 300);
-    sun.addColorStop(0, 'rgba(255,255,255,0.55)');
-    sun.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = sun;
+    // 顶部阳光光晕 + 两侧柔光（静态光斑，缓存渐变）
+    ctx.fillStyle = grad('sun' + lk, function () {
+      var gg = ctx.createRadialGradient(LW * 0.5, -30, 20, LW * 0.5, -30, 300);
+      gg.addColorStop(0, 'rgba(255,255,255,0.55)');
+      gg.addColorStop(1, 'rgba(255,255,255,0)');
+      return gg;
+    });
     ctx.fillRect(0, 0, LW, 300);
-
-    // 柔和顶部光感（径向光晕，无生硬斜向条带）
-    var glowL = ctx.createRadialGradient(LW * 0.22, -50, 10, LW * 0.22, -50, 280);
-    glowL.addColorStop(0, 'rgba(255,255,255,0.34)');
-    glowL.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = glowL;
+    ctx.fillStyle = grad('glowL' + lk, function () {
+      var gg = ctx.createRadialGradient(LW * 0.22, -50, 10, LW * 0.22, -50, 280);
+      gg.addColorStop(0, 'rgba(255,255,255,0.34)');
+      gg.addColorStop(1, 'rgba(255,255,255,0)');
+      return gg;
+    });
     ctx.fillRect(0, 0, LW, 300);
-    var glowR = ctx.createRadialGradient(LW * 0.8, -50, 10, LW * 0.8, -50, 280);
-    glowR.addColorStop(0, 'rgba(255,255,255,0.26)');
-    glowR.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = glowR;
+    ctx.fillStyle = grad('glowR' + lk, function () {
+      var gg = ctx.createRadialGradient(LW * 0.8, -50, 10, LW * 0.8, -50, 280);
+      gg.addColorStop(0, 'rgba(255,255,255,0.26)');
+      gg.addColorStop(1, 'rgba(255,255,255,0)');
+      return gg;
+    });
     ctx.fillRect(0, 0, LW, 300);
 
     // 两侧延伸海水柔和压暗（游戏区居中成为视觉焦点，主流 letterbox 质感）
     if (BX > 0) {
       var edge = BX + 26; // 仅轻微溢入游戏区，避免在缸体内形成可见的明暗台阶
-      var shadeL = ctx.createLinearGradient(0, 0, edge, 0);
-      shadeL.addColorStop(0, st.shade);
-      shadeL.addColorStop(1, 'rgba(16,56,96,0)');
-      ctx.fillStyle = shadeL;
+      var ek = Math.round(edge);
+      ctx.fillStyle = grad('shadeL' + lk + '_' + ek + '_' + seaStage(), function () {
+        var gg = ctx.createLinearGradient(0, 0, edge, 0);
+        gg.addColorStop(0, st.shade);
+        gg.addColorStop(1, 'rgba(16,56,96,0)');
+        return gg;
+      });
       ctx.fillRect(0, 0, edge, VH);
-      var shadeR = ctx.createLinearGradient(LW, 0, LW - edge, 0);
-      shadeR.addColorStop(0, st.shade);
-      shadeR.addColorStop(1, 'rgba(16,56,96,0)');
-      ctx.fillStyle = shadeR;
+      ctx.fillStyle = grad('shadeR' + lk + '_' + ek + '_' + seaStage(), function () {
+        var gg = ctx.createLinearGradient(LW, 0, LW - edge, 0);
+        gg.addColorStop(0, st.shade);
+        gg.addColorStop(1, 'rgba(16,56,96,0)');
+        return gg;
+      });
       ctx.fillRect(LW - edge, 0, edge, VH);
     }
 
     // 顶部斜射光柱（缓慢摇曳 + 呼吸明暗，营造水下丁达尔效应）
+    // 性能：渐变只建一次（满 alpha），明暗用 globalAlpha 表达
+    var ray = grad('ray' + vk, function () {
+      var gg = ctx.createLinearGradient(0, 0, 0, VH * 0.72);
+      gg.addColorStop(0, 'rgba(255,255,255,1)');
+      gg.addColorStop(1, 'rgba(255,255,255,0)');
+      return gg;
+    });
     for (var bi = 0; bi < 3; bi++) {
       var bx0 = LW * (0.16 + bi * 0.3) + Math.sin(time * 0.13 + bi * 2.1) * LW * 0.04;
       var tilt = Math.sin(time * 0.09 + bi * 1.4) * 0.10 + (bi - 1) * 0.06;
       var bw = 46 + bi * 24;
       var rayA = 0.05 + 0.035 * (0.5 + 0.5 * Math.sin(time * 0.23 + bi * 2.6));
-      var ray = ctx.createLinearGradient(0, 0, 0, VH * 0.72);
-      ray.addColorStop(0, 'rgba(255,255,255,' + rayA + ')');
-      ray.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.save();
+      ctx.globalAlpha = rayA;
       ctx.translate(bx0, -10);
       ctx.rotate(tilt);
       ctx.fillStyle = ray;
@@ -2205,9 +2319,13 @@
       ctx.translate(f.x, f.y);
       ctx.scale(f.dir, 1);
       var twk = Math.sin(f.tail) * f.s * 0.18;
-      var bodyG = ctx.createLinearGradient(0, -f.s * 0.45, 0, f.s * 0.45);
-      bodyG.addColorStop(0, 'rgba(42,108,160,0.28)');
-      bodyG.addColorStop(1, 'rgba(18,66,110,0.16)');
+      // 渐变缓存：坐标在缩放后的局部空间定义，同一鱼的 s 恒定 → 直接复用
+      var bodyG = grad('fish' + Math.round(f.s), function () {
+        var gg = ctx.createLinearGradient(0, -f.s * 0.45, 0, f.s * 0.45);
+        gg.addColorStop(0, 'rgba(42,108,160,0.28)');
+        gg.addColorStop(1, 'rgba(18,66,110,0.16)');
+        return gg;
+      });
       ctx.fillStyle = bodyG;
       // 叉形尾鳍（随 tail 摆动）
       ctx.beginPath();
@@ -2370,11 +2488,15 @@
       ctx.scale(1 + k, 1 - k);
     }
 
-    // 主体径向渐变（相对坐标）
-    var g = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.12, 0, 0, r * 1.05);
-    g.addColorStop(0, '#FFFFFF');
-    g.addColorStop(0.30, t.color);
-    g.addColorStop(1, t.dark);
+    // 主体径向渐变（相对坐标；性能：按 tier+半径缓存，满场时省下 ~150 次/帧的 create）
+    var rk = Math.round(r * 2) / 2;
+    var g = grad('bM' + b.tier + '_' + rk, function () {
+      var gg = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.12, 0, 0, r * 1.05);
+      gg.addColorStop(0, '#FFFFFF');
+      gg.addColorStop(0.30, t.color);
+      gg.addColorStop(1, t.dark);
+      return gg;
+    });
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
 
@@ -2382,21 +2504,25 @@
     ctx.save();
     ctx.beginPath(); ctx.arc(0, 0, r * 0.96, 0, Math.PI * 2); ctx.clip();
     ctx.globalAlpha = alpha * 0.5;
-    var bg = ctx.createRadialGradient(0, r * 1.55, r * 0.1, 0, r * 1.55, r * 1.35);
-    bg.addColorStop(0, 'rgba(223,244,255,0.55)');
-    bg.addColorStop(1, 'rgba(223,244,255,0)');
-    ctx.fillStyle = bg;
+    ctx.fillStyle = grad('bB' + b.tier + '_' + rk, function () {
+      var gg = ctx.createRadialGradient(0, r * 1.55, r * 0.1, 0, r * 1.55, r * 1.35);
+      gg.addColorStop(0, 'rgba(223,244,255,0.55)');
+      gg.addColorStop(1, 'rgba(223,244,255,0)');
+      return gg;
+    });
     ctx.fillRect(-r, 0, r * 2, r);
     ctx.restore();
 
     // 边缘高光：两端渐隐的柔光弧
     ctx.save();
     ctx.globalAlpha = alpha * 0.6;
-    var lg = ctx.createLinearGradient(-r * 0.94, -r * 0.09, r * 0.21, -r * 0.92);
-    lg.addColorStop(0, 'rgba(255,255,255,0)');
-    lg.addColorStop(0.5, 'rgba(255,255,255,0.8)');
-    lg.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.strokeStyle = lg;
+    ctx.strokeStyle = grad('bE' + b.tier + '_' + rk, function () {
+      var gg = ctx.createLinearGradient(-r * 0.94, -r * 0.09, r * 0.21, -r * 0.92);
+      gg.addColorStop(0, 'rgba(255,255,255,0)');
+      gg.addColorStop(0.5, 'rgba(255,255,255,0.8)');
+      gg.addColorStop(1, 'rgba(255,255,255,0)');
+      return gg;
+    });
     ctx.lineWidth = Math.max(1.2, r * 0.055);
     ctx.lineCap = 'round';
     ctx.beginPath(); ctx.arc(0, 0, r * 0.94, Math.PI * 1.03, Math.PI * 1.57); ctx.stroke();
@@ -2440,11 +2566,15 @@
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(b.x, b.y);
-    // 岩石主体
-    var g = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r * 1.05);
-    g.addColorStop(0, '#D2CCBC');
-    g.addColorStop(0.45, '#9A9282');
-    g.addColorStop(1, '#645C4D');
+    // 岩石主体（渐变缓存）
+    var rk2 = Math.round(r * 2) / 2;
+    var g = grad('iron' + rk2, function () {
+      var gg = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r * 1.05);
+      gg.addColorStop(0, '#D2CCBC');
+      gg.addColorStop(0.45, '#9A9282');
+      gg.addColorStop(1, '#645C4D');
+      return gg;
+    });
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
     // 深色外圈
@@ -2507,17 +2637,22 @@
   function drawWaves(r) {
     ctx.save();
     ctx.beginPath(); ctx.arc(0, 0, r * 0.94, 0, Math.PI * 2); ctx.clip();
-    // 底部深海内阴影（增强体积感）
-    var sg = ctx.createRadialGradient(0, r * 0.6, r * 0.12, 0, r * 0.6, r * 0.95);
-    sg.addColorStop(0, 'rgba(0,18,46,0.30)');
-    sg.addColorStop(1, 'rgba(0,18,46,0)');
-    ctx.fillStyle = sg;
+    // 底部深海内阴影（增强体积感；渐变缓存）
+    var wk = Math.round(r * 2) / 2;
+    ctx.fillStyle = grad('wvS' + wk, function () {
+      var gg = ctx.createRadialGradient(0, r * 0.6, r * 0.12, 0, r * 0.6, r * 0.95);
+      gg.addColorStop(0, 'rgba(0,18,46,0.30)');
+      gg.addColorStop(1, 'rgba(0,18,46,0)');
+      return gg;
+    });
     ctx.fillRect(-r, -r, r * 2, r * 2);
-    // 左上柔光带
-    var hg = ctx.createLinearGradient(-r * 0.7, -r * 0.8, r * 0.1, 0);
-    hg.addColorStop(0, 'rgba(255,255,255,0.22)');
-    hg.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = hg;
+    // 左上柔光带（渐变缓存）
+    ctx.fillStyle = grad('wvH' + wk, function () {
+      var gg = ctx.createLinearGradient(-r * 0.7, -r * 0.8, r * 0.1, 0);
+      gg.addColorStop(0, 'rgba(255,255,255,0.22)');
+      gg.addColorStop(1, 'rgba(255,255,255,0)');
+      return gg;
+    });
     ctx.beginPath();
     ctx.ellipse(-r * 0.28, -r * 0.42, r * 0.52, r * 0.3, -0.5, 0, Math.PI * 2);
     ctx.fill();
@@ -2732,18 +2867,24 @@
   function drawContainer() {
     var floorY = FLOORY, FH = 12;
     // 海底基色：从床面到画布底一条连续渐变（泡沫白 → 青 → 深海青），先铺满
-    var bed = ctx.createLinearGradient(0, floorY, 0, VH);
-    bed.addColorStop(0, 'rgba(216,236,232,0.95)');
-    bed.addColorStop(0.3, 'rgba(170,208,204,0.95)');
-    bed.addColorStop(0.62, 'rgba(112,158,174,0.95)');
-    bed.addColorStop(1, 'rgba(56,102,130,0.95)');
+    var bed = grad('bed' + Math.round(VH), function () {
+      var gg = ctx.createLinearGradient(0, floorY, 0, VH);
+      gg.addColorStop(0, 'rgba(216,236,232,0.95)');
+      gg.addColorStop(0.3, 'rgba(170,208,204,0.95)');
+      gg.addColorStop(0.62, 'rgba(112,158,174,0.95)');
+      gg.addColorStop(1, 'rgba(56,102,130,0.95)');
+      return gg;
+    });
     ctx.fillStyle = bed;
     ctx.fillRect(0, floorY + 4, C.W, VH - floorY - 4);
     // 床面：圆角横条（半透明玻璃质感，透出海底基色，不再有硬边界）
-    var fg = ctx.createLinearGradient(0, floorY, 0, floorY + FH + 6);
-    fg.addColorStop(0, 'rgba(255,255,255,0.6)');
-    fg.addColorStop(0.55, 'rgba(228,244,240,0.4)');
-    fg.addColorStop(1, 'rgba(200,230,226,0.22)');
+    var fg = grad('fg' + Math.round(VH), function () {
+      var gg = ctx.createLinearGradient(0, floorY, 0, floorY + FH + 6);
+      gg.addColorStop(0, 'rgba(255,255,255,0.6)');
+      gg.addColorStop(0.55, 'rgba(228,244,240,0.4)');
+      gg.addColorStop(1, 'rgba(200,230,226,0.22)');
+      return gg;
+    });
     ctx.fillStyle = fg;
     roundRect(-6, floorY, C.W + 12, FH + 6, 6); ctx.fill();
     ctx.strokeStyle = 'rgba(90,150,190,0.22)';
@@ -2767,9 +2908,12 @@
     ctx.restore();
 
     // 容器底部进深渐变（水底压暗，衬托水滴）
-    var dep = ctx.createLinearGradient(0, floorY - 30, 0, floorY);
-    dep.addColorStop(0, 'rgba(20,70,120,0)');
-    dep.addColorStop(1, 'rgba(20,70,120,0.14)');
+    var dep = grad('dep' + Math.round(FLOORY), function () {
+      var gg = ctx.createLinearGradient(0, floorY - 30, 0, floorY);
+      gg.addColorStop(0, 'rgba(20,70,120,0)');
+      gg.addColorStop(1, 'rgba(20,70,120,0.14)');
+      return gg;
+    });
     ctx.fillStyle = dep;
     ctx.fillRect(0, floorY - 30, C.W, 30);
 
@@ -2839,9 +2983,12 @@
   function drawWaterBack() {
     if (tide.progress <= 0.01) return;
     var wy = tideY(), left = C.wall, right = C.W - C.wall;
-    var g = ctx.createLinearGradient(0, wy - tideAmp(), 0, FLOORY);
-    g.addColorStop(0, 'rgba(90,180,235,0.28)');
-    g.addColorStop(1, 'rgba(30,110,190,0.5)');
+    var g = grad('wback' + Math.round(wy / 4), function () {
+      var gg = ctx.createLinearGradient(0, wy - tideAmp(), 0, FLOORY);
+      gg.addColorStop(0, 'rgba(90,180,235,0.28)');
+      gg.addColorStop(1, 'rgba(30,110,190,0.5)');
+      return gg;
+    });
     ctx.fillStyle = g;
     // 沿波形路径填充（顶部随波浪起伏，而非平顶矩形）
     ctx.beginPath();
@@ -3241,9 +3388,12 @@
 
   function drawSkillBar() {
     // 道具带：海底基色的柔和延续（同色系微加深，方向与渐变一致，不割裂）
-    var g = ctx.createLinearGradient(0, VH - 56, 0, VH);
-    g.addColorStop(0, 'rgba(56,102,130,0)');
-    g.addColorStop(1, 'rgba(36,78,106,0.3)');
+    var g = grad('skbar' + Math.round(VH), function () {
+      var gg = ctx.createLinearGradient(0, VH - 56, 0, VH);
+      gg.addColorStop(0, 'rgba(56,102,130,0)');
+      gg.addColorStop(1, 'rgba(36,78,106,0.3)');
+      return gg;
+    });
     ctx.fillStyle = g;
     ctx.fillRect(0, VH - 56, C.W, 56);
 
@@ -3272,9 +3422,20 @@
     ctx.textAlign = 'center';
     for (var i = 0; i < SKILL_BTNS.length; i++) {
       var btn = SKILL_BTNS[i], cfg = C.skills[i];
-      var ch = skillCharge[cfg.key], ready = ch >= cfg.cost;
-      drawCircleBtn(btn, ready ? '#2E86B4' : '#5E90B4', ready ? 1 : 0.55, ready, readyPulse);
-      if (!ready) {
+      var unl = skillUnlocked(cfg.key); // 渐进解锁：未点亮只显示锁
+      var ch = skillCharge[cfg.key], ready = unl && ch >= cfg.cost;
+      drawCircleBtn(btn, unl ? (ready ? '#2E86B4' : '#5E90B4') : '#7E93A3', unl ? (ready ? 1 : 0.55) : 0.4, ready, readyPulse);
+      if (!unl) {
+        // 锁图标（小挂锁）
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(btn.cx, btn.cy - 8, 4.5, Math.PI, 0); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        roundRect(btn.cx - 6.5, btn.cy - 8, 13, 10, 2); ctx.fill();
+        ctx.fillStyle = 'rgba(230,242,248,0.75)';
+        ctx.font = '9px system-ui, sans-serif';
+        ctx.fillText('累计 ' + C.skillUnlock[cfg.key] + ' 分', btn.cx, btn.cy + 13);
+      } else if (!ready) {
         ctx.strokeStyle = 'rgba(255,255,255,0.85)';
         ctx.lineWidth = 3;
         ctx.beginPath();
@@ -3288,8 +3449,8 @@
         ctx.font = 'bold 10px system-ui, sans-serif';
         ctx.fillText('就绪', btn.cx, btn.cy + 13);
       }
-      drawSkillIcon(cfg.key, btn.cx, btn.cy - 6, ready ? '#FFFFFF' : 'rgba(255,255,255,0.85)');
-      if ((cfg.key === 'evap' && evapMode) || (cfg.key === 'ripple' && rippleMode) || (cfg.key === 'flow' && flowMode)) {
+      if (unl) drawSkillIcon(cfg.key, btn.cx, btn.cy - 6, ready ? '#FFFFFF' : 'rgba(255,255,255,0.85)');
+      if (unl && ((cfg.key === 'evap' && evapMode) || (cfg.key === 'ripple' && rippleMode) || (cfg.key === 'flow' && flowMode))) {
         ctx.strokeStyle = '#E24B4A'; ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(btn.cx, btn.cy, btn.r + 3, 0, Math.PI * 2); ctx.stroke();
       }
@@ -3297,6 +3458,22 @@
       ctx.fillStyle = 'rgba(240,250,252,0.95)';
       ctx.font = '10px system-ui, sans-serif';
       ctx.fillText(cfg.name, btn.cx, btn.cy + btn.r + 6);
+    }
+
+    // 二周目「深渊回响」入口（解锁后显示）：紫色圆钮 + 渊字
+    if (ng.unlocked && state === 'play') {
+      drawCircleBtn(ngBtn, '#6B5AA8', 0.95, false, 0);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      ctx.fillText('渊', ngBtn.cx, ngBtn.cy + 5);
+      // 当前词缀局：HUD 顶部紫标
+      if (ng.active) {
+        ctx.fillStyle = 'rgba(107,90,168,0.85)';
+        roundRect(C.W - 128, 58, 108, 22, 6); ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '10px system-ui, sans-serif';
+        ctx.fillText('「' + ng.active.name + '」×' + ng.active.mult, C.W - 74, 73);
+      }
     }
 
     if (seaCount > 0) {
@@ -3311,6 +3488,51 @@
       ctx.restore();
     }
   }
+  // 二周目词缀三选一弹窗
+  function drawNgPick() {
+    ctx.fillStyle = 'rgba(10,40,70,0.66)';
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    var pw = 330, ph = 320, px = (C.W - pw) / 2, py = (VH - ph) / 2;
+    panel(px, py, pw, ph, 14, 0.97);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#5B4A94';
+    ctx.font = 'bold 20px system-ui, sans-serif';
+    ctx.fillText('深渊回响', C.W / 2, py + 38);
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = '#4A7FA0';
+    ctx.fillText('选择一条海况词缀 · 高危高收益的无尽局', C.W / 2, py + 60);
+
+    ngPickRects = [];
+    for (var i = 0; i < ngPicks.length; i++) {
+      var af = ngPicks[i];
+      var ry = py + 80 + i * 74, rh = 64;
+      var rect = { x: px + 20, y: ry, w: pw - 40, h: rh };
+      ngPickRects.push(rect);
+      ctx.fillStyle = 'rgba(107,90,168,0.12)';
+      roundRect(rect.x, rect.y, rect.w, rect.h, 10); ctx.fill();
+      ctx.strokeStyle = 'rgba(107,90,168,0.5)'; ctx.lineWidth = 1.5;
+      roundRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1, 10); ctx.stroke();
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#5B4A94';
+      ctx.font = 'bold 15px system-ui, sans-serif';
+      ctx.fillText(af.name, rect.x + 18, rect.y + 26);
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.fillStyle = '#4A7FA0';
+      ctx.fillText(af.desc, rect.x + 18, rect.y + 46);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#1E7A6F';
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      ctx.fillText('得分 ×' + af.mult, rect.x + rect.w - 16, rect.y + 26);
+      ctx.font = '10px system-ui, sans-serif';
+      ctx.fillStyle = '#8AA5B8';
+      ctx.fillText('点击出航', rect.x + rect.w - 16, rect.y + 46);
+    }
+    ctx.textAlign = 'center';
+    ctx.font = '10px system-ui, sans-serif';
+    ctx.fillStyle = '#8AA5B8';
+    ctx.fillText('点击空白处取消', C.W / 2, py + ph - 14);
+  }
+
   function drawCircleBtn(c, color, alpha, ready, pulse) {
     var s = c.pressT > 0 ? 1 - 0.1 * (c.pressT / 0.16) : 1;
     ctx.save();
@@ -3321,9 +3543,12 @@
       ctx.fillStyle = 'rgba(46,134,180,' + (0.18 + pulse * 0.14) + ')';
       ctx.beginPath(); ctx.arc(0, 0, c.r + 5 + pulse * 2, 0, Math.PI * 2); ctx.fill();
     }
-    var g = ctx.createLinearGradient(0, -c.r, 0, c.r);
-    g.addColorStop(0, color);
-    g.addColorStop(1, shade(color, ready ? -0.25 : -0.1));
+    var g = grad('cb' + color + (ready ? 'r' : 'n') + c.r, function () {
+      var gg = ctx.createLinearGradient(0, -c.r, 0, c.r);
+      gg.addColorStop(0, color);
+      gg.addColorStop(1, shade(color, ready ? -0.25 : -0.1));
+      return gg;
+    });
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(0, 0, c.r, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.75)';
@@ -3385,9 +3610,9 @@
     for (var t = 0; t < T.length; t++) {
       var col = t % 3, row = Math.floor(t / 3);
       var cx0 = DEX_PANEL.x + 14 + col * 118;
-      var cy0 = DEX_PANEL.y + 66 + row * 130;
+      var cy0 = DEX_PANEL.y + 66 + row * 124;
       ctx.fillStyle = 'rgba(46,134,180,0.08)';
-      roundRect(cx0, cy0, 110, 122, 8); ctx.fill();
+      roundRect(cx0, cy0, 110, 112, 8); ctx.fill();
       var unlocked = !!dexUnlocked[t];
       var bx = cx0 + 55, by = cy0 + 38;
       if (unlocked) {
@@ -3414,6 +3639,32 @@
         ctx.fillStyle = totalScore() >= gate ? '#C97A10' : '#B0584A';
         ctx.fillText(totalScore() >= gate ? '已达标 · 待合成' : ('累计 ' + gate + ' 分'), bx, cy0 + 108);
       }
+    }
+
+    // 海域演进全景：四个阶段一屏看全（当前高亮 / 已达成点亮 / 未达成显示门槛）
+    ctx.textAlign = 'center';
+    var curStage = seaStage(), tsNow = totalScore();
+    ctx.font = '10px system-ui, sans-serif';
+    ctx.fillStyle = '#4A7FA0';
+    ctx.textAlign = 'left';
+    ctx.fillText('海域演进', DEX_PANEL.x + 14, DEX_PANEL.y + 430);
+    ctx.textAlign = 'center';
+    for (var stg = 0; stg < C.seaStages.length; stg++) {
+      var ss = C.seaStages[stg];
+      var sw = 82, sx0 = DEX_PANEL.x + 14 + stg * (sw + 8), sy0 = DEX_PANEL.y + 436;
+      var isCur = stg === curStage, reached = tsNow >= ss.at;
+      ctx.fillStyle = isCur ? '#2E86B4' : (reached ? 'rgba(46,134,180,0.14)' : 'rgba(120,145,165,0.14)');
+      roundRect(sx0, sy0, sw, 40, 7); ctx.fill();
+      if (isCur) {
+        ctx.strokeStyle = '#2E86B4'; ctx.lineWidth = 1.5;
+        roundRect(sx0 + 0.5, sy0 + 0.5, sw - 1, 39, 7); ctx.stroke();
+      }
+      ctx.fillStyle = isCur ? '#FFFFFF' : (reached ? '#155A8A' : '#8AA5B8');
+      ctx.font = 'bold 12px system-ui, sans-serif';
+      ctx.fillText(ss.name, sx0 + sw / 2, sy0 + 17);
+      ctx.font = '9px system-ui, sans-serif';
+      ctx.fillStyle = isCur ? 'rgba(255,255,255,0.85)' : (reached ? '#1E7A6F' : '#B0584A');
+      ctx.fillText(stg === 0 ? '起点' : (reached ? '已抵达' : (ss.at + ' 分解锁')), sx0 + sw / 2, sy0 + 32);
     }
 
     // 特殊水滴条（发现即点亮，点选查看说明）
@@ -3452,14 +3703,14 @@
     var dsc = SP_DEFS[dexSelSp] || SP_DEFS[0];
     var known = !!dexSpecial[dsc.key];
     ctx.fillStyle = 'rgba(46,134,180,0.10)';
-    roundRect(DEX_PANEL.x + 12, DEX_PANEL.y + 546, DEX_PANEL.w - 24, 62, 8); ctx.fill();
+    roundRect(DEX_PANEL.x + 12, DEX_PANEL.y + 572, DEX_PANEL.w - 24, 44, 8); ctx.fill();
     ctx.fillStyle = known ? '#155A8A' : '#8AA5B8';
     ctx.font = 'bold 12px system-ui, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(known ? dsc.name : '？？？', DEX_PANEL.x + 24, DEX_PANEL.y + 566);
-    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillText(known ? dsc.name : '？？？', DEX_PANEL.x + 24, DEX_PANEL.y + 589);
+    ctx.font = '10px system-ui, sans-serif';
     ctx.fillStyle = '#4A7FA0';
-    ctx.fillText(known ? dsc.desc : '在海域中发现它即可点亮说明', DEX_PANEL.x + 24, DEX_PANEL.y + 586);
+    ctx.fillText(known ? dsc.desc : '在海域中发现它即可点亮说明', DEX_PANEL.x + 24, DEX_PANEL.y + 606);
     ctx.textAlign = 'center';
   }
 
@@ -3946,9 +4197,12 @@
     }
 
     // 暗角（纵深）
-    var vg = ctx.createRadialGradient(C.W / 2, VH / 2, VH * 0.34, C.W / 2, VH / 2, VH * 0.74);
-    vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(6,28,52,0.16)');
+    var vg = grad('vig' + Math.round(VH) + '_' + Math.round(BX), function () {
+      var gg = ctx.createRadialGradient(C.W / 2, VH / 2, VH * 0.34, C.W / 2, VH / 2, VH * 0.74);
+      gg.addColorStop(0, 'rgba(0,0,0,0)');
+      gg.addColorStop(1, 'rgba(6,28,52,0.16)');
+      return gg;
+    });
     ctx.fillStyle = vg;
     ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
 
@@ -3964,6 +4218,7 @@
     if (adOverlay) drawAdOverlay();
     if (state === 'over') drawOver();
     if (dexOpen) drawDex();
+    if (ngOpen) drawNgPick();
     drawShare();
 
     ctx.restore();
@@ -3977,7 +4232,7 @@
     var dt = Math.min((ts - last) / 1000, 1 / 30);
     last = ts;
     update(dt);
-    render();
+    if (!MG.debug.headless) { update(dt); render(); } // 模拟器模式：完全由 step() 驱动，rAF 空转
   }
 
   makeQuest(0);

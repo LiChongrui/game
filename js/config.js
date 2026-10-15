@@ -43,6 +43,20 @@ MG.config = {
     { key: 'flow',   name: '水流', cost: 6 }
   ],
 
+  // 技能渐进解锁：按累计得分（跨局）逐个点亮，压第一分钟认知负荷（0 = 开局即有）
+  skillUnlock: { swap: 0, ripple: 600, evap: 1600, flow: 3000 },
+
+  // 二周目「深渊回响」：达成最深海域后解锁，选一条海况词缀开高危高收益的无尽局
+  ng: {
+    unlockScore: 20000,                 // 解锁门槛（= 午夜深渊）
+    affixes: [
+      { id: 'heavy', name: '重压之海', desc: '重力 +25%',        grav: 1.25, mult: 1.5 },
+      { id: 'storm', name: '疾风骤雨', desc: '潮汐间隔 -40%',    tideInt: 0.6, mult: 1.6 },
+      { id: 'reef',  name: '暗礁密布', desc: '礁石概率 ×2',      ironX: 2,   mult: 1.5 },
+      { id: 'frost', name: '冰封之海', desc: '水滴 15% 落水即冻', ice: 0.15,  mult: 1.4 }
+    ]
+  },
+
   // 涟漪：以水堆重心为中心的双重波纹推挤
   ripple: {
     power: 300,        // 首波推力
