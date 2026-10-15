@@ -13,6 +13,8 @@
   var ctx = canvas.getContext('2d');
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
   var VH = C.H;           // 当前逻辑高度
+  var LW = C.W;           // 当前逻辑宽度（≥ C.W，宽窗口下两侧为延伸海水）
+  var BX = 0;             // 游戏区（420 逻辑宽）水平居中偏移
   var FLOORY = C.floorY;  // 容器底 y（底部锚定：VH - 74）
   var view = { s: 1 };
 
@@ -20,6 +22,8 @@
     var w = window.innerWidth, h = window.innerHeight;
     view.s = Math.min(w / C.W, h / C.H);   // 等比缩放，不变形
     VH = h / view.s;
+    LW = w / view.s;                       // 逻辑宽度（≥420）
+    BX = (LW - C.W) / 2;                   // 游戏区水平居中
     FLOORY = VH - 74;                      // 容器底贴住窗口底部（720-646=74）
     C.floorY = FLOORY;                     // 同步给物理引擎（每帧读取，水滴落到新地板）
     // 警戒线以下区域大小固定（容器高度不变，与 720 标准布局完全一致）：
@@ -27,9 +31,9 @@
     C.dangerY = FLOORY - (646 - 182);      // 警戒线 = 容器底 - 464
     C.containerTop = FLOORY - (646 - 118); // 容器顶开口 = 容器底 - 528
     C.spawnY = FLOORY - (646 - 120);       // 出生点 = 容器底 - 526（掉落位置相对警戒线固定，游戏区高宽比恒定）
-    canvas.width = C.W * dpr;
-    canvas.height = Math.round(VH * dpr);
-    canvas.style.width = (C.W * view.s) + 'px';
+    canvas.width = Math.round(w * dpr);    // 画布铺满整个窗口（背景全程由游戏自绘）
+    canvas.height = Math.round(h * dpr);
+    canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
     // 底部按钮/图鉴角标同步贴底（上移 4px 给名称标签留出完整显示空间）
     var cy = VH - 36;
@@ -246,7 +250,7 @@
   var bubbles = [];
   for (var bi = 0; bi < 14; bi++) {
     bubbles.push({
-      x: Math.random() * C.W, y: Math.random() * VH,
+      x: Math.random() * LW, y: Math.random() * VH,
       r: 1.5 + Math.random() * 3.5, sp: 12 + Math.random() * 22,
       sway: Math.random() * Math.PI * 2
     });
@@ -265,7 +269,7 @@
   for (var fi = 0; fi < 5; fi++) {
     var nf = { tail: 0, dir: 1, x: 0, y: 0, sp: 0, s: 0, wob: 0 };
     resetFish(nf);
-    nf.x = Math.random() * C.W;
+    nf.x = Math.random() * LW;
     fishes.push(nf);
   }
 
@@ -286,7 +290,7 @@
   var glitters = [];
   for (var gi = 0; gi < 22; gi++) {
     glitters.push({
-      x: Math.random() * C.W, y: Math.random() * VH,
+      x: Math.random() * LW, y: Math.random() * VH,
       r: 0.8 + Math.random() * 1.5,
       ph: Math.random() * Math.PI * 2, sp: 1.5 + Math.random() * 2.5
     });
@@ -426,7 +430,7 @@
       p = bubbles[i];
       p.y -= p.sp * dt;
       p.sway += dt;
-      if (p.y < -8) { p.y = VH + 8; p.x = Math.random() * C.W; }
+      if (p.y < -8) { p.y = VH + 8; p.x = Math.random() * LW; }
     }
     for (i = 0; i < fishes.length; i++) {
       var f = fishes[i];
@@ -440,12 +444,12 @@
       var jl = jellies[i];
       jl.y -= jl.drift * dt;
       jl.x += Math.sin(time * 0.5 + jl.ph) * 9 * dt;
-      if (jl.y < 170) { jl.y = VH * 0.88; jl.x = 50 + Math.random() * (C.W - 100); }
+      if (jl.y < 170) { jl.y = VH * 0.88; jl.x = 50 + Math.random() * (LW - 100); }
     }
     for (i = 0; i < glitters.length; i++) {
       var gl = glitters[i];
       gl.y -= gl.sp * dt;
-      if (gl.y < -6) { gl.y = VH + 6; gl.x = Math.random() * C.W; }
+      if (gl.y < -6) { gl.y = VH + 6; gl.x = Math.random() * LW; }
     }
     if (shakeT > 0) { shakeT -= dt; if (shakeT <= 0) shakeAmp = 0; }
     if (scoreBump > 0) scoreBump -= dt;
@@ -1040,8 +1044,8 @@
   function toLocal(e) {
     var rect = canvas.getBoundingClientRect();
     return {
-      x: (e.clientX - rect.left) * (C.W / rect.width),
-      y: (e.clientY - rect.top) * (VH / rect.height)
+      x: (e.clientX - rect.left) / view.s - BX,
+      y: (e.clientY - rect.top) / view.s
     };
   }
   function hitButton(p) {
@@ -1242,41 +1246,56 @@
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   }
 
-  // ---------- 背景：深海渐变 + 顶部柔光 + 波光 + 气泡 ----------
+  // ---------- 背景：深海渐变（全窗口宽） + 顶部柔光 + 波光 + 气泡 ----------
   function drawBackground() {
-    // 深海渐变
+    // 深海渐变（铺满整个窗口，两侧即延伸海水）
     var bg = ctx.createLinearGradient(0, 0, 0, VH);
     bg.addColorStop(0, '#D8F1FD');
     bg.addColorStop(0.4, '#B8E4F8');
     bg.addColorStop(0.75, '#97CDEB');
     bg.addColorStop(1, '#7CB6DE');
     ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, C.W, VH);
+    ctx.fillRect(0, 0, LW, VH);
 
     // 顶部阳光光晕
-    var sun = ctx.createRadialGradient(C.W * 0.5, -30, 20, C.W * 0.5, -30, 300);
+    var sun = ctx.createRadialGradient(LW * 0.5, -30, 20, LW * 0.5, -30, 300);
     sun.addColorStop(0, 'rgba(255,255,255,0.55)');
     sun.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = sun;
-    ctx.fillRect(0, 0, C.W, 300);
+    ctx.fillRect(0, 0, LW, 300);
 
     // 柔和顶部光感（径向光晕，无生硬斜向条带）
-    var glowL = ctx.createRadialGradient(C.W * 0.22, -50, 10, C.W * 0.22, -50, 280);
+    var glowL = ctx.createRadialGradient(LW * 0.22, -50, 10, LW * 0.22, -50, 280);
     glowL.addColorStop(0, 'rgba(255,255,255,0.34)');
     glowL.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = glowL;
-    ctx.fillRect(0, 0, C.W, 300);
-    var glowR = ctx.createRadialGradient(C.W * 0.8, -50, 10, C.W * 0.8, -50, 280);
+    ctx.fillRect(0, 0, LW, 300);
+    var glowR = ctx.createRadialGradient(LW * 0.8, -50, 10, LW * 0.8, -50, 280);
     glowR.addColorStop(0, 'rgba(255,255,255,0.26)');
     glowR.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = glowR;
-    ctx.fillRect(0, 0, C.W, 300);
+    ctx.fillRect(0, 0, LW, 300);
+
+    // 两侧延伸海水柔和压暗（游戏区居中成为视觉焦点，主流 letterbox 质感）
+    if (BX > 0) {
+      var edge = BX + 110;
+      var shadeL = ctx.createLinearGradient(0, 0, edge, 0);
+      shadeL.addColorStop(0, 'rgba(16,56,96,0.26)');
+      shadeL.addColorStop(1, 'rgba(16,56,96,0)');
+      ctx.fillStyle = shadeL;
+      ctx.fillRect(0, 0, edge, VH);
+      var shadeR = ctx.createLinearGradient(LW, 0, LW - edge, 0);
+      shadeR.addColorStop(0, 'rgba(16,56,96,0.26)');
+      shadeR.addColorStop(1, 'rgba(16,56,96,0)');
+      ctx.fillStyle = shadeR;
+      ctx.fillRect(LW - edge, 0, edge, VH);
+    }
 
     // 远处缓慢漂移的水波纹
     ctx.strokeStyle = 'rgba(255,255,255,0.10)';
     ctx.lineWidth = 1.5;
     for (var ri = 0; ri < 3; ri++) {
-      var rx = ((time * (10 + ri * 6) + ri * 240) % (C.W + 300)) - 150;
+      var rx = ((time * (10 + ri * 6) + ri * 240) % (LW + 300)) - 150;
       var ry = 210 + ri * 130;
       ctx.beginPath();
       ctx.ellipse(rx, ry, 90 + ri * 24, 12 + ri * 4, 0, 0, Math.PI * 2);
@@ -2519,6 +2538,11 @@
     }
 
     drawBackground();
+
+    // 游戏区（420 逻辑宽）水平居中：整体平移 BX，两侧为延伸海水
+    ctx.save();
+    ctx.translate(BX, 0);
+
     drawContainer();
     drawDangerLine();
     drawWaterBack();
@@ -2602,6 +2626,8 @@
     if (adOverlay) drawAdOverlay();
     if (state === 'over') drawOver();
     if (dexOpen) drawDex();
+
+    ctx.restore();
   }
 
   // ---------- 主循环 ----------
