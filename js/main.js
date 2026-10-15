@@ -1282,7 +1282,7 @@
 
     // 两侧延伸海水柔和压暗（游戏区居中成为视觉焦点，主流 letterbox 质感）
     if (BX > 0) {
-      var edge = BX + 110;
+      var edge = BX + 26; // 仅轻微溢入游戏区，避免在缸体内形成可见的明暗台阶
       var shadeL = ctx.createLinearGradient(0, 0, edge, 0);
       shadeL.addColorStop(0, 'rgba(16,56,96,0.26)');
       shadeL.addColorStop(1, 'rgba(16,56,96,0)');
@@ -2188,7 +2188,7 @@
   function drawConfirm() {
     if (!confirmOpen) return;
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
-    ctx.fillRect(0, 0, C.W, VH);
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
     var px = 60, py = 300, pw = C.W - 120, ph = 170;
     panel(px, py, pw, ph, 14, 0.97);
     ctx.textAlign = 'center';
@@ -2363,7 +2363,7 @@
   // ---------- 图鉴 ----------
   function drawDex() {
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
-    ctx.fillRect(0, 0, C.W, VH);
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
 
     ctx.textAlign = 'center';
@@ -2470,7 +2470,7 @@
 
   function drawAdOverlay() {
     ctx.fillStyle = 'rgba(0,0,0,0.72)';
-    ctx.fillRect(0, 0, C.W, VH);
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 22px system-ui, sans-serif';
@@ -2485,7 +2485,7 @@
   function drawOver() {
     buildOverButtons();
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
-    ctx.fillRect(0, 0, C.W, VH);
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
 
     var pw = 320, ph = 380, px = (C.W - pw) / 2, py = 170;
     panel(px, py, pw, ph, 16, 0.97);
@@ -2564,7 +2564,7 @@
 
     if (evapMode) {
       ctx.fillStyle = 'rgba(10,40,70,0.18)';
-      ctx.fillRect(0, 0, C.W, VH);
+      ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
       var hb = ballAt(lastPointer);
       if (hb) {
         ctx.save();
@@ -2585,7 +2585,7 @@
     // 涟漪选位模式：显示波纹中心指示
     if (rippleMode) {
       ctx.fillStyle = 'rgba(10,40,70,0.12)';
-      ctx.fillRect(0, 0, C.W, VH);
+      ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
       var rx = Math.max(12, Math.min(C.W - 12, lastPointer.x < 0 ? C.W / 2 : lastPointer.x));
       var ry = Math.max(C.containerTop + 30, Math.min(FLOORY - 16, lastPointer.y < 0 ? (C.containerTop + FLOORY) / 2 : lastPointer.y));
       ctx.save();
@@ -2616,7 +2616,7 @@
     vg.addColorStop(0, 'rgba(0,0,0,0)');
     vg.addColorStop(1, 'rgba(6,28,52,0.16)');
     ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, C.W, VH);
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
 
     drawHUD();
     drawLevelHud();
