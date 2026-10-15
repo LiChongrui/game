@@ -3252,11 +3252,12 @@
       ctx.fillText((done ? '★ ' : '') + a.name + (done ? ' · 已达成' : ''), DEX_PANEL.x + 26, ry + 20);
       ctx.fillStyle = '#4A7FA0';
       ctx.font = '11px system-ui, sans-serif';
-      ctx.fillText(a.desc, DEX_PANEL.x + 26, ry + 40);
-      // 永续加成说明（右侧，达成后变为海绿色）
+      ctx.fillText(a.desc, DEX_PANEL.x + 26, ry + 42);
+      // 永续加成说明（名称行右侧，达成后变为海绿色；避开下方进度条）
       ctx.fillStyle = done ? '#1E7A6F' : '#9AB4C4';
+      ctx.font = '10px system-ui, sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText(a.perk, DEX_PANEL.x + DEX_PANEL.w - 26, ry + 40);
+      ctx.fillText(a.perk, DEX_PANEL.x + DEX_PANEL.w - 26, ry + 18);
       ctx.textAlign = 'left';
       // 进度条（右侧）
       var barX = DEX_PANEL.x + DEX_PANEL.w - 150, barW = 116, barY = ry + 24;
