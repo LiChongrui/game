@@ -2977,7 +2977,7 @@
     ctx.font = '11px system-ui, sans-serif';
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-    var sub = '最佳 ' + best + (seaCount > 0 ? ' · 海域 ×' + seaCount : '');
+    var sub = '最佳 ' + best + ' · ' + C.seaStages[seaStage()].name + (seaCount > 0 ? ' · 海域 ×' + seaCount : '');
     var scoreTxt = String(Math.round(displayScore));
     ctx.font = 'bold 27px system-ui, sans-serif';
     var sw = ctx.measureText(scoreTxt).width;
@@ -3373,7 +3373,13 @@
     ctx.textAlign = 'center';
     ctx.font = '12px system-ui, sans-serif';
     ctx.fillStyle = '#4A7FA0';
-    ctx.fillText('当前海域「' + C.seaStages[seaStage()].name + '」· 汇入海域 ×' + seaCount + ' · 累计得分 ' + totalScore(), C.W / 2, DEX_PANEL.y + 56);
+    // 海域演进进度：当前称号 + 距下一阶段还差多少累计分（已满级则显示"已至最深处"）
+    var stg = seaStage(), stageHint;
+    if (stg < C.seaStages.length - 1) {
+      var nextAt = C.seaStages[stg + 1].at;
+      stageHint = ' · 距「' + C.seaStages[stg + 1].name + '」还需 ' + Math.max(0, nextAt - totalScore()) + ' 分';
+    } else stageHint = ' · 已至最深处';
+    ctx.fillText('「' + C.seaStages[stg].name + '」· 累计 ' + totalScore() + ' 分' + stageHint, C.W / 2, DEX_PANEL.y + 56);
 
     // 合成链 3×3
     for (var t = 0; t < T.length; t++) {
@@ -3628,8 +3634,11 @@
     ctx.fillStyle = '#3E6E90';
     for (var li = 0; li < shLines.length; li++) ctx.fillText(shLines[li], px + 32, py + 296 + li * 16);
     ctx.textAlign = 'center';
-    // 按钮：复制文案 / 关闭
+    // 按钮：复制文案 / 关闭（关闭提示放按钮上方，避免贴面板底边被圆角裁切）
     shareCopyBtn.x = px + 20; shareCopyBtn.y = py + ph - 62; shareCopyBtn.w = pw - 40; shareCopyBtn.h = 42;
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = '#8AA5B8';
+    ctx.fillText('点击卡片外任意位置关闭', C.W / 2, shareCopyBtn.y - 12);
     var bg2 = ctx.createLinearGradient(0, shareCopyBtn.y, 0, shareCopyBtn.y + 42);
     bg2.addColorStop(0, '#3B9BD0'); bg2.addColorStop(1, '#2578A8');
     ctx.fillStyle = bg2;
@@ -3637,9 +3646,6 @@
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 15px system-ui, sans-serif';
     ctx.fillText('复制分享文案', C.W / 2, shareCopyBtn.y + 27);
-    ctx.font = '11px system-ui, sans-serif';
-    ctx.fillStyle = '#8AA5B8';
-    ctx.fillText('点击卡片外任意位置关闭', C.W / 2, py + ph - 10);
   }
   function wrapLines(text, maxW) {
     var lines = [], line = '';
