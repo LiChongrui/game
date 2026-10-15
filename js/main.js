@@ -968,20 +968,41 @@
   }
 
   // ---------- 失败判定 ----------
+  // 预计算"有支撑"集合：贴底，或下方紧贴别的球。悬空/被顶起/弹跳中的球不算堆积越线。
+  function computeSupported(bs) {
+    var sup = [], i, j;
+    for (i = 0; i < bs.length; i++) sup.push(false);
+    for (i = 0; i < bs.length; i++) {
+      var b = bs[i];
+      if (b.y + b.r >= C.floorY - 2.5) { sup[i] = true; continue; }
+      for (j = 0; j < bs.length; j++) {
+        if (j === i) continue;
+        var o = bs[j];
+        if (o.y <= b.y) continue; // 只认位于下方的支撑
+        var dx = o.x - b.x, dy = o.y - b.y;
+        var minD = b.r + o.r + 2.5;
+        if (dx * dx + dy * dy <= minD * minD) { sup[i] = true; break; }
+      }
+    }
+    return sup;
+  }
   function checkDanger(dt) {
+    // 潮汐涨落期间豁免：浮力把水滴顶过线不是玩家堆太高，潮退后再重新累计
+    if (tide.progress > 0.15) return;
     var bs = phys.bodies;
+    var sup = computeSupported(bs);
     for (var i = 0; i < bs.length; i++) {
       var b = bs[i];
       if (b.frozen > 0) continue; // 冻结滴视为"封存"，不判负
       if (b.grace > 0) { b.dangerT = 0; continue; }
       var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
       var above = (b.y - b.r) < C.dangerY;
-      if (above && sp < C.dangerSpeed * 2) {
-        // 越线且基本静止（阈值放宽一倍：堆顶微颤不算"在动"）
+      if (above && sup[i] && sp < C.dangerSpeed * 2) {
+        // 越线 + 有支撑 + 基本静止（阈值放宽一倍：堆顶微颤不算"在动"）
         b.dangerT += dt;
         if (b.dangerT > C.dangerTime) { gameOver(); return; }
       } else if (above) {
-        // 越线但被明显扰动（滚动/被推）：计时缓慢消退而非清零，避免永远攒不满
+        // 越线但悬空/被明显扰动：计时缓慢消退而非清零，避免永远攒不满
         b.dangerT = Math.max(0, b.dangerT - dt * 2);
       } else {
         b.dangerT = 0; // 回到线下，重置
@@ -996,6 +1017,16 @@
     saveDex();
     audio.over();
   }
+
+  // 只读探针：供自动化测试读取内部状态（不写入、不影响任何游戏逻辑）
+  MG.probe = function () {
+    var top = -1;
+    for (var i = 0; i < phys.bodies.length; i++) {
+      var b = phys.bodies[i];
+      if (top < 0 || b.y - b.r < top) top = b.y - b.r;
+    }
+    return { state: state, dangerY: C.dangerY, floorY: C.floorY, pileTop: top, n: phys.bodies.length, tide: tide.progress };
+  };
 
   // 第 1 关通过：弹出提示进入无尽模式，不清场、不重置，继续当前局面
   function passLevel1() {
