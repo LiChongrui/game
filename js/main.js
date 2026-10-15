@@ -3618,12 +3618,16 @@
       ctx.font = '10px system-ui, sans-serif';
       ctx.fillText(stats[i][0], sx + (sw - 8) / 2, py + 258);
     }
-    // 分享文案预览
-    ctx.fillStyle = 'rgba(46,134,180,0.06)';
-    roundRect(px + 20, py + 282, pw - 40, 66, 8); ctx.fill();
-    ctx.fillStyle = '#3E6E90';
+    // 分享文案预览（左对齐 + 按行数自适应盒高）
+    ctx.textAlign = 'left';
     ctx.font = '11px system-ui, sans-serif';
-    wrapText(shareText, px + 30, py + 300, pw - 60, 16);
+    var shLines = wrapLines(shareText, pw - 60);
+    var shBoxH = Math.max(44, 20 + shLines.length * 16);
+    ctx.fillStyle = 'rgba(46,134,180,0.06)';
+    roundRect(px + 20, py + 278, pw - 40, shBoxH, 8); ctx.fill();
+    ctx.fillStyle = '#3E6E90';
+    for (var li = 0; li < shLines.length; li++) ctx.fillText(shLines[li], px + 32, py + 296 + li * 16);
+    ctx.textAlign = 'center';
     // 按钮：复制文案 / 关闭
     shareCopyBtn.x = px + 20; shareCopyBtn.y = py + ph - 62; shareCopyBtn.w = pw - 40; shareCopyBtn.h = 42;
     var bg2 = ctx.createLinearGradient(0, shareCopyBtn.y, 0, shareCopyBtn.y + 42);
@@ -3637,14 +3641,15 @@
     ctx.fillStyle = '#8AA5B8';
     ctx.fillText('点击卡片外任意位置关闭', C.W / 2, py + ph - 10);
   }
-  function wrapText(text, x, y, maxW, lh) {
-    var line = '', yy = y;
+  function wrapLines(text, maxW) {
+    var lines = [], line = '';
     for (var i = 0; i < text.length; i++) {
       var test = line + text[i];
-      if (ctx.measureText(test).width > maxW && line) { ctx.fillText(line, x, yy); line = text[i]; yy += lh; }
+      if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = text[i]; }
       else line = test;
     }
-    if (line) ctx.fillText(line, x, yy);
+    if (line) lines.push(line);
+    return lines;
   }
 
   // ---------- 特效绘制 ----------
