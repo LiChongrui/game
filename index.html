@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>水滴成海 · 合成小游戏</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: radial-gradient(120% 90% at 50% 0%, #1A5E8F 0%, #0E3A5C 55%, #082943 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    touch-action: none; -webkit-user-select: none; user-select: none;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+    border-radius: 16px;
+    border: 1px solid rgba(160, 215, 245, .25);
+    box-shadow: 0 16px 48px rgba(0, 10, 25, .55), 0 0 0 1px rgba(0,0,0,.2), inset 0 0 0 1px rgba(255,255,255,.06);
+    touch-action: none;
+  }
+</style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <script src="js/config.js"></script>
+  <script src="js/physics.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
