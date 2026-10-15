@@ -2533,7 +2533,8 @@
 
   // ---------- 主渲染 ----------
   function render() {
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // 逻辑坐标 → 设备像素：dpr × view.s（画布铺满窗口后，缩放必须在变换里完成）
+    ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, 0);
 
     if (shakeT > 0) {
       var s = shakeAmp * (shakeT / 0.4);
