@@ -13,7 +13,7 @@
   var ctx = canvas.getContext('2d');
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
   var VH = C.H;           // 当前逻辑高度
-  var FLOORY = FLOORY;  // 容器底 y（底部锚定：VH - 74）
+  var FLOORY = C.floorY;  // 容器底 y（底部锚定：VH - 74）
   var view = { s: 1 };
 
   function fit() {
@@ -22,6 +22,10 @@
     VH = h / view.s;
     FLOORY = VH - 74;                      // 容器底贴住窗口底部（720-646=74）
     C.floorY = FLOORY;                     // 同步给物理引擎（每帧读取，水滴落到新地板）
+    // 警戒线以下区域大小固定（容器高度不变，与 720 标准布局完全一致）：
+    // 多出来的高度全部留在警戒线之上（水滴滴落区域拉伸）
+    C.dangerY = FLOORY - (646 - 182);      // 警戒线 = 容器底 - 464
+    C.containerTop = FLOORY - (646 - 118); // 容器顶开口 = 容器底 - 528
     canvas.width = C.W * dpr;
     canvas.height = Math.round(VH * dpr);
     canvas.style.width = (C.W * view.s) + 'px';
@@ -1762,8 +1766,8 @@
     // （危险区渐晕已并入 drawDangerLine，随危险度动态变化）
     var fg = ctx.createLinearGradient(0, floorY, 0, floorY + FH + 6);
     fg.addColorStop(0, 'rgba(255,255,255,0.92)');
-    fg.addColorStop(0.5, 'rgba(168,214,240,0.92)');
-    fg.addColorStop(1, 'rgba(108,174,214,0.92)');
+    fg.addColorStop(0.55, 'rgba(196,228,224,0.92)');
+    fg.addColorStop(1, 'rgba(168,207,203,0.92)');   // 尾色与下方沙床首色一致，无缝衔接
     ctx.fillStyle = fg;
     roundRect(-6, floorY, C.W + 12, FH + 6, 6); ctx.fill();
     ctx.strokeStyle = 'rgba(70,130,180,0.4)';
@@ -1796,8 +1800,8 @@
     // 海底沙床（底栏下方空档，不进游戏区）
     var sy0 = floorY + FH + 6;
     var sand = ctx.createLinearGradient(0, sy0, 0, VH);
-    sand.addColorStop(0, 'rgba(228,242,233,0.95)');   // 浅沙白
-    sand.addColorStop(0.45, 'rgba(168,207,203,0.95)'); // 青绿过渡
+    sand.addColorStop(0, 'rgba(168,207,203,0.95)');    // 与上方床面尾色无缝衔接
+    sand.addColorStop(0.5, 'rgba(126,170,182,0.95)');  // 过渡青
     sand.addColorStop(1, 'rgba(84,138,160,0.95)');     // 深海青
     ctx.fillStyle = sand;
     ctx.fillRect(0, sy0, C.W, VH - sy0);
@@ -2237,11 +2241,11 @@
   }
 
   function drawSkillBar() {
-    // 渐变底带从床面之下开始（贴底动态），不遮挡床面图形
+    // 渐变底带：沙床色的柔和延续（浅泡沫感），不再用突兀的纯白高光
     var g = ctx.createLinearGradient(0, VH - 56, 0, VH - 4);
-    g.addColorStop(0, 'rgba(255,255,255,0.0)');
-    g.addColorStop(0.3, 'rgba(255,255,255,0.55)');
-    g.addColorStop(1, 'rgba(255,255,255,0.7)');
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.55, 'rgba(244,251,249,0.28)');
+    g.addColorStop(1, 'rgba(238,248,246,0.5)');
     ctx.fillStyle = g;
     ctx.fillRect(0, VH - 56, C.W, 56);
 
