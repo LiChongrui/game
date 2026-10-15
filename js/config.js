@@ -110,6 +110,20 @@ MG.config = {
     minDrops: 4          // 场上普通水滴少于此数不触发
   },
 
+  // 无尽模式渐进加压（进入无尽后随时长线性到满，坡度平缓）
+  ramp: {
+    minutes: 20,         // 达到满强度所需分钟数
+    tideIntervalMin: 18, // 潮汐间隔下限（秒）
+    ironChanceMax: 0.14, // 礁石概率上限
+    spawnWeightsMax: [22, 24, 22, 16, 16] // 投放权重演进终点（向高级倾斜）
+  },
+
+  // 潮汐限定合成：两枚「江河」只能在涨潮时聚成「大海」（彩虹跳级不受限）
+  tidePair: { tier: 6, threshold: 0.15 },
+
+  // 高潮时刻：无尽模式每累计 +500 分，场上最高档的可合成对自发相聚
+  climaxEvery: 500,
+
   // 里程碑任务链
   questScoreBase: 35,
   questScoreStep: 22,

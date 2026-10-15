@@ -206,10 +206,12 @@
           b.start(t0); b.stop(t0 + 4.1);
           self._live.push({ o: b, g: bg });
           // 五声琶音点缀（随机 3~5 个短音，落在小节内随机位置）
+          // 声音反馈：连击越高琶音整体升调（每连击约 +60 音分，上限 6 连击）
+          var lift = Math.pow(2, Math.min(combo, 6) / 20);
           var n = 3 + (Math.random() * 3 | 0);
           for (i = 0; i < n; i++) {
             var at = t0 + 0.4 + Math.random() * 3.0;
-            var fq = arp[(Math.random() * arp.length) | 0];
+            var fq = arp[(Math.random() * arp.length) | 0] * lift;
             var a = c.createOscillator(), ag = c.createGain();
             a.type = 'sine'; a.frequency.value = fq;
             ag.gain.setValueAtTime(0.0001, at);
@@ -240,6 +242,29 @@
       playBar();
       this.iv = setInterval(playBar, 4000);
     },
+    // 声音预警①：危险度 0~1 → 母线低通收紧（水堆越贴近警戒线，音色越闷越紧）
+    setDanger: function (x) {
+      if (!audio.ctx || !this._flt || audio.muted) return;
+      try { this._flt.frequency.setTargetAtTime(1150 - x * 480, audio.ctx.currentTime, 0.5); } catch (e) {}
+    },
+    // 声音预警②：潮汐低频隆隆（progress 渐入，预警期脉冲）
+    setTide: function (progress, warn) {
+      if (!audio.ctx || audio.muted) return;
+      try {
+        if (!this._drone) {
+          var c = audio.ctx;
+          var o = c.createOscillator(), g = c.createGain(), f = c.createBiquadFilter();
+          o.type = 'sine'; o.frequency.value = 48;
+          f.type = 'lowpass'; f.frequency.value = 120;
+          g.gain.value = 0.0001;
+          o.connect(f); f.connect(g); g.connect(this.master());
+          o.start();
+          this._drone = { o: o, g: g };
+        }
+        var target = Math.max(progress * 0.055, warn ? 0.02 : 0);
+        this._drone.g.gain.setTargetAtTime(target, audio.ctx.currentTime, 0.8);
+      } catch (e) {}
+    },
     stop: function () {
       if (this.iv) clearInterval(this.iv);
       this.iv = null; this.on = false;
@@ -259,6 +284,8 @@
       // 涌动噪声一并停掉（下次 start 重建）
       try { if (this._amb) { this._amb.src.stop(); this._amb.lfo.stop(); } } catch (e) {}
       this._amb = null;
+      // 潮汐低频隆隆一并停掉（下次 setTide 重建）
+      try { if (this._drone) { this._drone.o.stop(); this._drone = null; } } catch (e) {}
     }
   };
 
@@ -337,6 +364,16 @@
   // 潮汐状态
   var tide = { phase: 'idle', timer: C.tide.firstDelay, progress: 0, banner: 0 };
   var achTick = 0; // 成就周期检查计时
+  // 无尽模式渐进加压：随时长线性到满（潮汐更频/礁石更多/投放向高级倾斜）
+  var endlessT = 0, rampStage = 0;
+  var climaxMark = 0; // 高潮时刻：上次触发时的分数标记
+  var tideGateHint = false; // 潮汐限定合成：一次性提示
+  function endlessRamp() {
+    return level === 2 ? Math.min(1, endlessT / (C.ramp.minutes * 60)) : 0;
+  }
+  // 成就永续加成查询（勋章变成长线）
+  function perkOn(id) { return !!achDone[id]; }
+  function perkMult() { return (achDone.tide12 && tide.progress > 0.2) ? 1.1 : 1; }
 
   // 背景气泡
   var bubbles = [];
@@ -391,8 +428,12 @@
   // 海草已按用户要求移除
 
   function rollTier() {
-    var ws = C.spawnWeights, total = 0, i;
-    for (i = 0; i < ws.length; i++) total += ws[i];
+    // 渐进加压：投放权重随无尽时长向高级演进（线性插值到 spawnWeightsMax）
+    var rp = endlessRamp(), ws = [], total = 0, i;
+    for (i = 0; i < C.spawnWeights.length; i++) {
+      var w = C.spawnWeights[i] + (C.ramp.spawnWeightsMax[i] - C.spawnWeights[i]) * rp;
+      ws.push(w); total += w;
+    }
     var r = Math.random() * total;
     for (i = 0; i < ws.length; i++) { r -= ws[i]; if (r <= 0) return i; }
     return 0;
@@ -407,8 +448,8 @@
   }
   function rollIron() {
     if (seaEvent && seaEvent.type === 'storm') return false; // 保底：风暴期间不再落礁石，避免双重失控
-    return level === 2 && Math.random() < C.iron.chance;
-  } // 礁石仅无尽模式
+    return level === 2 && Math.random() < C.iron.chance + (C.ramp.ironChanceMax - C.iron.chance) * endlessRamp();
+  } // 礁石仅无尽模式（概率随渐进加压提升）
   // 符文：普通水滴随机附带的道具属性，合成时为对应技能充能
   function rollRune() {
     if (Math.random() >= C.rune.chance) return null;
@@ -580,16 +621,16 @@
     }
   }
 
-  // ---------- 成就（常驻目标，跨局累计） ----------
+  // ---------- 成就（常驻目标，跨局累计；达成后永久生效的加成见 perk） ----------
   var ACH_DEFS = [
-    { id: 'canghai',  name: '沧海遗珠', desc: '合成出传说中的「沧海」',   target: 1,    cur: function () { return dexCounts[8] || 0; } },
-    { id: 'combo6',   name: '连浪六叠', desc: '达成 6 连击',              target: 6,    cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
-    { id: 'chest5',   name: '寻宝猎人', desc: '累计开启 5 只深海宝箱',    target: 5,    cur: function () { return lifeStats.chest || 0; } },
-    { id: 'tide12',   name: '弄潮儿',   desc: '经历 12 次涨潮',           target: 12,   cur: function () { return lifeStats.tide || 0; } },
-    { id: 'iron5',    name: '礁石克星', desc: '累计消除 5 对礁石',        target: 5,    cur: function () { return lifeStats.ironPair || 0; } },
-    { id: 'rainbow5', name: '虹光使者', desc: '触发 5 次彩虹合成',        target: 5,    cur: function () { return lifeStats.rainbow || 0; } },
-    { id: 'quest12',  name: '任务大师', desc: '累计完成 12 个任务',       target: 12,   cur: function () { return lifeStats.quest || 0; } },
-    { id: 'score2k',  name: '深海富豪', desc: '单局得分达到 2000',        target: 2000, cur: function () { return Math.max(score, best, lifeStats.best || 0); } }
+    { id: 'canghai',  name: '沧海遗珠', desc: '合成出传说中的「沧海」',   target: 1,    perk: '永续：沧海汇入海域得分 +50%', cur: function () { return dexCounts[8] || 0; } },
+    { id: 'combo6',   name: '连浪六叠', desc: '达成 6 连击',              target: 6,    perk: '永续：连击窗口 +0.3 秒', cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
+    { id: 'chest5',   name: '寻宝猎人', desc: '累计开启 5 只深海宝箱',    target: 5,    perk: '永续：宝箱奖励 +50% · 充能 +3', cur: function () { return lifeStats.chest || 0; } },
+    { id: 'tide12',   name: '弄潮儿',   desc: '经历 12 次涨潮',           target: 12,   perk: '永续：潮汐期间合成得分 +10%', cur: function () { return lifeStats.tide || 0; } },
+    { id: 'iron5',    name: '礁石克星', desc: '累计消除 5 对礁石',        target: 5,    perk: '永续：礁石相消得分翻倍', cur: function () { return lifeStats.ironPair || 0; } },
+    { id: 'rainbow5', name: '虹光使者', desc: '触发 5 次彩虹合成',        target: 5,    perk: '永续：彩虹合成得分 +50%', cur: function () { return lifeStats.rainbow || 0; } },
+    { id: 'quest12',  name: '任务大师', desc: '累计完成 12 个任务',       target: 12,   perk: '永续：任务奖励 +30%', cur: function () { return lifeStats.quest || 0; } },
+    { id: 'score2k',  name: '深海富豪', desc: '单局得分达到 2000',        target: 2000, perk: '永续：开局随机技能充能 +2', cur: function () { return Math.max(score, best, lifeStats.best || 0); } }
   ];
   function checkAchievements() {
     lifeStats.best = Math.max(lifeStats.best || 0, best, score);
@@ -658,7 +699,7 @@
     if (quest.have >= quest.need) completeQuest();
   }
   function completeQuest() {
-    var gain = Math.round(quest.rewardScore * scoreMult);
+    var gain = Math.round(quest.rewardScore * scoreMult * (perkOn('quest12') ? 1.3 : 1)); // 成就加成：任务大师
     score += gain;
     scoreBump = 0.35;
     bumpStat('quest');
@@ -697,6 +738,14 @@
       for (j = i + 1; j < bs.length; j++) {
         var b = bs[j];
         if (used[b.id] || b.special || b.frozen > 0 || b.iron || b.tier !== a.tier) continue;
+        // 潮汐限定合成：两枚「江河」只能在涨潮时聚成「大海」（彩虹跳级不受限）
+        if (a.tier === C.tidePair.tier && tide.progress < C.tidePair.threshold) {
+          if (!tideGateHint) {
+            tideGateHint = true;
+            addPopup(C.W / 2, 250, '两枚「江河」需在潮汐中才能聚成「大海」', true, 0);
+          }
+          continue;
+        }
         var dx = b.x - a.x, dy = b.y - a.y;
         // 合成阈值：接触即合（+0.5 容差覆盖物理 slop 允许的静置重叠）
         var minD = a.r + b.r + 0.5;
@@ -730,7 +779,7 @@
   function ironPairMerge(a, b) {
     var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
     phys.remove(a); phys.remove(b);
-    var gain = Math.round(C.iron.pairScore * scoreMult);
+    var gain = Math.round(C.iron.pairScore * scoreMult * (perkOn('iron5') ? 2 : 1)); // 成就加成：礁石克星翻倍
     score += gain;
     scoreBump = 0.3;
     if (score > best) { best = score; saveNum('mg_best', best); }
@@ -753,10 +802,10 @@
     var nt = Math.min(T.length - 1, t.tier + 2);
     var nb = phys.create(mx, my, nt, 0, -60);
     nb.popT = 0.28;
-    var gain = Math.round(T[nt].score * 2 * scoreMult);
+    var gain = Math.round(T[nt].score * 2 * scoreMult * (perkOn('rainbow5') ? 1.5 : 1) * perkMult());
     score += gain;
     scoreBump = 0.4;
-    combo++; comboTimer = C.comboWindow;
+    combo++; comboTimer = C.comboWindow + (perkOn('combo6') ? 0.3 : 0);
     if (score > best) { best = score; saveNum('mg_best', best); }
     bumpStat('rainbow');
     addPopup(mx, my - T[nt].r - 14, '彩虹合成！「' + T[nt].name + '」', true, 0);
@@ -782,7 +831,7 @@
     if (a.rune) chargeRune(a, mx, my);
     if (b.rune) chargeRune(b, mx, my);
 
-    combo++; comboTimer = C.comboWindow;
+    combo++; comboTimer = C.comboWindow + (perkOn('combo6') ? 0.3 : 0); // 成就加成：连浪六叠延长连击窗口
     if (combo > maxCombo) { maxCombo = combo; if (maxCombo > (lifeStats.combo || 0)) { lifeStats.combo = maxCombo; } }
     var mult = Math.min(combo, C.comboMaxMult);
 
@@ -790,7 +839,7 @@
     if (tier >= T.length - 1) {
       seaCount++;
       scoreMult = 1 + seaCount * C.seaMultStep;
-      var gain = Math.round((T[tier].score * 4 + C.seaBonus) * mult * scoreMult);
+      var gain = Math.round((T[tier].score * 4 + C.seaBonus) * mult * scoreMult * (perkOn('canghai') ? 1.5 : 1) * perkMult());
       score += gain;
       scoreBump = 0.35;
       addPopup(mx, my - 22, '汇入海域 ×' + seaCount, true, 0);
@@ -810,7 +859,7 @@
     nb.grace = 0.25;
     nb.popT = 0.28;
 
-    var gain2 = Math.round(T[nt].score * mult * scoreMult);
+    var gain2 = Math.round(T[nt].score * mult * scoreMult * perkMult()); // 成就加成：弄潮儿潮汐期间 +10%
     score += gain2;
     scoreBump = 0.3;
     if (score > best) { best = score; saveNum('mg_best', best); }
@@ -836,6 +885,34 @@
         addPopup(C.W / 2, 130, '甘霖 · 下一滴是「' + T[t].name + '」', false, 0);
       }
     }
+  }
+
+  // 高潮时刻：无尽模式每累计 +500 分，场上最高档的可合成对自发相聚（防后期机械投放）
+  function doClimax() {
+    var bs = phys.bodies, best = null, i, j;
+    for (i = 0; i < bs.length; i++) {
+      var a = bs[i];
+      if (a.iron || a.chest || a.special || a.frozen > 0) continue;
+      for (j = i + 1; j < bs.length; j++) {
+        var b2 = bs[j];
+        if (b2.iron || b2.chest || b2.special || b2.frozen > 0 || b2.tier !== a.tier) continue;
+        if (!best || a.tier > best[0].tier) best = [a, b2];
+      }
+    }
+    climaxMark = score; // 无论是否找到可合对都重置（找不到则下一轮再试）
+    if (!best) return;
+    var a = best[0], b2 = best[1];
+    parts.push({ type: 'ring', x: a.x, y: a.y, r: a.r, life: 0.6, max: 0.6, color: '#F5D76E' });
+    parts.push({ type: 'ring', x: b2.x, y: b2.y, r: b2.r, life: 0.6, max: 0.6, color: '#F5D76E' });
+    for (var k = 0; k < 12; k++) {
+      parts.push({ type: 'dot', x: (a.x + b2.x) / 2, y: (a.y + b2.y) / 2,
+        vx: (Math.random() - 0.5) * 160, vy: -40 - Math.random() * 120,
+        r: 1.5 + Math.random() * 2, life: 0.7, max: 0.7, color: '#F5D76E' });
+    }
+    addPopup(C.W / 2, 250, '海潮高潮！水滴自发相聚', true, 0);
+    addShake(2, 0.2);
+    audio.quest();
+    doMerge(a, b2);
   }
 
   function pushNeighbors(x, y, R) {
@@ -975,7 +1052,7 @@
       tide.timer -= dt;
       if (tide.timer <= 0) {
         tide.phase = 'idle';
-        tide.timer = C.tide.cycleInterval;
+        tide.timer = C.tide.cycleInterval - (C.tide.cycleInterval - C.ramp.tideIntervalMin) * endlessRamp(); // 渐进加压：潮汐更频
         bumpStat('tide');                      // 成就：经历涨潮次数（跨局累计）
         seaEvent.timer = Math.max(seaEvent.timer, 4); // 保底：退潮后至少 4s 再来事件
         tryTideBless();                        // 组合技：退潮余波概率引来海神恩泽
@@ -1240,12 +1317,16 @@
       modes: { evap: evapMode, ripple: rippleMode, flow: flowMode }
     };
   };
-  // 测试钩子（仅自动化测试用）：充能 / 手动触发成就检查 / 强制无尽模式（潮汐·宝箱·事件）
+  // 测试钩子（仅自动化测试用）：充能 / 成就 / 局面构造 / 加压进度
   MG.debug = {
     give: function (k, n) { if (k in skillCharge) skillCharge[k] = n; },
     achCheck: function () { checkAchievements(); },
     bump: bumpStat,
-    forceEndless: function () { level = 2; }
+    forceEndless: function () { level = 2; },
+    setRamp: function (t) { endlessT = t; },
+    grant: function (id) { achDone[id] = 1; saveDex(); },
+    addScore: function (n) { score += n; },
+    spawn: function (tier, x, y) { return phys.create(x || C.W / 2, y || C.spawnY, tier, 0, 0); }
   };
 
   // 第 1 关通过：弹出提示进入无尽模式，不清场、不重置，继续当前局面
@@ -1289,15 +1370,16 @@
     chest = null;
     chestTimer = 45 + Math.random() * 30;
     var r = Math.random();
+    var chestBonus = perkOn('chest5') ? 1.5 : 1; // 成就加成：寻宝猎人
     if (r < 0.4) {
-      var gain = Math.round((60 + Math.random() * 90) * scoreMult);
+      var gain = Math.round((60 + Math.random() * 90) * scoreMult * chestBonus);
       score += gain; scoreBump = 0.4;
       if (score > best) { best = score; saveNum('mg_best', best); }
       addPopup(x, y - 30, '宝箱开启 +' + gain, true, 0);
     } else if (r < 0.75) {
       var keys = ['swap', 'ripple', 'evap', 'flow'];
       var k = keys[(Math.random() * keys.length) | 0];
-      skillCharge[k] += 2;
+      skillCharge[k] += perkOn('chest5') ? 3 : 2;
       addPopup(x, y - 30, '宝箱开启：' + runeName(k) + ' +2 充能', true, 0);
     } else {
       nextSpecial = 'rainbow'; nextIron = false; nextRune = null;
@@ -1454,6 +1536,7 @@
     skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
     seaCount = 0; scoreMult = 1;
     evapMode = false; rippleMode = false; flowMode = false; flowPick = null; rainHint = 0;
+    tideGateHint = false;
     level = 1; levelTime = C.level1.time; failReason = ''; levelBanner = 0;
     levelElapsed = 0; runCounted = 0;
     nextTier = rollTier();
@@ -1463,7 +1546,14 @@
     aimX = C.W / 2;
     popups.length = 0; parts.length = 0; rippleQueue.length = 0;
     tide.phase = 'idle'; tide.timer = C.tide.firstDelay; tide.progress = 0; tide.banner = 0;
+    endlessT = 0; rampStage = 0; climaxMark = 0;
     makeQuest(0);
+    // 成就加成：深海富豪开局随机技能充能 +2
+    if (perkOn('score2k')) {
+      var pk = C.skills[(Math.random() * C.skills.length) | 0];
+      skillCharge[pk.key] += 2;
+      addPopup(C.W / 2, 280, '深海富豪：「' + pk.name + '」开局充能 +2', false, 0);
+    }
     state = 'play';
   }
 
@@ -1711,6 +1801,23 @@
       b.trail.push({ x: b.x, y: b.y });
       if (b.trail.length > 6) b.trail.shift();
     }
+
+    // 无尽渐进加压计时 + 档位提示 + 高潮时刻
+    if (level === 2) {
+      endlessT += dt;
+      var stg = Math.floor(endlessRamp() * 4);
+      if (stg > rampStage) { rampStage = stg; addPopup(C.W / 2, 250, '海域渐深：潮汐更频 · 礁石更多', true, 0); }
+      if (score - climaxMark >= C.climaxEvery) doClimax();
+    }
+    // 声音预警：危险→母线低通收紧；潮汐临近/进行→低频隆隆
+    var dg = 0;
+    for (i = 0; i < phys.bodies.length; i++) {
+      b = phys.bodies[i];
+      var ddist = (b.y - b.r) - C.dangerY;
+      if (ddist < 90) dg = Math.max(dg, 1 - Math.max(0, ddist) / 90);
+    }
+    audio.bgm.setDanger(dg);
+    audio.bgm.setTide(tide.progress, (level === 2 && tide.phase === 'idle' && tide.timer < C.tide.warnTime) ? 1 : 0);
 
     processMerges();
     updateChest(dt);
@@ -3142,10 +3249,15 @@
       ctx.textAlign = 'left';
       ctx.fillStyle = done ? '#B8860B' : '#155A8A';
       ctx.font = 'bold 13px system-ui, sans-serif';
-      ctx.fillText((done ? '★ ' : '') + a.name, DEX_PANEL.x + 26, ry + 20);
+      ctx.fillText((done ? '★ ' : '') + a.name + (done ? ' · 已达成' : ''), DEX_PANEL.x + 26, ry + 20);
       ctx.fillStyle = '#4A7FA0';
       ctx.font = '11px system-ui, sans-serif';
       ctx.fillText(a.desc, DEX_PANEL.x + 26, ry + 40);
+      // 永续加成说明（右侧，达成后变为海绿色）
+      ctx.fillStyle = done ? '#1E7A6F' : '#9AB4C4';
+      ctx.textAlign = 'right';
+      ctx.fillText(a.perk, DEX_PANEL.x + DEX_PANEL.w - 26, ry + 40);
+      ctx.textAlign = 'left';
       // 进度条（右侧）
       var barX = DEX_PANEL.x + DEX_PANEL.w - 150, barW = 116, barY = ry + 24;
       ctx.fillStyle = 'rgba(46,134,180,0.15)';
@@ -3155,7 +3267,7 @@
       ctx.textAlign = 'center';
       ctx.fillStyle = done ? '#B8860B' : '#4A7FA0';
       ctx.font = '10px system-ui, sans-serif';
-      ctx.fillText(done ? '已达成' : (cur + '/' + a.target), barX + barW / 2, barY + 24);
+      if (!done) ctx.fillText(cur + '/' + a.target, barX + barW / 2, barY + 24);
     }
   }
 
@@ -3321,6 +3433,20 @@
 
     var i;
     for (i = 0; i < phys.bodies.length; i++) drawBall(phys.bodies[i], 1);
+
+    // 潮汐限定标记：旱期的江河带脉动波纹虚线圈（提示需等潮才能合成大海）
+    for (i = 0; i < phys.bodies.length; i++) {
+      var tb = phys.bodies[i];
+      if (!tb.iron && !tb.chest && tb.tier === C.tidePair.tier && tide.progress < C.tidePair.threshold) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(127,212,255,' + (0.32 + 0.25 * Math.sin(time * 3)).toFixed(2) + ')';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 6]);
+        ctx.lineDashOffset = -time * 24;
+        ctx.beginPath(); ctx.arc(tb.x, tb.y, tb.r + 6, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+    }
 
     drawWaterFront();
 
