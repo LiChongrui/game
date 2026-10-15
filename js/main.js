@@ -44,6 +44,10 @@
   }
   window.addEventListener('resize', fit);
   window.addEventListener('orientationchange', fit);
+  if (window.ResizeObserver) {
+    // 兜底：预览面板/嵌入容器改变尺寸时不一定触发 resize 事件
+    new ResizeObserver(fit).observe(document.documentElement);
+  }
 
   // ---------- 存储（带兜底） ----------
   function saveNum(key, v) { try { localStorage.setItem(key, String(v)); } catch (e) {} }
@@ -1983,7 +1987,6 @@
       ctx.moveTo(C.W - 14, C.dangerY - 11); ctx.lineTo(C.W - 4, C.dangerY - 11); ctx.lineTo(C.W - 9, C.dangerY - 3);
       ctx.closePath(); ctx.fill();
     }
-    ctx.restore();
   }
 
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
@@ -2070,7 +2073,7 @@
     ctx.beginPath(); ctx.arc(0, 0, c.r, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(90,140,180,0.5)'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(0, 0, c.r, 0, Math.PI * 2); ctx.stroke();
-    ctx.translate(-c.cx, -c.cy);
+    ctx.restore();
   }
   // 潮汐信息胶囊（独立放在右上"下一个"预览正下方，不与任务条同排）
   function drawTidePill() {
