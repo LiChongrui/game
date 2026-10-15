@@ -56,11 +56,11 @@
   function loadDex() {
     try {
       var v = JSON.parse(localStorage.getItem('mg_dex') || '{}');
-      return { u: v.u || {}, c: v.c || {} };
-    } catch (e) { return { u: {}, c: {} }; }
+      return { u: v.u || {}, c: v.c || {}, sp: v.sp || {}, stats: v.stats || {}, ach: v.ach || {} };
+    } catch (e) { return { u: {}, c: {}, sp: {}, stats: {}, ach: {} }; }
   }
   function saveDex() {
-    try { localStorage.setItem('mg_dex', JSON.stringify({ u: dexUnlocked, c: dexCounts })); } catch (e) {}
+    try { localStorage.setItem('mg_dex', JSON.stringify({ u: dexUnlocked, c: dexCounts, sp: dexSpecial, stats: lifeStats, ach: achDone })); } catch (e) {}
   }
 
   // ---------- 音效（WebAudio 合成，无素材文件） ----------
@@ -291,16 +291,34 @@
   var overButtons = [];
   var shakeT = 0, shakeAmp = 0;
 
-  var skillCharge = { swap: 0, ripple: 0, evap: 0 };
+  var skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
   // 深海宝箱（无尽模式）：定期沉入一只，限时点击开启随机奖励
   var chest = null;
   var chestTimer = 26 + Math.random() * 20;
   // 随机深海事件（无尽模式）：涌泉 / 甘霖 / 漩涡风暴
   var seaEvent = { timer: 24 + Math.random() * 14, type: null, t: 0, x: 0, y: 0, data: null };
   var rippleMode = false; // 涟漪选位模式：点击画布指定波纹中心
+  var flowMode = false;   // 水流模式：点选两枚水滴交换位置（布局型道具）
+  var flowPick = null;    // 水流模式已选中的第一枚水滴
   var dexLoaded = loadDex();
   var dexUnlocked = dexLoaded.u;
   var dexCounts = dexLoaded.c;
+  var dexSpecial = dexLoaded.sp;   // 特殊水滴发现记录 { vortex:1, iron:1, ... }
+  var dexTab = 0;                  // 图鉴页签：0=图鉴 1=成就
+  var dexSelSp = 0;                // 图鉴页当前选中的特殊滴说明
+  // 跨局终身统计（成就进度用）：宝箱/涨潮/礁石对/彩虹合成/任务/连击/单局最高分
+  var lifeStats = (function () {
+    var d = { chest: 0, tide: 0, ironPair: 0, rainbow: 0, quest: 0, combo: 0, best: 0 };
+    var s = dexLoaded.stats || {};
+    for (var k in d) if (typeof s[k] === 'number' && s[k] > d[k]) d[k] = s[k];
+    return d;
+  })();
+  var achDone = dexLoaded.ach;     // 已达成成就 { id: 1 }
+  function bumpStat(k, n) {
+    lifeStats[k] = (lifeStats[k] || 0) + (n || 1);
+    saveDex();
+    checkAchievements();
+  }
   var seaCount = 0;
   var scoreMult = 1;
   var evapMode = false;
@@ -318,6 +336,7 @@
 
   // 潮汐状态
   var tide = { phase: 'idle', timer: C.tide.firstDelay, progress: 0, banner: 0 };
+  var achTick = 0; // 成就周期检查计时
 
   // 背景气泡
   var bubbles = [];
@@ -386,21 +405,25 @@
     if (r < 0.84) return 'ice';
     return 'rainbow'; // 彩虹滴：碰到任意水滴直接跳 2 级合成
   }
-  function rollIron() { return level === 2 && Math.random() < C.iron.chance; } // 礁石仅无尽模式
+  function rollIron() {
+    if (seaEvent && seaEvent.type === 'storm') return false; // 保底：风暴期间不再落礁石，避免双重失控
+    return level === 2 && Math.random() < C.iron.chance;
+  } // 礁石仅无尽模式
   // 符文：普通水滴随机附带的道具属性，合成时为对应技能充能
   function rollRune() {
     if (Math.random() >= C.rune.chance) return null;
-    var r = Math.random();
-    if (r < C.rune.weights.swap) return 'swap';
-    if (r < C.rune.weights.swap + C.rune.weights.ripple) return 'ripple';
-    return 'evap';
+    var r = Math.random(), w = C.rune.weights;
+    if (r < w.swap) return 'swap';
+    if (r < w.swap + w.ripple) return 'ripple';
+    if (r < w.swap + w.ripple + w.evap) return 'evap';
+    return 'flow';
   }
   function runeName(key) {
     for (var i = 0; i < C.skills.length; i++) if (C.skills[i].key === key) return C.skills[i].name;
     return '';
   }
   function runeColor(key) {
-    return key === 'swap' ? '#8E6FC0' : (key === 'ripple' ? '#2FA8A0' : '#E2705E');
+    return key === 'swap' ? '#8E6FC0' : (key === 'ripple' ? '#2FA8A0' : (key === 'evap' ? '#E2705E' : '#3FA8B8'));
   }
   function ironCount() {
     var n = 0;
@@ -408,6 +431,7 @@
     return n;
   }
   function createIron(x, y) {
+    discoverSpecial('iron');
     var b = phys.create(x, y, 0, 0, 0);
     b.iron = true;
     b.tier = -1;
@@ -556,6 +580,59 @@
     }
   }
 
+  // ---------- 成就（常驻目标，跨局累计） ----------
+  var ACH_DEFS = [
+    { id: 'canghai',  name: '沧海遗珠', desc: '合成出传说中的「沧海」',   target: 1,    cur: function () { return dexCounts[8] || 0; } },
+    { id: 'combo6',   name: '连浪六叠', desc: '达成 6 连击',              target: 6,    cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
+    { id: 'chest5',   name: '寻宝猎人', desc: '累计开启 5 只深海宝箱',    target: 5,    cur: function () { return lifeStats.chest || 0; } },
+    { id: 'tide12',   name: '弄潮儿',   desc: '经历 12 次涨潮',           target: 12,   cur: function () { return lifeStats.tide || 0; } },
+    { id: 'iron5',    name: '礁石克星', desc: '累计消除 5 对礁石',        target: 5,    cur: function () { return lifeStats.ironPair || 0; } },
+    { id: 'rainbow5', name: '虹光使者', desc: '触发 5 次彩虹合成',        target: 5,    cur: function () { return lifeStats.rainbow || 0; } },
+    { id: 'quest12',  name: '任务大师', desc: '累计完成 12 个任务',       target: 12,   cur: function () { return lifeStats.quest || 0; } },
+    { id: 'score2k',  name: '深海富豪', desc: '单局得分达到 2000',        target: 2000, cur: function () { return Math.max(score, best, lifeStats.best || 0); } }
+  ];
+  function checkAchievements() {
+    lifeStats.best = Math.max(lifeStats.best || 0, best, score);
+    for (var i = 0; i < ACH_DEFS.length; i++) {
+      var a = ACH_DEFS[i];
+      if (achDone[a.id]) continue;
+      if (a.cur() < a.target) continue;
+      achDone[a.id] = 1;
+      var gain = Math.round(80 * scoreMult);
+      score += gain;
+      scoreBump = 0.4;
+      var pick = C.skills[(Math.random() * C.skills.length) | 0];
+      skillCharge[pick.key] += 2;
+      addPopup(C.W / 2, 150, '成就达成 · ' + a.name + ' +' + gain, true, 0);
+      addPopup(C.W / 2, 176, '「' + pick.name + '」充能 +2', false, 0);
+      parts.push({ type: 'ring', x: C.W / 2, y: 150, r: 26, life: 0.6, max: 0.6, color: '#F5C542' });
+      audio.quest();
+      saveDex();
+    }
+  }
+
+  // ---------- 特殊水滴图鉴（发现即点亮） ----------
+  var SP_DEFS = [
+    { key: 'vortex',  name: '漩涡滴', color: '#7B6FD0', desc: '落地后吸附周围水滴再消散，可用来聚拢散滴。' },
+    { key: 'cloud',   name: '雨云滴', color: '#8FA8BC', desc: '落地后分裂成两颗雾泡，快速补充低级水滴。' },
+    { key: 'ice',     name: '冰晶滴', color: '#A8DFF2', desc: '落定后冻结周围水滴，冻结滴可以当临时平台。' },
+    { key: 'rainbow', name: '彩虹滴', color: '#E86FA8', desc: '碰到任意水滴使其直接跳 2 级，得分双倍。' },
+    { key: 'iron',    name: '礁石',   color: '#6E7B88', desc: '沉重障碍，无法合成；两两相消或用蒸发移除。' },
+    { key: 'rune',    name: '符文滴', color: '#B08FD0', desc: '带符文的水滴，合成时为对应技能 +1 充能。' },
+    { key: 'chest',   name: '深海宝箱', color: '#C98B3E', desc: '限时沉入场中，点击开启随机奖励。' }
+  ];
+  function discoverSpecial(sp) {
+    if (dexSpecial[sp]) return;
+    dexSpecial[sp] = 1;
+    saveDex();
+    for (var i = 0; i < SP_DEFS.length; i++) {
+      if (SP_DEFS[i].key === sp) {
+        addPopup(C.W / 2, 130, '图鉴新发现 · ' + SP_DEFS[i].name, true, 0);
+        break;
+      }
+    }
+  }
+
   // ---------- 任务链 ----------
   function makeQuest(depth) {
     questDepth = depth;
@@ -584,6 +661,7 @@
     var gain = Math.round(quest.rewardScore * scoreMult);
     score += gain;
     scoreBump = 0.35;
+    bumpStat('quest');
     var pick = C.skills[Math.floor(Math.random() * C.skills.length)];
     skillCharge[pick.key] = pick.cost;
     addPopup(C.W / 2, 150, '任务完成 +' + gain, true, 0);
@@ -661,6 +739,7 @@
     burstIron(mx, my);
     burstIron(a.x, a.y);
     burstIron(b.x, b.y);
+    bumpStat('ironPair');
     parts.push({ type: 'ring', x: mx, y: my, r: 22, life: 0.5, max: 0.5, color: '#9AA7B4' });
     addShake(5, 0.3);
     audio.blip(320, 0.3, 'square', 0.12, 0.5);
@@ -679,6 +758,7 @@
     scoreBump = 0.4;
     combo++; comboTimer = C.comboWindow;
     if (score > best) { best = score; saveNum('mg_best', best); }
+    bumpStat('rainbow');
     addPopup(mx, my - T[nt].r - 14, '彩虹合成！「' + T[nt].name + '」', true, 0);
     addPopup(mx, my - T[nt].r + 8, '+' + gain, false, 0);
     for (var i = 0; i < 14; i++) {
@@ -703,7 +783,7 @@
     if (b.rune) chargeRune(b, mx, my);
 
     combo++; comboTimer = C.comboWindow;
-    if (combo > maxCombo) maxCombo = combo;
+    if (combo > maxCombo) { maxCombo = combo; if (maxCombo > (lifeStats.combo || 0)) { lifeStats.combo = maxCombo; } }
     var mult = Math.min(combo, C.comboMaxMult);
 
     // 顶级「沧海」两两相消 → 汇入海域
@@ -896,8 +976,36 @@
       if (tide.timer <= 0) {
         tide.phase = 'idle';
         tide.timer = C.tide.cycleInterval;
+        bumpStat('tide');                      // 成就：经历涨潮次数（跨局累计）
+        seaEvent.timer = Math.max(seaEvent.timer, 4); // 保底：退潮后至少 4s 再来事件
+        tryTideBless();                        // 组合技：退潮余波概率引来海神恩泽
       }
     }
+  }
+  // 潮汐+祝福组合技：退潮瞬间概率触发，全场普通水滴集体升 1 级（连续两次退潮至多出一次）
+  var tideBlessCd = false;
+  function tryTideBless() {
+    var bs = phys.bodies, i, n = 0;
+    for (i = 0; i < bs.length; i++) if (!bs[i].iron && !bs[i].chest && !bs[i].special) n++;
+    if (n < C.tideBless.minDrops) return;
+    if (tideBlessCd) { tideBlessCd = false; return; }
+    if (Math.random() >= C.tideBless.chance) return;
+    tideBlessCd = true;
+    for (i = 0; i < bs.length; i++) {
+      var b = bs[i];
+      if (b.iron || b.chest || b.special || b.tier >= T.length - 1) continue;
+      b.tier += 1;
+      b.popT = 0.3;
+      parts.push({ type: 'ring', x: b.x, y: b.y, r: b.r * 0.6, life: 0.5, max: 0.5, color: '#F5D76E' });
+    }
+    for (i = 0; i < 10; i++) {
+      parts.push({ type: 'dot', x: 30 + Math.random() * (C.W - 60), y: FLOORY - Math.random() * 120,
+        vx: (Math.random() - 0.5) * 40, vy: -60 - Math.random() * 80,
+        r: 1.5 + Math.random() * 2, life: 0.8, max: 0.8, color: '#F5D76E' });
+    }
+    addPopup(C.W / 2, 220, '海神恩泽！退潮余波祝福全场 +1 级', true, 0);
+    addShake(3, 0.3);
+    audio.quest();
   }
   function applyBuoyancy(dt) {
     if (tide.progress <= 0.02) return;
@@ -932,21 +1040,34 @@
     for (var i = 0; i < C.skills.length; i++) if (C.skills[i].key === key) return C.skills[i].cost;
     return 999;
   }
-  function flashSkill(idx, text) {
-    addPopup(SKILL_BTNS[idx].cx, SKILL_BTNS[idx].cy - 46, text, false, 0);
+  function skillBtnIdx(key) {
+    for (var i = 0; i < SKILL_BTNS.length; i++) if (SKILL_BTNS[i].key === key) return i;
+    return 0;
+  }
+  function flashSkill(key, text) {
+    var b = SKILL_BTNS[skillBtnIdx(key)];
+    addPopup(b.cx, b.cy - 46, text, false, 0);
   }
   function useSkill(key) {
     var i;
     if (key === 'evap') {
       if (evapMode) { evapMode = false; return; }
-      if (skillCharge.evap < skillCost('evap')) { flashSkill(2, '符文 ' + skillCharge.evap + '/' + skillCost('evap')); return; }
+      if (skillCharge.evap < skillCost('evap')) { flashSkill('evap', '符文 ' + skillCharge.evap + '/' + skillCost('evap')); return; }
       evapMode = true;
       rippleMode = false;
+      flowMode = false; flowPick = null;
+      return;
+    }
+    if (key === 'flow') {
+      if (flowMode) { flowMode = false; flowPick = null; return; }
+      if (skillCharge.flow < skillCost('flow')) { flashSkill('flow', '符文 ' + skillCharge.flow + '/' + skillCost('flow')); return; }
+      flowMode = true;
+      evapMode = false; rippleMode = false;
       return;
     }
     if (key === 'ripple' && rippleMode) { rippleMode = false; return; } // 再点按钮取消选位
     if (skillCharge[key] < skillCost(key)) {
-      flashSkill(key === 'swap' ? 0 : 1, '符文 ' + skillCharge[key] + '/' + skillCost(key));
+      flashSkill(key, '符文 ' + skillCharge[key] + '/' + skillCost(key));
       return;
     }
     if (key === 'swap') {
@@ -962,7 +1083,23 @@
       // 进入选位模式：点击画布任意位置作为波纹中心释放
       rippleMode = true;
       evapMode = false;
+      flowMode = false; flowPick = null;
     }
+  }
+  // 水流交换：两枚水滴互换位置（布局型道具——把挡路的滴换到它能合的地方）
+  function flowSwap(a, b) {
+    var tx = a.x, ty = a.y;
+    a.x = b.x; a.y = b.y;
+    b.x = tx; b.y = ty;
+    a.vx = a.vy = b.vx = b.vy = 0;
+    a.svx = a.svy = b.svx = b.svy = 0;
+    a.trail = []; b.trail = [];
+    skillCharge.flow = 0;
+    flowMode = false; flowPick = null;
+    parts.push({ type: 'ring', x: a.x, y: a.y, r: a.r, life: 0.4, max: 0.4, color: '#7FD4FF' });
+    parts.push({ type: 'ring', x: b.x, y: b.y, r: b.r, life: 0.4, max: 0.4, color: '#7FD4FF' });
+    addPopup((a.x + b.x) / 2, Math.min(a.y, b.y) - 30, '水流交换！', false, 0);
+    audio.pop(3);
   }
   // 在指定位置释放双重波纹（首波强推 + 延迟次波再推）
   function castRipple(x, y) {
@@ -1074,6 +1211,7 @@
     lifeScore += score - runCounted; runCounted = score; // 累计分只记增量（复活续局不重复计）
     saveNum('mg_life', lifeScore);
     saveNum('mg_best', best);
+    checkAchievements();
     saveDex();
     audio.over();
   }
@@ -1085,13 +1223,29 @@
       var b = phys.bodies[i];
       if (top < 0 || b.y - b.r < top) top = b.y - b.r;
     }
+    var bs = [], i;
+    for (i = 0; i < phys.bodies.length; i++) {
+      b = phys.bodies[i];
+      bs.push({ x: Math.round(b.x), y: Math.round(b.y), r: Math.round(b.r), tier: b.tier, iron: !!b.iron, chest: !!b.chest });
+    }
+    var ui = { book: { cx: bookBtn.cx, cy: bookBtn.cy }, restart: { cx: restartBtn.cx, cy: restartBtn.cy }, skills: [] };
+    for (i = 0; i < SKILL_BTNS.length; i++) ui.skills.push({ key: SKILL_BTNS[i].key, cx: SKILL_BTNS[i].cx, cy: SKILL_BTNS[i].cy });
     return {
       state: state, dangerY: C.dangerY, floorY: C.floorY, pileTop: top, n: phys.bodies.length,
       tide: tide.progress, tideRef: tide, level: level, score: score,
       chest: chest ? [Math.round(chest.b.x), Math.round(chest.b.y)] : null,
       chestLife: chest ? Math.round((chest.life - chest.t) * 10) / 10 : null,
-      event: seaEvent.type, eventT: seaEvent.type ? Math.round(seaEvent.t * 10) / 10 : null
+      event: seaEvent.type, eventT: seaEvent.type ? Math.round(seaEvent.t * 10) / 10 : null,
+      bodies: bs, ui: ui, stats: lifeStats, ach: achDone, dexSp: dexSpecial,
+      modes: { evap: evapMode, ripple: rippleMode, flow: flowMode }
     };
+  };
+  // 测试钩子（仅自动化测试用）：充能 / 手动触发成就检查 / 强制无尽模式（潮汐·宝箱·事件）
+  MG.debug = {
+    give: function (k, n) { if (k in skillCharge) skillCharge[k] = n; },
+    achCheck: function () { checkAchievements(); },
+    bump: bumpStat,
+    forceEndless: function () { level = 2; }
   };
 
   // 第 1 关通过：弹出提示进入无尽模式，不清场、不重置，继续当前局面
@@ -1112,6 +1266,7 @@
 
   // ---------- 深海宝箱（无尽模式探索要素） ----------
   function spawnChest() {
+    discoverSpecial('chest');
     var b = createIron(C.W * (0.2 + Math.random() * 0.6), C.spawnY - 40);
     b.chest = true;
     b.r = 17; b.m = b.r * b.r * 6; // 比礁石轻，不会被砸得太凶
@@ -1140,8 +1295,8 @@
       if (score > best) { best = score; saveNum('mg_best', best); }
       addPopup(x, y - 30, '宝箱开启 +' + gain, true, 0);
     } else if (r < 0.75) {
-      var keys = ['swap', 'ripple', 'evap'];
-      var k = keys[(Math.random() * 3) | 0];
+      var keys = ['swap', 'ripple', 'evap', 'flow'];
+      var k = keys[(Math.random() * keys.length) | 0];
       skillCharge[k] += 2;
       addPopup(x, y - 30, '宝箱开启：' + runeName(k) + ' +2 充能', true, 0);
     } else {
@@ -1155,6 +1310,7 @@
     }
     addShake(3, 0.2);
     audio.quest();
+    bumpStat('chest');
   }
   function updateChest(dt) {
     if (level < 2) return;
@@ -1222,6 +1378,7 @@
   }
   function updateSeaEvent(dt) {
     if (level < 2) return;
+    if (tide.phase === 'active') return; // 保底：涨潮期间冻结事件节奏，避免双重混乱
     if (!seaEvent.type) {
       seaEvent.timer -= dt;
       if (seaEvent.timer <= 0) startSeaEvent();
@@ -1294,9 +1451,9 @@
     score = 0; displayScore = 0; scoreBump = 0;
     combo = 0; comboTimer = 0; cooldown = 0; maxCombo = 0;
     reviveCount = 0; doubled = false;
-    skillCharge = { swap: 0, ripple: 0, evap: 0 };
+    skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
     seaCount = 0; scoreMult = 1;
-    evapMode = false; rippleMode = false; rainHint = 0;
+    evapMode = false; rippleMode = false; flowMode = false; flowPick = null; rainHint = 0;
     level = 1; levelTime = C.level1.time; failReason = ''; levelBanner = 0;
     levelElapsed = 0; runCounted = 0;
     nextTier = rollTier();
@@ -1334,13 +1491,19 @@
   var bookBtn = { cx: 46, cy: 688, r: 20, pressT: 0 };
   var restartBtn = { cx: C.W - 24, cy: 688, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
   var SKILL_BTNS = [
-    { key: 'swap',   cx: 140, cy: 688, r: 20, pressT: 0 },
-    { key: 'ripple', cx: 210, cy: 688, r: 20, pressT: 0 },
-    { key: 'evap',   cx: 280, cy: 688, r: 20, pressT: 0 }
+    { key: 'swap',   cx: 116, cy: 688, r: 20, pressT: 0 },
+    { key: 'ripple', cx: 178, cy: 688, r: 20, pressT: 0 },
+    { key: 'evap',   cx: 240, cy: 688, r: 20, pressT: 0 },
+    { key: 'flow',   cx: 302, cy: 688, r: 20, pressT: 0 }
   ];
   fit(); // 首次适配（按钮已定义，底部元素可同步贴底）
-  var DEX_PANEL = { x: 26, y: 78, w: 368, h: 560 };
-  var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 64, y: DEX_PANEL.y + 8, w: 54, h: 26 };
+  var DEX_PANEL = { x: 20, y: 64, w: 380, h: 624 };
+  var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 60, y: DEX_PANEL.y + 10, w: 50, h: 26 };
+  var tabDexBtn = { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 10, w: 76, h: 26 };
+  var tabAchBtn = { x: DEX_PANEL.x + 98, y: DEX_PANEL.y + 10, w: 76, h: 26 };
+  function spCellRect(i) {
+    return { x: DEX_PANEL.x + 12 + i * 50, y: DEX_PANEL.y + 452, w: 48, h: 82 };
+  }
 
   // 重开确认弹窗
   var confirmOpen = false;
@@ -1384,9 +1547,10 @@
       addShake(2, 0.15);
     } else {
       nb = phys.create(clampAim(aimX), C.spawnY, useTier, 0, 0);
-      if (nextSpecial) { nb.special = nextSpecial; nb.specialT = 0; }
+      if (nextSpecial) { nb.special = nextSpecial; nb.specialT = 0; discoverSpecial(nextSpecial); }
       else if (nextRune) {
         nb.rune = nextRune;
+        discoverSpecial('rune');
         if (!runeHintShown) {
           runeHintShown = true;
           addPopup(C.W / 2, 244, '带符文的水滴：合成即可为技能充能', false, 0);
@@ -1422,7 +1586,14 @@
       return;
     }
     if (dexOpen) {
-      if (inRect(p, dexCloseBtn) || !inRect(p, DEX_PANEL)) dexOpen = false;
+      if (inRect(p, dexCloseBtn) || !inRect(p, DEX_PANEL)) { dexOpen = false; return; }
+      if (inRect(p, tabDexBtn)) { dexTab = 0; return; }
+      if (inRect(p, tabAchBtn)) { dexTab = 1; return; }
+      if (dexTab === 0) {
+        for (var si = 0; si < SP_DEFS.length; si++) {
+          if (inRect(p, spCellRect(si))) { dexSelSp = si; audio.blip(620, 0.08, 'sine', 0.06, 0.3); return; }
+        }
+      }
       return;
     }
     if (inMute(p)) { MUTE.pressT = 0.16; audio.muted = !audio.muted; saveFlag('mg_mute', audio.muted); if (audio.muted) audio.bgm.stop(); else audio.bgm.start(); return; }
@@ -1449,6 +1620,15 @@
       else evapMode = false;
       return;
     }
+    if (flowMode) {
+      var fb = ballAt(p);
+      if (fb && !fb.iron && !fb.chest) {
+        if (!flowPick) { flowPick = fb; audio.blip(700, 0.08, 'sine', 0.06, 0.3); }
+        else if (fb === flowPick) { flowPick = null; } // 点自己 = 取消选择
+        else flowSwap(flowPick, fb);
+      } else if (!fb) { flowMode = false; flowPick = null; } // 点空白处退出
+      return;
+    }
     if (rippleMode) {
       castRipple(p.x, p.y);
       return;
@@ -1459,11 +1639,11 @@
   canvas.addEventListener('pointermove', function (e) {
     var p = toLocal(e);
     lastPointer = p;
-    if (state !== 'play' || adOverlay || dexOpen || evapMode || confirmOpen) return;
+    if (state !== 'play' || adOverlay || dexOpen || evapMode || flowMode || confirmOpen) return;
     aimX = clampAim(p.x);
   });
   canvas.addEventListener('pointerup', function (e) {
-    if (!aiming || state !== 'play' || adOverlay || dexOpen || evapMode || rippleMode || confirmOpen) { aiming = false; return; }
+    if (!aiming || state !== 'play' || adOverlay || dexOpen || evapMode || flowMode || rippleMode || confirmOpen) { aiming = false; return; }
     aiming = false;
     aimX = clampAim(toLocal(e).x);
     tryDrop();
@@ -1494,6 +1674,8 @@
     }
     levelElapsed += dt; // 从第 1 关开局起连续累计，进入无尽模式后时间无缝接着走
     checkDexGates();
+    achTick -= dt;
+    if (achTick <= 0) { achTick = 1; checkAchievements(); }
 
     if (level === 2) updateTide(dt); // 潮汐仅无尽模式（第 1 关风平浪静，降低难度）
     phys.step(dt);
@@ -2725,6 +2907,14 @@
       ctx.quadraticCurveTo(cx - 8, cy - 1, cx, cy - 8);
       ctx.quadraticCurveTo(cx + 8, cy - 1, cx, cy + 7);
       ctx.stroke();
+    } else if (key === 'flow') {
+      // 水流：两枚水滴互换（双圆 + 双弧箭头）
+      ctx.beginPath(); ctx.arc(cx - 6, cy - 5, 4, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx + 6, cy + 5, 4, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx - 2, cy - 10); ctx.quadraticCurveTo(cx + 9, cy - 10, cx + 10, cy - 2);
+      ctx.moveTo(cx + 2, cy + 10); ctx.quadraticCurveTo(cx - 9, cy + 10, cx - 10, cy + 2);
+      ctx.stroke();
     }
     ctx.lineCap = 'butt';
   }
@@ -2779,7 +2969,7 @@
         ctx.fillText('就绪', btn.cx, btn.cy + 13);
       }
       drawSkillIcon(cfg.key, btn.cx, btn.cy - 6, ready ? '#FFFFFF' : 'rgba(255,255,255,0.85)');
-      if ((cfg.key === 'evap' && evapMode) || (cfg.key === 'ripple' && rippleMode)) {
+      if ((cfg.key === 'evap' && evapMode) || (cfg.key === 'ripple' && rippleMode) || (cfg.key === 'flow' && flowMode)) {
         ctx.strokeStyle = '#E24B4A'; ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(btn.cx, btn.cy, btn.r + 3, 0, Math.PI * 2); ctx.stroke();
       }
@@ -2825,58 +3015,147 @@
     ctx.restore();
   }
 
-  // ---------- 图鉴 ----------
+  // ---------- 图鉴（页签：图鉴 / 成就） ----------
   function drawDex() {
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
     ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
 
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#155A8A';
-    ctx.font = 'bold 20px system-ui, sans-serif';
-    ctx.fillText('海域图鉴', C.W / 2, DEX_PANEL.y + 34);
-    ctx.font = '12px system-ui, sans-serif';
-    ctx.fillStyle = '#4A7FA0';
-    ctx.fillText('汇入海域 ×' + seaCount + ' · 全局得分 +' + Math.round((scoreMult - 1) * 100) + '% · 累计得分 ' + totalScore(), C.W / 2, DEX_PANEL.y + 54);
-
+    // 页签
+    var tabs = [{ r: tabDexBtn, label: '图鉴', on: dexTab === 0 }, { r: tabAchBtn, label: '成就', on: dexTab === 1 }];
+    for (var ti = 0; ti < tabs.length; ti++) {
+      var tb = tabs[ti];
+      ctx.fillStyle = tb.on ? '#2E86B4' : 'rgba(46,134,180,0.12)';
+      roundRect(tb.r.x, tb.r.y, tb.r.w, tb.r.h, 6); ctx.fill();
+      ctx.fillStyle = tb.on ? '#FFFFFF' : '#4A7FA0';
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      ctx.fillText(tb.label, tb.r.x + tb.r.w / 2, tb.r.y + 18);
+    }
     ctx.fillStyle = '#2E86B4';
     roundRect(dexCloseBtn.x, dexCloseBtn.y, dexCloseBtn.w, dexCloseBtn.h, 6); ctx.fill();
     ctx.fillStyle = '#FFFFFF';
     ctx.font = '13px system-ui, sans-serif';
     ctx.fillText('关闭', dexCloseBtn.x + dexCloseBtn.w / 2, dexCloseBtn.y + 17);
 
+    if (dexTab === 1) { drawAchTab(); return; }
+
+    ctx.textAlign = 'center';
+    ctx.font = '12px system-ui, sans-serif';
+    ctx.fillStyle = '#4A7FA0';
+    ctx.fillText('汇入海域 ×' + seaCount + ' · 全局得分 +' + Math.round((scoreMult - 1) * 100) + '% · 累计得分 ' + totalScore(), C.W / 2, DEX_PANEL.y + 56);
+
+    // 合成链 3×3
     for (var t = 0; t < T.length; t++) {
       var col = t % 3, row = Math.floor(t / 3);
-      var cx0 = DEX_PANEL.x + 14 + col * 114;
-      var cy0 = DEX_PANEL.y + 74 + row * 158;
+      var cx0 = DEX_PANEL.x + 14 + col * 118;
+      var cy0 = DEX_PANEL.y + 66 + row * 130;
       ctx.fillStyle = 'rgba(46,134,180,0.08)';
-      roundRect(cx0, cy0, 106, 148, 8); ctx.fill();
+      roundRect(cx0, cy0, 110, 122, 8); ctx.fill();
       var unlocked = !!dexUnlocked[t];
-      var bx = cx0 + 53, by = cy0 + 44;
+      var bx = cx0 + 55, by = cy0 + 38;
       if (unlocked) {
-        drawBall({ x: bx, y: by, r: 26, tier: t, vx: 0, vy: 0 }, 1);
+        drawBall({ x: bx, y: by, r: 22, tier: t, vx: 0, vy: 0 }, 1);
       } else {
         ctx.fillStyle = '#B8CBD8';
-        ctx.beginPath(); ctx.arc(bx, by, 26, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(bx, by, 22, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#8AA5B8';
-        ctx.font = 'bold 18px system-ui, sans-serif';
-        ctx.fillText('?', bx, by + 6);
+        ctx.font = 'bold 16px system-ui, sans-serif';
+        ctx.fillText('?', bx, by + 5);
       }
       ctx.fillStyle = unlocked ? '#155A8A' : '#8AA5B8';
-      ctx.font = 'bold 14px system-ui, sans-serif';
-      ctx.fillText(unlocked ? T[t].name : '？？？', bx, cy0 + 94);
-      ctx.font = '12px system-ui, sans-serif';
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      ctx.fillText(unlocked ? T[t].name : '？？？', bx, cy0 + 76);
+      ctx.font = '11px system-ui, sans-serif';
       ctx.fillStyle = '#4A7FA0';
-      ctx.fillText(unlocked ? ('分值 ' + T[t].score + ' · 合成 ' + (dexCounts[t] || 0) + ' 次') : '未解锁', bx, cy0 + 114);
+      ctx.fillText(unlocked ? ('分值 ' + T[t].score + ' · ×' + (dexCounts[t] || 0)) : '未解锁', bx, cy0 + 92);
       if (unlocked) {
         ctx.fillStyle = '#1E7A6F';
-        ctx.fillText('已收录', bx, cy0 + 134);
+        ctx.fillText('已收录', bx, cy0 + 108);
       } else if ((C.dexGate[t] || 0) > 0) {
         // 积分门槛提示：已达门槛但未合成出 → "待合成"；未达门槛 → 显示所需累计分
         var gate = C.dexGate[t] || 0;
         ctx.fillStyle = totalScore() >= gate ? '#C97A10' : '#B0584A';
-        ctx.fillText(totalScore() >= gate ? '已达标 · 待合成' : ('累计 ' + gate + ' 分解锁'), bx, cy0 + 134);
+        ctx.fillText(totalScore() >= gate ? '已达标 · 待合成' : ('累计 ' + gate + ' 分'), bx, cy0 + 108);
       }
+    }
+
+    // 特殊水滴条（发现即点亮，点选查看说明）
+    ctx.textAlign = 'center';
+    for (var s = 0; s < SP_DEFS.length; s++) {
+      var sp = SP_DEFS[s], rect = spCellRect(s);
+      var found = !!dexSpecial[sp.key];
+      var sel = dexSelSp === s;
+      ctx.fillStyle = sel ? 'rgba(46,134,180,0.18)' : 'rgba(46,134,180,0.06)';
+      roundRect(rect.x, rect.y, rect.w, rect.h, 8); ctx.fill();
+      if (sel) {
+        ctx.strokeStyle = '#2E86B4'; ctx.lineWidth = 1.5;
+        roundRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1, 8); ctx.stroke();
+      }
+      var sx = rect.x + rect.w / 2, sy = rect.y + 24;
+      if (found) {
+        ctx.fillStyle = sp.color;
+        ctx.beginPath(); ctx.arc(sx, sy, 13, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.beginPath(); ctx.arc(sx - 4, sy - 4, 4, 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.fillStyle = '#C3D2DC';
+        ctx.beginPath(); ctx.arc(sx, sy, 13, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#8AA5B8';
+        ctx.font = 'bold 13px system-ui, sans-serif';
+        ctx.fillText('?', sx, sy + 5);
+      }
+      ctx.fillStyle = found ? '#155A8A' : '#8AA5B8';
+      ctx.font = '9px system-ui, sans-serif';
+      ctx.fillText(found ? sp.name : '？？？', sx, rect.y + 54);
+      ctx.fillStyle = found ? '#1E7A6F' : '#B0584A';
+      ctx.fillText(found ? '已发现' : '未发现', sx, rect.y + 68);
+    }
+
+    // 说明框：选中特殊滴的玩法说明
+    var dsc = SP_DEFS[dexSelSp] || SP_DEFS[0];
+    var known = !!dexSpecial[dsc.key];
+    ctx.fillStyle = 'rgba(46,134,180,0.10)';
+    roundRect(DEX_PANEL.x + 12, DEX_PANEL.y + 546, DEX_PANEL.w - 24, 62, 8); ctx.fill();
+    ctx.fillStyle = known ? '#155A8A' : '#8AA5B8';
+    ctx.font = 'bold 12px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(known ? dsc.name : '？？？', DEX_PANEL.x + 24, DEX_PANEL.y + 566);
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = '#4A7FA0';
+    ctx.fillText(known ? dsc.desc : '在海域中发现它即可点亮说明', DEX_PANEL.x + 24, DEX_PANEL.y + 586);
+    ctx.textAlign = 'center';
+  }
+
+  // 成就页签：常驻目标列表（跨局累计，达成给分与充能奖励）
+  function drawAchTab() {
+    ctx.textAlign = 'center';
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = '#4A7FA0';
+    ctx.fillText('达成奖励：得分 +80 · 随机技能充能 +2 · 跨局累计', C.W / 2, DEX_PANEL.y + 56);
+    for (var i = 0; i < ACH_DEFS.length; i++) {
+      var a = ACH_DEFS[i];
+      var ry = DEX_PANEL.y + 70 + i * 66;
+      var done = !!achDone[a.id];
+      var cur = Math.min(a.target, a.cur());
+      ctx.fillStyle = done ? 'rgba(245,197,66,0.14)' : 'rgba(46,134,180,0.07)';
+      roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 58, 8); ctx.fill();
+      ctx.textAlign = 'left';
+      ctx.fillStyle = done ? '#B8860B' : '#155A8A';
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      ctx.fillText((done ? '★ ' : '') + a.name, DEX_PANEL.x + 26, ry + 20);
+      ctx.fillStyle = '#4A7FA0';
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.fillText(a.desc, DEX_PANEL.x + 26, ry + 40);
+      // 进度条（右侧）
+      var barX = DEX_PANEL.x + DEX_PANEL.w - 150, barW = 116, barY = ry + 24;
+      ctx.fillStyle = 'rgba(46,134,180,0.15)';
+      roundRect(barX, barY, barW, 9, 4.5); ctx.fill();
+      ctx.fillStyle = done ? '#F5C542' : '#2E86B4';
+      if (cur > 0) { roundRect(barX, barY, Math.max(6, barW * cur / a.target), 9, 4.5); ctx.fill(); }
+      ctx.textAlign = 'center';
+      ctx.fillStyle = done ? '#B8860B' : '#4A7FA0';
+      ctx.font = '10px system-ui, sans-serif';
+      ctx.fillText(done ? '已达成' : (cur + '/' + a.target), barX + barW / 2, barY + 24);
     }
   }
 
@@ -3045,7 +3324,7 @@
 
     drawWaterFront();
 
-    if (state === 'play' && !adOverlay && !evapMode && !rippleMode && !confirmOpen) {
+    if (state === 'play' && !adOverlay && !evapMode && !flowMode && !rippleMode && !confirmOpen) {
       drawGhost(aimX, C.spawnY, nextTier, cooldown > 0 ? 0.25 : 0.6);
     }
 
@@ -3099,6 +3378,29 @@
       ctx.strokeText('涟漪模式：点击选择波纹中心（再点按钮取消）', C.W / 2, 112);
       ctx.fillStyle = '#FFFFFF';
       ctx.fillText('涟漪模式：点击选择波纹中心（再点按钮取消）', C.W / 2, 112);
+    }
+
+    // 水流模式：已选水滴高亮 + 操作提示
+    if (flowMode) {
+      ctx.fillStyle = 'rgba(10,40,70,0.14)';
+      ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+      if (flowPick) {
+        ctx.save();
+        ctx.strokeStyle = '#7FE8F5';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([7, 5]);
+        ctx.lineDashOffset = -time * 30; // 旋转虚线圈：指示当前选中
+        ctx.beginPath(); ctx.arc(flowPick.x, flowPick.y, flowPick.r + 9, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 15px system-ui, sans-serif';
+      ctx.strokeStyle = 'rgba(10,40,70,0.6)';
+      ctx.lineWidth = 4;
+      var flowHint = flowPick ? '水流模式：再点一枚水滴与之交换（点原滴取消）' : '水流模式：点选第一枚水滴';
+      ctx.strokeText(flowHint, C.W / 2, 112);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(flowHint, C.W / 2, 112);
     }
 
     // 暗角（纵深）

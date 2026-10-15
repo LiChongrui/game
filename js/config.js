@@ -39,7 +39,8 @@ MG.config = {
   skills: [
     { key: 'swap',   name: '换滴', cost: 4 },
     { key: 'ripple', name: '涟漪', cost: 6 },
-    { key: 'evap',   name: '蒸发', cost: 10 }
+    { key: 'evap',   name: '蒸发', cost: 10 },
+    { key: 'flow',   name: '水流', cost: 6 }
   ],
 
   // 涟漪：以水堆重心为中心的双重波纹推挤
@@ -55,8 +56,8 @@ MG.config = {
   specialChance: 0.15,           // 每次投放出现特殊滴的概率
   // 符文水滴（随机附带道具属性）：合成带符文的水滴为对应技能 +1 充能（特殊滴/礁石不带符文）
   rune: {
-    chance: 0.30,                          // 普通投放带符文的概率
-    weights: { swap: 0.42, ripple: 0.34, evap: 0.24 } // 三种符文的分布权重
+    chance: 0.30,                                      // 普通投放带符文的概率
+    weights: { swap: 0.28, ripple: 0.24, evap: 0.20, flow: 0.28 } // 四种符文的分布权重
   },
   vortex: {                      // 漩涡滴：吸附周围水滴后消散
     pullR: 190,
@@ -101,6 +102,12 @@ MG.config = {
     waterMax: 0.62,      // 最高水位占容器高度比例
     buoyancy: 2300,      // 浮力加速度（大于重力才能浮起）
     warnTime: 3          // 涨潮前预警秒数
+  },
+
+  // 潮汐组合技：退潮余波有概率引来海神恩泽，全场普通水滴集体升 1 级
+  tideBless: {
+    chance: 0.4,         // 每次退潮触发概率（防连发：连续两次至多出一次）
+    minDrops: 4          // 场上普通水滴少于此数不触发
   },
 
   // 里程碑任务链
