@@ -6,18 +6,27 @@
   var T = C.tiers;
 
   // ---------- 画布 ----------
+  // 游戏在一张固定 420×720 的离屏画布上绘制；可见画布宽度=游戏区宽度（居中，
+  // 两侧是页面深海背景），高度恒等于窗口高度——垂直方向永远铺满，
+  // 上下空档用场景边缘像素拉伸延伸（延伸色），任何窗口比例都不露空
   var canvas = document.getElementById('game');
-  var ctx = canvas.getContext('2d');
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = C.W * dpr;
-  canvas.height = C.H * dpr;
+  var scene = document.createElement('canvas'); // 游戏区离屏画布（420×720，尺寸恒定）
+  scene.width = C.W * dpr;
+  scene.height = C.H * dpr;
+  var vctx = canvas.getContext('2d');
+  var ctx = scene.getContext('2d');
 
+  var view = { s: 1, dx: 0, dy: 0 }; // 游戏区缩放与垂直偏移
   function fit() {
-    // 等比缩放，取宽/高约束的较小值：宽窗口下高度正好撑满（顶部不露空），
-    // 水平多余空间由页面深海背景填充；窄窗口下反向同理
-    var scale = Math.min(window.innerWidth / C.W, window.innerHeight / C.H);
-    canvas.style.width = (C.W * scale) + 'px';
-    canvas.style.height = (C.H * scale) + 'px';
+    var w = window.innerWidth, h = window.innerHeight;
+    view.s = Math.min(w / C.W, h / C.H);      // 等比缩放，不变形
+    canvas.width = C.W * view.s * dpr;        // 可见画布宽度 = 游戏区宽度（水平两侧留页面背景）
+    canvas.height = h * dpr;                  // 高度恒等于窗口高度（垂直铺满）
+    canvas.style.width = (C.W * view.s) + 'px';
+    canvas.style.height = h + 'px';
+    view.dx = 0;
+    view.dy = (h - C.H * view.s) / 2;         // 游戏区在窗口中的垂直偏移（上下延伸带之外）
   }
   window.addEventListener('resize', fit);
   window.addEventListener('orientationchange', fit);
@@ -1022,7 +1031,7 @@
     var rect = canvas.getBoundingClientRect();
     return {
       x: (e.clientX - rect.left) * (C.W / rect.width),
-      y: (e.clientY - rect.top) * (C.H / rect.height)
+      y: (e.clientY - rect.top - view.dy) / view.s // 垂直方向减去延伸带偏移
     };
   }
   function hitButton(p) {
@@ -2583,6 +2592,23 @@
     if (dexOpen) drawDex();
   }
 
+  // 把游戏区合成到可见画布：宽度上游戏区占满画布，垂直居中，
+  // 上下空档用场景最上/最下 2px 拉伸延伸（无缝延伸色）
+  function composite() {
+    var w = canvas.width, h = canvas.height;
+    var gw = C.W * view.s * dpr, gh = C.H * view.s * dpr;
+    var dx = view.dx * dpr, dy = view.dy * dpr;
+    var slice = 2 * dpr;
+    vctx.imageSmoothingEnabled = true;
+    if (dy > 0) vctx.drawImage(scene, 0, 0, scene.width, slice, dx, 0, gw, dy); // 顶部延伸
+    if (dy + gh < h) vctx.drawImage(scene, 0, scene.height - slice, scene.width, slice, dx, dy + gh, gw, h - dy - gh); // 底部延伸
+    if (dx > 0) {
+      vctx.drawImage(scene, 0, 0, slice, scene.height, 0, dy, dx, gh);
+      vctx.drawImage(scene, scene.width - slice, 0, slice, scene.height, dx + gw, dy, w - dx - gw, gh);
+    }
+    vctx.drawImage(scene, 0, 0, scene.width, scene.height, dx, dy, gw, gh); // 游戏区本体
+  }
+
   // ---------- 主循环 ----------
   var last = 0;
   function frame(ts) {
@@ -2592,6 +2618,7 @@
     last = ts;
     update(dt);
     render();
+    composite();
   }
 
   makeQuest(0);
