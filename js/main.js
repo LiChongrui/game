@@ -21,12 +21,13 @@
     view.s = Math.min(w / C.W, h / C.H);   // 等比缩放，不变形
     VH = h / view.s;
     FLOORY = VH - 74;                      // 容器底贴住窗口底部（720-646=74）
+    C.floorY = FLOORY;                     // 同步给物理引擎（每帧读取，水滴落到新地板）
     canvas.width = C.W * dpr;
     canvas.height = Math.round(VH * dpr);
     canvas.style.width = (C.W * view.s) + 'px';
     canvas.style.height = h + 'px';
-    // 底部按钮/图鉴角标同步贴底
-    var cy = VH - 32;
+    // 底部按钮/图鉴角标同步贴底（上移 4px 给名称标签留出完整显示空间）
+    var cy = VH - 36;
     if (bookBtn) {
       bookBtn.cy = cy; restartBtn.cy = cy;
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
@@ -1795,8 +1796,9 @@
     // 海底沙床（底栏下方空档，不进游戏区）
     var sy0 = floorY + FH + 6;
     var sand = ctx.createLinearGradient(0, sy0, 0, VH);
-    sand.addColorStop(0, 'rgba(216,233,224,0.95)');
-    sand.addColorStop(1, 'rgba(152,192,200,0.95)');
+    sand.addColorStop(0, 'rgba(228,242,233,0.95)');   // 浅沙白
+    sand.addColorStop(0.45, 'rgba(168,207,203,0.95)'); // 青绿过渡
+    sand.addColorStop(1, 'rgba(84,138,160,0.95)');     // 深海青
     ctx.fillStyle = sand;
     ctx.fillRect(0, sy0, C.W, VH - sy0);
     // 沙丘
@@ -2235,13 +2237,13 @@
   }
 
   function drawSkillBar() {
-    // 渐变底带从床面之下开始，不遮挡床面图形
-    var g = ctx.createLinearGradient(0, 664, 0, 716);
+    // 渐变底带从床面之下开始（贴底动态），不遮挡床面图形
+    var g = ctx.createLinearGradient(0, VH - 56, 0, VH - 4);
     g.addColorStop(0, 'rgba(255,255,255,0.0)');
     g.addColorStop(0.3, 'rgba(255,255,255,0.55)');
     g.addColorStop(1, 'rgba(255,255,255,0.7)');
     ctx.fillStyle = g;
-    ctx.fillRect(0, 664, C.W, 56);
+    ctx.fillRect(0, VH - 56, C.W, 56);
 
     var readyPulse = 0.5 + 0.5 * Math.sin(time * 5);
 
@@ -2289,15 +2291,15 @@
         ctx.strokeStyle = '#E24B4A'; ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(btn.cx, btn.cy, btn.r + 3, 0, Math.PI * 2); ctx.stroke();
       }
-      // 名称标签：保持完整可见（y=717，画布 720 内）
+      // 名称标签：保持完整可见（底边留 6px 余量）
       ctx.fillStyle = '#3E6E90';
       ctx.font = '10px system-ui, sans-serif';
-      ctx.fillText(cfg.name, btn.cx, btn.cy + btn.r + 9);
+      ctx.fillText(cfg.name, btn.cx, btn.cy + btn.r + 6);
     }
 
     if (seaCount > 0) {
       ctx.save();
-      ctx.translate(C.W - 64, VH - 32);
+      ctx.translate(C.W - 64, VH - 36);
       ctx.rotate(Math.sin(time * 2) * 0.05);
       ctx.fillStyle = 'rgba(30,122,111,0.9)';
       ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2); ctx.fill();
