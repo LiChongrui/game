@@ -331,7 +331,7 @@
   var dexUnlocked = dexLoaded.u;
   var dexCounts = dexLoaded.c;
   var dexSpecial = dexLoaded.sp;   // 特殊水滴发现记录 { vortex:1, iron:1, ... }
-  var dexTab = 0;                  // 图鉴页签：0=图鉴 1=成就
+  var dexTab = 0;                  // 图鉴页签：0=图鉴 1=成就 2=每日 3=榜单
   var dexSelSp = 0;                // 图鉴页当前选中的特殊滴说明
   // 跨局终身统计（成就进度用）：宝箱/涨潮/礁石对/彩虹合成/任务/连击/单局最高分
   var lifeStats = (function () {
@@ -368,12 +368,179 @@
   var endlessT = 0, rampStage = 0;
   var climaxMark = 0; // 高潮时刻：上次触发时的分数标记
   var tideGateHint = false; // 潮汐限定合成：一次性提示
+  // 首局主动引导：前 5 投分步提示（只出现一次，localStorage 标记）
+  var dropCount = 0, tutDone = loadFlag('mg_tut');
+  var TUT_STEPS = [
+    '按住屏幕左右拖动瞄准，松手投下水滴',
+    '低级水滴先垫底，给大水滴留空间',
+    '相同水滴碰到一起就会合成升级',
+    '水堆漫过警戒线并停住就输了——留意上方白线',
+    '攒满符文即可点亮底部技能按钮'
+  ];
   function endlessRamp() {
     return level === 2 ? Math.min(1, endlessT / (C.ramp.minutes * 60)) : 0;
   }
   // 成就永续加成查询（勋章变成长线）
   function perkOn(id) { return !!achDone[id]; }
   function perkMult() { return (achDone.tide12 && tide.progress > 0.2) ? 1.1 : 1; }
+  // 数值封顶：所有乘区叠乘后总倍率不超过 C.multCap（防成就/海域加成叠乘导致分数膨胀）
+  function cm(m) { return Math.min(m, C.multCap); }
+
+  // 海域演进：累计分跨过里程碑改变世界（背景色调随阶段加深 + 称号）
+  var stageSeen = -1; // 已提示过的阶段（会话内）
+  function seaStage() {
+    var s = 0, ts = totalScore();
+    for (var i = C.seaStages.length - 1; i >= 0; i--) { if (ts >= C.seaStages[i].at) { s = i; break; } }
+    return s;
+  }
+
+  // ---------- 每日任务（按日期种子生成，跨局累计；全完成涨连续天数） ----------
+  function todayStr() {
+    var d = new Date();
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  }
+  function yesterdayStr() {
+    var d = new Date(); d.setDate(d.getDate() - 1);
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  }
+  function dateSeed(str) {
+    var h = 2166136261;
+    for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = (h * 16777619) >>> 0; }
+    return h >>> 0;
+  }
+  function mulberry(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function loadDaily() {
+    try { return JSON.parse(localStorage.getItem('mg_daily') || 'null'); } catch (e) { return null; }
+  }
+  function saveDaily() { try { localStorage.setItem('mg_daily', JSON.stringify(daily)); } catch (e) {} }
+  function buildDailyTasks(date, rnd) {
+    var pool = [
+      { type: 'merge', tier: 1 + Math.floor(rnd() * 3), need: 6 + Math.floor(rnd() * 5) },
+      { type: 'combo', need: 3 + Math.floor(rnd() * 3) },
+      { type: 'chest', need: 1 },
+      { type: 'tide',  need: 2 },
+      { type: 'iron',  need: 1 }
+    ];
+    // 按种子挑 3 个不同类型：合成/连击固定候选，第三个从宝箱/涨潮/礁石里选
+    var t1 = { type: 'merge', tier: 1 + Math.floor(rnd() * 3), need: 6 + Math.floor(rnd() * 5) };
+    t1.text = '合成 ' + t1.need + ' 个「' + T[t1.tier].name + '」';
+    var t2 = { type: 'combo', need: 3 + Math.floor(rnd() * 3) };
+    t2.text = '达成 ' + t2.need + ' 连击';
+    var extra = [pool[2], pool[3], pool[4]][Math.floor(rnd() * 3)];
+    extra = { type: extra.type, need: extra.need };
+    extra.text = extra.type === 'chest' ? '开启 1 只深海宝箱'
+      : (extra.type === 'tide' ? '经历 ' + extra.need + ' 次涨潮' : '消除 1 对礁石');
+    return [t1, t2, extra];
+  }
+  var daily = (function () {
+    var d = loadDaily(), today = todayStr();
+    if (!d || d.date !== today) {
+      var streak = (d && d.date === yesterdayStr()) ? (d.streak || 0) : 0; // 断签清零
+      var rnd = mulberry(dateSeed(today));
+      var fresh = { date: today, streak: streak, streakToday: false, tasks: buildDailyTasks(today, rnd), prog: [0, 0, 0], done: [false, false, false], allDone: false };
+      saveDailyFresh(fresh);
+      return fresh;
+    }
+    return d;
+  })();
+  function saveDailyFresh(d) { try { localStorage.setItem('mg_daily', JSON.stringify(d)); } catch (e) {} }
+  function dailyProgress(type, tier, n) {
+    for (var i = 0; i < daily.tasks.length; i++) {
+      var t = daily.tasks[i];
+      if (daily.done[i] || t.type !== type) continue;
+      if (type === 'merge' && t.tier !== tier) continue;
+      if (type === 'combo') daily.prog[i] = Math.min(t.need, Math.max(daily.prog[i], n || 0)); // 连击取峰值
+      else daily.prog[i] = Math.min(t.need, daily.prog[i] + (n || 1));
+      if (daily.prog[i] >= t.need) {
+        daily.done[i] = true;
+        var gain = Math.round(C.daily.rewardScore * scoreMult);
+        score += gain;
+        scoreBump = 0.35;
+        addPopup(C.W / 2, 205, '每日任务完成 +' + gain, true, 0);
+        audio.quest();
+      }
+    }
+    // 三项全完成 → 连续天数 +1（每天只涨一次）+ 天数奖励
+    if (!daily.allDone && daily.done[0] && daily.done[1] && daily.done[2]) {
+      daily.allDone = true;
+      if (!daily.streakToday) { daily.streakToday = true; daily.streak++; }
+      var bonus = C.daily.streakBase + daily.streak * C.daily.streakStep;
+      score += bonus;
+      scoreBump = 0.4;
+      var pk = C.skills[(Math.random() * C.skills.length) | 0];
+      skillCharge[pk.key] += 2;
+      addPopup(C.W / 2, 232, '今日全勤！连续 ' + daily.streak + ' 天 +' + bonus, true, 0);
+      addPopup(C.W / 2, 258, '「' + pk.name + '」充能 +2', false, 0);
+      parts.push({ type: 'ring', x: C.W / 2, y: 232, r: 30, life: 0.7, max: 0.7, color: '#F5C542' });
+      audio.quest();
+    }
+    saveDaily();
+  }
+
+  // ---------- 好友榜（本地模拟榜：预留微信 wx 接口位，上线后替换数据源） ----------
+  var friends = (function () {
+    var list = null;
+    try { list = JSON.parse(localStorage.getItem('mg_friends') || 'null'); } catch (e) { list = null; }
+    if (!list) {
+      var names = ['海风酱', '泡泡鱼', '深蓝船长', '浪里格', '珊瑚酱', '夜航星'];
+      var rnd = mulberry(dateSeed('friends-v1'));
+      list = [];
+      for (var i = 0; i < names.length; i++) list.push({ name: names[i], base: Math.floor(300 + rnd() * 4200) });
+      try { localStorage.setItem('mg_friends', JSON.stringify(list)); } catch (e) {}
+    }
+    return list;
+  })();
+  function friendBoard() {
+    // 好友分随日期轻微浮动（模拟活跃），我方取历史最佳
+    var rnd = mulberry(dateSeed(todayStr()) ^ 0x5f5f);
+    var rows = [];
+    for (var i = 0; i < friends.length; i++) {
+      rows.push({ name: friends[i].name, score: Math.max(0, Math.round(friends[i].base * (0.9 + rnd() * 0.25))), me: false });
+    }
+    rows.push({ name: '我', score: best, me: true });
+    rows.sort(function (a, b) { return b.score - a.score; });
+    return rows;
+  }
+
+  // ---------- 战报分享（卡片式预览；上线后在此接 wx.shareAppMessage） ----------
+  var shareOpen = false, shareText = '';
+  function buildShareText() {
+    return '【水滴成海】我在' + C.seaStages[seaStage()].name + '拿下 ' + score + ' 分！' +
+      (maxCombo > 1 ? '最高 ' + maxCombo + ' 连击，' : '') +
+      (seaCount > 0 ? '沧海汇入海域 ×' + seaCount + '，' : '') +
+      '最佳 ' + best + '。来和我比比谁潜得更深！';
+  }
+  function openShare() {
+    shareText = buildShareText();
+    shareOpen = true;
+    // 上线接微信小游戏时此处调用：
+    // wx.shareAppMessage({ title: shareText, imageUrl: canvas 截图 })
+  }
+  function copyShareText() {
+    var ok = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareText);
+        ok = true;
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = shareText;
+        document.body.appendChild(ta);
+        ta.select();
+        ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+    } catch (e) { ok = false; }
+    addPopup(C.W / 2, 300, ok ? '文案已复制，去粘贴给好友吧' : '复制失败：长按文案手动复制', true, 0);
+    audio.blip(ok ? 760 : 300, 0.15, 'sine', 0.1, 1);
+  }
 
   // 背景气泡
   var bubbles = [];
@@ -639,7 +806,7 @@
       if (achDone[a.id]) continue;
       if (a.cur() < a.target) continue;
       achDone[a.id] = 1;
-      var gain = Math.round(80 * scoreMult);
+      var gain = Math.round(80 * cm(scoreMult));
       score += gain;
       scoreBump = 0.4;
       var pick = C.skills[(Math.random() * C.skills.length) | 0];
@@ -699,7 +866,7 @@
     if (quest.have >= quest.need) completeQuest();
   }
   function completeQuest() {
-    var gain = Math.round(quest.rewardScore * scoreMult * (perkOn('quest12') ? 1.3 : 1)); // 成就加成：任务大师
+    var gain = Math.round(quest.rewardScore * cm(scoreMult * (perkOn('quest12') ? 1.3 : 1))); // 成就加成：任务大师；总倍率封顶
     score += gain;
     scoreBump = 0.35;
     bumpStat('quest');
@@ -779,7 +946,7 @@
   function ironPairMerge(a, b) {
     var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
     phys.remove(a); phys.remove(b);
-    var gain = Math.round(C.iron.pairScore * scoreMult * (perkOn('iron5') ? 2 : 1)); // 成就加成：礁石克星翻倍
+    var gain = Math.round(C.iron.pairScore * cm(scoreMult * (perkOn('iron5') ? 2 : 1))); // 成就加成：礁石克星翻倍；总倍率封顶
     score += gain;
     scoreBump = 0.3;
     if (score > best) { best = score; saveNum('mg_best', best); }
@@ -789,6 +956,7 @@
     burstIron(a.x, a.y);
     burstIron(b.x, b.y);
     bumpStat('ironPair');
+    dailyProgress('iron');
     parts.push({ type: 'ring', x: mx, y: my, r: 22, life: 0.5, max: 0.5, color: '#9AA7B4' });
     addShake(5, 0.3);
     audio.blip(320, 0.3, 'square', 0.12, 0.5);
@@ -802,12 +970,14 @@
     var nt = Math.min(T.length - 1, t.tier + 2);
     var nb = phys.create(mx, my, nt, 0, -60);
     nb.popT = 0.28;
-    var gain = Math.round(T[nt].score * 2 * scoreMult * (perkOn('rainbow5') ? 1.5 : 1) * perkMult());
+    var gain = Math.round(T[nt].score * 2 * cm(scoreMult * (perkOn('rainbow5') ? 1.5 : 1) * perkMult()));
     score += gain;
     scoreBump = 0.4;
     combo++; comboTimer = C.comboWindow + (perkOn('combo6') ? 0.3 : 0);
+    dailyProgress('combo', 0, combo);
     if (score > best) { best = score; saveNum('mg_best', best); }
     bumpStat('rainbow');
+    dailyProgress('merge', nt);
     addPopup(mx, my - T[nt].r - 14, '彩虹合成！「' + T[nt].name + '」', true, 0);
     addPopup(mx, my - T[nt].r + 8, '+' + gain, false, 0);
     for (var i = 0; i < 14; i++) {
@@ -833,13 +1003,14 @@
 
     combo++; comboTimer = C.comboWindow + (perkOn('combo6') ? 0.3 : 0); // 成就加成：连浪六叠延长连击窗口
     if (combo > maxCombo) { maxCombo = combo; if (maxCombo > (lifeStats.combo || 0)) { lifeStats.combo = maxCombo; } }
+    dailyProgress('combo', 0, combo); // 每日任务：连击取峰值
     var mult = Math.min(combo, C.comboMaxMult);
 
     // 顶级「沧海」两两相消 → 汇入海域
     if (tier >= T.length - 1) {
       seaCount++;
       scoreMult = 1 + seaCount * C.seaMultStep;
-      var gain = Math.round((T[tier].score * 4 + C.seaBonus) * mult * scoreMult * (perkOn('canghai') ? 1.5 : 1) * perkMult());
+      var gain = Math.round((T[tier].score * 4 + C.seaBonus) * cm(mult * scoreMult * (perkOn('canghai') ? 1.5 : 1) * perkMult()));
       score += gain;
       scoreBump = 0.35;
       addPopup(mx, my - 22, '汇入海域 ×' + seaCount, true, 0);
@@ -859,10 +1030,11 @@
     nb.grace = 0.25;
     nb.popT = 0.28;
 
-    var gain2 = Math.round(T[nt].score * mult * scoreMult * perkMult()); // 成就加成：弄潮儿潮汐期间 +10%
+    var gain2 = Math.round(T[nt].score * cm(mult * scoreMult * perkMult())); // 成就加成：弄潮儿潮汐期间 +10%；总倍率封顶
     score += gain2;
     scoreBump = 0.3;
     if (score > best) { best = score; saveNum('mg_best', best); }
+    dailyProgress('merge', nt);
 
     unlockTier(nt, mx, my - T[nt].r - 38);
     addPopup(mx, my - T[nt].r - 12, '+' + gain2, nt >= T.length - 1, mult > 1 ? mult : 0);
@@ -1054,6 +1226,7 @@
         tide.phase = 'idle';
         tide.timer = C.tide.cycleInterval - (C.tide.cycleInterval - C.ramp.tideIntervalMin) * endlessRamp(); // 渐进加压：潮汐更频
         bumpStat('tide');                      // 成就：经历涨潮次数（跨局累计）
+        dailyProgress('tide');                 // 每日任务：经历涨潮
         seaEvent.timer = Math.max(seaEvent.timer, 4); // 保底：退潮后至少 4s 再来事件
         tryTideBless();                        // 组合技：退潮余波概率引来海神恩泽
       }
@@ -1314,7 +1487,8 @@
       chestLife: chest ? Math.round((chest.life - chest.t) * 10) / 10 : null,
       event: seaEvent.type, eventT: seaEvent.type ? Math.round(seaEvent.t * 10) / 10 : null,
       bodies: bs, ui: ui, stats: lifeStats, ach: achDone, dexSp: dexSpecial,
-      modes: { evap: evapMode, ripple: rippleMode, flow: flowMode }
+      modes: { evap: evapMode, ripple: rippleMode, flow: flowMode },
+      stage: seaStage(), daily: { done: daily.done.slice(), streak: daily.streak }, best: best
     };
   };
   // 测试钩子（仅自动化测试用）：充能 / 成就 / 局面构造 / 加压进度
@@ -1326,7 +1500,17 @@
     setRamp: function (t) { endlessT = t; },
     grant: function (id) { achDone[id] = 1; saveDex(); },
     addScore: function (n) { score += n; },
-    spawn: function (tier, x, y) { return phys.create(x || C.W / 2, y || C.spawnY, tier, 0, 0); }
+    spawn: function (tier, x, y) { return phys.create(x || C.W / 2, y || C.spawnY, tier, 0, 0); },
+    dailyProg: dailyProgress,
+    dailyState: function () { return daily; },
+    board: friendBoard,
+    share: function () { openShare(); return shareText; },
+    shareCopy: copyShareText,
+    setDrops: function (n) { dropCount = n; },
+    tutDone: function () { return tutDone; },
+    stage: function () { return { i: seaStage(), name: C.seaStages[seaStage()].name }; },
+    setLife: function (n) { lifeScore = n; runCounted = 0; },
+    cm: cm
   };
 
   // 第 1 关通过：弹出提示进入无尽模式，不清场、不重置，继续当前局面
@@ -1372,7 +1556,7 @@
     var r = Math.random();
     var chestBonus = perkOn('chest5') ? 1.5 : 1; // 成就加成：寻宝猎人
     if (r < 0.4) {
-      var gain = Math.round((60 + Math.random() * 90) * scoreMult * chestBonus);
+      var gain = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
       score += gain; scoreBump = 0.4;
       if (score > best) { best = score; saveNum('mg_best', best); }
       addPopup(x, y - 30, '宝箱开启 +' + gain, true, 0);
@@ -1393,6 +1577,7 @@
     addShake(3, 0.2);
     audio.quest();
     bumpStat('chest');
+    dailyProgress('chest');
   }
   function updateChest(dt) {
     if (level < 2) return;
@@ -1561,8 +1746,8 @@
     overButtons = [];
     var bw = 240, bh = 48, gap = 14, x = (C.W - bw) / 2;
     // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中
-    var areaTop = 170 + 170, areaBottom = 170 + 380 - 26;
-    var n = (reviveCount < 2 ? 1 : 0) + (doubled ? 0 : 1) + 1;
+    var areaTop = 150 + 176, areaBottom = 150 + 436 - 26;
+    var n = (reviveCount < 2 ? 1 : 0) + (doubled ? 0 : 1) + 2; // 复活/双倍/分享/重开
     var groupH = n * bh + (n - 1) * gap;
     var y = areaTop + (areaBottom - areaTop - groupH) / 2;
     if (reviveCount < 2) {
@@ -1573,6 +1758,8 @@
       overButtons.push({ x: x, y: y, w: bw, h: bh, label: '结算双倍（看广告）', action: doDouble });
       y += bh + gap;
     }
+    overButtons.push({ x: x, y: y, w: bw, h: bh, label: '分享战报', action: openShare });
+    y += bh + gap;
     overButtons.push({ x: x, y: y, w: bw, h: bh, label: '重新开始', action: restart });
   }
 
@@ -1589,8 +1776,11 @@
   fit(); // 首次适配（按钮已定义，底部元素可同步贴底）
   var DEX_PANEL = { x: 20, y: 64, w: 380, h: 624 };
   var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 60, y: DEX_PANEL.y + 10, w: 50, h: 26 };
-  var tabDexBtn = { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 10, w: 76, h: 26 };
-  var tabAchBtn = { x: DEX_PANEL.x + 98, y: DEX_PANEL.y + 10, w: 76, h: 26 };
+  var tabDexBtn = { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 10, w: 66, h: 26 };
+  var tabAchBtn = { x: DEX_PANEL.x + 86, y: DEX_PANEL.y + 10, w: 66, h: 26 };
+  var tabDailyBtn = { x: DEX_PANEL.x + 158, y: DEX_PANEL.y + 10, w: 66, h: 26 };
+  var tabRankBtn = { x: DEX_PANEL.x + 230, y: DEX_PANEL.y + 10, w: 66, h: 26 };
+  var shareCopyBtn = { x: 0, y: 0, w: 150, h: 42 }; // 分享卡片：复制文案按钮（打开时定位）
   function spCellRect(i) {
     return { x: DEX_PANEL.x + 12 + i * 50, y: DEX_PANEL.y + 452, w: 48, h: 82 };
   }
@@ -1650,6 +1840,8 @@
     }
     cooldown = C.dropCooldown;
     audio.drop();
+    dropCount++;
+    if (dropCount >= TUT_STEPS.length && !tutDone) { tutDone = true; saveFlag('mg_tut', 1); }
     nextTier = rollTier();
     // 甘霖期间：虚影预览也显示馈赠档位，所见即所得
     if (!nextSpecial && !nextIron && seaEvent.type === 'bless' && seaEvent.data && seaEvent.data.left > 0) nextTier = seaEvent.data.tier;
@@ -1675,10 +1867,21 @@
       else if (inRect(p, confirmNo)) confirmOpen = false;
       return;
     }
+    if (shareOpen) {
+      // 战报卡片：复制文案 / 点面板外关闭
+      if (inRect(p, shareCopyBtn)) {
+        copyShareText();
+        return;
+      }
+      shareOpen = false;
+      return;
+    }
     if (dexOpen) {
       if (inRect(p, dexCloseBtn) || !inRect(p, DEX_PANEL)) { dexOpen = false; return; }
       if (inRect(p, tabDexBtn)) { dexTab = 0; return; }
       if (inRect(p, tabAchBtn)) { dexTab = 1; return; }
+      if (inRect(p, tabDailyBtn)) { dexTab = 2; return; }
+      if (inRect(p, tabRankBtn)) { dexTab = 3; return; }
       if (dexTab === 0) {
         for (var si = 0; si < SP_DEFS.length; si++) {
           if (inRect(p, spCellRect(si))) { dexSelSp = si; audio.blip(620, 0.08, 'sine', 0.06, 0.3); return; }
@@ -1764,6 +1967,15 @@
     }
     levelElapsed += dt; // 从第 1 关开局起连续累计，进入无尽模式后时间无缝接着走
     checkDexGates();
+    // 海域演进：累计分跨过里程碑 → 世界换色 + 弹报
+    var stg = seaStage();
+    if (stageSeen < 0) stageSeen = stg;
+    else if (stg > stageSeen) {
+      stageSeen = stg;
+      addPopup(C.W / 2, 285, '海域演进 · 潜入「' + C.seaStages[stg].name + '」', true, 0);
+      parts.push({ type: 'ring', x: C.W / 2, y: 285, r: 40, life: 0.9, max: 0.9, color: '#7FD4FF' });
+      audio.big();
+    }
     achTick -= dt;
     if (achTick <= 0) { achTick = 1; checkAchievements(); }
 
@@ -1866,12 +2078,13 @@
 
   // ---------- 背景：深海渐变（全窗口宽） + 顶部柔光 + 波光 + 气泡 ----------
   function drawBackground() {
-    // 深海渐变（铺满整个窗口，两侧即延伸海水）
+    // 深海渐变（铺满整个窗口，两侧即延伸海水）；色调随海域里程碑逐级加深
+    var st = C.seaStages[seaStage()];
     var bg = ctx.createLinearGradient(0, 0, 0, VH);
-    bg.addColorStop(0, '#D8F1FD');
-    bg.addColorStop(0.4, '#B8E4F8');
-    bg.addColorStop(0.75, '#97CDEB');
-    bg.addColorStop(1, '#7CB6DE');
+    bg.addColorStop(0, st.bg[0]);
+    bg.addColorStop(0.4, st.bg[1]);
+    bg.addColorStop(0.75, st.bg[2]);
+    bg.addColorStop(1, st.bg[3]);
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, LW, VH);
 
@@ -1898,12 +2111,12 @@
     if (BX > 0) {
       var edge = BX + 26; // 仅轻微溢入游戏区，避免在缸体内形成可见的明暗台阶
       var shadeL = ctx.createLinearGradient(0, 0, edge, 0);
-      shadeL.addColorStop(0, 'rgba(16,56,96,0.26)');
+      shadeL.addColorStop(0, st.shade);
       shadeL.addColorStop(1, 'rgba(16,56,96,0)');
       ctx.fillStyle = shadeL;
       ctx.fillRect(0, 0, edge, VH);
       var shadeR = ctx.createLinearGradient(LW, 0, LW - edge, 0);
-      shadeR.addColorStop(0, 'rgba(16,56,96,0.26)');
+      shadeR.addColorStop(0, st.shade);
       shadeR.addColorStop(1, 'rgba(16,56,96,0)');
       ctx.fillStyle = shadeR;
       ctx.fillRect(LW - edge, 0, edge, VH);
@@ -3129,7 +3342,12 @@
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
 
     // 页签
-    var tabs = [{ r: tabDexBtn, label: '图鉴', on: dexTab === 0 }, { r: tabAchBtn, label: '成就', on: dexTab === 1 }];
+    var tabs = [
+      { r: tabDexBtn, label: '图鉴', on: dexTab === 0 },
+      { r: tabAchBtn, label: '成就', on: dexTab === 1 },
+      { r: tabDailyBtn, label: '每日', on: dexTab === 2, dot: !(daily.done[0] && daily.done[1] && daily.done[2]) },
+      { r: tabRankBtn, label: '榜单', on: dexTab === 3 }
+    ];
     for (var ti = 0; ti < tabs.length; ti++) {
       var tb = tabs[ti];
       ctx.fillStyle = tb.on ? '#2E86B4' : 'rgba(46,134,180,0.12)';
@@ -3137,6 +3355,10 @@
       ctx.fillStyle = tb.on ? '#FFFFFF' : '#4A7FA0';
       ctx.font = 'bold 13px system-ui, sans-serif';
       ctx.fillText(tb.label, tb.r.x + tb.r.w / 2, tb.r.y + 18);
+      if (tb.dot && !tb.on) { // 未全勤提醒小红点
+        ctx.fillStyle = '#E2705E';
+        ctx.beginPath(); ctx.arc(tb.r.x + tb.r.w - 7, tb.r.y + 6, 3.2, 0, Math.PI * 2); ctx.fill();
+      }
     }
     ctx.fillStyle = '#2E86B4';
     roundRect(dexCloseBtn.x, dexCloseBtn.y, dexCloseBtn.w, dexCloseBtn.h, 6); ctx.fill();
@@ -3145,11 +3367,13 @@
     ctx.fillText('关闭', dexCloseBtn.x + dexCloseBtn.w / 2, dexCloseBtn.y + 17);
 
     if (dexTab === 1) { drawAchTab(); return; }
+    if (dexTab === 2) { drawDailyTab(); return; }
+    if (dexTab === 3) { drawRankTab(); return; }
 
     ctx.textAlign = 'center';
     ctx.font = '12px system-ui, sans-serif';
     ctx.fillStyle = '#4A7FA0';
-    ctx.fillText('汇入海域 ×' + seaCount + ' · 全局得分 +' + Math.round((scoreMult - 1) * 100) + '% · 累计得分 ' + totalScore(), C.W / 2, DEX_PANEL.y + 56);
+    ctx.fillText('当前海域「' + C.seaStages[seaStage()].name + '」· 汇入海域 ×' + seaCount + ' · 累计得分 ' + totalScore(), C.W / 2, DEX_PANEL.y + 56);
 
     // 合成链 3×3
     for (var t = 0; t < T.length; t++) {
@@ -3272,6 +3496,157 @@
     }
   }
 
+  // 每日页签：3 个按日期生成的任务 + 连续天数
+  function drawDailyTab() {
+    ctx.textAlign = 'center';
+    ctx.font = '12px system-ui, sans-serif';
+    ctx.fillStyle = '#4A7FA0';
+    var allDone = daily.done[0] && daily.done[1] && daily.done[2];
+    ctx.fillText(daily.date + (allDone ? ' · 今日全勤 ✓' : ' · 完成全部任务涨连续天数'), C.W / 2, DEX_PANEL.y + 56);
+    // 连续天数火焰
+    var fy = DEX_PANEL.y + 86;
+    ctx.font = 'bold 15px system-ui, sans-serif';
+    ctx.fillStyle = daily.streak > 0 ? '#E2705E' : '#8AA5B8';
+    var flame = ''; for (var fi = 0; fi < Math.min(daily.streak, 7); fi++) flame += '🔥';
+    ctx.fillText(flame + (daily.streak > 7 ? ' ×' + daily.streak : (daily.streak > 0 ? ' 连续 ' + daily.streak + ' 天' : ' 尚无连续记录')), C.W / 2, fy);
+    for (var i = 0; i < daily.tasks.length; i++) {
+      var t = daily.tasks[i], done = daily.done[i];
+      var ry = DEX_PANEL.y + 110 + i * 86;
+      ctx.fillStyle = done ? 'rgba(245,197,66,0.14)' : 'rgba(46,134,180,0.07)';
+      roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 74, 8); ctx.fill();
+      ctx.textAlign = 'left';
+      ctx.fillStyle = done ? '#B8860B' : '#155A8A';
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      ctx.fillText((done ? '✓ ' : '') + t.text, DEX_PANEL.x + 26, ry + 22);
+      ctx.fillStyle = '#4A7FA0';
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.fillText('奖励 +' + C.daily.rewardScore + ' 分', DEX_PANEL.x + 26, ry + 42);
+      // 进度条
+      var barX = DEX_PANEL.x + 26, barW = DEX_PANEL.w - 120, barY = ry + 54;
+      ctx.fillStyle = 'rgba(46,134,180,0.15)';
+      roundRect(barX, barY, barW, 9, 4.5); ctx.fill();
+      if (daily.prog[i] > 0) {
+        ctx.fillStyle = done ? '#F5C542' : '#2E86B4';
+        roundRect(barX, barY, Math.max(6, barW * daily.prog[i] / t.need), 9, 4.5); ctx.fill();
+      }
+      ctx.textAlign = 'center';
+      ctx.fillStyle = done ? '#B8860B' : '#4A7FA0';
+      ctx.font = '10px system-ui, sans-serif';
+      ctx.fillText(done ? '已完成' : (daily.prog[i] + '/' + t.need), barX + barW + 34, barY + 9);
+      ctx.textAlign = 'left';
+    }
+    ctx.textAlign = 'center';
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = '#4A7FA0';
+    ctx.fillText('全勤奖励：+' + (C.daily.streakBase + (daily.streak + 1) * C.daily.streakStep) + ' 分 · 随机技能充能 +2', C.W / 2, DEX_PANEL.y + 400);
+  }
+
+  // 榜单页签：本地好友榜（预留微信排行榜接口位）+ 晒成绩
+  function drawRankTab() {
+    var rows = friendBoard();
+    ctx.textAlign = 'center';
+    ctx.font = '12px system-ui, sans-serif';
+    ctx.fillStyle = '#4A7FA0';
+    ctx.fillText('好友深海榜 · 比比谁潜得更深', C.W / 2, DEX_PANEL.y + 56);
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var ry = DEX_PANEL.y + 76 + i * 46;
+      ctx.fillStyle = r.me ? 'rgba(245,197,66,0.16)' : (i % 2 ? 'rgba(46,134,180,0.05)' : 'rgba(46,134,180,0.09)');
+      roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 38, 8); ctx.fill();
+      // 名次徽章
+      var badge = ['#F5C542', '#B9C4CC', '#D2955B'][i] || 'rgba(46,134,180,0.35)';
+      ctx.fillStyle = badge;
+      ctx.beginPath(); ctx.arc(DEX_PANEL.x + 38, ry + 19, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = i < 3 ? '#FFFFFF' : '#3E6E90';
+      ctx.font = 'bold 11px system-ui, sans-serif';
+      ctx.fillText(String(i + 1), DEX_PANEL.x + 38, ry + 23);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = r.me ? '#B8860B' : '#155A8A';
+      ctx.font = (r.me ? 'bold ' : '') + '13px system-ui, sans-serif';
+      ctx.fillText(r.me ? r.name + '（你）' : r.name, DEX_PANEL.x + 58, ry + 24);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = r.me ? '#B8860B' : '#3E6E90';
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      ctx.fillText(String(r.score), DEX_PANEL.x + DEX_PANEL.w - 26, ry + 24);
+      ctx.textAlign = 'left';
+    }
+    ctx.textAlign = 'center';
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = '#8AA5B8';
+    ctx.fillText('上线后接入微信好友排行（wx.setUserCloudStorage）', C.W / 2, DEX_PANEL.y + 412);
+  }
+
+  // 战报分享卡片（结算页"分享战报"打开；上线后接 wx.shareAppMessage）
+  function drawShare() {
+    if (!shareOpen) return;
+    ctx.fillStyle = 'rgba(10,40,70,0.6)';
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    var pw = 300, ph = 420, px = (C.W - pw) / 2, py = 160;
+    panel(px, py, pw, ph, 16, 0.97);
+    // 卡片头：深海渐变 + 标题
+    var head = ctx.createLinearGradient(0, py, 0, py + 96);
+    head.addColorStop(0, '#2E86B4'); head.addColorStop(1, '#155A8A');
+    ctx.fillStyle = head;
+    roundRect(px, py, pw, 96, 16); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    roundRect(px, py + 80, pw, 16, 8); ctx.fill();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 20px system-ui, sans-serif';
+    ctx.fillText('水滴成海 · 深海战报', C.W / 2, py + 40);
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillText(C.seaStages[seaStage()].name + ' · ' + daily.date, C.W / 2, py + 66);
+    // 大分数
+    ctx.font = 'bold 46px system-ui, sans-serif';
+    ctx.fillStyle = '#0F4C79';
+    ctx.fillText(String(score), C.W / 2, py + 168);
+    ctx.font = '12px system-ui, sans-serif';
+    ctx.fillStyle = '#4A7FA0';
+    var isNewBest = score >= best && score > 0;
+    ctx.fillText(isNewBest ? '★ 新纪录！' : '最佳 ' + best, C.W / 2, py + 192);
+    // 统计格
+    var stats = [['最高连击', '×' + Math.max(1, maxCombo)], ['汇入海域', '×' + seaCount], ['当前海域', C.seaStages[seaStage()].name]];
+    for (var i = 0; i < stats.length; i++) {
+      var sx = px + 30 + i * ((pw - 60) / 3), sw = (pw - 60) / 3;
+      ctx.fillStyle = 'rgba(46,134,180,0.08)';
+      roundRect(sx, py + 214, sw - 8, 54, 8); ctx.fill();
+      ctx.fillStyle = '#155A8A';
+      ctx.font = 'bold 14px system-ui, sans-serif';
+      ctx.fillText(stats[i][1], sx + (sw - 8) / 2, py + 240);
+      ctx.fillStyle = '#4A7FA0';
+      ctx.font = '10px system-ui, sans-serif';
+      ctx.fillText(stats[i][0], sx + (sw - 8) / 2, py + 258);
+    }
+    // 分享文案预览
+    ctx.fillStyle = 'rgba(46,134,180,0.06)';
+    roundRect(px + 20, py + 282, pw - 40, 66, 8); ctx.fill();
+    ctx.fillStyle = '#3E6E90';
+    ctx.font = '11px system-ui, sans-serif';
+    wrapText(shareText, px + 30, py + 300, pw - 60, 16);
+    // 按钮：复制文案 / 关闭
+    shareCopyBtn.x = px + 20; shareCopyBtn.y = py + ph - 62; shareCopyBtn.w = pw - 40; shareCopyBtn.h = 42;
+    var bg2 = ctx.createLinearGradient(0, shareCopyBtn.y, 0, shareCopyBtn.y + 42);
+    bg2.addColorStop(0, '#3B9BD0'); bg2.addColorStop(1, '#2578A8');
+    ctx.fillStyle = bg2;
+    roundRect(shareCopyBtn.x, shareCopyBtn.y, shareCopyBtn.w, shareCopyBtn.h, 12); ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 15px system-ui, sans-serif';
+    ctx.fillText('复制分享文案', C.W / 2, shareCopyBtn.y + 27);
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = '#8AA5B8';
+    ctx.fillText('点击卡片外任意位置关闭', C.W / 2, py + ph - 10);
+  }
+  function wrapText(text, x, y, maxW, lh) {
+    var line = '', yy = y;
+    for (var i = 0; i < text.length; i++) {
+      var test = line + text[i];
+      if (ctx.measureText(test).width > maxW && line) { ctx.fillText(line, x, yy); line = text[i]; yy += lh; }
+      else line = test;
+    }
+    if (line) ctx.fillText(line, x, yy);
+  }
+
   // ---------- 特效绘制 ----------
   function drawFx() {
     var i, p;
@@ -3368,7 +3743,7 @@
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
     ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
 
-    var pw = 320, ph = 380, px = (C.W - pw) / 2, py = 170;
+    var pw = 320, ph = 436, px = (C.W - pw) / 2, py = 150;
     panel(px, py, pw, ph, 16, 0.97);
 
     ctx.textAlign = 'center';
@@ -3412,6 +3787,33 @@
     }
   }
 
+  // ---------- 首局主动引导（前 5 投分步提示，只出现一次） ----------
+  function drawTutorial() {
+    if (tutDone || state !== 'play' || level !== 1 || adOverlay || dexOpen || confirmOpen) return;
+    var step = Math.min(dropCount, TUT_STEPS.length - 1);
+    var ty = 480;
+    var pulse = 0.5 + 0.5 * Math.sin(time * 4);
+    ctx.save();
+    ctx.textAlign = 'center';
+    // 提示胶囊
+    var tw = ctx.measureText(TUT_STEPS[step]).width;
+    ctx.font = 'bold 13px system-ui, sans-serif';
+    tw = ctx.measureText(TUT_STEPS[step]).width + 44;
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.82 + pulse * 0.15).toFixed(2) + ')';
+    roundRect(C.W / 2 - tw / 2, ty - 20, tw, 40, 20); ctx.fill();
+    ctx.strokeStyle = 'rgba(46,134,180,' + (0.5 + pulse * 0.4).toFixed(2) + ')';
+    ctx.lineWidth = 2;
+    roundRect(C.W / 2 - tw / 2, ty - 20, tw, 40, 20); ctx.stroke();
+    ctx.fillStyle = '#12517E';
+    ctx.fillText(TUT_STEPS[step], C.W / 2, ty + 5);
+    // 步骤圆点
+    for (var i = 0; i < TUT_STEPS.length; i++) {
+      ctx.fillStyle = i < dropCount ? '#2E86B4' : 'rgba(46,134,180,0.25)';
+      ctx.beginPath(); ctx.arc(C.W / 2 - (TUT_STEPS.length - 1) * 7 + i * 14, ty + 36, 3.2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   // ---------- 主渲染 ----------
   function render() {
     // 逻辑坐标 → 设备像素：dpr × view.s（画布铺满窗口后，缩放必须在变换里完成）
@@ -3450,6 +3852,8 @@
     }
 
     drawWaterFront();
+
+    drawTutorial(); // 首局分步引导（前 5 投）
 
     if (state === 'play' && !adOverlay && !evapMode && !flowMode && !rippleMode && !confirmOpen) {
       drawGhost(aimX, C.spawnY, nextTier, cooldown > 0 ? 0.25 : 0.6);
@@ -3549,6 +3953,7 @@
     if (adOverlay) drawAdOverlay();
     if (state === 'over') drawOver();
     if (dexOpen) drawDex();
+    drawShare();
 
     ctx.restore();
   }
