@@ -867,6 +867,18 @@
   function tideY() {
     return FLOORY - tide.progress * (FLOORY - C.containerTop) * C.tide.waterMax;
   }
+  // 波浪振幅随潮汐增强（潮越大浪越涌），物理水面(tideY)保持平，仅视觉起浪
+  function tideAmp() {
+    return 2.5 + tide.progress * 5.5;
+  }
+  // 共用水面波形：两组行波叠加，所有视觉层（水体/染色/波线/泡沫）对齐同一条 crest
+  function tideCrest(x) {
+    var amp = tideAmp();
+    return tideY()
+      + Math.sin(x * 0.032 + time * 2.4) * amp
+      + Math.sin(x * 0.071 - time * 1.7) * amp * 0.55
+      + Math.sin(x * 0.16 + time * 3.6) * amp * 0.25;
+  }
   function updateTide(dt) {
     if (tide.banner > 0) tide.banner -= dt;
     if (tide.phase === 'idle') {
@@ -1075,7 +1087,7 @@
     }
     return {
       state: state, dangerY: C.dangerY, floorY: C.floorY, pileTop: top, n: phys.bodies.length,
-      tide: tide.progress, level: level, score: score,
+      tide: tide.progress, tideRef: tide, level: level, score: score,
       chest: chest ? [Math.round(chest.b.x), Math.round(chest.b.y)] : null,
       chestLife: chest ? Math.round((chest.life - chest.t) * 10) / 10 : null,
       event: seaEvent.type, eventT: seaEvent.type ? Math.round(seaEvent.t * 10) / 10 : null
@@ -2325,33 +2337,55 @@
   function drawWaterBack() {
     if (tide.progress <= 0.01) return;
     var wy = tideY(), left = C.wall, right = C.W - C.wall;
-    var g = ctx.createLinearGradient(0, wy, 0, FLOORY);
+    var g = ctx.createLinearGradient(0, wy - tideAmp(), 0, FLOORY);
     g.addColorStop(0, 'rgba(90,180,235,0.28)');
     g.addColorStop(1, 'rgba(30,110,190,0.5)');
     ctx.fillStyle = g;
-    ctx.fillRect(left, wy, right - left, FLOORY - wy);
+    // 沿波形路径填充（顶部随波浪起伏，而非平顶矩形）
+    ctx.beginPath();
+    ctx.moveTo(left, FLOORY + 4);
+    for (var x = left; x <= right; x += 6) ctx.lineTo(x, tideCrest(x));
+    ctx.lineTo(right, FLOORY + 4);
+    ctx.closePath();
+    ctx.fill();
   }
   function drawWaterFront() {
     if (tide.progress <= 0.01) return;
-    var wy = tideY(), left = C.wall, right = C.W - C.wall;
-    // 半透明覆盖（浸没部分染色）
+    var left = C.wall, right = C.W - C.wall;
+    // 半透明覆盖（浸没部分染色，同一条波形）
     ctx.fillStyle = 'rgba(80,170,230,0.15)';
-    ctx.fillRect(left, wy, right - left, FLOORY - wy);
-    // 水面波浪线
+    ctx.beginPath();
+    ctx.moveTo(left, FLOORY + 4);
+    for (var x = left; x <= right; x += 6) ctx.lineTo(x, tideCrest(x));
+    ctx.lineTo(right, FLOORY + 4);
+    ctx.closePath();
+    ctx.fill();
+    // 水面波浪线（高亮 crest）
     ctx.save();
     ctx.strokeStyle = 'rgba(255,255,255,0.75)';
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    for (var x = left; x <= right; x += 6) {
-      var y = wy + Math.sin(x * 0.08 + time * 3) * 2.5 + Math.sin(x * 0.17 - time * 2) * 1.5;
+    for (x = left; x <= right; x += 5) {
+      var y = tideCrest(x);
       if (x === left) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.stroke();
-    // 浪尖泡沫
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    // 波谷暗影（增强立体感）
+    ctx.strokeStyle = 'rgba(20,90,160,0.35)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    var first = true;
+    for (x = left; x <= right; x += 5) {
+      var sy = tideCrest(x) + 4;
+      if (first) { ctx.moveTo(x, sy); first = false; } else ctx.lineTo(x, sy);
+    }
+    ctx.stroke();
+    // 浪尖泡沫（骑在 crest 上，涨潮越猛泡沫越亮越多）
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.4 + tide.progress * 0.3).toFixed(2) + ')';
     for (x = left; x <= right; x += 26) {
-      var fy = wy + Math.sin(x * 0.08 + time * 3) * 2.5 - 3;
-      ctx.beginPath(); ctx.arc(x, fy, 1.6, 0, Math.PI * 2); ctx.fill();
+      var fy = tideCrest(x) - 3;
+      var fr = 1.4 + Math.sin(x * 0.5 + time * 5) * 0.5;
+      ctx.beginPath(); ctx.arc(x, fy, fr, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
   }
