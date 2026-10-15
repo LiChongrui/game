@@ -119,61 +119,122 @@
     }
   };
 
-  // ---------- 背景音乐（深海氛围垫：实时合成，Cmaj7→Am7→Fmaj7→G7 无缝循环 + 水滴点缀） ----------
+  // ---------- 背景音乐（深海氛围：母线低通呼吸 + 双振荡器暖垫 + 五声琶音 + 水底涌动噪声 + 水滴点缀） ----------
   audio.bgm = {
-    on: false, iv: null, step: 0, _live: [],
+    on: false, iv: null, step: 0, _live: [], _flt: null, _masterGain: null, _lfo: null, _amb: null,
     chords: [
       [261.63, 329.63, 392.00, 493.88], // Cmaj7
       [220.00, 261.63, 329.63, 392.00], // Am7
       [174.61, 220.00, 261.63, 349.23], // Fmaj7
       [196.00, 246.94, 293.66, 392.00]  // G7
     ],
+    arps: [ // 各和弦的琶音点缀音池（高八度五声/和弦音）
+      [523.25, 659.25, 783.99, 1046.50],
+      [440.00, 523.25, 659.25, 880.00],
+      [523.25, 698.46, 880.00],
+      [587.33, 783.99, 987.77]
+    ],
+    // 母线：低通(缓慢呼吸扫频) + 总增益，所有 BGM 声部都汇入这里，音色整体"水下感"
+    master: function () {
+      var c = audio.ctx;
+      if (this._flt) return this._flt;
+      var f = c.createBiquadFilter();
+      f.type = 'lowpass'; f.frequency.value = 1150; f.Q.value = 0.5;
+      var lfo = c.createOscillator(), lg = c.createGain();
+      lfo.type = 'sine'; lfo.frequency.value = 0.05; lg.gain.value = 240;
+      lfo.connect(lg); lg.connect(f.frequency); lfo.start();
+      var g = c.createGain(); g.gain.value = 0.9;
+      f.connect(g); g.connect(c.destination);
+      this._flt = f; this._masterGain = g; this._lfo = lfo;
+      return f;
+    },
+    // 水底涌动：布朗噪声循环 + 低通 + 慢速 swell（一次性创建，stop 时整体停掉）
+    ambience: function () {
+      var c = audio.ctx;
+      if (this._amb) return;
+      var len = Math.floor(c.sampleRate * 3);
+      var buf = c.createBuffer(1, len, c.sampleRate);
+      var d = buf.getChannelData(0), last = 0, i;
+      for (i = 0; i < len; i++) {
+        var w = Math.random() * 2 - 1;
+        last = (last + 0.02 * w) / 1.02;
+        d[i] = last * 3.2;
+      }
+      var src = c.createBufferSource(); src.buffer = buf; src.loop = true;
+      var f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 400;
+      var g = c.createGain(); g.gain.value = 0.045;
+      var lfo = c.createOscillator(), lg = c.createGain();
+      lfo.type = 'sine'; lfo.frequency.value = 0.08; lg.gain.value = 0.022;
+      lfo.connect(lg); lg.connect(g.gain);
+      src.connect(f); f.connect(g); g.connect(this.master());
+      src.start(); lfo.start();
+      this._amb = { src: src, lfo: lfo };
+    },
     start: function () {
       if (this.on || audio.muted || !audio.ctx) return;
       this.on = true;
+      this.master(); this.ambience();
       var self = this;
       var playBar = function () {
         try {
-          var c = audio.ctx, t0 = c.currentTime;
-          var ch = self.chords[self.step % self.chords.length], i;
-          // 柔和垫音（缓起缓落，4s 内收干净 → 循环无缝）
+          var c = audio.ctx, t0 = c.currentTime, dst = self.master();
+          var ch = self.chords[self.step % self.chords.length];
+          var arp = self.arps[self.step % self.arps.length];
+          var i, k;
+          // 暖垫：每个和弦音两个微失谐正弦（合唱质感），尾音与下小节头交叉淡化 → 无缝循环
           for (i = 0; i < ch.length; i++) {
-            var o = c.createOscillator(), g = c.createGain();
-            o.type = 'sine'; o.frequency.value = ch[i];
-            g.gain.setValueAtTime(0.0001, t0);
-            g.gain.linearRampToValueAtTime(0.022, t0 + 1.4);
-            g.gain.setValueAtTime(0.022, t0 + 2.4);
-            g.gain.linearRampToValueAtTime(0.0001, t0 + 4.0);
-            o.connect(g); g.connect(c.destination);
-            o.start(t0); o.stop(t0 + 4.05);
-            self._live.push({ o: o, g: g });
+            for (k = 0; k < 2; k++) {
+              var o = c.createOscillator(), g = c.createGain();
+              o.type = 'sine'; o.frequency.value = ch[i] * (k ? 1.0022 : 0.9978);
+              g.gain.setValueAtTime(0.0001, t0);
+              g.gain.linearRampToValueAtTime(0.014, t0 + 1.6);
+              g.gain.setValueAtTime(0.014, t0 + 2.6);
+              g.gain.linearRampToValueAtTime(0.0001, t0 + 4.15);
+              o.connect(g); g.connect(dst);
+              o.start(t0); o.stop(t0 + 4.2);
+              self._live.push({ o: o, g: g });
+            }
           }
           // 低音铺底
           var b = c.createOscillator(), bg = c.createGain();
           b.type = 'triangle'; b.frequency.value = ch[0] / 2;
           bg.gain.setValueAtTime(0.0001, t0);
-          bg.gain.linearRampToValueAtTime(0.045, t0 + 1.2);
-          bg.gain.setValueAtTime(0.045, t0 + 2.4);
-          bg.gain.linearRampToValueAtTime(0.0001, t0 + 4.0);
-          b.connect(bg); bg.connect(c.destination);
-          b.start(t0); b.stop(t0 + 4.05);
+          bg.gain.linearRampToValueAtTime(0.038, t0 + 1.2);
+          bg.gain.setValueAtTime(0.038, t0 + 2.4);
+          bg.gain.linearRampToValueAtTime(0.0001, t0 + 4.05);
+          b.connect(bg); bg.connect(dst);
+          b.start(t0); b.stop(t0 + 4.1);
           self._live.push({ o: b, g: bg });
-          // 水滴点缀（随机高音滑音）
-          if (Math.random() < 0.55) {
+          // 五声琶音点缀（随机 3~5 个短音，落在小节内随机位置）
+          var n = 3 + (Math.random() * 3 | 0);
+          for (i = 0; i < n; i++) {
+            var at = t0 + 0.4 + Math.random() * 3.0;
+            var fq = arp[(Math.random() * arp.length) | 0];
+            var a = c.createOscillator(), ag = c.createGain();
+            a.type = 'sine'; a.frequency.value = fq;
+            ag.gain.setValueAtTime(0.0001, at);
+            ag.gain.linearRampToValueAtTime(0.016, at + 0.04);
+            ag.gain.exponentialRampToValueAtTime(0.0001, at + 1.1);
+            a.connect(ag); ag.connect(dst);
+            a.start(at); a.stop(at + 1.15);
+            self._live.push({ o: a, g: ag });
+          }
+          // 水滴滑音（低概率，柔和）
+          if (Math.random() < 0.4) {
             var dl = 0.8 + Math.random() * 2.2, f0 = 900 + Math.random() * 700;
             var p = c.createOscillator(), pg = c.createGain();
             p.type = 'sine';
             p.frequency.setValueAtTime(f0, t0 + dl);
             p.frequency.exponentialRampToValueAtTime(f0 * 1.6, t0 + dl + 0.12);
             pg.gain.setValueAtTime(0.0001, t0 + dl);
-            pg.gain.linearRampToValueAtTime(0.02, t0 + dl + 0.02);
+            pg.gain.linearRampToValueAtTime(0.013, t0 + dl + 0.02);
             pg.gain.exponentialRampToValueAtTime(0.0001, t0 + dl + 0.5);
-            p.connect(pg); pg.connect(c.destination);
+            p.connect(pg); pg.connect(dst);
             p.start(t0 + dl); p.stop(t0 + dl + 0.55);
             self._live.push({ o: p, g: pg });
           }
         } catch (e) {}
-        if (self._live.length > 60) self._live.splice(0, self._live.length - 60);
+        if (self._live.length > 90) self._live.splice(0, self._live.length - 90);
         self.step++;
       };
       playBar();
@@ -182,7 +243,7 @@
     stop: function () {
       if (this.iv) clearInterval(this.iv);
       this.iv = null; this.on = false;
-      // 立即静音所有已排程的音符（否则最后一个小节还会余音最多 4 秒）
+      // 立即静音所有已排程音符（否则最后一个小节还会余音最多 4 秒）
       try {
         var t = audio.ctx ? audio.ctx.currentTime : 0;
         for (var i = 0; i < this._live.length; i++) {
@@ -195,6 +256,9 @@
         }
       } catch (e) {}
       this._live = [];
+      // 涌动噪声一并停掉（下次 start 重建）
+      try { if (this._amb) { this._amb.src.stop(); this._amb.lfo.stop(); } } catch (e) {}
+      this._amb = null;
     }
   };
 
