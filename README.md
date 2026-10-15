@@ -36,18 +36,6 @@ python -m http.server 8080
 └── tools/            # 辅助脚本（音效离线合成 gen-audio.js、wx 环境启动自检 test-boot.js）
 ```
 
-## 发布（GitHub Pages）
-
-1. 仓库根目录已含 `CNAME`（内容为 `game.luosgeo.com`）。
-2. GitHub 仓库 **Settings → Pages**：Source 选 `main` 分支 / `(root)`，Custom domain 填 `game.luosgeo.com`。
-3. 在 `luosgeo.com` 的 DNS 解析处添加记录：
-
-   | 类型 | 主机记录 | 记录值 |
-   | ---- | -------- | ------ |
-   | CNAME | game | `<你的GitHub用户名>.github.io` |
-
-4. 生效后在 Pages 设置里勾选 **Enforce HTTPS**。
-
 ## 许可
 
 MIT License，见 [LICENSE](LICENSE)。
