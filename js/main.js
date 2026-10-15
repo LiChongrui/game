@@ -13,8 +13,9 @@
   canvas.height = C.H * dpr;
 
   function fit() {
-    // 等比缩放、最大范围铺满窗口（比例恒为 420:720）
-    var scale = Math.min(window.innerWidth / C.W, window.innerHeight / C.H);
+    // 游戏区固定上限 525×900（1.25 倍）：窗口更大时游戏区大小不变，
+    // 多余空间由页面深海背景填充（body 渐变 + flex 居中）；窗口较小时缩小适配
+    var scale = Math.min(window.innerWidth / C.W, window.innerHeight / C.H, 1.25);
     canvas.style.width = (C.W * scale) + 'px';
     canvas.style.height = (C.H * scale) + 'px';
   }
