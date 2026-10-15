@@ -6,33 +6,34 @@
   var T = C.tiers;
 
   // ---------- 画布 ----------
-  // 游戏在一张固定 420×720 的离屏画布上绘制；可见画布宽度=游戏区宽度（居中，
-  // 两侧是页面深海背景），高度恒等于窗口高度——垂直方向永远铺满。
-  // 游戏区底部锚定（海底贴底、警戒线等位置固定），多余高度全部成为顶部延伸带
-  // （场景边缘像素拉伸，视觉上水滴滴落区域向上延伸）
+  // 逻辑高度动态（VH ≥ 720）：顶部元素（HUD/出生区/警戒线）按顶部坐标绘制，
+  // 底部元素（海底/技能栏/按钮）按 VH-偏移 贴底，中间水域随窗口高度自适应；
+  // 画布 CSS 高度恒等于窗口高度，CSS 宽度=游戏区宽度（两侧为页面深海背景）
   var canvas = document.getElementById('game');
+  var ctx = canvas.getContext('2d');
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
-  var scene = document.createElement('canvas'); // 游戏区离屏画布（420×720，尺寸恒定）
-  scene.width = C.W * dpr;
-  scene.height = C.H * dpr;
-  var vctx = canvas.getContext('2d');
-  var ctx = scene.getContext('2d');
+  var VH = C.H;           // 当前逻辑高度
+  var FLOORY = FLOORY;  // 容器底 y（底部锚定：VH - 74）
+  var view = { s: 1 };
 
-  var view = { s: 1, dx: 0, dy: 0 }; // 游戏区缩放与垂直偏移
   function fit() {
     var w = window.innerWidth, h = window.innerHeight;
-    view.s = Math.min(w / C.W, h / C.H);      // 等比缩放，不变形
-    canvas.width = C.W * view.s * dpr;        // 可见画布宽度 = 游戏区宽度（水平两侧留页面背景）
-    canvas.height = h * dpr;                  // 高度恒等于窗口高度（垂直铺满）
+    view.s = Math.min(w / C.W, h / C.H);   // 等比缩放，不变形
+    VH = h / view.s;
+    FLOORY = VH - 74;                      // 容器底贴住窗口底部（720-646=74）
+    canvas.width = C.W * dpr;
+    canvas.height = Math.round(VH * dpr);
     canvas.style.width = (C.W * view.s) + 'px';
     canvas.style.height = h + 'px';
-    view.dx = 0;
-    view.dy = h - C.H * view.s;               // 游戏区锚定窗口底部：海底贴底、警戒线等位置固定，
-                                              // 多余高度全部成为顶部延伸带（水滴滴落区域向上延伸）
+    // 底部按钮/图鉴角标同步贴底
+    var cy = VH - 32;
+    if (bookBtn) {
+      bookBtn.cy = cy; restartBtn.cy = cy;
+      for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
+    }
   }
   window.addEventListener('resize', fit);
   window.addEventListener('orientationchange', fit);
-  fit();
 
   // ---------- 存储（带兜底） ----------
   function saveNum(key, v) { try { localStorage.setItem(key, String(v)); } catch (e) {} }
@@ -239,7 +240,7 @@
   var bubbles = [];
   for (var bi = 0; bi < 14; bi++) {
     bubbles.push({
-      x: Math.random() * C.W, y: Math.random() * C.H,
+      x: Math.random() * C.W, y: Math.random() * VH,
       r: 1.5 + Math.random() * 3.5, sp: 12 + Math.random() * 22,
       sway: Math.random() * Math.PI * 2
     });
@@ -279,7 +280,7 @@
   var glitters = [];
   for (var gi = 0; gi < 22; gi++) {
     glitters.push({
-      x: Math.random() * C.W, y: Math.random() * C.H,
+      x: Math.random() * C.W, y: Math.random() * VH,
       r: 0.8 + Math.random() * 1.5,
       ph: Math.random() * Math.PI * 2, sp: 1.5 + Math.random() * 2.5
     });
@@ -419,7 +420,7 @@
       p = bubbles[i];
       p.y -= p.sp * dt;
       p.sway += dt;
-      if (p.y < -8) { p.y = C.H + 8; p.x = Math.random() * C.W; }
+      if (p.y < -8) { p.y = VH + 8; p.x = Math.random() * C.W; }
     }
     for (i = 0; i < fishes.length; i++) {
       var f = fishes[i];
@@ -433,12 +434,12 @@
       var jl = jellies[i];
       jl.y -= jl.drift * dt;
       jl.x += Math.sin(time * 0.5 + jl.ph) * 9 * dt;
-      if (jl.y < 170) { jl.y = C.H * 0.88; jl.x = 50 + Math.random() * (C.W - 100); }
+      if (jl.y < 170) { jl.y = VH * 0.88; jl.x = 50 + Math.random() * (C.W - 100); }
     }
     for (i = 0; i < glitters.length; i++) {
       var gl = glitters[i];
       gl.y -= gl.sp * dt;
-      if (gl.y < -6) { gl.y = C.H + 6; gl.x = Math.random() * C.W; }
+      if (gl.y < -6) { gl.y = VH + 6; gl.x = Math.random() * C.W; }
     }
     if (shakeT > 0) { shakeT -= dt; if (shakeT <= 0) shakeAmp = 0; }
     if (scoreBump > 0) scoreBump -= dt;
@@ -738,7 +739,7 @@
 
   // ---------- 潮汐 ----------
   function tideY() {
-    return C.floorY - tide.progress * (C.floorY - C.containerTop) * C.tide.waterMax;
+    return FLOORY - tide.progress * (FLOORY - C.containerTop) * C.tide.waterMax;
   }
   function updateTide(dt) {
     if (tide.banner > 0) tide.banner -= dt;
@@ -828,7 +829,7 @@
   // 在指定位置释放双重波纹（首波强推 + 延迟次波再推）
   function castRipple(x, y) {
     x = Math.max(12, Math.min(C.W - 12, x));
-    y = Math.max(C.containerTop + 30, Math.min(C.floorY - 16, y));
+    y = Math.max(C.containerTop + 30, Math.min(FLOORY - 16, y));
     skillCharge.ripple = 0;
     rippleMode = false;
     applyRipplePush(x, y, C.ripple.power);
@@ -1013,6 +1014,7 @@
     { key: 'ripple', cx: 210, cy: 688, r: 20, pressT: 0 },
     { key: 'evap',   cx: 280, cy: 688, r: 20, pressT: 0 }
   ];
+  fit(); // 首次适配（按钮已定义，底部元素可同步贴底）
   var DEX_PANEL = { x: 26, y: 78, w: 368, h: 560 };
   var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 64, y: DEX_PANEL.y + 8, w: 54, h: 26 };
 
@@ -1033,7 +1035,7 @@
     var rect = canvas.getBoundingClientRect();
     return {
       x: (e.clientX - rect.left) * (C.W / rect.width),
-      y: (e.clientY - rect.top - view.dy) / view.s // 垂直方向减去延伸带偏移
+      y: (e.clientY - rect.top) * (VH / rect.height)
     };
   }
   function hitButton(p) {
@@ -1237,13 +1239,13 @@
   // ---------- 背景：深海渐变 + 顶部柔光 + 波光 + 气泡 ----------
   function drawBackground() {
     // 深海渐变
-    var bg = ctx.createLinearGradient(0, 0, 0, C.H);
+    var bg = ctx.createLinearGradient(0, 0, 0, VH);
     bg.addColorStop(0, '#D8F1FD');
     bg.addColorStop(0.4, '#B8E4F8');
     bg.addColorStop(0.75, '#97CDEB');
     bg.addColorStop(1, '#7CB6DE');
     ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, C.W, C.H);
+    ctx.fillRect(0, 0, C.W, VH);
 
     // 顶部阳光光晕
     var sun = ctx.createRadialGradient(C.W * 0.5, -30, 20, C.W * 0.5, -30, 300);
@@ -1423,12 +1425,12 @@
     var speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
 
     // 落地软阴影（绝对坐标，先画）
-    var floorDist = C.floorY - (b.y + b.r);
+    var floorDist = FLOORY - (b.y + b.r);
     if (floorDist < 30 && floorDist > -b.r) {
       var sa = 0.18 * (1 - Math.max(0, floorDist) / 30);
       ctx.fillStyle = 'rgba(10,40,70,' + sa + ')';
       ctx.beginPath();
-      ctx.ellipse(b.x, C.floorY - 2, b.r * 0.85, b.r * 0.2, 0, 0, Math.PI * 2);
+      ctx.ellipse(b.x, FLOORY - 2, b.r * 0.85, b.r * 0.2, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -1513,12 +1515,12 @@
   function drawIronBall(b, alpha) {
     var r = b.r;
     // 落地软阴影
-    var floorDist = C.floorY - (b.y + b.r);
+    var floorDist = FLOORY - (b.y + b.r);
     if (floorDist < 30 && floorDist > -b.r) {
       var sa = 0.22 * (1 - Math.max(0, floorDist) / 30);
       ctx.fillStyle = 'rgba(10,20,30,' + sa + ')';
       ctx.beginPath();
-      ctx.ellipse(b.x, C.floorY - 2, b.r * 0.9, b.r * 0.2, 0, 0, Math.PI * 2);
+      ctx.ellipse(b.x, FLOORY - 2, b.r * 0.9, b.r * 0.2, 0, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.save();
@@ -1727,7 +1729,7 @@
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(x, y + r);
-    ctx.lineTo(x, C.floorY);
+    ctx.lineTo(x, FLOORY);
     ctx.stroke();
     ctx.restore();
   }
@@ -1754,7 +1756,7 @@
 
   // ---------- 容器：玻璃质感 + 底部焦散 ----------
   function drawContainer() {
-    var floorY = C.floorY, FH = 12;
+    var floorY = FLOORY, FH = 12;
     // 床面：圆角横条（两端探出画布，营造开放感）
     // （危险区渐晕已并入 drawDangerLine，随危险度动态变化）
     var fg = ctx.createLinearGradient(0, floorY, 0, floorY + FH + 6);
@@ -1792,25 +1794,26 @@
 
     // 海底沙床（底栏下方空档，不进游戏区）
     var sy0 = floorY + FH + 6;
-    var sand = ctx.createLinearGradient(0, sy0, 0, C.H);
+    var sand = ctx.createLinearGradient(0, sy0, 0, VH);
     sand.addColorStop(0, 'rgba(216,233,224,0.95)');
     sand.addColorStop(1, 'rgba(152,192,200,0.95)');
     ctx.fillStyle = sand;
-    ctx.fillRect(0, sy0, C.W, C.H - sy0);
+    ctx.fillRect(0, sy0, C.W, VH - sy0);
     // 沙丘
     ctx.fillStyle = 'rgba(238,246,240,0.7)';
     ctx.beginPath(); ctx.ellipse(C.W * 0.2, sy0 + 12, 95, 13, 0, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.ellipse(C.W * 0.74, sy0 + 14, 115, 15, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = 'rgba(228,240,234,0.55)';
     ctx.beginPath(); ctx.ellipse(C.W * 0.47, sy0 + 18, 85, 11, 0, 0, Math.PI * 2); ctx.fill();
-    // 卵石
+    // 卵石（y 相对底部：VH-720 偏移）
     ctx.fillStyle = 'rgba(110,150,168,0.4)';
+    var yoff = VH - C.H;
     var peb = [[24, 688, 3], [66, 700, 2], [112, 686, 2.5], [172, 702, 2], [246, 690, 2.5], [306, 700, 2], [352, 686, 2.5], [404, 696, 2.2]];
     for (var pi = 0; pi < peb.length; pi++) {
-      ctx.beginPath(); ctx.arc(peb[pi][0], peb[pi][1], peb[pi][2], 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(peb[pi][0], peb[pi][1] + yoff, peb[pi][2], 0, Math.PI * 2); ctx.fill();
     }
-    drawStarfish(88, 700, 9);
-    drawShell(330, 702, 9);
+    drawStarfish(88, 700 + yoff, 9);
+    drawShell(330, 702 + yoff, 9);
   }
 
   // 海星：五条圆钝臂 + 中心盘 + 亮斑
@@ -1860,18 +1863,18 @@
   function drawWaterBack() {
     if (tide.progress <= 0.01) return;
     var wy = tideY(), left = C.wall, right = C.W - C.wall;
-    var g = ctx.createLinearGradient(0, wy, 0, C.floorY);
+    var g = ctx.createLinearGradient(0, wy, 0, FLOORY);
     g.addColorStop(0, 'rgba(90,180,235,0.28)');
     g.addColorStop(1, 'rgba(30,110,190,0.5)');
     ctx.fillStyle = g;
-    ctx.fillRect(left, wy, right - left, C.floorY - wy);
+    ctx.fillRect(left, wy, right - left, FLOORY - wy);
   }
   function drawWaterFront() {
     if (tide.progress <= 0.01) return;
     var wy = tideY(), left = C.wall, right = C.W - C.wall;
     // 半透明覆盖（浸没部分染色）
     ctx.fillStyle = 'rgba(80,170,230,0.15)';
-    ctx.fillRect(left, wy, right - left, C.floorY - wy);
+    ctx.fillRect(left, wy, right - left, FLOORY - wy);
     // 水面波浪线
     ctx.save();
     ctx.strokeStyle = 'rgba(255,255,255,0.75)';
@@ -2155,7 +2158,7 @@
   function drawConfirm() {
     if (!confirmOpen) return;
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
-    ctx.fillRect(0, 0, C.W, C.H);
+    ctx.fillRect(0, 0, C.W, VH);
     var px = 60, py = 300, pw = C.W - 120, ph = 170;
     panel(px, py, pw, ph, 14, 0.97);
     ctx.textAlign = 'center';
@@ -2294,7 +2297,7 @@
 
     if (seaCount > 0) {
       ctx.save();
-      ctx.translate(C.W - 64, 688);
+      ctx.translate(C.W - 64, VH - 32);
       ctx.rotate(Math.sin(time * 2) * 0.05);
       ctx.fillStyle = 'rgba(30,122,111,0.9)';
       ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2); ctx.fill();
@@ -2331,7 +2334,7 @@
   // ---------- 图鉴 ----------
   function drawDex() {
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
-    ctx.fillRect(0, 0, C.W, C.H);
+    ctx.fillRect(0, 0, C.W, VH);
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
 
     ctx.textAlign = 'center';
@@ -2438,22 +2441,22 @@
 
   function drawAdOverlay() {
     ctx.fillStyle = 'rgba(0,0,0,0.72)';
-    ctx.fillRect(0, 0, C.W, C.H);
+    ctx.fillRect(0, 0, C.W, VH);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 22px system-ui, sans-serif';
-    ctx.fillText('广告位演示（激励视频）', C.W / 2, C.H / 2 - 30);
+    ctx.fillText('广告位演示（激励视频）', C.W / 2, VH / 2 - 30);
     ctx.font = '15px system-ui, sans-serif';
-    ctx.fillText(adOverlay.label + ' · ' + adOverlay.t.toFixed(1) + 's 后发放奖励', C.W / 2, C.H / 2 + 4);
+    ctx.fillText(adOverlay.label + ' · ' + adOverlay.t.toFixed(1) + 's 后发放奖励', C.W / 2, VH / 2 + 4);
     ctx.font = '13px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.fillText('上线微信时替换为 wx.createRewardedVideoAd', C.W / 2, C.H / 2 + 34);
+    ctx.fillText('上线微信时替换为 wx.createRewardedVideoAd', C.W / 2, VH / 2 + 34);
   }
 
   function drawOver() {
     buildOverButtons();
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
-    ctx.fillRect(0, 0, C.W, C.H);
+    ctx.fillRect(0, 0, C.W, VH);
 
     var pw = 320, ph = 380, px = (C.W - pw) / 2, py = 170;
     panel(px, py, pw, ph, 16, 0.97);
@@ -2526,7 +2529,7 @@
 
     if (evapMode) {
       ctx.fillStyle = 'rgba(10,40,70,0.18)';
-      ctx.fillRect(0, 0, C.W, C.H);
+      ctx.fillRect(0, 0, C.W, VH);
       var hb = ballAt(lastPointer);
       if (hb) {
         ctx.save();
@@ -2547,9 +2550,9 @@
     // 涟漪选位模式：显示波纹中心指示
     if (rippleMode) {
       ctx.fillStyle = 'rgba(10,40,70,0.12)';
-      ctx.fillRect(0, 0, C.W, C.H);
+      ctx.fillRect(0, 0, C.W, VH);
       var rx = Math.max(12, Math.min(C.W - 12, lastPointer.x < 0 ? C.W / 2 : lastPointer.x));
-      var ry = Math.max(C.containerTop + 30, Math.min(C.floorY - 16, lastPointer.y < 0 ? (C.containerTop + C.floorY) / 2 : lastPointer.y));
+      var ry = Math.max(C.containerTop + 30, Math.min(FLOORY - 16, lastPointer.y < 0 ? (C.containerTop + FLOORY) / 2 : lastPointer.y));
       ctx.save();
       ctx.setLineDash([8, 8]);
       ctx.strokeStyle = 'rgba(127,212,255,0.55)';
@@ -2574,11 +2577,11 @@
     }
 
     // 暗角（纵深）
-    var vg = ctx.createRadialGradient(C.W / 2, C.H / 2, C.H * 0.34, C.W / 2, C.H / 2, C.H * 0.74);
+    var vg = ctx.createRadialGradient(C.W / 2, VH / 2, VH * 0.34, C.W / 2, VH / 2, VH * 0.74);
     vg.addColorStop(0, 'rgba(0,0,0,0)');
     vg.addColorStop(1, 'rgba(6,28,52,0.16)');
     ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, C.W, C.H);
+    ctx.fillRect(0, 0, C.W, VH);
 
     drawHUD();
     drawLevelHud();
@@ -2594,22 +2597,6 @@
     if (dexOpen) drawDex();
   }
 
-  // 把游戏区合成到可见画布：宽度上游戏区占满画布，底部锚定（海底贴底、
-  // 其他区域位置固定），仅顶部空档用场景最上 2px 拉伸延伸（水滴滴落区域延伸）
-  function composite() {
-    var w = canvas.width, h = canvas.height;
-    var gw = C.W * view.s * dpr, gh = C.H * view.s * dpr;
-    var dx = view.dx * dpr, dy = view.dy * dpr;
-    var slice = 2 * dpr;
-    vctx.imageSmoothingEnabled = true;
-    if (dy > 0) vctx.drawImage(scene, 0, 0, scene.width, slice, dx, 0, gw, dy); // 仅顶部延伸
-    if (dx > 0) {
-      vctx.drawImage(scene, 0, 0, slice, scene.height, 0, dy, dx, gh);
-      vctx.drawImage(scene, scene.width - slice, 0, slice, scene.height, dx + gw, dy, w - dx - gw, gh);
-    }
-    vctx.drawImage(scene, 0, 0, scene.width, scene.height, dx, dy, gw, gh); // 游戏区本体
-  }
-
   // ---------- 主循环 ----------
   var last = 0;
   function frame(ts) {
@@ -2619,7 +2606,6 @@
     last = ts;
     update(dt);
     render();
-    composite();
   }
 
   makeQuest(0);
