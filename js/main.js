@@ -7,8 +7,9 @@
 
   // ---------- 画布 ----------
   // 游戏在一张固定 420×720 的离屏画布上绘制；可见画布宽度=游戏区宽度（居中，
-  // 两侧是页面深海背景），高度恒等于窗口高度——垂直方向永远铺满，
-  // 上下空档用场景边缘像素拉伸延伸（延伸色），任何窗口比例都不露空
+  // 两侧是页面深海背景），高度恒等于窗口高度——垂直方向永远铺满。
+  // 游戏区底部锚定（海底贴底、警戒线等位置固定），多余高度全部成为顶部延伸带
+  // （场景边缘像素拉伸，视觉上水滴滴落区域向上延伸）
   var canvas = document.getElementById('game');
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
   var scene = document.createElement('canvas'); // 游戏区离屏画布（420×720，尺寸恒定）
@@ -26,7 +27,8 @@
     canvas.style.width = (C.W * view.s) + 'px';
     canvas.style.height = h + 'px';
     view.dx = 0;
-    view.dy = (h - C.H * view.s) / 2;         // 游戏区在窗口中的垂直偏移（上下延伸带之外）
+    view.dy = h - C.H * view.s;               // 游戏区锚定窗口底部：海底贴底、警戒线等位置固定，
+                                              // 多余高度全部成为顶部延伸带（水滴滴落区域向上延伸）
   }
   window.addEventListener('resize', fit);
   window.addEventListener('orientationchange', fit);
@@ -2592,16 +2594,15 @@
     if (dexOpen) drawDex();
   }
 
-  // 把游戏区合成到可见画布：宽度上游戏区占满画布，垂直居中，
-  // 上下空档用场景最上/最下 2px 拉伸延伸（无缝延伸色）
+  // 把游戏区合成到可见画布：宽度上游戏区占满画布，底部锚定（海底贴底、
+  // 其他区域位置固定），仅顶部空档用场景最上 2px 拉伸延伸（水滴滴落区域延伸）
   function composite() {
     var w = canvas.width, h = canvas.height;
     var gw = C.W * view.s * dpr, gh = C.H * view.s * dpr;
     var dx = view.dx * dpr, dy = view.dy * dpr;
     var slice = 2 * dpr;
     vctx.imageSmoothingEnabled = true;
-    if (dy > 0) vctx.drawImage(scene, 0, 0, scene.width, slice, dx, 0, gw, dy); // 顶部延伸
-    if (dy + gh < h) vctx.drawImage(scene, 0, scene.height - slice, scene.width, slice, dx, dy + gh, gw, h - dy - gh); // 底部延伸
+    if (dy > 0) vctx.drawImage(scene, 0, 0, scene.width, slice, dx, 0, gw, dy); // 仅顶部延伸
     if (dx > 0) {
       vctx.drawImage(scene, 0, 0, slice, scene.height, 0, dy, dx, gh);
       vctx.drawImage(scene, scene.width - slice, 0, slice, scene.height, dx + gw, dy, w - dx - gw, gh);
