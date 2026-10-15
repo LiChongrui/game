@@ -813,7 +813,7 @@
     score += bonus;
     scoreBump = 0.3;
     if (score > best) { best = score; saveNum('mg_best', best); }
-    addPopup(px === undefined ? C.W / 2 : px, py === undefined ? 100 : py,
+    addPopup(px === undefined ? C.W / 2 : px, py === undefined ? 240 : py,
       '图鉴解锁 · ' + T[t].name + ' +' + bonus, true, 0);
     saveDex();
   }
@@ -847,8 +847,8 @@
       scoreBump = 0.4;
       var pick = C.skills[(Math.random() * C.skills.length) | 0];
       skillCharge[pick.key] += 2;
-      addPopup(C.W / 2, 150, '成就达成 · ' + a.name + ' +' + gain, true, 0);
-      addPopup(C.W / 2, 176, '「' + pick.name + '」充能 +2', false, 0);
+      addPopup(C.W / 2, 240, '成就达成 · ' + a.name + ' +' + gain, true, 0);
+      addPopup(C.W / 2, 266, '「' + pick.name + '」充能 +2', false, 0);
       parts.push({ type: 'ring', x: C.W / 2, y: 150, r: 26, life: 0.6, max: 0.6, color: '#F5C542' });
       audio.quest();
       saveDex();
@@ -871,7 +871,7 @@
     saveDex();
     for (var i = 0; i < SP_DEFS.length; i++) {
       if (SP_DEFS[i].key === sp) {
-        addPopup(C.W / 2, 130, '图鉴新发现 · ' + SP_DEFS[i].name, true, 0);
+        addPopup(C.W / 2, 240, '图鉴新发现 · ' + SP_DEFS[i].name, true, 0);
         break;
       }
     }
@@ -908,8 +908,8 @@
     bumpStat('quest');
     var pick = C.skills[Math.floor(Math.random() * C.skills.length)];
     skillCharge[pick.key] = pick.cost;
-    addPopup(C.W / 2, 150, '任务完成 +' + gain, true, 0);
-    addPopup(C.W / 2, 176, '「' + pick.name + '」已充满', false, 0);
+    addPopup(C.W / 2, 240, '任务完成 +' + gain, true, 0);
+    addPopup(C.W / 2, 266, '「' + pick.name + '」已充满', false, 0);
     parts.push({ type: 'ring', x: C.W / 2, y: 150, r: 20, life: 0.5, max: 0.5, color: '#F5C542' });
     audio.quest();
     if (score > best) { best = score; saveNum('mg_best', best); }
@@ -1090,7 +1090,7 @@
         nextTier = t;
         rainHint = 2.5;
         aimX = clampAim(aimX);
-        addPopup(C.W / 2, 130, '甘霖 · 下一滴是「' + T[t].name + '」', false, 0);
+        addPopup(C.W / 2, 240, '甘霖 · 下一滴是「' + T[t].name + '」', false, 0);
       }
     }
   }
@@ -1375,7 +1375,7 @@
       nextRune = nextSpecial ? null : rollRune();
       nextIron = rollIron();
       aimX = clampAim(aimX);
-      addPopup(aimX, C.spawnY - 16, '换滴', false, 0);
+      addPopup(aimX, C.spawnY + 66, '换滴', false, 0); // 移到虚影下方，不压住水滴
       audio.drop();
     } else if (key === 'ripple') {
       // 进入选位模式：点击画布任意位置作为波纹中心释放
@@ -1542,6 +1542,17 @@
   // 测试钩子（仅自动化测试用）：充能 / 成就 / 局面构造 / 加压进度
   MG.debug = {
     give: function (k, n) { if (k in skillCharge) skillCharge[k] = n; },
+    setNext: function (opt) {
+      opt = opt || {};
+      nextIron = !!opt.iron;
+      nextSpecial = opt.special || null;
+      nextRune = !opt.special && !opt.iron ? (opt.rune || null) : null;
+      if (opt.tier != null) nextTier = opt.tier;
+    },
+    chestNow: function (x) {
+      if (!chest) spawnChest();
+      if (x != null) chest.b.x = x;
+    },
     achCheck: function () { checkAchievements(); },
     bump: bumpStat,
     forceEndless: function () { level = 2; },
@@ -1593,11 +1604,11 @@
   // ---------- 深海宝箱（无尽模式探索要素） ----------
   function spawnChest() {
     discoverSpecial('chest');
-    var b = createIron(C.W * (0.2 + Math.random() * 0.6), C.spawnY - 40);
+    var b = createIron(C.W * (0.2 + Math.random() * 0.6), C.dangerY + 52); // 警戒线下方开阔水域生成，不压坠落区虚影
     b.chest = true;
     b.r = 17; b.m = b.r * b.r * 6; // 比礁石轻，不会被砸得太凶
     chest = { b: b, t: 0, life: 14 }; // 14 秒内不点就沉走
-    addPopup(b.x, C.containerTop + 66, '沉宝箱！点它开启', true, 0);
+    addPopup(b.x, C.dangerY + 10, '沉宝箱！点它开启', true, 0);
     audio.blip(392, 0.25, 'triangle', 0.14, 1.5);
   }
   function expireChest() {
@@ -2702,7 +2713,7 @@
     ctx.restore();
   }
 
-  // 深海宝箱：木箱 + 金边 + 呼吸光晕 + 剩余时间环（超时会沉走）
+  // 深海宝箱：弧顶木盖 + 直壁箱身 + 铜箍铆钉 + 金锁 + 盖缝透光 + 环绕星光 + 剩余时间环（超时会沉走）
   function drawChest(b, alpha) {
     var bob = Math.sin(time * 2.2) * 1.5;
     ctx.save();
@@ -2711,34 +2722,101 @@
     var fd = FLOORY - (b.y + b.r);
     if (fd < 30 && fd > -b.r) {
       ctx.fillStyle = 'rgba(10,20,30,' + (0.2 * (1 - Math.max(0, fd) / 30)) + ')';
-      ctx.beginPath(); ctx.ellipse(b.x, FLOORY - 2, b.r * 0.9, b.r * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(b.x, FLOORY - 2, b.r * 0.95, b.r * 0.2, 0, 0, Math.PI * 2); ctx.fill();
     }
     ctx.translate(b.x, b.y);
-    // 呼吸光晕（吸引点击）
-    var glow = 0.25 + 0.15 * Math.sin(time * 3);
-    var gg = ctx.createRadialGradient(0, bob, 4, 0, bob, b.r + 14);
-    gg.addColorStop(0, 'rgba(255,208,96,' + glow + ')');
-    gg.addColorStop(1, 'rgba(255,208,96,0)');
-    ctx.fillStyle = gg;
-    ctx.beginPath(); ctx.arc(0, bob, b.r + 14, 0, Math.PI * 2); ctx.fill();
+    // 呼吸金光（渐变缓存；脉动走 globalAlpha，不重建渐变）
+    var glow = 0.5 + 0.28 * Math.sin(time * 3);
+    ctx.globalAlpha = alpha * glow;
+    ctx.fillStyle = grad('chestGlow', function () {
+      var gg = ctx.createRadialGradient(0, 0, 3, 0, 0, 44);
+      gg.addColorStop(0, 'rgba(255,214,110,0.7)');
+      gg.addColorStop(0.55, 'rgba(255,190,80,0.2)');
+      gg.addColorStop(1, 'rgba(255,190,80,0)');
+      return gg;
+    });
+    ctx.beginPath(); ctx.arc(0, bob, b.r + 16, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = alpha;
     ctx.translate(0, bob);
-    var w = b.r * 1.5, h = b.r * 1.2;
-    ctx.fillStyle = '#8A5A2B';
-    roundRect(-w / 2, -h * 0.15, w, h * 0.65, 3); ctx.fill();
-    ctx.fillStyle = '#A96F35';
+
+    var w = b.r * 1.6, h = b.r * 1.3;
+    var seamY = -h * 0.06; // 盖/身分界
+    // 盖（弧顶木盖）
+    ctx.fillStyle = grad('chestLid', function () {
+      var gg = ctx.createLinearGradient(0, -h * 0.62, 0, seamY);
+      gg.addColorStop(0, '#C08A48'); gg.addColorStop(1, '#8F5E2C');
+      return gg;
+    });
     ctx.beginPath();
-    ctx.moveTo(-w / 2, -h * 0.15);
-    ctx.quadraticCurveTo(0, -h * 0.85, w / 2, -h * 0.15);
+    ctx.moveTo(-w / 2, seamY);
+    ctx.quadraticCurveTo(0, -h * 0.72, w / 2, seamY);
     ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = '#F2C14E'; ctx.lineWidth = 1.6;
-    roundRect(-w / 2, -h * 0.15, w, h * 0.65, 3); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-w / 2, -h * 0.15); ctx.quadraticCurveTo(0, -h * 0.85, w / 2, -h * 0.15); ctx.stroke();
+    // 身（直壁木箱，底部圆角）
+    ctx.fillStyle = grad('chestBody', function () {
+      var gg = ctx.createLinearGradient(0, seamY, 0, h * 0.56);
+      gg.addColorStop(0, '#96622D'); gg.addColorStop(1, '#64401A');
+      return gg;
+    });
+    roundRect(-w / 2, seamY, w, h * 0.62, 3); ctx.fill();
+    // 木板竖缝
+    ctx.strokeStyle = 'rgba(60,36,12,0.35)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.17, seamY + 3); ctx.lineTo(-w * 0.17, h * 0.52);
+    ctx.moveTo(w * 0.17, seamY + 3); ctx.lineTo(w * 0.17, h * 0.52);
+    ctx.stroke();
+    // 铜箍 ×2（贯穿盖与身）
+    ctx.fillStyle = '#6B5539';
+    roundRect(-w * 0.42, -h * 0.36, 4.5, h * 0.9, 2); ctx.fill();
+    roundRect(w * 0.42 - 4.5, -h * 0.36, 4.5, h * 0.9, 2); ctx.fill();
+    // 铆钉
+    ctx.fillStyle = '#E8C877';
+    ctx.beginPath();
+    ctx.arc(-w * 0.42 + 2.2, -h * 0.2, 1.1, 0, Math.PI * 2);
+    ctx.arc(w * 0.42 - 2.3, -h * 0.2, 1.1, 0, Math.PI * 2);
+    ctx.arc(-w * 0.42 + 2.2, h * 0.34, 1.1, 0, Math.PI * 2);
+    ctx.arc(w * 0.42 - 2.3, h * 0.34, 1.1, 0, Math.PI * 2);
+    ctx.fill();
+    // 盖缝透光（呼吸）
+    var seamG = 0.26 + 0.24 * Math.sin(time * 3 + 1);
+    ctx.fillStyle = 'rgba(255,224,130,' + seamG.toFixed(2) + ')';
+    roundRect(-w * 0.4, seamY - 1, w * 0.8, 2.2, 1.1); ctx.fill();
+    // 金锁 + 锁孔
     ctx.fillStyle = '#F2C14E';
-    roundRect(-3.5, -h * 0.22, 7, 8, 2); ctx.fill();
-    // 剩余时间环（白色，随时间缩短）
+    roundRect(-4.5, seamY - 3, 9, 10, 2.5); ctx.fill();
+    ctx.fillStyle = '#8A5A18';
+    ctx.beginPath(); ctx.arc(0, seamY + 1.2, 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-0.9, seamY + 2.2); ctx.lineTo(0.9, seamY + 2.2);
+    ctx.lineTo(0.55, seamY + 5.2); ctx.lineTo(-0.55, seamY + 5.2);
+    ctx.closePath(); ctx.fill();
+    // 描金边（盖弧 + 箱身）
+    ctx.strokeStyle = 'rgba(242,193,78,0.85)'; ctx.lineWidth = 1.4;
+    roundRect(-w / 2, seamY, w, h * 0.62, 3); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, seamY);
+    ctx.quadraticCurveTo(0, -h * 0.72, w / 2, seamY);
+    ctx.stroke();
+    // 环绕星光（3 颗，闪烁）
+    var k;
+    for (k = 0; k < 3; k++) {
+      var a2 = time * 0.9 + k * 2.09;
+      var sx2 = Math.cos(a2) * (b.r + 11), sy2 = -4 + Math.sin(a2) * (b.r * 0.55);
+      var tw2 = 0.35 + 0.35 * Math.sin(time * 5 + k * 2.1);
+      ctx.strokeStyle = 'rgba(255,240,190,' + tw2.toFixed(2) + ')';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(sx2 - 3, sy2); ctx.lineTo(sx2 + 3, sy2);
+      ctx.moveTo(sx2, sy2 - 3); ctx.lineTo(sx2, sy2 + 3);
+      ctx.stroke();
+    }
+    // 剩余时间环：底轨 + 分级变色（充足白 → 偏短金 → 将沉红）
     var frac = Math.max(0, 1 - chest.t / chest.life);
-    ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(0, 0, b.r + 7, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(20,40,55,0.28)'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(0, 0, b.r + 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = frac > 0.5 ? 'rgba(255,255,255,0.85)' : (frac > 0.25 ? '#FFC94D' : '#FF6B52');
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(0, 0, b.r + 8, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke();
+    ctx.lineCap = 'butt';
     ctx.restore();
   }
   // 彩虹滴徽记：旋转的五彩弧 + 游动星光
@@ -3647,11 +3725,11 @@
     ctx.font = '10px system-ui, sans-serif';
     ctx.fillStyle = '#4A7FA0';
     ctx.textAlign = 'left';
-    ctx.fillText('海域演进', DEX_PANEL.x + 14, DEX_PANEL.y + 430);
+    ctx.fillText('海域演进', DEX_PANEL.x + 14, DEX_PANEL.y + 436);
     ctx.textAlign = 'center';
     for (var stg = 0; stg < C.seaStages.length; stg++) {
       var ss = C.seaStages[stg];
-      var sw = 82, sx0 = DEX_PANEL.x + 14 + stg * (sw + 8), sy0 = DEX_PANEL.y + 436;
+      var sw = 82, sx0 = DEX_PANEL.x + 14 + stg * (sw + 8), sy0 = DEX_PANEL.y + 442;
       var isCur = stg === curStage, reached = tsNow >= ss.at;
       ctx.fillStyle = isCur ? '#2E86B4' : (reached ? 'rgba(46,134,180,0.14)' : 'rgba(120,145,165,0.14)');
       roundRect(sx0, sy0, sw, 40, 7); ctx.fill();
