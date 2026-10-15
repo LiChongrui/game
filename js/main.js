@@ -419,7 +419,7 @@
     return sp === 'vortex' ? '漩涡滴' : (sp === 'cloud' ? '雨云滴' : (sp === 'ice' ? '冰晶滴' : '彩虹滴'));
   }
   function specialColor(sp) {
-    return sp === 'vortex' ? '#6A46B0' : (sp === 'cloud' ? '#3C6EAA' : (sp === 'ice' ? '#2E8FB8' : '#9B4FD0'));
+    return sp === 'vortex' ? '#4A5FC8' : (sp === 'cloud' ? '#3C6EAA' : (sp === 'ice' ? '#2E8FB8' : '#9B4FD0'));
   }
 
   function clampAim(x) {
@@ -810,7 +810,7 @@
       if (Math.random() < 0.3) {
         var ang = Math.random() * Math.PI * 2;
         parts.push({ type: 'dot', x: b.x + Math.cos(ang) * b.r, y: b.y + Math.sin(ang) * b.r,
-          vx: Math.cos(ang + 2) * 60, vy: Math.sin(ang + 2) * 60, r: 2, life: 0.3, max: 0.3, color: '#9B7FD4' });
+          vx: Math.cos(ang + 2) * 60, vy: Math.sin(ang + 2) * 60, r: 2, life: 0.3, max: 0.3, color: '#8FA8E8' });
       }
     }
     if (b.specialT >= C.vortex.delay + C.vortex.life) dissolveVortex(b);
@@ -834,7 +834,7 @@
     scoreBump = 0.25;
     addPopup(b.x, b.y - b.r - 10, '+' + gain, false, 0);
     burst(b.x, b.y, 5, false);
-    parts.push({ type: 'ring', x: b.x, y: b.y, r: 16, life: 0.45, max: 0.45, color: '#9B7FD4' });
+    parts.push({ type: 'ring', x: b.x, y: b.y, r: 16, life: 0.45, max: 0.45, color: '#8FA8E8' });
     phys.remove(b);
     audio.swirl();
   }
@@ -1226,7 +1226,7 @@
       ctx.save();
       ctx.translate(seaEvent.x, seaEvent.y);
       for (var k = 0; k < 3; k++) {
-        ctx.strokeStyle = 'rgba(120,90,220,' + (0.38 - k * 0.1) + ')';
+        ctx.strokeStyle = 'rgba(96,112,215,' + (0.38 - k * 0.1) + ')';
         ctx.lineWidth = 2.5;
         ctx.beginPath();
         for (var a2 = 0; a2 < Math.PI * 3.2; a2 += 0.25) {
@@ -2116,7 +2116,7 @@
   function drawVortexMark(r) {
     ctx.save();
     ctx.rotate(time * 4);
-    ctx.strokeStyle = 'rgba(120,80,190,0.85)';
+    ctx.strokeStyle = 'rgba(94,110,208,0.85)';
     ctx.lineWidth = Math.max(2, r * 0.09);
     ctx.lineCap = 'round';
     ctx.beginPath();
@@ -2900,17 +2900,41 @@
   }
 
   function drawAdOverlay() {
-    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    // 深海主题化广告演示层：暗化海水渐变 + 上浮气泡 + 漂流瓶，替代生硬的纯黑遮罩
+    var dim = ctx.createLinearGradient(0, 0, 0, VH);
+    dim.addColorStop(0, 'rgba(6,30,56,0.82)');
+    dim.addColorStop(1, 'rgba(4,18,36,0.88)');
+    ctx.fillStyle = dim;
     ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    ctx.strokeStyle = 'rgba(160,220,255,0.25)';
+    ctx.lineWidth = 1.2;
+    for (var i = 0; i < 8; i++) {
+      var bx2 = 40 + i * 48 + Math.sin(time * 1.2 + i * 2.2) * 10;
+      var by2 = (VH + 20) - ((time * 46 + i * 97) % (VH + 40));
+      ctx.beginPath(); ctx.arc(bx2, by2, 3 + (i % 3), 0, Math.PI * 2); ctx.stroke();
+    }
+    // 漂流瓶（随水流轻摆）
+    ctx.save();
+    ctx.translate(C.W / 2, VH / 2 - 64);
+    ctx.rotate(Math.sin(time * 1.4) * 0.12);
+    ctx.fillStyle = 'rgba(150,220,200,0.9)';
+    roundRect(-13, -10, 26, 34, 8); ctx.fill();
+    ctx.fillStyle = 'rgba(196,238,222,0.95)';
+    roundRect(-7, -24, 14, 16, 5); ctx.fill();
+    ctx.fillStyle = '#C99046';
+    roundRect(-8, -30, 16, 7, 3); ctx.fill();
+    ctx.fillStyle = '#F5E9C8';
+    roundRect(-8, 0, 16, 12, 2); ctx.fill();
+    ctx.restore();
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 22px system-ui, sans-serif';
-    ctx.fillText('广告位演示（激励视频）', C.W / 2, VH / 2 - 30);
-    ctx.font = '15px system-ui, sans-serif';
-    ctx.fillText(adOverlay.label + ' · ' + adOverlay.t.toFixed(1) + 's 后发放奖励', C.W / 2, VH / 2 + 4);
-    ctx.font = '13px system-ui, sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.fillText('上线微信时替换为 wx.createRewardedVideoAd', C.W / 2, VH / 2 + 34);
+    ctx.font = 'bold 20px system-ui, sans-serif';
+    ctx.fillText('深海漂流瓶 · 激励视频', C.W / 2, VH / 2 + 26);
+    ctx.font = '14px system-ui, sans-serif';
+    ctx.fillText(adOverlay.label + ' · ' + adOverlay.t.toFixed(1) + 's 后发放奖励', C.W / 2, VH / 2 + 52);
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillText('（演示占位：上线微信时替换为 wx.createRewardedVideoAd）', C.W / 2, VH / 2 + 78);
   }
 
   function drawOver() {
