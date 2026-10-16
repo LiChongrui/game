@@ -2100,9 +2100,7 @@
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
     ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
-    // 页头标题随页签联动：与页签名错开（页签是入口，标题是场景语境），同图鉴「图鉴」页头的层级感
-    var achTitles = ['成就殿堂', '每日任务', '好友排行榜'];
-    drawPanelHeader(achTitles[dexTab] || '成就殿堂');
+    drawPanelHeader('成就殿堂'); // 固定页头标题，不随页签变化
     var dailyDot = !(daily.done[0] && daily.done[1] && daily.done[2]) ? 1 : -1;
     drawSegTabs([achTabRect(0), achTabRect(1), achTabRect(2)], ['成就', '每日', '榜单'], dexTab, dailyDot, 'achtabs');
     if (dexTab === 1) drawDailyTab();
