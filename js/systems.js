@@ -1,0 +1,1859 @@
+// 水滴成海 - systems：游戏状态 / 输入 / 合成 / 技能 / 潮汐 / 海域事件 / 图鉴数据 / 主更新
+// 模块加载顺序 2/4（依赖 core.js：canvas、audio、存储助手）。顶层 var 初始化
+// （rollTier 等）调用的函数与本文件同域提升，或来自已加载的 core.js。
+// 水滴成海 - 游戏主逻辑
+// 输入 / 合成 / 技能 / 图鉴 / 海域 / 特殊水滴(漩涡·雨云·冰晶) / 潮汐 / 任务链 / 渲染 / 音效 / 广告占位
+// 全部 UI 画在 canvas 内（含按钮命中判定），便于后续原样移植到微信小游戏（无 DOM 环境）
+  // ---------- 状态 ----------
+  var phys = new MG.Physics();
+  var state = 'play';
+  var score = 0, displayScore = 0, scoreBump = 0;
+  var best = 0; // 刷新页面即重新计，不跨刷新保留
+  var nextTier = rollTier();
+  var nextSpecial = rollSpecial();
+  var nextRune = nextSpecial ? null : rollRune();
+  var nextIron = rollIron();
+  var runeHintShown = false; // 符文玩法一次性提示
+  var aimX = C.W / 2;
+  var aiming = false;
+  var cooldown = 0;
+  var combo = 0, comboTimer = 0, maxCombo = 0;
+  var reviveCount = 0, doubled = false; // 每局复活上限 2 次（看广告）
+  var runBuffered = false; // 每局一次「深流缓冲」是否已用
+  var popups = [], parts = [];
+  var rippleQueue = []; // 待发的涟漪次波 { t, x, y }
+  var time = 0;
+  var overButtons = [];
+  var shakeT = 0, shakeAmp = 0;
+
+  var skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
+  // 深海宝箱（无尽模式）：定期沉入一只，限时点击开启随机奖励
+  var chest = null;
+  var chestTimer = 26 + Math.random() * 20;
+  // 随机深海事件（无尽模式）：涌泉 / 甘霖 / 漩涡风暴
+  var seaEvent = { timer: 24 + Math.random() * 14, type: null, t: 0, x: 0, y: 0, data: null };
+  var rippleMode = false; // 涟漪选位模式：点击画布指定波纹中心
+  var flowMode = false;   // 水流模式：点选两枚水滴交换位置（布局型道具）
+  var flowPick = null;    // 水流模式已选中的第一枚水滴
+  var dexLoaded = loadDex();
+  var dexUnlocked = dexLoaded.u;
+  var dexCounts = dexLoaded.c;
+  var dexSpecial = dexLoaded.sp;   // 特殊水滴发现记录 { vortex:1, iron:1, ... }
+  var dexTab = 0;                  // 图鉴页签：0=图鉴 1=成就 2=每日 3=榜单
+  var dexSelSp = 0;                // 图鉴页当前选中的特殊滴说明
+  // 跨局终身统计（成就进度用）：宝箱/涨潮/礁石对/彩虹合成/任务/连击/单局最高分
+  var lifeStats = (function () {
+    var d = { chest: 0, tide: 0, ironPair: 0, rainbow: 0, quest: 0, combo: 0, best: 0 };
+    var s = dexLoaded.stats || {};
+    for (var k in d) if (typeof s[k] === 'number' && s[k] > d[k]) d[k] = s[k];
+    return d;
+  })();
+  var achDone = dexLoaded.ach;     // 已达成成就 { id: 1 }
+  function bumpStat(k, n) {
+    lifeStats[k] = (lifeStats[k] || 0) + (n || 1);
+    saveDex();
+    checkAchievements();
+  }
+  var seaCount = 0;
+  var scoreMult = 1;
+  var evapMode = false;
+  var rainHint = 0;
+  var dexOpen = false;
+  var lastPointer = { x: -100, y: -100 };
+
+  var quest = null, questDepth = 0;
+
+  // 关卡状态：1 = 限时得分关（低难度），2 = 无尽模式（礁石/潮汐齐全，计时改为累计进行时长）
+  var level = 1, levelTime = C.level1.time, failReason = '', levelBanner = 0;
+  var levelElapsed = 0;                                  // 无尽模式已进行时长
+  var lifeScore = 0, runCounted = 0; // 累计分（图鉴门槛用）：刷新页面即重新计，不跨刷新保留
+  function totalScore() { return lifeScore + (score - runCounted); }
+
+  // 潮汐状态
+  var tide = { phase: 'idle', timer: C.tide.firstDelay, progress: 0, banner: 0 };
+  var achTick = 0; // 成就周期检查计时
+  // 无尽模式渐进加压：随时长线性到满（潮汐更频/礁石更多/投放向高级倾斜）
+  var endlessT = 0, rampStage = 0;
+  var climaxMark = 0; // 高潮时刻：上次触发时的分数标记
+  var tideGateHint = false; // 潮汐限定合成：一次性提示
+  // 首局主动引导：前 5 投分步提示（只出现一次，localStorage 标记）
+  var dropCount = 0, tutDone = loadFlag('mg_tut');
+  var TUT_STEPS = [
+    '按住屏幕左右拖动瞄准，松手投下水滴',
+    '低级水滴先垫底，给大水滴留空间',
+    '相同水滴碰到一起就会合成升级',
+    '水堆漫过警戒线并停住就输了——留意上方白线',
+    '攒满符文即可点亮底部技能按钮'
+  ];
+  function endlessRamp() {
+    return level === 2 ? Math.min(1, endlessT / (C.ramp.minutes * 60)) : 0;
+  }
+  // 成就永续加成查询（勋章变成长线）
+  function perkOn(id) { return !!achDone[id]; }
+  function perkMult() { return (achDone.tide12 && tide.progress > 0.2) ? 1.1 : 1; }
+  // 数值封顶：所有乘区叠乘后总倍率不超过 C.multCap（防成就/海域加成叠乘导致分数膨胀）
+  // 二周目词缀的得分倍率并入乘区；词缀局上限额外 +3（高危要有高收益）
+  function cm(m) { return Math.min(m * (ng.active ? ng.active.mult : 1), C.multCap + (ng.active ? 3 : 0)); }
+
+  // 技能渐进解锁：按累计得分逐个点亮（换滴开局即有，涟漪/蒸发/水流递进）
+  function skillUnlocked(key) { return totalScore() >= (C.skillUnlock[key] || 0); }
+
+  // ---------- 二周目「深渊回响」（达成最深海域解锁：带词缀的高危高收益无尽局） ----------
+  var ng = { unlocked: loadFlag('mg_ng'), active: null };
+  var ngOpen = false, ngPicks = [];   // 词缀三选一弹窗
+  var ngPickRects = [];               // 三张词缀卡的命中区（draw 时填充）
+  var GRAV0 = C.gravity;              // 基准重力（词缀局按倍率改写，重开恢复）
+  function ngStartRun(affix) {
+    ng.active = affix;
+    C.gravity = GRAV0 * (affix.grav || 1);
+    restart();
+    ng.active = affix;                 // restart 会清 active，重设
+    C.gravity = GRAV0 * (affix.grav || 1);
+    level = 2;                         // 直入无尽（潮汐/宝箱/事件全开）
+    levelBanner = 2.2;
+    addPopup(C.W / 2, 300, '深渊回响 ·「' + affix.name + '」×' + affix.mult, true, 0);
+    ngOpen = false;
+  }
+  function ngEndRun() {
+    if (!ng.active) return;
+    ng.active = null;
+    C.gravity = GRAV0;
+  }
+  // 词缀三选一：从词缀池随机抽 3 张
+  function openNgPick() {
+    var pool = C.ng.affixes.slice(), picks = [];
+    while (picks.length < 3 && pool.length) picks.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]);
+    ngPicks = picks;
+    ngPickRects = [];
+    ngOpen = true;
+    audio.blip(460, 0.12, 'sine', 0.08, 0.6);
+  }
+
+  // 海域演进：累计分跨过里程碑改变世界（背景色调随阶段加深 + 称号）
+  var stageSeen = -1; // 已提示过的阶段（会话内）
+  function seaStage() {
+    var s = 0, ts = totalScore();
+    for (var i = C.seaStages.length - 1; i >= 0; i--) { if (ts >= C.seaStages[i].at) { s = i; break; } }
+    return s;
+  }
+
+  // ---------- 每日任务（按日期种子生成，跨局累计；全完成涨连续天数） ----------
+  function todayStr() {
+    var d = new Date();
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  }
+  function yesterdayStr() {
+    var d = new Date(); d.setDate(d.getDate() - 1);
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  }
+  function dateSeed(str) {
+    var h = 2166136261;
+    for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = (h * 16777619) >>> 0; }
+    return h >>> 0;
+  }
+  function mulberry(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function loadDaily() { return MG.platform.getJSON('mg_daily', null); }
+  function saveDaily() { MG.platform.setJSON('mg_daily', daily); }
+  function buildDailyTasks(date, rnd) {
+    var pool = [
+      { type: 'merge', tier: 1 + Math.floor(rnd() * 3), need: 6 + Math.floor(rnd() * 5) },
+      { type: 'combo', need: 3 + Math.floor(rnd() * 3) },
+      { type: 'chest', need: 1 },
+      { type: 'tide',  need: 2 },
+      { type: 'iron',  need: 1 }
+    ];
+    // 按种子挑 3 个不同类型：合成/连击固定候选，第三个从宝箱/涨潮/礁石里选
+    var t1 = { type: 'merge', tier: 1 + Math.floor(rnd() * 3), need: 6 + Math.floor(rnd() * 5) };
+    t1.text = '合成 ' + t1.need + ' 个「' + T[t1.tier].name + '」';
+    var t2 = { type: 'combo', need: 3 + Math.floor(rnd() * 3) };
+    t2.text = '达成 ' + t2.need + ' 连击';
+    var extra = [pool[2], pool[3], pool[4]][Math.floor(rnd() * 3)];
+    extra = { type: extra.type, need: extra.need };
+    extra.text = extra.type === 'chest' ? '开启 1 只深海宝箱'
+      : (extra.type === 'tide' ? '经历 ' + extra.need + ' 次涨潮' : '消除 1 对礁石');
+    return [t1, t2, extra];
+  }
+  var daily = (function () {
+    var d = loadDaily(), today = todayStr();
+    if (!d || d.date !== today) {
+      var streak = (d && d.date === yesterdayStr()) ? (d.streak || 0) : 0; // 断签清零
+      var rnd = mulberry(dateSeed(today));
+      var fresh = { date: today, streak: streak, streakToday: false, tasks: buildDailyTasks(today, rnd), prog: [0, 0, 0], done: [false, false, false], allDone: false };
+      saveDailyFresh(fresh);
+      return fresh;
+    }
+    return d;
+  })();
+  function saveDailyFresh(d) { MG.platform.setJSON('mg_daily', d); }
+  function dailyProgress(type, tier, n) {
+    for (var i = 0; i < daily.tasks.length; i++) {
+      var t = daily.tasks[i];
+      if (daily.done[i] || t.type !== type) continue;
+      if (type === 'merge' && t.tier !== tier) continue;
+      if (type === 'combo') daily.prog[i] = Math.min(t.need, Math.max(daily.prog[i], n || 0)); // 连击取峰值
+      else daily.prog[i] = Math.min(t.need, daily.prog[i] + (n || 1));
+      if (daily.prog[i] >= t.need) {
+        daily.done[i] = true;
+        var gain = Math.round(C.daily.rewardScore * scoreMult);
+        score += gain;
+        scoreBump = 0.35;
+        addPopup(C.W / 2, 205, '每日任务完成 +' + gain, true, 0);
+        audio.quest();
+      }
+    }
+    // 三项全完成 → 连续天数 +1（每天只涨一次）+ 天数奖励
+    if (!daily.allDone && daily.done[0] && daily.done[1] && daily.done[2]) {
+      daily.allDone = true;
+      if (!daily.streakToday) { daily.streakToday = true; daily.streak++; }
+      var bonus = C.daily.streakBase + daily.streak * C.daily.streakStep;
+      score += bonus;
+      scoreBump = 0.4;
+      var pk = C.skills[(Math.random() * C.skills.length) | 0];
+      skillCharge[pk.key] += 2;
+      addPopup(C.W / 2, 232, '今日全勤！连续 ' + daily.streak + ' 天 +' + bonus, true, 0);
+      addPopup(C.W / 2, 258, '「' + pk.name + '」充能 +2', false, 0);
+      parts.push({ type: 'ring', x: C.W / 2, y: 232, r: 30, life: 0.7, max: 0.7, color: '#F5C542' });
+      audio.quest();
+    }
+    saveDaily();
+  }
+
+  // ---------- 好友榜（本地模拟榜：预留微信 wx 接口位，上线后替换数据源） ----------
+  var friends = (function () {
+    var list = MG.platform.getJSON('mg_friends', null);
+    if (!list) {
+      var names = ['海风酱', '泡泡鱼', '深蓝船长', '浪里格', '珊瑚酱', '夜航星'];
+      var rnd = mulberry(dateSeed('friends-v1'));
+      list = [];
+      for (var i = 0; i < names.length; i++) list.push({ name: names[i], base: Math.floor(300 + rnd() * 4200) });
+      MG.platform.setJSON('mg_friends', list);
+    }
+    return list;
+  })();
+  function friendBoard() {
+    // 好友分随日期轻微浮动（模拟活跃），我方取历史最佳
+    var rnd = mulberry(dateSeed(todayStr()) ^ 0x5f5f);
+    var rows = [];
+    for (var i = 0; i < friends.length; i++) {
+      rows.push({ name: friends[i].name, score: Math.max(0, Math.round(friends[i].base * (0.9 + rnd() * 0.25))), me: false });
+    }
+    rows.push({ name: '我', score: best, me: true });
+    rows.sort(function (a, b) { return b.score - a.score; });
+    return rows;
+  }
+
+  // ---------- 战报分享（卡片式预览；上线后在此接 wx.shareAppMessage） ----------
+  var shareOpen = false, shareText = '';
+  function buildShareText() {
+    return '【水滴成海】我在' + C.seaStages[seaStage()].name + '拿下 ' + score + ' 分！' +
+      (maxCombo > 1 ? '最高 ' + maxCombo + ' 连击，' : '') +
+      (seaCount > 0 ? '沧海汇入海域 ×' + seaCount + '，' : '') +
+      '最佳 ' + best + '。来和我比比谁潜得更深！';
+  }
+  function openShare() {
+    shareText = buildShareText();
+    shareOpen = true;
+    // 上线接微信小游戏时此处调用：
+    // wx.shareAppMessage({ title: shareText, imageUrl: canvas 截图 })
+  }
+  function copyShareText() {
+    var ok = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareText);
+        ok = true;
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = shareText;
+        document.body.appendChild(ta);
+        ta.select();
+        ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+    } catch (e) { ok = false; }
+    addPopup(C.W / 2, 300, ok ? '文案已复制，去粘贴给好友吧' : '复制失败：长按文案手动复制', true, 0);
+    audio.blip(ok ? 760 : 300, 0.15, 'sine', 0.1, 1);
+  }
+
+  // 背景气泡
+  var bubbles = [];
+  for (var bi = 0; bi < 14; bi++) {
+    bubbles.push({
+      x: Math.random() * LW, y: Math.random() * VH,
+      r: 1.5 + Math.random() * 3.5, sp: 12 + Math.random() * 22,
+      sway: Math.random() * Math.PI * 2
+    });
+  }
+
+  // 远景鱼群
+  var fishes = [];
+  function resetFish(f) {
+    f.dir = Math.random() < 0.5 ? 1 : -1;
+    f.x = f.dir > 0 ? -70 : C.W + 70;
+    f.y = 160 + Math.random() * 400;
+    f.sp = 24 + Math.random() * 34;
+    f.s = 7 + Math.random() * 9;
+    f.wob = Math.random() * Math.PI * 2;
+  }
+  for (var fi = 0; fi < 5; fi++) {
+    var nf = { tail: 0, dir: 1, x: 0, y: 0, sp: 0, s: 0, wob: 0 };
+    resetFish(nf);
+    nf.x = Math.random() * LW;
+    fishes.push(nf);
+  }
+
+  // 水母
+  var jellies = [];
+  for (var ji = 0; ji < 2; ji++) {
+    jellies.push({
+      x: 60 + Math.random() * (C.W - 120),
+      y: 260 + ji * 170,
+      s: 13 + Math.random() * 9,
+      ph: Math.random() * Math.PI * 2,
+      drift: 4 + Math.random() * 5,
+      tint: ji === 0 ? '255,175,205' : '185,160,255'
+    });
+  }
+
+  // 微光闪粒
+  var glitters = [];
+  for (var gi = 0; gi < 22; gi++) {
+    glitters.push({
+      x: Math.random() * LW, y: Math.random() * VH,
+      r: 0.8 + Math.random() * 1.5,
+      ph: Math.random() * Math.PI * 2, sp: 1.5 + Math.random() * 2.5
+    });
+  }
+
+  // 海草已按用户要求移除
+
+  function rollTier() {
+    // 渐进加压：投放权重随无尽时长向高级演进（线性插值到 spawnWeightsMax）
+    var rp = endlessRamp(), ws = [], total = 0, i;
+    for (i = 0; i < C.spawnWeights.length; i++) {
+      var w = C.spawnWeights[i] + (C.ramp.spawnWeightsMax[i] - C.spawnWeights[i]) * rp;
+      ws.push(w); total += w;
+    }
+    var r = Math.random() * total;
+    for (i = 0; i < ws.length; i++) { r -= ws[i]; if (r <= 0) return i; }
+    return 0;
+  }
+  function rollSpecial() {
+    if (Math.random() >= C.specialChance) return null;
+    var r = Math.random();
+    if (r < 0.30) return 'vortex';
+    if (r < 0.60) return 'cloud';
+    if (r < 0.84) return 'ice';
+    return 'rainbow'; // 彩虹滴：碰到任意水滴直接跳 2 级合成
+  }
+  function rollIron() {
+    if (seaEvent && seaEvent.type === 'storm') return false; // 保底：风暴期间不再落礁石，避免双重失控
+    var ch = C.iron.chance + (C.ramp.ironChanceMax - C.iron.chance) * endlessRamp();
+    if (ng && ng.active && ng.active.ironX) ch *= ng.active.ironX; // 二周目「暗礁密布」
+    return level === 2 && Math.random() < ch;
+  } // 礁石仅无尽模式（概率随渐进加压提升）
+  // 符文：普通水滴随机附带的道具属性，合成时为对应技能充能（只出已解锁的技能符文）
+  function rollRune() {
+    if (Math.random() >= C.rune.chance) return null;
+    var keys = [], ws = [], total = 0, k;
+    for (k in C.rune.weights) {
+      if (!C.rune.weights.hasOwnProperty(k) || !skillUnlocked(k)) continue;
+      keys.push(k); ws.push(C.rune.weights[k]); total += C.rune.weights[k];
+    }
+    if (!keys.length) return null;
+    var r = Math.random() * total;
+    for (k = 0; k < keys.length; k++) { r -= ws[k]; if (r <= 0) return keys[k]; }
+    return keys[keys.length - 1];
+  }
+  function runeName(key) {
+    for (var i = 0; i < C.skills.length; i++) if (C.skills[i].key === key) return C.skills[i].name;
+    return '';
+  }
+  function runeColor(key) {
+    return key === 'swap' ? '#8E6FC0' : (key === 'ripple' ? '#2FA8A0' : (key === 'evap' ? '#E2705E' : '#3FA8B8'));
+  }
+  function ironCount() {
+    var n = 0;
+    for (var i = 0; i < phys.bodies.length; i++) if (phys.bodies[i].iron) n++;
+    return n;
+  }
+  function createIron(x, y) {
+    discoverSpecial('iron');
+    var b = phys.create(x, y, 0, 0, 0);
+    b.iron = true;
+    b.tier = -1;
+    b.r = C.iron.r;
+    b.m = C.iron.r * C.iron.r * C.iron.massMult; // 大质量 → 下落时把水滴挤开（砸穿效果）
+    return b;
+  }
+  function specialLabel(sp) {
+    return sp === 'vortex' ? '漩涡滴' : (sp === 'cloud' ? '雨云滴' : (sp === 'ice' ? '冰晶滴' : '彩虹滴'));
+  }
+  function specialColor(sp) {
+    return sp === 'vortex' ? '#4A5FC8' : (sp === 'cloud' ? '#3C6EAA' : (sp === 'ice' ? '#2E8FB8' : '#9B4FD0'));
+  }
+
+  function clampAim(x) {
+    var r = nextIron ? C.iron.r : T[nextTier].r;
+    var lo = C.wall + r + 2, hi = C.W - C.wall - r - 2;
+    return Math.max(lo, Math.min(hi, x));
+  }
+
+  // 场上数量最多的一级（限可投放范围、排除特殊滴与冻结滴），用于甘霖馈赠
+  function mostCommonTier() {
+    var counts = {}, i, b;
+    for (i = 0; i < phys.bodies.length; i++) {
+      b = phys.bodies[i];
+      if (b.special || b.frozen > 0 || b.iron) continue;
+      counts[b.tier] = (counts[b.tier] || 0) + 1;
+    }
+    var bestT = -1, bestN = 0;
+    for (i = 0; i < C.spawnWeights.length; i++) {
+      if (counts[i] && counts[i] > bestN) { bestN = counts[i]; bestT = i; }
+    }
+    return bestT;
+  }
+
+  // ---------- 特效 ----------
+  function burst(x, y, tier, isBig) {
+    var t = T[tier];
+    parts.push({ type: 'ring', x: x, y: y, r: t.r * 0.6, life: 0.35, max: 0.35, color: t.color });
+    var n = isBig ? 14 : 7;
+    for (var i = 0; i < n; i++) {
+      var ang = Math.random() * Math.PI * 2, sp = 60 + Math.random() * (isBig ? 220 : 140);
+      var L = 0.5 + Math.random() * 0.3;
+      parts.push({ type: 'dot', x: x, y: y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 40,
+        r: 1.5 + Math.random() * 3, life: L, max: L, color: Math.random() < 0.4 ? '#FFFFFF' : t.color });
+    }
+  }
+  // 合成吸附粒子：从四周螺旋汇入合成点
+  function suckIn(x, y, tier) {
+    var r = T[tier].r + 18;
+    for (var i = 0; i < 6; i++) {
+      var ang = (i / 6) * Math.PI * 2 + Math.random() * 0.5;
+      parts.push({ type: 'suck',
+        x: x + Math.cos(ang) * r, y: y + Math.sin(ang) * r,
+        tx: x, ty: y, r: 2.5, life: 0.28, max: 0.28, color: '#FFFFFF' });
+    }
+  }
+  function addPopup(x, y, text, isBig, mult) {
+    popups.push({ x: x, y: y, text: text, life: 1.0, max: 1.0, big: !!isBig, mult: mult || 0, scale: 0.4 });
+  }
+  function addShake(amp, dur) {
+    shakeAmp = Math.max(shakeAmp, amp);
+    shakeT = Math.max(shakeT, dur);
+  }
+  function updateFx(dt) {
+    var i, p;
+    // 涟漪次波（延迟到达的第二推）
+    for (i = rippleQueue.length - 1; i >= 0; i--) {
+      var rq = rippleQueue[i];
+      rq.t -= dt;
+      if (rq.t <= 0) {
+        applyRipplePush(rq.x, rq.y, C.ripple.secondPower);
+        parts.push({ type: 'ring', x: rq.x, y: rq.y, r: 46, life: 0.5, max: 0.5, color: '#A8DDF5' });
+        rippleQueue.splice(i, 1);
+      }
+    }
+    for (i = parts.length - 1; i >= 0; i--) {
+      p = parts[i];
+      p.life -= dt;
+      if (p.type === 'dot') { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 400 * dt; }
+      else if (p.type === 'suck') {
+        var k = Math.min(1, dt * 13);
+        p.x += (p.tx - p.x) * k; p.y += (p.ty - p.y) * k;
+      }
+      if (p.life <= 0) parts.splice(i, 1);
+    }
+    for (i = popups.length - 1; i >= 0; i--) {
+      p = popups[i];
+      p.life -= dt; p.y -= 28 * dt;
+      if (p.scale < 1) p.scale = Math.min(1, p.scale + dt * 5);
+      if (p.life <= 0) popups.splice(i, 1);
+    }
+    for (i = 0; i < bubbles.length; i++) {
+      p = bubbles[i];
+      p.y -= p.sp * dt;
+      p.sway += dt;
+      if (p.y < -8) { p.y = VH + 8; p.x = Math.random() * LW; }
+    }
+    for (i = 0; i < fishes.length; i++) {
+      var f = fishes[i];
+      f.x += f.dir * f.sp * dt;
+      f.y += Math.sin(time * 0.7 + f.wob) * 8 * dt;
+      f.tail += dt * 9;
+      if (f.dir > 0 && f.x > C.W + 70) resetFish(f);
+      if (f.dir < 0 && f.x < -70) resetFish(f);
+    }
+    for (i = 0; i < jellies.length; i++) {
+      var jl = jellies[i];
+      jl.y -= jl.drift * dt;
+      jl.x += Math.sin(time * 0.5 + jl.ph) * 9 * dt;
+      if (jl.y < 170) { jl.y = VH * 0.88; jl.x = 50 + Math.random() * (LW - 100); }
+    }
+    for (i = 0; i < glitters.length; i++) {
+      var gl = glitters[i];
+      gl.y -= gl.sp * dt;
+      if (gl.y < -6) { gl.y = VH + 6; gl.x = Math.random() * LW; }
+    }
+    if (shakeT > 0) { shakeT -= dt; if (shakeT <= 0) shakeAmp = 0; }
+    if (scoreBump > 0) scoreBump -= dt;
+    // 按钮按压反馈计时
+    if (bookBtn.pressT > 0) bookBtn.pressT -= dt;
+    if (MUTE.pressT > 0) MUTE.pressT -= dt;
+    if (restartBtn.pressT > 0) restartBtn.pressT -= dt;
+    for (i = 0; i < SKILL_BTNS.length; i++) if (SKILL_BTNS[i].pressT > 0) SKILL_BTNS[i].pressT -= dt;
+  }
+
+  // ---------- 图鉴 ----------
+  // 解锁条件：合成出该级 + 跨局累计得分达到门槛（前 5 级无门槛）
+  function unlockTier(t, px, py) {
+    dexCounts[t] = (dexCounts[t] || 0) + 1;
+    if (dexUnlocked[t]) return;
+    if (totalScore() < (C.dexGate[t] || 0)) return; // 积分门槛未到
+    dexUnlocked[t] = 1;
+    var bonus = Math.round(T[t].score * C.dexBonusMult * scoreMult);
+    score += bonus;
+    scoreBump = 0.3;
+    if (score > best) { best = score; saveNum('mg_best', best); }
+    addPopup(px === undefined ? C.W / 2 : px, py === undefined ? 240 : py,
+      '图鉴解锁 · ' + T[t].name + ' +' + bonus, true, 0);
+    saveDex();
+  }
+  // 累计得分跨过门槛时补解锁（如先合出了高级、后攒够积分）
+  function checkDexGates() {
+    for (var t = 0; t < T.length; t++) {
+      if (!dexUnlocked[t] && totalScore() >= (C.dexGate[t] || 0)) unlockTier(t);
+    }
+  }
+
+  // ---------- 成就（常驻目标，跨局累计；达成后永久生效的加成见 perk） ----------
+  var ACH_DEFS = [
+    { id: 'canghai',  name: '沧海遗珠', desc: '合成出传说中的「沧海」',   target: 1,    perk: '永续：沧海汇入海域得分 +50%', cur: function () { return dexCounts[8] || 0; } },
+    { id: 'combo6',   name: '连浪六叠', desc: '达成 6 连击',              target: 6,    perk: '永续：连击窗口 +0.3 秒', cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
+    { id: 'chest5',   name: '寻宝猎人', desc: '累计开启 5 只深海宝箱',    target: 5,    perk: '永续：宝箱奖励 +50% · 充能 +3', cur: function () { return lifeStats.chest || 0; } },
+    { id: 'tide12',   name: '弄潮儿',   desc: '经历 12 次涨潮',           target: 12,   perk: '永续：潮汐期间合成得分 +10%', cur: function () { return lifeStats.tide || 0; } },
+    { id: 'iron5',    name: '礁石克星', desc: '累计消除 5 对礁石',        target: 5,    perk: '永续：礁石相消得分翻倍', cur: function () { return lifeStats.ironPair || 0; } },
+    { id: 'rainbow5', name: '虹光使者', desc: '触发 5 次彩虹合成',        target: 5,    perk: '永续：彩虹合成得分 +50%', cur: function () { return lifeStats.rainbow || 0; } },
+    { id: 'quest12',  name: '任务大师', desc: '累计完成 12 个任务',       target: 12,   perk: '永续：任务奖励 +30%', cur: function () { return lifeStats.quest || 0; } },
+    { id: 'score2k',  name: '深海富豪', desc: '单局得分达到 2000',        target: 2000, perk: '永续：开局随机技能充能 +2', cur: function () { return Math.max(score, best, lifeStats.best || 0); } }
+  ];
+  function checkAchievements() {
+    lifeStats.best = Math.max(lifeStats.best || 0, best, score);
+    for (var i = 0; i < ACH_DEFS.length; i++) {
+      var a = ACH_DEFS[i];
+      if (achDone[a.id]) continue;
+      if (a.cur() < a.target) continue;
+      achDone[a.id] = 1;
+      var gain = Math.round(80 * cm(scoreMult));
+      score += gain;
+      scoreBump = 0.4;
+      var pick = C.skills[(Math.random() * C.skills.length) | 0];
+      skillCharge[pick.key] += 2;
+      addPopup(C.W / 2, 240, '成就达成 · ' + a.name + ' +' + gain, true, 0);
+      addPopup(C.W / 2, 266, '「' + pick.name + '」充能 +2', false, 0);
+      parts.push({ type: 'ring', x: C.W / 2, y: 150, r: 26, life: 0.6, max: 0.6, color: '#F5C542' });
+      audio.quest();
+      saveDex();
+    }
+  }
+
+  // ---------- 特殊水滴图鉴（发现即点亮） ----------
+  var SP_DEFS = [
+    { key: 'vortex',  name: '漩涡滴', color: '#7B6FD0', desc: '落地后吸附周围水滴再消散，可用来聚拢散滴。' },
+    { key: 'cloud',   name: '雨云滴', color: '#8FA8BC', desc: '落地后分裂成两颗雾泡，快速补充低级水滴。' },
+    { key: 'ice',     name: '冰晶滴', color: '#A8DFF2', desc: '落定后冻结周围水滴，冻结滴可以当临时平台。' },
+    { key: 'rainbow', name: '彩虹滴', color: '#E86FA8', desc: '碰到任意水滴使其直接跳 2 级，得分双倍。' },
+    { key: 'iron',    name: '礁石',   color: '#6E7B88', desc: '沉重障碍，无法合成；两两相消或用蒸发移除。' },
+    { key: 'rune',    name: '符文滴', color: '#B08FD0', desc: '带符文的水滴，合成时为对应技能 +1 充能。' },
+    { key: 'chest',   name: '深海宝箱', color: '#C98B3E', desc: '限时沉入场中，点击开启随机奖励。' }
+  ];
+  function discoverSpecial(sp) {
+    if (dexSpecial[sp]) return;
+    dexSpecial[sp] = 1;
+    saveDex();
+    for (var i = 0; i < SP_DEFS.length; i++) {
+      if (SP_DEFS[i].key === sp) {
+        addPopup(C.W / 2, 240, '图鉴新发现 · ' + SP_DEFS[i].name, true, 0);
+        break;
+      }
+    }
+  }
+
+  // ---------- 任务链 ----------
+  function makeQuest(depth) {
+    questDepth = depth;
+    var roll = Math.random(), q;
+    if (roll < 0.45) {
+      q = { type: 'merge', tier: 1 + Math.floor(Math.random() * 3), need: 3 + Math.min(depth, 4), have: 0 };
+      q.text = '合成 ' + q.need + ' 个「' + T[q.tier].name + '」';
+    } else if (roll < 0.75) {
+      q = { type: 'combo', need: Math.min(3 + Math.floor(depth / 2), 6), have: 0 };
+      q.text = '达成 ' + q.need + ' 连击';
+    } else {
+      q = { type: 'tier', tier: 4 + Math.min(Math.floor(depth / 2), 2), need: 1, have: 0 };
+      q.text = '合成出「' + T[q.tier].name + '」';
+    }
+    q.rewardScore = C.questScoreBase + depth * C.questScoreStep;
+    quest = q;
+  }
+  function questProgress(nt, comboN) {
+    if (!quest) return;
+    if (quest.type === 'merge' && nt === quest.tier) quest.have++;
+    else if (quest.type === 'combo') quest.have = Math.max(quest.have, comboN);
+    else if (quest.type === 'tier' && nt === quest.tier) quest.have = 1;
+    if (quest.have >= quest.need) completeQuest();
+  }
+  function completeQuest() {
+    var gain = Math.round(quest.rewardScore * cm(scoreMult * (perkOn('quest12') ? 1.3 : 1))); // 成就加成：任务大师；总倍率封顶
+    score += gain;
+    scoreBump = 0.35;
+    bumpStat('quest');
+    var pick = C.skills[Math.floor(Math.random() * C.skills.length)];
+    skillCharge[pick.key] = pick.cost;
+    addPopup(C.W / 2, 240, '任务完成 +' + gain, true, 0);
+    addPopup(C.W / 2, 266, '「' + pick.name + '」已充满', false, 0);
+    parts.push({ type: 'ring', x: C.W / 2, y: 150, r: 20, life: 0.5, max: 0.5, color: '#F5C542' });
+    audio.quest();
+    if (score > best) { best = score; saveNum('mg_best', best); }
+    makeQuest(questDepth + 1);
+  }
+
+  // ---------- 合成 ----------
+  function processMerges() {
+    var bs = phys.bodies, used = {}, merges = [], i, j;
+    // 彩虹滴：接触任意普通水滴 → 目标滴直接跳 2 级（趣味高光时刻，优先于普通合成）
+    for (i = 0; i < bs.length; i++) {
+      var rb = bs[i];
+      if (used[rb.id] || rb.special !== 'rainbow' || rb.frozen > 0 || rb.iron) continue;
+      for (j = 0; j < bs.length; j++) {
+        var tb = bs[j];
+        if (tb === rb || used[tb.id] || tb.special || tb.frozen > 0 || tb.iron || tb.tier < 0) continue;
+        var rdx = tb.x - rb.x, rdy = tb.y - rb.y;
+        var rminD = rb.r + tb.r + 0.5;
+        if (rdx * rdx + rdy * rdy <= rminD * rminD) {
+          used[rb.id] = used[tb.id] = 1;
+          doRainbowMerge(rb, tb);
+          break;
+        }
+      }
+    }
+    for (i = 0; i < bs.length; i++) {
+      var a = bs[i];
+      if (used[a.id] || a.special || a.frozen > 0 || a.iron) continue;
+      for (j = i + 1; j < bs.length; j++) {
+        var b = bs[j];
+        if (used[b.id] || b.special || b.frozen > 0 || b.iron || b.tier !== a.tier) continue;
+        // 潮汐限定合成：两枚「江河」只能在涨潮时聚成「大海」（彩虹跳级不受限）
+        if (a.tier === C.tidePair.tier && tide.progress < C.tidePair.threshold) {
+          if (!tideGateHint) {
+            tideGateHint = true;
+            addPopup(C.W / 2, 250, '两枚「江河」需在潮汐中才能聚成「大海」', true, 0);
+          }
+          continue;
+        }
+        var dx = b.x - a.x, dy = b.y - a.y;
+        // 合成阈值：接触即合（+0.5 容差覆盖物理 slop 允许的静置重叠）
+        var minD = a.r + b.r + 0.5;
+        if (dx * dx + dy * dy <= minD * minD) {
+          used[a.id] = used[b.id] = 1;
+          merges.push([a, b]);
+          break;
+        }
+      }
+    }
+    for (i = 0; i < merges.length; i++) doMerge(merges[i][0], merges[i][1]);
+
+    // 礁石两两相消：接触即互相消除（不靠技能的移除途径）
+    for (i = 0; i < bs.length; i++) {
+      var ia = bs[i];
+      if (!ia.iron || ia.chest || used[ia.id] || ia.frozen > 0) continue;
+      for (j = i + 1; j < bs.length; j++) {
+        var ib = bs[j];
+        if (!ib.iron || ib.chest || used[ib.id] || ib.frozen > 0) continue;
+        var idx = ib.x - ia.x, idy = ib.y - ia.y;
+        var iminD = ia.r + ib.r + 0.5;
+        if (idx * idx + idy * idy <= iminD * iminD) {
+          used[ia.id] = used[ib.id] = 1;
+          ironPairMerge(ia, ib);
+          break;
+        }
+      }
+    }
+  }
+
+  function ironPairMerge(a, b) {
+    var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    phys.remove(a); phys.remove(b);
+    var gain = Math.round(C.iron.pairScore * cm(scoreMult * (perkOn('iron5') ? 2 : 1))); // 成就加成：礁石克星翻倍；总倍率封顶
+    score += gain;
+    scoreBump = 0.3;
+    if (score > best) { best = score; saveNum('mg_best', best); }
+    addPopup(mx, my - b.r - 12, '礁石相消', true, 0);
+    addPopup(mx, my - b.r + 10, '+' + gain, false, 0);
+    burstIron(mx, my);
+    burstIron(a.x, a.y);
+    burstIron(b.x, b.y);
+    bumpStat('ironPair');
+    dailyProgress('iron');
+    parts.push({ type: 'ring', x: mx, y: my, r: 22, life: 0.5, max: 0.5, color: '#9AA7B4' });
+    addShake(5, 0.3);
+    audio.blip(320, 0.3, 'square', 0.12, 0.5);
+    audio.blip(180, 0.35, 'sine', 0.15, 0.55);
+  }
+
+  // 彩虹合成：彩虹滴 + 任意普通水滴 → 该滴跳 2 级，双倍合成分
+  function doRainbowMerge(rb, t) {
+    var mx = (rb.x + t.x) / 2, my = (rb.y + t.y) / 2;
+    phys.remove(rb); phys.remove(t);
+    var nt = Math.min(T.length - 1, t.tier + 2);
+    var nb = phys.create(mx, my, nt, 0, -60);
+    nb.popT = 0.28;
+    var gain = Math.round(T[nt].score * 2 * cm(scoreMult * (perkOn('rainbow5') ? 1.5 : 1) * perkMult()));
+    score += gain;
+    scoreBump = 0.4;
+    combo++; comboTimer = C.comboWindow + (perkOn('combo6') ? 0.3 : 0);
+    dailyProgress('combo', 0, combo);
+    if (score > best) { best = score; saveNum('mg_best', best); }
+    bumpStat('rainbow');
+    dailyProgress('merge', nt);
+    addPopup(mx, my - T[nt].r - 14, '彩虹合成！「' + T[nt].name + '」', true, 0);
+    addPopup(mx, my - T[nt].r + 8, '+' + gain, false, 0);
+    for (var i = 0; i < 14; i++) {
+      var ang = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 160;
+      parts.push({ type: 'dot', x: mx, y: my, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 40,
+        r: 1.5 + Math.random() * 2.5, life: 0.6, max: 0.6,
+        color: 'hsl(' + Math.floor(Math.random() * 360) + ',80%,65%)' });
+    }
+    parts.push({ type: 'ring', x: mx, y: my, r: 18, life: 0.5, max: 0.5, color: '#C084FC' });
+    addShake(3, 0.2);
+    audio.blip(520, 0.3, 'sine', 0.16, 2.2);
+    audio.blip(780, 0.35, 'triangle', 0.12, 1.8);
+  }
+
+  function doMerge(a, b) {
+    var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    var vx = (a.vx + b.vx) / 2, vy = (a.vy + b.vy) / 2;
+    var tier = a.tier;
+    phys.remove(a); phys.remove(b);
+    // 符文充能：参与合成的水滴若带符文，为对应技能 +1
+    if (a.rune) chargeRune(a, mx, my);
+    if (b.rune) chargeRune(b, mx, my);
+
+    combo++; comboTimer = C.comboWindow + (perkOn('combo6') ? 0.3 : 0); // 成就加成：连浪六叠延长连击窗口
+    if (combo > maxCombo) { maxCombo = combo; if (maxCombo > (lifeStats.combo || 0)) { lifeStats.combo = maxCombo; } }
+    dailyProgress('combo', 0, combo); // 每日任务：连击取峰值
+    var mult = Math.min(combo, C.comboMaxMult);
+
+    // 顶级「沧海」两两相消 → 汇入海域
+    if (tier >= T.length - 1) {
+      seaCount++;
+      scoreMult = 1 + seaCount * C.seaMultStep;
+      var gain = Math.round((T[tier].score * 4 + C.seaBonus) * cm(mult * scoreMult * (perkOn('canghai') ? 1.5 : 1) * perkMult()));
+      score += gain;
+      scoreBump = 0.35;
+      addPopup(mx, my - 22, '汇入海域 ×' + seaCount, true, 0);
+      addPopup(mx, my + 12, '+' + gain, true, 0);
+      burst(mx, my, tier, true);
+      suckIn(mx, my, tier);
+      parts.push({ type: 'ring', x: mx, y: my, r: 20, life: 0.6, max: 0.6, color: '#7FD4FF' });
+      addShake(7, 0.4);
+      audio.big();
+      if (score > best) { best = score; saveNum('mg_best', best); }
+      questProgress(tier, combo);
+      return;
+    }
+
+    var nt = tier + 1;
+    var nb = phys.create(mx, my, nt, vx, vy - 40);
+    nb.grace = 0.25;
+    nb.popT = 0.28;
+
+    var gain2 = Math.round(T[nt].score * cm(mult * scoreMult * perkMult())); // 成就加成：弄潮儿潮汐期间 +10%；总倍率封顶
+    score += gain2;
+    scoreBump = 0.3;
+    if (score > best) { best = score; saveNum('mg_best', best); }
+    dailyProgress('merge', nt);
+
+    unlockTier(nt, mx, my - T[nt].r - 38);
+    addPopup(mx, my - T[nt].r - 12, '+' + gain2, nt >= T.length - 1, mult > 1 ? mult : 0);
+    burst(mx, my, nt, nt >= 6);
+    suckIn(mx, my, tier);
+    pushNeighbors(mx, my, T[nt].r + 30);
+    if (nt >= 6) addShake(4, 0.25);
+    audio.pop(nt);
+    if (nt >= T.length - 1) audio.big();
+
+    questProgress(nt, combo);
+
+    // 甘霖：连击馈赠
+    if (combo === C.rainCombo) {
+      var t = mostCommonTier();
+      if (t >= 0 && t !== nextTier) {
+        nextTier = t;
+        rainHint = 2.5;
+        aimX = clampAim(aimX);
+        addPopup(C.W / 2, 240, '甘霖 · 下一滴是「' + T[t].name + '」', false, 0);
+      }
+    }
+  }
+
+  // 高潮时刻：无尽模式每累计 +500 分，场上最高档的可合成对自发相聚（防后期机械投放）
+  function doClimax() {
+    var bs = phys.bodies, best = null, i, j;
+    for (i = 0; i < bs.length; i++) {
+      var a = bs[i];
+      if (a.iron || a.chest || a.special || a.frozen > 0) continue;
+      for (j = i + 1; j < bs.length; j++) {
+        var b2 = bs[j];
+        if (b2.iron || b2.chest || b2.special || b2.frozen > 0 || b2.tier !== a.tier) continue;
+        if (!best || a.tier > best[0].tier) best = [a, b2];
+      }
+    }
+    climaxMark = score; // 无论是否找到可合对都重置（找不到则下一轮再试）
+    if (!best) return;
+    var a = best[0], b2 = best[1];
+    parts.push({ type: 'ring', x: a.x, y: a.y, r: a.r, life: 0.6, max: 0.6, color: '#F5D76E' });
+    parts.push({ type: 'ring', x: b2.x, y: b2.y, r: b2.r, life: 0.6, max: 0.6, color: '#F5D76E' });
+    for (var k = 0; k < 12; k++) {
+      parts.push({ type: 'dot', x: (a.x + b2.x) / 2, y: (a.y + b2.y) / 2,
+        vx: (Math.random() - 0.5) * 160, vy: -40 - Math.random() * 120,
+        r: 1.5 + Math.random() * 2, life: 0.7, max: 0.7, color: '#F5D76E' });
+    }
+    addPopup(C.W / 2, 250, '海潮高潮！水滴自发相聚', true, 0);
+    addShake(2, 0.2);
+    audio.quest();
+    doMerge(a, b2);
+  }
+
+  function pushNeighbors(x, y, R) {
+    var bs = phys.bodies;
+    for (var i = 0; i < bs.length; i++) {
+      var b = bs[i];
+      var dx = b.x - x, dy = b.y - y;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d > 0 && d < R) {
+        var f = (1 - d / R) * 140;
+        b.vx += dx / d * f; b.vy += dy / d * f;
+      }
+    }
+  }
+
+  // ---------- 特殊水滴 ----------
+  function updateSpecials(dt) {
+    var bs = phys.bodies, i;
+    for (i = bs.length - 1; i >= 0; i--) {
+      var b = bs[i];
+      if (b.special) {
+        b.specialT += dt;
+        if (b.special === 'cloud') {
+          if (b.specialT >= C.cloud.splitDelay) splitCloud(b);
+        } else if (b.special === 'vortex') {
+          updateVortex(b, dt, bs);
+        } else if (b.special === 'ice') {
+          updateIce(b, bs);
+        }
+      }
+      // 冻结滴：速度清零 + 倒计时 + 解冻
+      if (b.frozen > 0) {
+        b.frozen -= dt;
+        b.vx *= 0.1; b.vy = 0;
+        if (b.frozen <= 0) thaw(b);
+      }
+      // 二周目「冰封之海」：标记滴落底即冻（临时平台，风险与资源并存）
+      if (b.ngIce && !b.iron && b.y + b.r >= C.floorY - 3) {
+        b.ngIce = false;
+        b.frozen = C.ice.freezeTime;
+        burst(b.x, b.y + b.r * 0.4, 0, false);
+      }
+    }
+  }
+  function updateVortex(b, dt, bs) {
+    if (b.specialT >= C.vortex.delay && b.specialT < C.vortex.delay + C.vortex.life) {
+      for (var j = 0; j < bs.length; j++) {
+        var o = bs[j];
+        if (o === b || o.special || o.frozen > 0 || o.iron) continue;
+        var dx = b.x - o.x, dy = b.y - o.y;
+        var d = Math.sqrt(dx * dx + dy * dy);
+        if (d > 1 && d < C.vortex.pullR) {
+          var f = C.vortex.pullF * (1 - d / C.vortex.pullR);
+          o.vx += dx / d * f * dt * 10;
+          o.vy += dy / d * f * dt * 10;
+        }
+      }
+      if (Math.random() < 0.3) {
+        var ang = Math.random() * Math.PI * 2;
+        parts.push({ type: 'dot', x: b.x + Math.cos(ang) * b.r, y: b.y + Math.sin(ang) * b.r,
+          vx: Math.cos(ang + 2) * 60, vy: Math.sin(ang + 2) * 60, r: 2, life: 0.3, max: 0.3, color: '#8FA8E8' });
+      }
+    }
+    if (b.specialT >= C.vortex.delay + C.vortex.life) dissolveVortex(b);
+  }
+  function updateIce(b, bs) {
+    var speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+    if ((b.specialT > 0.2 && speed < 70) || b.specialT > 1.6) freezeAround(b, bs);
+  }
+  function splitCloud(b) {
+    phys.remove(b);
+    burst(b.x, b.y, 0, false);
+    var s1 = phys.create(b.x - 14, b.y - 6, 0, -90, -60);
+    var s2 = phys.create(b.x + 14, b.y - 6, 0, 90, -60);
+    s1.popT = s2.popT = 0.25;
+    addPopup(b.x, b.y - 20, '雨云化雨', false, 0);
+    audio.blip(520, 0.2, 'sine', 0.13, 1.8);
+  }
+  function dissolveVortex(b) {
+    var gain = Math.round(C.vortex.score * scoreMult);
+    score += gain;
+    scoreBump = 0.25;
+    addPopup(b.x, b.y - b.r - 10, '+' + gain, false, 0);
+    burst(b.x, b.y, 5, false);
+    parts.push({ type: 'ring', x: b.x, y: b.y, r: 16, life: 0.45, max: 0.45, color: '#8FA8E8' });
+    phys.remove(b);
+    audio.swirl();
+  }
+  function freezeAround(b, bs) {
+    b.special = null;
+    b.frozen = C.ice.freezeTime;
+    var R = b.r * C.ice.radiusFactor;
+    for (var j = 0; j < bs.length; j++) {
+      var o = bs[j];
+      if (o === b || o.special || o.frozen > 0) continue;
+      var dx = o.x - b.x, dy = o.y - b.y;
+      if (dx * dx + dy * dy <= R * R) o.frozen = C.ice.freezeTime * 0.92;
+    }
+    addPopup(b.x, b.y - b.r - 14, '冰封！', false, 0);
+    parts.push({ type: 'ring', x: b.x, y: b.y, r: b.r, life: 0.4, max: 0.4, color: '#BFEAFF' });
+    for (var k = 0; k < 6; k++) {
+      var ang = Math.random() * Math.PI * 2;
+      parts.push({ type: 'dot', x: b.x + Math.cos(ang) * R * 0.5, y: b.y + Math.sin(ang) * R * 0.5,
+        vx: Math.cos(ang) * 40, vy: Math.sin(ang) * 40 - 20, r: 2, life: 0.5, max: 0.5, color: '#DFF4FF' });
+    }
+    audio.freeze();
+  }
+  function thaw(b) {
+    b.frozen = 0;
+    parts.push({ type: 'ring', x: b.x, y: b.y, r: b.r * 0.5, life: 0.3, max: 0.3, color: '#DFF4FF' });
+    audio.thaw();
+  }
+
+  // ---------- 潮汐 ----------
+  function tideY() {
+    return FLOORY - tide.progress * (FLOORY - C.containerTop) * C.tide.waterMax;
+  }
+  // 波浪振幅随潮汐增强（潮越大浪越涌），物理水面(tideY)保持平，仅视觉起浪
+  function tideAmp() {
+    return 2.5 + tide.progress * 5.5;
+  }
+  // 共用水面波形：两组行波叠加，所有视觉层（水体/染色/波线/泡沫）对齐同一条 crest
+  function tideCrest(x) {
+    var amp = tideAmp();
+    return tideY()
+      + Math.sin(x * 0.032 + time * 2.4) * amp
+      + Math.sin(x * 0.071 - time * 1.7) * amp * 0.55
+      + Math.sin(x * 0.16 + time * 3.6) * amp * 0.25;
+  }
+  function updateTide(dt) {
+    if (tide.banner > 0) tide.banner -= dt;
+    if (tide.phase === 'idle') {
+      tide.timer -= dt;
+      tide.progress = Math.max(0, tide.progress - dt / 1.6);
+      if (tide.timer <= 0) {
+        tide.phase = 'active';
+        tide.timer = C.tide.duration;
+        tide.banner = 2.4;
+        audio.tide();
+      }
+    } else {
+      tide.progress = Math.min(1, tide.progress + dt / 1.3);
+      tide.timer -= dt;
+      if (tide.timer <= 0) {
+        tide.phase = 'idle';
+        var tiv = C.tide.cycleInterval - (C.tide.cycleInterval - C.ramp.tideIntervalMin) * endlessRamp(); // 渐进加压：潮汐更频
+        if (ng.active && ng.active.tideInt) tiv *= ng.active.tideInt; // 二周目「疾风骤雨」
+        tide.timer = tiv;
+        bumpStat('tide');                      // 成就：经历涨潮次数（跨局累计）
+        dailyProgress('tide');                 // 每日任务：经历涨潮
+        seaEvent.timer = Math.max(seaEvent.timer, 4); // 保底：退潮后至少 4s 再来事件
+        tryTideBless();                        // 组合技：退潮余波概率引来海神恩泽
+      }
+    }
+  }
+  // 潮汐+祝福组合技：退潮瞬间概率触发，全场普通水滴集体升 1 级（连续两次退潮至多出一次）
+  var tideBlessCd = false;
+  function tryTideBless() {
+    var bs = phys.bodies, i, n = 0;
+    for (i = 0; i < bs.length; i++) if (!bs[i].iron && !bs[i].chest && !bs[i].special) n++;
+    if (n < C.tideBless.minDrops) return;
+    if (tideBlessCd) { tideBlessCd = false; return; }
+    if (Math.random() >= C.tideBless.chance) return;
+    tideBlessCd = true;
+    for (i = 0; i < bs.length; i++) {
+      var b = bs[i];
+      if (b.iron || b.chest || b.special || b.tier >= T.length - 1) continue;
+      b.tier += 1;
+      b.popT = 0.3;
+      parts.push({ type: 'ring', x: b.x, y: b.y, r: b.r * 0.6, life: 0.5, max: 0.5, color: '#F5D76E' });
+    }
+    for (i = 0; i < 10; i++) {
+      parts.push({ type: 'dot', x: 30 + Math.random() * (C.W - 60), y: FLOORY - Math.random() * 120,
+        vx: (Math.random() - 0.5) * 40, vy: -60 - Math.random() * 80,
+        r: 1.5 + Math.random() * 2, life: 0.8, max: 0.8, color: '#F5D76E' });
+    }
+    addPopup(C.W / 2, 220, '海神恩泽！退潮余波祝福全场 +1 级', true, 0);
+    addShake(3, 0.3);
+    audio.quest();
+  }
+  function applyBuoyancy(dt) {
+    if (tide.progress <= 0.02) return;
+    var wy = tideY();
+    var bs = phys.bodies;
+    for (var i = 0; i < bs.length; i++) {
+      var b = bs[i];
+      if (b.iron || b.frozen > 0) continue; // 礁石沉底不浮起
+      var subm = (b.y + b.r - wy) / (2 * b.r);
+      if (subm <= 0) continue;
+      var f = Math.min(1, subm);
+      b.vy -= C.tide.buoyancy * f * dt;
+      // 水的阻力
+      var drag = Math.min(0.9, 2.2 * f * dt);
+      b.vx *= (1 - drag);
+      b.vy *= (1 - drag);
+      // 水面轻微晃动推力（制造涌动感）
+      b.vx += Math.sin(time * 2.2 + b.y * 0.02) * 14 * f * dt;
+    }
+  }
+
+  // ---------- 技能 ----------
+  // 符文充能：合成带符文的水滴 → 对应技能 +1（充满可用）
+  function chargeRune(b, mx, my) {
+    var k = b.rune;
+    if (skillCharge[k] >= skillCost(k)) return;
+    skillCharge[k]++;
+    addPopup(mx + (Math.random() * 24 - 12), my - 10, '「' + runeName(k) + '」符文 +1', false, 0);
+    audio.blip(880, 0.12, 'sine', 0.10, 1.35);
+  }
+  function skillCost(key) {
+    for (var i = 0; i < C.skills.length; i++) if (C.skills[i].key === key) return C.skills[i].cost;
+    return 999;
+  }
+  function skillBtnIdx(key) {
+    for (var i = 0; i < SKILL_BTNS.length; i++) if (SKILL_BTNS[i].key === key) return i;
+    return 0;
+  }
+  function flashSkill(key, text) {
+    var b = SKILL_BTNS[skillBtnIdx(key)];
+    addPopup(b.cx, b.cy - 46, text, false, 0);
+  }
+  function useSkill(key) {
+    var i;
+    if (!skillUnlocked(key)) {
+      flashSkill(key, '累计 ' + C.skillUnlock[key] + ' 分解锁');
+      return;
+    }
+    if (key === 'evap') {
+      if (evapMode) { evapMode = false; return; }
+      if (skillCharge.evap < skillCost('evap')) { flashSkill('evap', '符文 ' + skillCharge.evap + '/' + skillCost('evap')); return; }
+      evapMode = true;
+      rippleMode = false;
+      flowMode = false; flowPick = null;
+      return;
+    }
+    if (key === 'flow') {
+      if (flowMode) { flowMode = false; flowPick = null; return; }
+      if (skillCharge.flow < skillCost('flow')) { flashSkill('flow', '符文 ' + skillCharge.flow + '/' + skillCost('flow')); return; }
+      flowMode = true;
+      evapMode = false; rippleMode = false;
+      return;
+    }
+    if (key === 'ripple' && rippleMode) { rippleMode = false; return; } // 再点按钮取消选位
+    if (skillCharge[key] < skillCost(key)) {
+      flashSkill(key, '符文 ' + skillCharge[key] + '/' + skillCost(key));
+      return;
+    }
+    if (key === 'swap') {
+      skillCharge.swap = 0;
+      nextTier = rollTier();
+      nextSpecial = rollSpecial();
+      nextRune = nextSpecial ? null : rollRune();
+      nextIron = rollIron();
+      aimX = clampAim(aimX);
+      addPopup(aimX, C.spawnY + 66, '换滴', false, 0); // 移到虚影下方，不压住水滴
+      audio.drop();
+    } else if (key === 'ripple') {
+      // 进入选位模式：点击画布任意位置作为波纹中心释放
+      rippleMode = true;
+      evapMode = false;
+      flowMode = false; flowPick = null;
+    }
+  }
+  // 水流交换：两枚水滴互换位置（布局型道具——把挡路的滴换到它能合的地方）
+  function flowSwap(a, b) {
+    var tx = a.x, ty = a.y;
+    a.x = b.x; a.y = b.y;
+    b.x = tx; b.y = ty;
+    a.vx = a.vy = b.vx = b.vy = 0;
+    a.svx = a.svy = b.svx = b.svy = 0;
+    a.trail = []; b.trail = [];
+    skillCharge.flow = 0;
+    flowMode = false; flowPick = null;
+    parts.push({ type: 'ring', x: a.x, y: a.y, r: a.r, life: 0.4, max: 0.4, color: '#7FD4FF' });
+    parts.push({ type: 'ring', x: b.x, y: b.y, r: b.r, life: 0.4, max: 0.4, color: '#7FD4FF' });
+    addPopup((a.x + b.x) / 2, Math.min(a.y, b.y) - 30, '水流交换！', false, 0);
+    audio.pop(3);
+  }
+  // 在指定位置释放双重波纹（首波强推 + 延迟次波再推）
+  function castRipple(x, y) {
+    x = Math.max(12, Math.min(C.W - 12, x));
+    y = Math.max(C.containerTop + 30, Math.min(FLOORY - 16, y));
+    skillCharge.ripple = 0;
+    rippleMode = false;
+    applyRipplePush(x, y, C.ripple.power);
+    rippleQueue.push({ t: C.ripple.delay, x: x, y: y });
+    parts.push({ type: 'ring', x: x, y: y, r: 30, life: 0.5, max: 0.5, color: '#7FD4FF' });
+    parts.push({ type: 'ring', x: x, y: y, r: 60, life: 0.55, max: 0.55, color: '#A8DDF5' });
+    addShake(2, 0.15);
+    audio.pop(5);
+  }
+  function applyRipplePush(cx, cy, power) {
+    var bs = phys.bodies;
+    for (var i = 0; i < bs.length; i++) {
+      var b = bs[i];
+      if (b.iron || b.frozen > 0) continue; // 冻结滴纹丝不动；礁石沉重推不动
+      var dx = b.x - cx, dy = b.y - cy;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 1) { dx = 0; dy = -1; d = 1; }
+      var f = power * Math.max(0.25, 1 - d / C.ripple.radius);
+      b.vx += dx / d * f;
+      b.vy += dy / d * f - C.ripple.lift * (power / C.ripple.power);
+    }
+  }
+  function ballAt(p) {
+    var bs = phys.bodies;
+    for (var i = bs.length - 1; i >= 0; i--) {
+      var b = bs[i];
+      var dx = p.x - b.x, dy = p.y - b.y;
+      var rr = b.r + 6;
+      if (dx * dx + dy * dy <= rr * rr) return b;
+    }
+    return null;
+  }
+  function evaporate(b) {
+    var gain;
+    if (b.iron) {
+      gain = C.iron.evaporateScore;
+      burstIron(b.x, b.y);
+    } else {
+      gain = Math.max(1, Math.round(T[b.tier].score * scoreMult));
+      burst(b.x, b.y, b.tier, false);
+    }
+    score += gain;
+    scoreBump = 0.25;
+    addPopup(b.x, b.y - b.r - 8, b.iron ? '礁石移除 +' + gain : '+' + gain, false, 0);
+    phys.remove(b);
+    skillCharge.evap = 0;
+    evapMode = false;
+    audio.blip(900, 0.25, 'sine', 0.15, 0.4);
+  }
+  function burstIron(x, y) {
+    parts.push({ type: 'ring', x: x, y: y, r: 16, life: 0.4, max: 0.4, color: '#8B98A5' });
+    for (var i = 0; i < 8; i++) {
+      var ang = Math.random() * Math.PI * 2, sp = 70 + Math.random() * 140;
+      parts.push({ type: 'dot', x: x, y: y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 30,
+        r: 1.5 + Math.random() * 2.5, life: 0.45, max: 0.45,
+        color: Math.random() < 0.5 ? '#8B98A5' : '#5A6572' });
+    }
+  }
+
+  // ---------- 失败判定 ----------
+  // 预计算"有支撑"集合：贴底，或下方紧贴别的球。悬空/被顶起/弹跳中的球不算堆积越线。
+  function computeSupported(bs) {
+    var sup = [], i, j;
+    for (i = 0; i < bs.length; i++) sup.push(false);
+    for (i = 0; i < bs.length; i++) {
+      var b = bs[i];
+      if (b.y + b.r >= C.floorY - 2.5) { sup[i] = true; continue; }
+      for (j = 0; j < bs.length; j++) {
+        if (j === i) continue;
+        var o = bs[j];
+        if (o.y <= b.y) continue; // 只认位于下方的支撑
+        var dx = o.x - b.x, dy = o.y - b.y;
+        var minD = b.r + o.r + 2.5;
+        if (dx * dx + dy * dy <= minD * minD) { sup[i] = true; break; }
+      }
+    }
+    return sup;
+  }
+  function checkDanger(dt) {
+    // 潮汐涨落期间豁免：浮力把水滴顶过线不是玩家堆太高，潮退后再重新累计
+    if (tide.progress > 0.15) return;
+    var bs = phys.bodies;
+    var sup = computeSupported(bs);
+    for (var i = 0; i < bs.length; i++) {
+      var b = bs[i];
+      if (b.frozen > 0) continue; // 冻结滴视为"封存"，不判负
+      if (b.grace > 0) { b.dangerT = 0; continue; }
+      var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+      var above = (b.y - b.r) < C.dangerY;
+      if (above && sup[i] && sp < C.dangerSpeed * 2) {
+        // 越线 + 有支撑 + 基本静止（阈值放宽一倍：堆顶微颤不算"在动"）
+        b.dangerT += dt;
+        if (b.dangerT > C.dangerTime) {
+          // 每局一次「深流缓冲」：首次判负改为全局 4 秒宽限，缓解前期暴毙挫败感
+          if (!runBuffered) {
+            runBuffered = true;
+            for (var j = 0; j < bs.length; j++) { bs[j].dangerT = 0; bs[j].grace = 4; }
+            addPopup(C.W / 2, C.dangerY + 66, '深流缓冲 · 宽限 4 秒', true, 0);
+          } else { gameOver(); return; }
+        }
+      } else if (above) {
+        // 越线但悬空/被明显扰动：计时缓慢消退而非清零，避免永远攒不满
+        b.dangerT = Math.max(0, b.dangerT - dt * 2);
+      } else {
+        b.dangerT = 0; // 回到线下，重置
+      }
+    }
+  }
+  function gameOver() {
+    state = 'over';
+    lifeScore += score - runCounted; runCounted = score; // 累计分只记增量（复活续局不重复计）
+    saveNum('mg_life', lifeScore);
+    saveNum('mg_best', best);
+    checkAchievements();
+    saveDex();
+    audio.over();
+  }
+
+  // 只读探针：供自动化测试读取内部状态（不写入、不影响任何游戏逻辑）
+  MG.probe = function () {
+    var top = -1;
+    for (var i = 0; i < phys.bodies.length; i++) {
+      var b = phys.bodies[i];
+      if (top < 0 || b.y - b.r < top) top = b.y - b.r;
+    }
+    var bs = [], i;
+    for (i = 0; i < phys.bodies.length; i++) {
+      b = phys.bodies[i];
+      bs.push({ x: Math.round(b.x), y: Math.round(b.y), r: Math.round(b.r), tier: b.tier, iron: !!b.iron, chest: !!b.chest });
+    }
+    var ui = { book: { cx: bookBtn.cx, cy: bookBtn.cy }, restart: { cx: restartBtn.cx, cy: restartBtn.cy }, skills: [] };
+    for (i = 0; i < SKILL_BTNS.length; i++) ui.skills.push({ key: SKILL_BTNS[i].key, cx: SKILL_BTNS[i].cx, cy: SKILL_BTNS[i].cy });
+    return {
+      state: state, dangerY: C.dangerY, floorY: C.floorY, pileTop: top, n: phys.bodies.length,
+      tide: tide.progress, tideRef: tide, level: level, score: score,
+      chest: chest ? [Math.round(chest.b.x), Math.round(chest.b.y)] : null,
+      chestLife: chest ? Math.round((chest.life - chest.t) * 10) / 10 : null,
+      event: seaEvent.type, eventT: seaEvent.type ? Math.round(seaEvent.t * 10) / 10 : null,
+      bodies: bs, ui: ui, stats: lifeStats, ach: achDone, dexSp: dexSpecial,
+      modes: { evap: evapMode, ripple: rippleMode, flow: flowMode },
+      stage: seaStage(), daily: { done: daily.done.slice(), streak: daily.streak }, best: best
+    };
+  };
+  // 测试钩子（仅自动化测试用）：充能 / 成就 / 局面构造 / 加压进度
+  MG.debug = {
+    give: function (k, n) { if (k in skillCharge) skillCharge[k] = n; },
+    setNext: function (opt) {
+      opt = opt || {};
+      nextIron = !!opt.iron;
+      nextSpecial = opt.special || null;
+      nextRune = !opt.special && !opt.iron ? (opt.rune || null) : null;
+      if (opt.tier != null) nextTier = opt.tier;
+    },
+    chestNow: function (x) {
+      if (!chest) spawnChest();
+      if (x != null) chest.b.x = x;
+    },
+    achCheck: function () { checkAchievements(); },
+    bump: bumpStat,
+    forceEndless: function () { level = 2; },
+    setRamp: function (t) { endlessT = t; },
+    grant: function (id) { achDone[id] = 1; saveDex(); },
+    addScore: function (n) { score += n; },
+    spawn: function (tier, x, y) { return phys.create(x || C.W / 2, y || C.spawnY, tier, 0, 0); },
+    dailyProg: dailyProgress,
+    dailyState: function () { return daily; },
+    board: friendBoard,
+    share: function () { openShare(); return shareText; },
+    shareCopy: copyShareText,
+    setDrops: function (n) { dropCount = n; },
+    tutDone: function () { return tutDone; },
+    stage: function () { return { i: seaStage(), name: C.seaStages[seaStage()].name }; },
+    setLife: function (n) { lifeScore = n; runCounted = 0; },
+    cm: cm,
+    // ---- 蒙特卡洛模拟器钩子（无渲染快进，见 test/simulate.js） ----
+    headless: false,
+    step: function (dt) { update(dt); },
+    drop: function (x) { aimX = clampAim(x == null ? Math.random() * C.W : x); tryDrop(); },
+    reset: function () { restart(); },
+    ngInfo: function () { return { unlocked: ng.unlocked, active: ng.active ? ng.active.id : null }; },
+    ngUnlock: function () { ng.unlocked = true; saveFlag('mg_ng', 1); },
+    ngStart: function (id) {
+      var af = null;
+      for (var i = 0; i < C.ng.affixes.length; i++) if (C.ng.affixes[i].id === id) af = C.ng.affixes[i];
+      if (af) ngStartRun(af);
+      return af ? af.name : null;
+    }
+  };
+
+  // 第 1 关通过：弹出提示进入无尽模式，不清场、不重置，继续当前局面
+  function passLevel1() {
+    var bonus = Math.ceil(levelTime) * C.level1.timeBonusPerSec;
+    level = 2;
+    levelBanner = 3;
+    // 潮汐从本关起效：重新计时首次涨潮，给玩家缓冲
+    tide.phase = 'idle'; tide.timer = C.tide.firstDelay; tide.progress = 0; tide.banner = 0;
+    if (bonus > 0) {
+      score += bonus;
+      scoreBump = 0.4;
+      addPopup(C.W / 2, 296, '时间奖励 +' + bonus, true, 0);
+    }
+    if (score > best) { best = score; saveNum('mg_best', best); }
+    audio.quest();
+  }
+
+  // ---------- 深海宝箱（无尽模式探索要素） ----------
+  function spawnChest() {
+    discoverSpecial('chest');
+    var b = createIron(C.W * (0.2 + Math.random() * 0.6), C.dangerY + 52); // 警戒线下方开阔水域生成，不压坠落区虚影
+    b.chest = true;
+    b.r = 17; b.m = b.r * b.r * 6; // 比礁石轻，不会被砸得太凶
+    chest = { b: b, t: 0, life: 14 }; // 14 秒内不点就沉走
+    addPopup(b.x, C.dangerY + 10, '沉宝箱！点它开启', true, 0);
+    audio.blip(392, 0.25, 'triangle', 0.14, 1.5);
+  }
+  function expireChest() {
+    if (chest) {
+      burstIron(chest.b.x, chest.b.y);
+      phys.remove(chest.b);
+      addPopup(C.W / 2, FLOORY - 60, '宝箱沉入深渊…', false, 0);
+    }
+    chest = null;
+    chestTimer = 40 + Math.random() * 25;
+  }
+  function openChest() {
+    var x = chest.b.x, y = chest.b.y;
+    phys.remove(chest.b);
+    chest = null;
+    chestTimer = 45 + Math.random() * 30;
+    var r = Math.random();
+    var chestBonus = perkOn('chest5') ? 1.5 : 1; // 成就加成：寻宝猎人
+    if (r < 0.4) {
+      var gain = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
+      score += gain; scoreBump = 0.4;
+      if (score > best) { best = score; saveNum('mg_best', best); }
+      addPopup(x, y - 30, '宝箱开启 +' + gain, true, 0);
+    } else if (r < 0.75) {
+      var keys = ['swap', 'ripple', 'evap', 'flow'].filter(function (k) { return skillUnlocked(k); });
+      var k = keys[(Math.random() * keys.length) | 0];
+      skillCharge[k] += perkOn('chest5') ? 3 : 2;
+      addPopup(x, y - 30, '宝箱开启：' + runeName(k) + ' +2 充能', true, 0);
+    } else {
+      nextSpecial = 'rainbow'; nextIron = false; nextRune = null;
+      addPopup(x, y - 30, '宝箱开启：下一滴是彩虹滴！', true, 0);
+    }
+    for (var i = 0; i < 12; i++) {
+      var ang = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 130;
+      parts.push({ type: 'dot', x: x, y: y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 50,
+        r: 1.5 + Math.random() * 2, life: 0.55, max: 0.55, color: '#F2C14E' });
+    }
+    addShake(3, 0.2);
+    audio.quest();
+    bumpStat('chest');
+    dailyProgress('chest');
+  }
+  function updateChest(dt) {
+    if (level < 2) return;
+    if (!chest) {
+      chestTimer -= dt;
+      if (chestTimer <= 0) spawnChest();
+    } else {
+      chest.t += dt;
+      if (chest.t >= chest.life) expireChest();
+    }
+  }
+
+  // ---------- 随机深海事件（无尽模式趣味变量） ----------
+  function startSeaEvent() {
+    var pool = ['surge', 'bless', 'storm'];
+    seaEvent.type = pool[(Math.random() * pool.length) | 0];
+    seaEvent.t = 6;
+    var names = {
+      surge: '深海涌泉！水滴被轻轻托起',
+      bless: '海神甘霖！接下来 3 滴同档',
+      storm: '漩涡风暴！水滴被卷起'
+    };
+    addPopup(C.W / 2, 250, names[seaEvent.type], true, 0);
+    if (seaEvent.type === 'bless') {
+      var tier = mostCommonTier();
+      seaEvent.data = { tier: tier < 0 ? rollTier() : tier, left: 3 };
+    }
+    if (seaEvent.type === 'storm') {
+      seaEvent.x = C.W * (0.25 + Math.random() * 0.5);
+      seaEvent.y = C.containerTop + (FLOORY - C.containerTop) * 0.45;
+    }
+    audio.tide();
+  }
+  function applySeaEvent(dt) {
+    var bs = phys.bodies, i, b;
+    if (seaEvent.type === 'surge') {
+      for (i = 0; i < bs.length; i++) {
+        b = bs[i];
+        if (b.iron) continue;
+        if (b.y + b.r > FLOORY - 190) b.vy -= 1500 * dt;
+      }
+      if (Math.random() < 0.5) {
+        parts.push({ type: 'dot', x: 30 + Math.random() * (C.W - 60), y: FLOORY, vx: 0,
+          vy: -120 - Math.random() * 90, r: 1.5 + Math.random() * 2, life: 0.8, max: 0.8,
+          color: 'rgba(220,244,255,0.8)' });
+      }
+    } else if (seaEvent.type === 'storm') {
+      for (i = 0; i < bs.length; i++) {
+        b = bs[i];
+        if (b.iron) continue;
+        var dx = seaEvent.x - b.x, dy = seaEvent.y - b.y, d = Math.sqrt(dx * dx + dy * dy);
+        if (d > 8 && d < 300) {
+          var f = 260 * (1 - d / 300);
+          b.vx += ((dx / d) * f - (dy / d) * f * 0.7) * dt;
+          b.vy += ((dy / d) * f + (dx / d) * f * 0.7) * dt;
+        }
+      }
+    }
+    // bless 无持续效果：在 tryDrop 里消耗
+  }
+  function endSeaEvent() {
+    seaEvent.type = null;
+    seaEvent.data = null;
+    seaEvent.timer = 30 + Math.random() * 20;
+  }
+  function updateSeaEvent(dt) {
+    if (level < 2) return;
+    if (tide.phase === 'active') return; // 保底：涨潮期间冻结事件节奏，避免双重混乱
+    if (!seaEvent.type) {
+      seaEvent.timer -= dt;
+      if (seaEvent.timer <= 0) startSeaEvent();
+    } else {
+      seaEvent.t -= dt;
+      applySeaEvent(dt);
+      if (seaEvent.t <= 0) endSeaEvent();
+    }
+  }
+  // 事件视觉（在游戏区坐标系内绘制）
+  function drawEventVfx() {
+    if (seaEvent.type === 'storm') {
+      var r0 = 90 + Math.sin(time * 3) * 8;
+      ctx.save();
+      ctx.translate(seaEvent.x, seaEvent.y);
+      for (var k = 0; k < 3; k++) {
+        ctx.strokeStyle = 'rgba(96,112,215,' + (0.38 - k * 0.1) + ')';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        for (var a2 = 0; a2 < Math.PI * 3.2; a2 += 0.25) {
+          var rr = 6 + (a2 / (Math.PI * 3.2)) * (r0 - 6) + k * 7;
+          var aa2 = a2 + time * (2.4 - k * 0.5);
+          var x2 = Math.cos(aa2) * rr, y2 = Math.sin(aa2) * rr * 0.55;
+          if (a2 === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (seaEvent.type === 'surge') {
+      var g = grad('surge' + Math.round(FLOORY), function () {
+        var gg = ctx.createLinearGradient(0, FLOORY - 90, 0, FLOORY);
+        gg.addColorStop(0, 'rgba(160,230,255,0)');
+        gg.addColorStop(1, 'rgba(160,230,255,0.18)');
+        return gg;
+      });
+      ctx.fillStyle = g;
+      ctx.fillRect(0, FLOORY - 90, C.W, 90);
+    }
+  }
+
+  // ---------- 结算 / 复活 / 重开 ----------
+  // 复活：不清空水滴——只冲走已越线的那几滴（否则它们悬在线上会立刻再次判负），其余局面原样保留
+  function doRevive() {
+    ads.show('复活', function () {
+      reviveCount++;
+      var bs = phys.bodies.slice(), i, removed = 0;
+      for (i = 0; i < bs.length; i++) {
+        var b = bs[i];
+        if ((b.y - b.r) < C.dangerY) {
+          burst(b.x, b.y, Math.max(0, b.tier), false);
+          phys.remove(b);
+          removed++;
+        }
+      }
+      for (i = 0; i < phys.bodies.length; i++) {
+        phys.bodies[i].dangerT = 0;
+        phys.bodies[i].grace = 0.8; // 短宽限，稳定局面
+      }
+      if (removed > 0) addPopup(C.W / 2, C.dangerY - 24, '越线水滴被冲走 ×' + removed, false, 0);
+      state = 'play';
+    });
+  }
+  function doDouble() {
+    ads.show('结算双倍', function () {
+      doubled = true;
+      score *= 2;
+      if (score > best) { best = score; saveNum('mg_best', best); }
+    });
+  }
+  function restart() {
+    ngEndRun(); // 二周目词缀只在单局内生效（普通重开回到常态）
+    phys.bodies.length = 0;
+    confirmOpen = false;
+    score = 0; displayScore = 0; scoreBump = 0;
+    combo = 0; comboTimer = 0; cooldown = 0; maxCombo = 0;
+    reviveCount = 0; doubled = false;
+    runBuffered = false; // 新局重置深流缓冲
+    skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
+    seaCount = 0; scoreMult = 1;
+    evapMode = false; rippleMode = false; flowMode = false; flowPick = null; rainHint = 0;
+    tideGateHint = false;
+    level = 1; levelTime = C.level1.time; failReason = ''; levelBanner = 0;
+    levelElapsed = 0; runCounted = 0;
+    nextTier = rollTier();
+    nextSpecial = rollSpecial();
+    nextRune = nextSpecial ? null : rollRune();
+    nextIron = rollIron();
+    aimX = C.W / 2;
+    popups.length = 0; parts.length = 0; rippleQueue.length = 0;
+    tide.phase = 'idle'; tide.timer = C.tide.firstDelay; tide.progress = 0; tide.banner = 0;
+    endlessT = 0; rampStage = 0; climaxMark = 0;
+    makeQuest(0);
+    // 成就加成：深海富豪开局随机技能充能 +2
+    if (perkOn('score2k')) {
+      var pk = C.skills[(Math.random() * C.skills.length) | 0];
+      skillCharge[pk.key] += 2;
+      addPopup(C.W / 2, 280, '深海富豪：「' + pk.name + '」开局充能 +2', false, 0);
+    }
+    state = 'play';
+  }
+
+  function buildOverButtons() {
+    overButtons = [];
+    var bw = 240, bh = 48, gap = 14, x = (C.W - bw) / 2;
+    // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中
+    var areaTop = 150 + 176, areaBottom = 150 + 436 - 26;
+    var n = (reviveCount < 2 ? 1 : 0) + (doubled ? 0 : 1) + 2; // 复活/双倍/分享/重开
+    var groupH = n * bh + (n - 1) * gap;
+    var y = areaTop + (areaBottom - areaTop - groupH) / 2;
+    if (reviveCount < 2) {
+      overButtons.push({ x: x, y: y, w: bw, h: bh, label: '复活继续（剩 ' + (2 - reviveCount) + ' 次）', action: doRevive, primary: true });
+      y += bh + gap;
+    }
+    if (!doubled) {
+      overButtons.push({ x: x, y: y, w: bw, h: bh, label: '结算双倍（看广告）', action: doDouble });
+      y += bh + gap;
+    }
+    overButtons.push({ x: x, y: y, w: bw, h: bh, label: '分享战报', action: openShare });
+    y += bh + gap;
+    overButtons.push({ x: x, y: y, w: bw, h: bh, label: '重新开始', action: restart });
+  }
+
+  // ---------- 命中区域（圆形按钮） ----------
+  var MUTE = { cx: C.W - 24, cy: 36, r: 13, pressT: 0 };
+  var bookBtn = { cx: 46, cy: 688, r: 20, pressT: 0 };
+  var restartBtn = { cx: C.W - 24, cy: 688, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
+  var ngBtn = { cx: 349, cy: 688, r: 16, pressT: 0 }; // 二周目「深渊回响」入口（解锁后显示）
+  var SKILL_BTNS = [
+    { key: 'swap',   cx: 116, cy: 688, r: 20, pressT: 0 },
+    { key: 'ripple', cx: 178, cy: 688, r: 20, pressT: 0 },
+    { key: 'evap',   cx: 240, cy: 688, r: 20, pressT: 0 },
+    { key: 'flow',   cx: 302, cy: 688, r: 20, pressT: 0 }
+  ];
+  fit(); // 首次适配（按钮已定义，底部元素可同步贴底）
+  var DEX_PANEL = { x: 20, y: 64, w: 380, h: 624 };
+  var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 60, y: DEX_PANEL.y + 10, w: 50, h: 26 };
+  var tabDexBtn = { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 10, w: 66, h: 26 };
+  var tabAchBtn = { x: DEX_PANEL.x + 86, y: DEX_PANEL.y + 10, w: 66, h: 26 };
+  var tabDailyBtn = { x: DEX_PANEL.x + 158, y: DEX_PANEL.y + 10, w: 66, h: 26 };
+  var tabRankBtn = { x: DEX_PANEL.x + 230, y: DEX_PANEL.y + 10, w: 66, h: 26 };
+  var shareCopyBtn = { x: 0, y: 0, w: 150, h: 42 }; // 分享卡片：复制文案按钮（打开时定位）
+  function spCellRect(i) {
+    return { x: DEX_PANEL.x + 12 + i * 50, y: DEX_PANEL.y + 490, w: 48, h: 72 };
+  }
+
+  // 重开确认弹窗
+  var confirmOpen = false;
+  var confirmYes = { x: C.W / 2 - 106, y: 402, w: 94, h: 42 };
+  var confirmNo = { x: C.W / 2 + 12, y: 402, w: 94, h: 42 };
+
+  function inRect(p, r) {
+    return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+  }
+  function inCircle(p, c) {
+    var dx = p.x - c.cx, dy = p.y - c.cy;
+    return dx * dx + dy * dy <= (c.r + 6) * (c.r + 6);
+  }
+  function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - MUTE.cy; return dx * dx + dy * dy <= 18 * 18; } // 命中区略大于视觉（小按钮易点空）
+  function toLocal(e) {
+    var rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) / view.s - BX,
+      y: (e.clientY - rect.top) / view.s
+    };
+  }
+  function hitButton(p) {
+    for (var i = 0; i < overButtons.length; i++) {
+      var b = overButtons[i];
+      if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) return b;
+    }
+    return null;
+  }
+  function tryDrop() {
+    if (cooldown > 0) return;
+    var nb;
+    // 甘霖馈赠：事件期间最多 3 滴使用馈赠档位（仅对普通滴生效）
+    var useTier = nextTier;
+    if (!nextIron && !nextSpecial && seaEvent.type === 'bless' && seaEvent.data && seaEvent.data.left > 0) {
+      useTier = seaEvent.data.tier;
+      seaEvent.data.left--;
+    }
+    if (nextIron && ironCount() < C.iron.maxActive) {
+      createIron(clampAim(aimX), C.spawnY);
+      addPopup(C.W / 2, 210, '礁石来袭！', true, 0); // 居中净空带，避开顶部 HUD
+      addShake(2, 0.15);
+    } else {
+      nb = phys.create(clampAim(aimX), C.spawnY, useTier, 0, 0);
+      if (nextSpecial) { nb.special = nextSpecial; nb.specialT = 0; discoverSpecial(nextSpecial); }
+      else if (nextRune) {
+        nb.rune = nextRune;
+        discoverSpecial('rune');
+        if (!runeHintShown) {
+          runeHintShown = true;
+          addPopup(C.W / 2, 244, '带符文的水滴：合成即可为技能充能', false, 0);
+        }
+      }
+      if (ng.active && ng.active.ice && Math.random() < ng.active.ice) nb.ngIce = true; // 二周目「冰封之海」
+      unlockTier(nextTier);
+    }
+    cooldown = C.dropCooldown;
+    audio.drop();
+    dropCount++;
+    if (dropCount >= TUT_STEPS.length && !tutDone) { tutDone = true; saveFlag('mg_tut', 1); }
+    nextTier = rollTier();
+    // 甘霖期间：虚影预览也显示馈赠档位，所见即所得
+    if (!nextSpecial && !nextIron && seaEvent.type === 'bless' && seaEvent.data && seaEvent.data.left > 0) nextTier = seaEvent.data.tier;
+    nextSpecial = rollSpecial();
+    nextRune = nextSpecial ? null : rollRune();
+    nextIron = rollIron();
+    aimX = clampAim(aimX);
+  }
+
+  // ---------- 输入 ----------
+  // 音频解锁兜底：任何手势（按下/抬起/键盘）都尝试恢复 AudioContext
+  window.addEventListener('pointerup', function () { audio.ensure(); });
+  window.addEventListener('keydown', function () { audio.ensure(); });
+  canvas.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    audio.ensure();
+    var p = toLocal(e);
+    lastPointer = p;
+    if (adOverlay) return;
+    if (confirmOpen) {
+      // 重开确认弹窗：点两个按钮之一，点面板外也视为取消
+      if (inRect(p, confirmYes)) { confirmOpen = false; restart(); }
+      else if (inRect(p, confirmNo)) confirmOpen = false;
+      return;
+    }
+    if (shareOpen) {
+      // 战报卡片：复制文案 / 点面板外关闭
+      if (inRect(p, shareCopyBtn)) {
+        copyShareText();
+        return;
+      }
+      shareOpen = false;
+      return;
+    }
+    if (dexOpen) {
+      if (inRect(p, dexCloseBtn) || !inRect(p, DEX_PANEL)) { dexOpen = false; return; }
+      if (inRect(p, tabDexBtn)) { dexTab = 0; return; }
+      if (inRect(p, tabAchBtn)) { dexTab = 1; return; }
+      if (inRect(p, tabDailyBtn)) { dexTab = 2; return; }
+      if (inRect(p, tabRankBtn)) { dexTab = 3; return; }
+      if (dexTab === 0) {
+        for (var si = 0; si < SP_DEFS.length; si++) {
+          if (inRect(p, spCellRect(si))) { dexSelSp = si; audio.blip(620, 0.08, 'sine', 0.06, 0.3); return; }
+        }
+      }
+      return;
+    }
+    if (inMute(p)) { MUTE.pressT = 0.16; audio.muted = !audio.muted; saveFlag('mg_mute', audio.muted); if (audio.muted) audio.bgm.stop(); else audio.bgm.start(); return; }
+    if (inCircle(p, bookBtn)) { bookBtn.pressT = 0.16; dexOpen = true; return; }
+    // 二周目「深渊回响」：词缀三选一弹窗（点卡片开跑，点外关闭）
+    if (ngOpen) {
+      for (var ni = 0; ni < ngPickRects.length; ni++) {
+        if (inRect(p, ngPickRects[ni])) { ngStartRun(ngPicks[ni]); return; }
+      }
+      ngOpen = false;
+      return;
+    }
+    if (ng.unlocked && state === 'play' && inCircle(p, ngBtn)) { ngBtn.pressT = 0.16; openNgPick(); return; }
+    if (state === 'play') {
+      if (inCircle(p, restartBtn)) { restartBtn.pressT = 0.16; confirmOpen = true; return; }
+      for (var i = 0; i < SKILL_BTNS.length; i++) {
+        if (inCircle(p, SKILL_BTNS[i])) { SKILL_BTNS[i].pressT = 0.16; useSkill(SKILL_BTNS[i].key); return; }
+      }
+      // 深海宝箱：点击开启（点击范围放宽 14px，手机上好点）
+      if (chest) {
+        var cdx = p.x - chest.b.x, cdy = p.y - chest.b.y;
+        if (cdx * cdx + cdy * cdy <= (chest.b.r + 14) * (chest.b.r + 14)) { openChest(); return; }
+      }
+    }
+    if (state === 'over') {
+      var b = hitButton(p);
+      if (b) b.action();
+      return;
+    }
+    if (evapMode) {
+      var ball = ballAt(p);
+      if (ball) evaporate(ball);
+      else evapMode = false;
+      return;
+    }
+    if (flowMode) {
+      var fb = ballAt(p);
+      if (fb && !fb.iron && !fb.chest) {
+        if (!flowPick) { flowPick = fb; audio.blip(700, 0.08, 'sine', 0.06, 0.3); }
+        else if (fb === flowPick) { flowPick = null; } // 点自己 = 取消选择
+        else flowSwap(flowPick, fb);
+      } else if (!fb) { flowMode = false; flowPick = null; } // 点空白处退出
+      return;
+    }
+    if (rippleMode) {
+      castRipple(p.x, p.y);
+      return;
+    }
+    aimX = clampAim(p.x);
+    aiming = true;
+  });
+  canvas.addEventListener('pointermove', function (e) {
+    var p = toLocal(e);
+    lastPointer = p;
+    if (state !== 'play' || adOverlay || dexOpen || evapMode || flowMode || confirmOpen) return;
+    aimX = clampAim(p.x);
+  });
+  canvas.addEventListener('pointerup', function (e) {
+    if (!aiming || state !== 'play' || adOverlay || dexOpen || evapMode || flowMode || rippleMode || confirmOpen) { aiming = false; return; }
+    aiming = false;
+    aimX = clampAim(toLocal(e).x);
+    tryDrop();
+  });
+  canvas.addEventListener('pointercancel', function () { aiming = false; });
+
+  // ---------- 更新 ----------
+  function update(dt) {
+    if (adOverlay) {
+      adOverlay.t -= dt;
+      if (adOverlay.t <= 0) { var cb = adOverlay.cb; adOverlay = null; if (cb) cb(); }
+      updateFx(dt);
+      return;
+    }
+    if (dexOpen) { updateFx(dt); return; }
+    if (state !== 'play') { updateFx(dt); return; }
+
+    time += dt;
+    if (rainHint > 0) rainHint -= dt;
+    if (levelBanner > 0) levelBanner -= dt;
+    cooldown = Math.max(0, cooldown - dt);
+
+    // 关卡计时：第 1 关限时得分，达标过关（不清场续无尽），超时判负；无尽模式计时改为累计进行时长
+    if (level === 1) {
+      levelTime -= dt;
+      if (score >= C.level1.target) passLevel1();
+      else if (levelTime <= 0) { levelTime = 0; failReason = 'timeout'; gameOver(); return; }
+    }
+    levelElapsed += dt; // 从第 1 关开局起连续累计，进入无尽模式后时间无缝接着走
+    checkDexGates();
+    // 二周目解锁：累计分抵达最深海域门槛
+    if (!ng.unlocked && totalScore() >= C.ng.unlockScore) {
+      ng.unlocked = true;
+      saveFlag('mg_ng', 1);
+      addPopup(C.W / 2, 260, '解锁「深渊回响」：右下角入口开启二周目', true, 0);
+      audio.quest();
+    }
+    // 海域演进：累计分跨过里程碑 → 世界换色 + 弹报
+    var stg = seaStage();
+    if (stageSeen < 0) stageSeen = stg;
+    else if (stg > stageSeen) {
+      stageSeen = stg;
+      addPopup(C.W / 2, 285, '海域演进 · 潜入「' + C.seaStages[stg].name + '」', true, 0);
+      parts.push({ type: 'ring', x: C.W / 2, y: 285, r: 40, life: 0.9, max: 0.9, color: '#7FD4FF' });
+      audio.big();
+    }
+    achTick -= dt;
+    if (achTick <= 0) { achTick = 1; checkAchievements(); }
+
+    if (level === 2) updateTide(dt); // 潮汐仅无尽模式（第 1 关风平浪静，降低难度）
+    phys.step(dt);
+    applyBuoyancy(dt);
+    updateSpecials(dt);
+
+    var i, b;
+    // 变形平滑：维护"变形矢量"（方向×幅度整体插值）——
+    // 方向变化时矢量连续过渡（反转时幅度先收敛到圆再转向，角度噪声不可见）；
+    // 速度低于死区直接回正圆，停稳后不再残留椭圆
+    for (i = 0; i < phys.bodies.length; i++) {
+      b = phys.bodies[i];
+      var sm = Math.min(1, dt * 6);
+      b.svx = (b.svx || 0) + (b.vx - b.svx) * sm;
+      b.svy = (b.svy || 0) + (b.vy - b.svy) * sm;
+      var spd = Math.sqrt(b.svx * b.svx + b.svy * b.svy);
+      var k = spd > 70 ? Math.min(0.14, spd / 3200) : 0; // 速度死区：仅近乎静止（物理微抖）视为正圆，滚动仍会倾斜旋转
+      var tx = k > 0 ? (b.svx / spd) * k : 0;
+      var ty = k > 0 ? (b.svy / spd) * k : 0;
+      var dsm = Math.min(1, dt * 10);
+      b.defX = (b.defX || 0) + (tx - b.defX) * dsm;
+      b.defY = (b.defY || 0) + (ty - b.defY) * dsm;
+      var mag = Math.sqrt(b.defX * b.defX + b.defY * b.defY);
+      if (mag < 0.01) { b.defX = 0; b.defY = 0; mag = 0; } // 残余幅度清零，确保完全回圆
+      b.defK = mag;
+    }
+    for (i = 0; i < phys.bodies.length; i++) {
+      b = phys.bodies[i];
+      if (b.grace > 0) b.grace -= dt;
+      if (b.popT > 0) b.popT -= dt;
+      // 运动拖尾采样
+      if (!b.trail) b.trail = [];
+      b.trail.push({ x: b.x, y: b.y });
+      if (b.trail.length > 6) b.trail.shift();
+    }
+
+    // 无尽渐进加压计时 + 档位提示 + 高潮时刻
+    if (level === 2) {
+      endlessT += dt;
+      var stg = Math.floor(endlessRamp() * 4);
+      if (stg > rampStage) { rampStage = stg; addPopup(C.W / 2, 250, '海域渐深：潮汐更频 · 礁石更多', true, 0); }
+      if (score - climaxMark >= C.climaxEvery) doClimax();
+    }
+    // 声音预警：危险→母线低通收紧；潮汐临近/进行→低频隆隆
+    var dg = 0;
+    for (i = 0; i < phys.bodies.length; i++) {
+      b = phys.bodies[i];
+      var ddist = (b.y - b.r) - C.dangerY;
+      if (ddist < 90) dg = Math.max(dg, 1 - Math.max(0, ddist) / 90);
+    }
+    audio.bgm.setDanger(dg);
+    audio.bgm.setTide(tide.progress, (level === 2 && tide.phase === 'idle' && tide.timer < C.tide.warnTime) ? 1 : 0);
+
+    processMerges();
+    updateChest(dt);
+    updateSeaEvent(dt);
+    checkDanger(dt);
+
+    if (comboTimer > 0) { comboTimer -= dt; if (comboTimer <= 0) combo = 0; }
+    aimX = clampAim(aimX);
+    updateFx(dt);
+
+    if (displayScore < score) {
+      displayScore += Math.max(1, (score - displayScore) * Math.min(1, dt * 8));
+      if (displayScore > score) displayScore = score;
+    }
+  }
