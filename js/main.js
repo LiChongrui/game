@@ -1497,11 +1497,11 @@
         // 越线 + 有支撑 + 基本静止（阈值放宽一倍：堆顶微颤不算"在动"）
         b.dangerT += dt;
         if (b.dangerT > C.dangerTime) {
-          // 每局一次「深流缓冲」：首次判负改为全局 6 秒宽限，缓解前期暴毙挫败感
+          // 每局一次「深流缓冲」：首次判负改为全局 4 秒宽限，缓解前期暴毙挫败感
           if (!runBuffered) {
             runBuffered = true;
-            for (var j = 0; j < bs.length; j++) { bs[j].dangerT = 0; bs[j].grace = 6; }
-            addPopup(C.W / 2, C.dangerY + 66, '深流缓冲 · 宽限 6 秒', true, 0);
+            for (var j = 0; j < bs.length; j++) { bs[j].dangerT = 0; bs[j].grace = 4; }
+            addPopup(C.W / 2, C.dangerY + 66, '深流缓冲 · 宽限 4 秒', true, 0);
           } else { gameOver(); return; }
         }
       } else if (above) {
