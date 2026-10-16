@@ -41,8 +41,8 @@
   var dexCounts = dexLoaded.c;
   var dexSpecial = dexLoaded.sp;   // 特殊水滴发现记录 { vortex:1, iron:1, ... }
   var dexTab = 0;                  // 图鉴页签：0=图鉴 1=成就 2=每日 3=榜单
-  var dexSelSp = 0;                // 图鉴页当前选中的特殊滴说明
-  var dexSec = 0;                  // 图鉴主页分节：0=合成链 1=海域演进 2=特殊·宝箱
+  var dexSelSp = -1;               // 图鉴页当前选中的特殊滴说明（-1=未选）
+  var dexSec = 0;                  // 图鉴主页分节：0=合成链 1=海域演进（特殊滴槽位并入海域行）
   var dexSelTier = -1;             // 选中的合成链档位（-1 未选）
   var dexSelStage = -1;            // 选中的海域阶段（-1 未选）
   // 跨局终身统计（成就进度用）：宝箱/涨潮/礁石对/彩虹合成/任务/连击/单局最高分
@@ -1772,7 +1772,7 @@
   // ---------- 命中区域（圆形按钮） ----------
   var MUTE = { cx: C.W - 24, cy: 36, r: 13, pressT: 0 };
   var bookBtn = { cx: 46, cy: 688, r: 20, pressT: 0 };
-  var trophyBtn = { cx: 90, cy: 688, r: 16, pressT: 0 }; // 成就页入口（奖杯）
+  var trophyBtn = { cx: 24, cy: 36, r: 14, pressT: 0 }; // 成就页入口（奖杯，左上角，与右上静音钮对称）
   var restartBtn = { cx: C.W - 24, cy: 688, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
   var ngBtn = { cx: 349, cy: 688, r: 16, pressT: 0 }; // 二周目「深渊回响」入口（解锁后显示）
   var SKILL_BTNS = [
@@ -1790,20 +1790,10 @@
     return { x: DEX_PANEL.x + 15 + i * segW, y: DEX_PANEL.y + 44, w: segW, h: 24 };
   }
   var shareCopyBtn = { x: 0, y: 0, w: 150, h: 42 }; // 分享卡片：复制文案按钮（打开时定位）
-  function spRowRect(i) {
-    // 特殊·宝箱分节：按海域分组行（每行 = 一片海域 + 它的 2 种特殊滴）
-    return { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 76 + i * 44, w: DEX_PANEL.w - 28, h: 40 };
-  }
-  function spSlotRect(i, s) {
-    // 行内特殊滴槽位（s=0/1），宝箱也占一个槽位
-    var r = spRowRect(i);
-    return { x: r.x + 124 + s * 106, y: r.y + 4, w: 102, h: 32 };
-  }
-  function spVisibleStages() {
-    // 全部海域都列出（未解锁的以"？？？"占位，不隐藏结构）
-    var arr = [], i;
-    for (i = 0; i < C.seaStages.length; i++) arr.push(i);
-    return arr;
+  function spSlotRect(stg, s) {
+    // 海域演进行右侧的特殊滴槽位（s=0/1），宝箱也占一个槽位；与 stageRowRect 同基
+    var r = stageRowRect(stg);
+    return { x: r.x + r.w - 196 + s * 98, y: r.y + 4, w: 92, h: 32 };
   }
   function tierCellRect(t) {
     // 合成链分节：3 列 × 3 行（9 档）
@@ -1814,8 +1804,8 @@
     return { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 76 + g * 44, w: DEX_PANEL.w - 28, h: 40 };
   }
   function dexSecRect(i) {
-    // 分节切换：通栏分段控件（合成链 / 海域演进 / 特殊·宝箱），样式与顶部页签区分
-    var segW = Math.floor((DEX_PANEL.w - 30) / 3);
+    // 分节切换：通栏分段控件（合成链 / 海域演进——特殊滴已并入海域行），样式与顶部页签区分
+    var segW = Math.floor((DEX_PANEL.w - 30) / 2);
     return { x: DEX_PANEL.x + 15 + i * segW, y: DEX_PANEL.y + 44, w: segW, h: 24 };
   }
 
@@ -1914,32 +1904,30 @@
     if (dexOpen) {
       if (inRect(p, dexCloseBtn) || !inRect(p, DEX_PANEL)) { dexOpen = false; return; }
       // 分节切换
-      for (var sc = 0; sc < 3; sc++) {
+      for (var sc = 0; sc < 2; sc++) {
         if (inRect(p, dexSecRect(sc))) {
-          dexSec = sc; dexSelTier = -1; dexSelStage = -1;
+          dexSec = sc; dexSelTier = -1; dexSelStage = -1; dexSelSp = -1;
           audio.blip(520 + sc * 80, 0.08, 'sine', 0.06, 0.3); return;
         }
       }
         if (dexSec === 0) {
           for (var ti2 = 0; ti2 < T.length; ti2++) {
-            if (inRect(p, tierCellRect(ti2))) { dexSelTier = ti2; dexSelStage = -1; audio.blip(620, 0.08, 'sine', 0.06, 0.3); return; }
-          }
-        } else if (dexSec === 1) {
-          for (var st = 0; st < C.seaStages.length; st++) {
-            if (inRect(p, stageRowRect(st))) { dexSelStage = st; dexSelTier = -1; audio.blip(620, 0.08, 'sine', 0.06, 0.3); return; }
+            if (inRect(p, tierCellRect(ti2))) { dexSelTier = ti2; dexSelStage = -1; dexSelSp = -1; audio.blip(620, 0.08, 'sine', 0.06, 0.3); return; }
           }
         } else {
-          // 特殊·宝箱：按海域分组行，点槽位选中说明（宝箱 = SP_DEFS.length 虚拟位）
-          var vis = spVisibleStages();
-          for (var vr = 0; vr < vis.length; vr++) {
+          // 海域演进行：点右侧特殊滴槽位看滴的说明，点行其他区域看海域说明
+          for (var st = 0; st < C.seaStages.length; st++) {
             for (var slot = 0; slot < 2; slot++) {
-              if (inRect(p, spSlotRect(vr, slot))) {
-                var spKeys = STAGE_SP_SLOTS[vis[vr]] || STAGE_SP_SLOTS[0];
+              if (inRect(p, spSlotRect(st, slot))) {
+                var spKeys = STAGE_SP_SLOTS[st] || STAGE_SP_SLOTS[0];
                 dexSelSp = slot === 0 ? spKeys[0] : spKeys[1];
                 dexSelTier = -1; dexSelStage = -1;
                 audio.blip(620, 0.08, 'sine', 0.06, 0.3); return;
               }
             }
+          }
+          for (var st2 = 0; st2 < C.seaStages.length; st2++) {
+            if (inRect(p, stageRowRect(st2))) { dexSelStage = st2; dexSelTier = -1; dexSelSp = -1; audio.blip(620, 0.08, 'sine', 0.06, 0.3); return; }
           }
         }
       return;

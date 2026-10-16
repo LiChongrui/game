@@ -1215,12 +1215,12 @@
 
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
   function drawHUD() {
-    // 计分（左上角悬浮）
+    // 计分（左上角悬浮；左端让位给奖杯按钮，从 x48 起）
     ctx.textAlign = 'left';
     var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
     ctx.lineJoin = 'round';
     ctx.save();
-    ctx.translate(16, 38);
+    ctx.translate(48, 38);
     ctx.scale(bump, bump);
     ctx.font = 'bold 27px system-ui, sans-serif';
     ctx.lineWidth = 4;
@@ -1236,9 +1236,9 @@
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     var sub = '最佳 ' + best + ' · ' + C.seaStages[seaStage()].name + (seaCount > 0 ? ' · 海域 ×' + seaCount : '') +
       (ng.active ? ' · 「' + ng.active.name + '」×' + ng.active.mult : '');
-    ctx.strokeText(sub, 16, 58);
+    ctx.strokeText(sub, 48, 58);
     ctx.fillStyle = ng.active ? '#6B5AA8' : '#3E6E90';
-    ctx.fillText(sub, 16, 58);
+    ctx.fillText(sub, 48, 58);
 
     // 右上角：下一滴预览 + 静音按钮（主流布局）
     ctx.textAlign = 'center';
@@ -1716,9 +1716,9 @@
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
     drawPanelHeader('图鉴');
 
-    // —— 分节切换：通栏分段控件 ——
-    var secNames = ['合成链', '海域演进', '特殊·宝箱'];
-    var secRects = [dexSecRect(0), dexSecRect(1), dexSecRect(2)];
+    // —— 分节切换：通栏分段控件（特殊滴槽位已并入海域演进，不再单列）——
+    var secNames = ['合成链', '海域演进'];
+    var secRects = [dexSecRect(0), dexSecRect(1)];
     drawSegTabs(secRects, secNames, dexSec, -1);
     var curStage = seaStage(), tsNow = totalScore();
     ctx.textAlign = 'center';
@@ -1753,12 +1753,15 @@
       }
     } else if (dexSec === 1) {
 
-      // 海域演进纵向列表（由浅入深）：已抵达 / 当前海域 / 未抵达（？？？）
+      // 海域演进纵向列表（由浅入深）：每行 = 徽章 + 海域名/状态 + 该海域 2 个特殊滴槽位
+      // 已抵达：发现的显实际形态，未发现的显"？"；下一海域：灰度形态+真名预告；更深海域："？？？"虚位占格（不隐藏结构）
       ctx.textAlign = 'left';
       for (var stg = 0; stg < C.seaStages.length; stg++) {
         var ss = C.seaStages[stg];
         var sRow = stageRowRect(stg);
         var isCur = stg === curStage, reached = tsNow >= ss.at, sel = dexSelStage === stg;
+        var isNext = stg === curStage + 1, hiddenStg = !isCur && !reached && !isNext;
+        var rowCy = sRow.y + sRow.h / 2;
         if (isCur) {
           ctx.fillStyle = '#2E86B4';
         } else if (reached) { // 已抵达：铺该海域专属色的浅底
@@ -1774,67 +1777,36 @@
           ctx.strokeStyle = '#2E86B4'; ctx.lineWidth = 1.5;
           roundRect(sRow.x + 0.5, sRow.y + 0.5, sRow.w - 1, sRow.h - 1, 9); ctx.stroke();
         }
-        // 海域专属徽章：当前=脉冲环+彩徽 / 已抵达=彩徽 / 下一海域=灰徽（图标+名字预告） / 更深海域不显示图标
-        var dotX = sRow.x + 22, dotY = sRow.y + sRow.h / 2;
-        var isNext = stg === curStage + 1;
+        // 左侧：海域专属徽章（当前=脉冲环 / 已抵达·下一海域=彩/灰徽 / 更深海域不显示图标）
+        var dotX = sRow.x + 20, dotY = rowCy;
         if (isCur) {
           ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.5;
           ctx.beginPath(); ctx.arc(dotX, dotY, 12.5 + Math.sin(time * 4) * 1.2, 0, Math.PI * 2); ctx.stroke();
         }
         if (isCur || reached || isNext) drawSeaBadge(stg, dotX, dotY, reached || isCur);
-        ctx.fillStyle = isCur ? '#FFFFFF' : (reached ? '#155A8A' : (isNext ? '#8AA5B8' : '#8AA5B8'));
-        ctx.font = 'bold 13px system-ui, sans-serif';
-        ctx.fillText(isCur || reached || isNext ? ss.name : '？？？', dotX + 16, dotY + 5);
-        ctx.textAlign = 'right';
-        ctx.font = '10px system-ui, sans-serif';
-        ctx.fillStyle = isCur ? 'rgba(255,255,255,0.92)' : (reached ? '#1E7A6F' : (isNext ? '#7A98AC' : '#B0584A'));
-        var gateTxt = isCur ? '当前海域' : (reached ? '已抵达' : ('累计 ' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + ' 分解锁' + (isNext ? ' · 下一海域' : '')));
-        ctx.fillText(gateTxt, sRow.x + sRow.w - 14, dotY + 4);
-        ctx.textAlign = 'left';
-      }
-      ctx.textAlign = 'center';
-    } else {
-
-      // 特殊·宝箱按海域分组行：每行 = 海域徽章 + 名称 + 2 个槽位
-      // 已抵达：发现的显实际形态，未发现的显"？"；下一海域：灰度形态+名字+解锁积分；更深海域："？？？"虚位占格（不隐藏结构）
-      ctx.textAlign = 'left';
-      var visRows = spVisibleStages();
-      for (var vr = 0; vr < visRows.length; vr++) {
-        var stg2 = visRows[vr];
-        var sRow2 = spRowRect(vr);
-        var curStg2 = stg2 === curStage, reachedStg2 = tsNow >= C.seaStages[stg2].at;
-        var nextStg2 = stg2 === curStage + 1;
-        var hiddenStg2 = !curStg2 && !reachedStg2 && !nextStg2;
-        var rowCy = sRow2.y + sRow2.h / 2;
-        ctx.fillStyle = curStg2 ? '#2E86B4' : (reachedStg2 ? 'rgba(46,134,180,0.09)' : 'rgba(120,145,165,0.10)');
-        roundRect(sRow2.x, sRow2.y, sRow2.w, sRow2.h, 9); ctx.fill();
-        if (!hiddenStg2) drawSeaBadge(stg2, sRow2.x + 20, rowCy, reachedStg2 || curStg2);
-        ctx.fillStyle = curStg2 ? '#FFFFFF' : (reachedStg2 ? '#155A8A' : '#8AA5B8');
+        ctx.fillStyle = isCur ? '#FFFFFF' : (reached ? '#155A8A' : '#8AA5B8');
         ctx.font = 'bold 12px system-ui, sans-serif';
-        if (nextStg2) { // 下一海域：名字 + 解锁积分两行
-          ctx.fillText(C.seaStages[stg2].name, sRow2.x + 36, rowCy - 2);
-          ctx.font = '8.5px system-ui, sans-serif';
-          ctx.fillStyle = '#7A98AC';
-          var nAt = C.seaStages[stg2].at;
-          ctx.fillText('累计 ' + (nAt >= 10000 ? (nAt / 10000) + '万' : nAt) + ' 分解锁', sRow2.x + 36, rowCy + 12);
-        } else {
-          ctx.fillText(hiddenStg2 ? '？？？' : C.seaStages[stg2].name, sRow2.x + 36, rowCy + 4);
-        }
-        var slots2 = STAGE_SP_SLOTS[stg2] || STAGE_SP_SLOTS[0];
+        ctx.fillText(isCur || reached || isNext ? ss.name : '？？？', dotX + 15, rowCy - 3);
+        ctx.font = '8.5px system-ui, sans-serif';
+        ctx.fillStyle = isCur ? 'rgba(255,255,255,0.92)' : (reached ? '#1E7A6F' : (isNext ? '#7A98AC' : '#B0584A'));
+        var gateTxt = isCur ? '当前海域' : (reached ? '已抵达' : (isNext ? '下一海域 · 累计' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + '分' : '累计 ' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + ' 分解锁'));
+        ctx.fillText(gateTxt, dotX + 15, rowCy + 11);
+        // 右侧：该海域的 2 个特殊滴槽位（点击查看说明）
+        var slots2 = STAGE_SP_SLOTS[stg] || STAGE_SP_SLOTS[0];
         for (var sl = 0; sl < 2; sl++) {
-          var slotR = spSlotRect(vr, sl);
+          var slotR = spSlotRect(stg, sl);
           var spIdx2 = slots2[sl];
           var isChest2 = spIdx2 === SP_DEFS.length;
           var spDef2 = isChest2 ? null : SP_DEFS[spIdx2];
           var found2 = isChest2 ? true : !!dexSpecial[spDef2.key];
-          if (dexSelSp === spIdx2) {
+          if (dexSelSp === spIdx2 && dexSelStage < 0) {
             ctx.fillStyle = 'rgba(46,134,180,0.14)';
             roundRect(slotR.x, slotR.y, slotR.w, slotR.h, 8); ctx.fill();
             ctx.strokeStyle = '#2E86B4'; ctx.lineWidth = 1.2;
             roundRect(slotR.x + 0.5, slotR.y + 0.5, slotR.w - 1, slotR.h - 1, 8); ctx.stroke();
           }
-          var cx2 = slotR.x + 16, cy2 = slotR.y + slotR.h / 2;
-          if (hiddenStg2) { // 更深海域：虚线空位 + "？？？"（结构可见，内容不剧透）
+          var cx2 = slotR.x + 14, cy2 = rowCy;
+          if (hiddenStg) { // 更深海域：虚线空位 + "？？？"（结构可见，内容不剧透）
             ctx.save();
             ctx.setLineDash([3, 3]);
             ctx.strokeStyle = '#A8BCCB'; ctx.lineWidth = 1;
@@ -1849,8 +1821,8 @@
             continue;
           }
           ctx.save();
-          if (nextStg2 && !curStg2) ctx.filter = 'grayscale(1) opacity(0.75)'; // 下一海域：灰色预告
-          if (found2 || nextStg2) {
+          if (isNext) ctx.filter = 'grayscale(1) opacity(0.75)'; // 下一海域：灰色预告
+          if (found2 || isNext) {
             drawSpForm(spIdx2, cx2, cy2);
             ctx.filter = 'none';
           } else {
@@ -1864,14 +1836,15 @@
             ctx.textAlign = 'left';
           }
           ctx.restore();
-          ctx.fillStyle = (found2 || nextStg2) ? (reachedStg2 ? '#155A8A' : '#8AA5B8') : '#8AA5B8';
-          ctx.font = '9px system-ui, sans-serif';
-          ctx.fillText((found2 || nextStg2) ? (isChest2 ? '深海宝箱' : spDef2.name) : '？？？', slotR.x + 30, rowCy + 3);
+          ctx.fillStyle = (found2 || isNext) ? (reached ? '#155A8A' : '#8AA5B8') : '#8AA5B8';
+          ctx.font = '8.5px system-ui, sans-serif';
+          ctx.fillText((found2 || isNext) ? (isChest2 ? '深海宝箱' : spDef2.name) : '？？？', slotR.x + 27, cy2 + 3);
         }
       }
+      ctx.textAlign = 'center';
     }
 
-    // —— 说明区：合成链 / 海域 / 特殊·宝箱 三类条目通用 ——
+    // —— 说明区：合成链 / 海域 / 特殊滴·宝箱 三类条目通用 ——
     var title, sub, body, known = true;
     if (dexSelTier >= 0) {
       var tu = !!dexUnlocked[dexSelTier];
