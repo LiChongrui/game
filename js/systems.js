@@ -386,6 +386,7 @@
   function rollIron() {
     if (seaStage() < ((C.specialStage && C.specialStage.iron) || 1)) return false; // 珊瑚浅海起才落礁石
     if (seaEvent && seaEvent.type === 'storm') return false; // 保底：风暴期间不再落礁石，避免双重失控
+    if (ironCount() >= C.iron.maxActive) return false; // 场上已满员：预览不再出礁石，避免落下时被迫转成水滴
     var ch = C.iron.chance + (C.ramp.ironChanceMax - C.iron.chance) * endlessRamp();
     if (ng && ng.active && ng.active.ironX) ch *= ng.active.ironX; // 二周目「暗礁密布」
     return Math.random() < ch;
@@ -584,17 +585,17 @@
   // ---------- 成就（常驻目标，跨局累计；达成后永久生效的加成见 perk） ----------
   // 成就难度分级：diff 1=★入门 2=★★进阶 3=★★★传说，奖励按难度递增
   var ACH_DEFS = [
-    { id: 'score2k',  name: '深海富豪', desc: '单局得分达到 30000',        target: 30000, diff: 1, perk: '永续：开局随机技能充能 +2', cur: function () { return Math.max(score, best, lifeStats.best || 0); } },
-    { id: 'combo6',   name: '连浪六叠', desc: '达成 6 连击',               target: 6,     diff: 1, perk: '永续：连击窗口 +0.3 秒', cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
-    { id: 'chest5',   name: '寻宝猎人', desc: '累计开启 10 只深海宝箱',    target: 10,    diff: 1, perk: '永续：宝箱奖励 +50% · 充能 +3', cur: function () { return lifeStats.chest || 0; } },
-    { id: 'tide12',   name: '弄潮儿',   desc: '经历 25 次涨潮',            target: 25,    diff: 2, perk: '永续：潮汐期间合成得分 +10%', cur: function () { return lifeStats.tide || 0; } },
-    { id: 'iron5',    name: '礁石克星', desc: '累计消除 12 对礁石',        target: 12,    diff: 2, perk: '永续：礁石相消得分翻倍', cur: function () { return lifeStats.ironPair || 0; } },
-    { id: 'rainbow5', name: '虹光使者', desc: '触发 12 次彩虹合成',        target: 12,    diff: 2, perk: '永续：彩虹合成得分 +50%', cur: function () { return lifeStats.rainbow || 0; } },
-    { id: 'quest12',  name: '任务大师', desc: '累计完成 30 个任务',        target: 30,    diff: 2, perk: '永续：任务奖励 +30%', cur: function () { return lifeStats.quest || 0; } },
-    { id: 'canghai',  name: '沧海遗珠', desc: '合成出传说中的「沧海」',    target: 1,     diff: 2, perk: '永续：顶级水滴汇入海域得分 +50%', cur: function () { return dexCounts[8] || 0; } },
-    { id: 'canghai5', name: '沧海成群', desc: '累计合成 5 只「沧海」',     target: 5,     diff: 3, perk: '称号：沧海之主', cur: function () { return dexCounts[8] || 0; } },
-    { id: 'combo12',  name: '惊涛十二叠', desc: '达成 12 连击',            target: 12,    diff: 3, perk: '称号：驭浪者', cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
-    { id: 'score10w', name: '海渊传说', desc: '单局得分达到 100000',       target: 100000, diff: 3, perk: '称号：海渊传说', cur: function () { return Math.max(score, best, lifeStats.best || 0); } }
+    { id: 'score2k',  name: '深海富豪', desc: '单局得分达到 30000',        target: 30000, diff: 1, perk: '永续 · 开局充能 +2', cur: function () { return Math.max(score, best, lifeStats.best || 0); } },
+    { id: 'combo6',   name: '连浪六叠', desc: '达成 6 连击',               target: 6,     diff: 1, perk: '永续 · 连击窗 +0.3s', cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
+    { id: 'chest5',   name: '寻宝猎人', desc: '累计开启 10 只深海宝箱',    target: 10,    diff: 1, perk: '永续 · 宝箱奖励 +50%', cur: function () { return lifeStats.chest || 0; } },
+    { id: 'tide12',   name: '弄潮儿',   desc: '经历 25 次涨潮',            target: 25,    diff: 2, perk: '永续 · 潮期得分 +10%', cur: function () { return lifeStats.tide || 0; } },
+    { id: 'iron5',    name: '礁石克星', desc: '累计消除 12 对礁石',        target: 12,    diff: 2, perk: '永续 · 礁石相消 ×2', cur: function () { return lifeStats.ironPair || 0; } },
+    { id: 'rainbow5', name: '虹光使者', desc: '触发 12 次彩虹合成',        target: 12,    diff: 2, perk: '永续 · 彩虹得分 +50%', cur: function () { return lifeStats.rainbow || 0; } },
+    { id: 'quest12',  name: '任务大师', desc: '累计完成 30 个任务',        target: 30,    diff: 2, perk: '永续 · 任务奖励 +30%', cur: function () { return lifeStats.quest || 0; } },
+    { id: 'canghai',  name: '沧海遗珠', desc: '合成出传说中的「沧海」',    target: 1,     diff: 2, perk: '永续 · 沧海汇入 +50%', cur: function () { return dexCounts[8] || 0; } },
+    { id: 'canghai5', name: '沧海成群', desc: '累计合成 5 只「沧海」',     target: 5,     diff: 3, perk: '称号 · 沧海之主', cur: function () { return dexCounts[8] || 0; } },
+    { id: 'combo12',  name: '惊涛十二叠', desc: '达成 12 连击',            target: 12,    diff: 3, perk: '称号 · 驭浪者', cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
+    { id: 'score10w', name: '海渊传说', desc: '单局得分达到 100000',       target: 100000, diff: 3, perk: '称号 · 海渊传说', cur: function () { return Math.max(score, best, lifeStats.best || 0); } }
   ];
   function checkAchievements() {
     lifeStats.best = Math.max(lifeStats.best || 0, best, score);
@@ -622,21 +623,21 @@
   // ---------- 特殊水滴图鉴（发现即点亮；与海域绑定：stage=解锁海域） ----------
   // 每片海域相对上一片恰好新增 2 种（潮汐池=漩涡滴+深海宝箱，宝箱在图鉴中单列）
   var SP_DEFS = [
-    { key: 'vortex',  stage: 0, name: '漩涡滴', color: '#7B6FD0', desc: '落地后吸附周围水滴再消散，可用来聚拢散滴。' },
-    { key: 'cloud',   stage: 1, name: '雨云滴', color: '#8FA8BC', desc: '落地后分裂成两颗雾泡，快速补充低级水滴。' },
-    { key: 'iron',    stage: 1, name: '礁石',   color: '#6E7B88', desc: '沉重障碍，无法合成；两两相消或用蒸发移除。' },
-    { key: 'ice',     stage: 2, name: '冰晶滴', color: '#A8DFF2', desc: '落定后冻结周围水滴，冻结滴可以当临时平台。' },
-    { key: 'rune',    stage: 2, name: '符文滴', color: '#B08FD0', desc: '带符文的水滴，合成时为对应技能 +1 充能。' },
-    { key: 'rainbow', stage: 3, name: '彩虹滴', color: '#E86FA8', desc: '碰到任意水滴使其直接跳 2 级，得分双倍。' },
-    { key: 'gale',    stage: 3, name: '疾风滴', color: '#7FCDA4', desc: '落定瞬间刮起疾风吹开周围水滴，为堆场腾出空间。' },
-    { key: 'magnet',  stage: 4, name: '磁石滴', color: '#6A8FD8', desc: '更强更久的磁场漩涡，把大范围的水滴聚到一起。' },
-    { key: 'spring',  stage: 4, name: '甘霖滴', color: '#8FD8B8', desc: '落定即降甘霖：下一滴变成场上最多的那个档位。' },
-    { key: 'thunder', stage: 5, name: '雷霆滴', color: '#F2C14E', desc: '落定引下一道雷：让场上一对同档水滴直接合成。' },
-    { key: 'pearl',   stage: 5, name: '珍珠滴', color: '#F0E6D2', desc: '落定祝福最多的档位：该档水滴全体升 1 级。' },
-    { key: 'magma',   stage: 6, name: '熔岩滴', color: '#E2703A', desc: '落定烧毁周围礁石与最低两档水滴，折算得分。' },
-    { key: 'geyser',  stage: 6, name: '间歇泉滴', color: '#5FC8D8', desc: '落定向上喷出垂直水柱，冲开上方水滴腾出空间。' },
-    { key: 'void',    stage: 7, name: '虚空滴', color: '#4A3A6A', desc: '吞噬场上最低档的水滴（至多 5 颗），折算高分。' },
-    { key: 'aurora',  stage: 7, name: '极光滴', color: '#9BE8D8', desc: '落定后获得极光庇护：下一次合成得分 ×3。' }
+    { key: 'vortex',  stage: 0, name: '漩涡滴', color: '#7B6FD0', desc: '吸附周围水滴后消散，聚拢散滴。' },
+    { key: 'cloud',   stage: 1, name: '雨云滴', color: '#8FA8BC', desc: '分裂成两颗雾泡，补充低级滴。' },
+    { key: 'iron',    stage: 1, name: '礁石',   color: '#6E7B88', desc: '沉重障碍，两两相消或蒸发移除。' },
+    { key: 'ice',     stage: 2, name: '冰晶滴', color: '#A8DFF2', desc: '冻结周围水滴，可当临时平台。' },
+    { key: 'rune',    stage: 2, name: '符文滴', color: '#B08FD0', desc: '合成时为对应技能 +1 充能。' },
+    { key: 'rainbow', stage: 3, name: '彩虹滴', color: '#E86FA8', desc: '使碰到的水滴跳 2 级，得分双倍。' },
+    { key: 'gale',    stage: 3, name: '疾风滴', color: '#7FCDA4', desc: '刮起疾风吹开周围水滴。' },
+    { key: 'magnet',  stage: 4, name: '磁石滴', color: '#6A8FD8', desc: '磁场漩涡聚拢大范围水滴。' },
+    { key: 'spring',  stage: 4, name: '甘霖滴', color: '#8FD8B8', desc: '下一滴变成场上最多的档位。' },
+    { key: 'thunder', stage: 5, name: '雷霆滴', color: '#F2C14E', desc: '引雷让一对同档水滴直接合成。' },
+    { key: 'pearl',   stage: 5, name: '珍珠滴', color: '#F0E6D2', desc: '祝福最多的档位全体升 1 级。' },
+    { key: 'magma',   stage: 6, name: '熔岩滴', color: '#E2703A', desc: '烧毁周围礁石与最低两档。' },
+    { key: 'geyser',  stage: 6, name: '间歇泉滴', color: '#5FC8D8', desc: '向上喷出水柱，冲开上方水滴。' },
+    { key: 'void',    stage: 7, name: '虚空滴', color: '#4A3A6A', desc: '吞噬最低档水滴至多 5 颗。' },
+    { key: 'aurora',  stage: 7, name: '极光滴', color: '#9BE8D8', desc: '极光庇护：下次合成得分 ×3。' }
   ];
   function spIndexByKey(key) {
     for (var i = 0; i < SP_DEFS.length; i++) if (SP_DEFS[i].key === key) return i;

@@ -1815,7 +1815,7 @@
         ctx.fillText(isCur || reached || isNext ? ss.name : '？？？', dotX + 15, rowCy - 3);
         ctx.font = '11px system-ui, sans-serif';
         ctx.fillStyle = isCur ? 'rgba(255,255,255,0.92)' : (reached ? '#1E7A6F' : (isNext ? '#7A98AC' : '#B0584A'));
-        var gateTxt = isCur ? '当前海域' : (reached ? '已抵达' : (isNext ? '下一海域 · 累计' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + '分' : '累计 ' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + ' 分解锁'));
+        var gateTxt = isCur ? '当前海域' : (isNext ? '下一海域 · 累计' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + '分' : '累计 ' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + ' 分解锁');
         if (isCur) ctx.strokeText(gateTxt, dotX + 15, rowCy + 11);
         ctx.fillText(gateTxt, dotX + 15, rowCy + 11);
         // 右侧：该海域的 2 个特殊滴槽位（点击查看说明）
@@ -1878,15 +1878,15 @@
       known = tu;
       title = tu ? T[dexSelTier].name : '？？？';
       sub = tu ? ('分值 ' + T[dexSelTier].score + ' · 累计合成 ×' + (dexCounts[dexSelTier] || 0)) : '未解锁';
-      body = tu ? '与同档水滴相触合成更高阶；「沧海」会汇入海域折算得分。' : '继续在海里合成更深处的水滴，遇见它便会点亮。';
+      body = tu ? '与同档水滴相触即合成更高阶。' : '继续合成，遇见它便会点亮。';
     } else if (dexSelStage >= 0) {
       var stgS = C.seaStages[dexSelStage];
       var stgReached = Math.max(tsNow, careerPeak) >= stgS.at, stgCur = dexSelStage === curStage;
       title = stgReached || stgCur ? stgS.name : '？？？';
       sub = stgCur ? '当前海域' : (stgReached ? '已抵达' : ('累计 ' + (stgS.at >= 10000 ? (stgS.at / 10000) + '万' : stgS.at) + ' 分解锁'));
-      body = '海域越深水色越暗：潮汐更频、礁石更多，宝箱与稀有滴逐步出现。';
+      body = '越深水色越暗：潮汐更频、礁石更多。';
     } else {
-      var CHEST_INFO = { key: 'chest', name: '深海宝箱', desc: '沉入海底的木箱，在沉走前点击开启：得分 / 符文充能 / 甘霖预告。' };
+      var CHEST_INFO = { key: 'chest', name: '深海宝箱', desc: '沉底木箱，沉走前点开：得分或充能。' };
       var isChestSel = dexSelSp === SP_DEFS.length;
       var dsc = isChestSel ? CHEST_INFO : (SP_DEFS[dexSelSp] || SP_DEFS[0]);
       known = !!dexSpecial[isChestSel ? 'chest' : dsc.key];
@@ -1951,9 +1951,9 @@
     { c: '#38A98A', g: 'coral' },   // 珊瑚浅海：珊瑚枝（绿=海域主题色，珊瑚也有绿色的）
     { c: '#2E9BD4', g: 'bubbles' }, // 蔚蓝深海：气泡
     { c: '#4A5FB4', g: 'star' },    // 午夜深渊：夜星
-    { c: '#C9A84C', g: 'moon' },    // 月光环礁：月牙
+    { c: '#647FA8', g: 'moon' },    // 月光环礁：月牙（银蓝=月下海面色，不用金色抢主题）
     { c: '#2A4C8A', g: 'eye' },     // 海沟之眼：海之眼
-    { c: '#D4622A', g: 'vent' },    // 热泉裂谷：热泉火苗
+    { c: '#B85C3A', g: 'vent' },    // 热泉裂谷：热泉火苗（暗锈橙=热泉褐岩色）
     { c: '#8A5FB4', g: 'crown' }    // 深渊王座：王冠
   ];
   function drawSeaBadge(stg, x, y, reached) {
@@ -2025,15 +2025,12 @@
   // 成就页签：常驻目标列表（跨局累计，达成给分与充能奖励）
   function drawAchTab() {
     ctx.textAlign = 'center';
-    ctx.font = '14px system-ui, sans-serif';
-    ctx.fillStyle = '#4A7FA0';
-    ctx.fillText('难度分级：★ +60分/充能1 · ★★ +150/2 · ★★★ +400/4 · 跨局累计', C.W / 2, DEX_PANEL.y + 82);
-    // 双列紧凑布局（12 项成就）
+    // 双列紧凑布局（12 项成就）：难度看星数、奖励看卡片内一行，页首不再放说明行
     var cw = 178, ch = 70, gap = 8;
     for (var i = 0; i < ACH_DEFS.length; i++) {
       var a = ACH_DEFS[i];
       var cx0 = DEX_PANEL.x + 14 + (i % 2) * (cw + gap);
-      var ry = DEX_PANEL.y + 92 + Math.floor(i / 2) * (ch + gap);
+      var ry = DEX_PANEL.y + 86 + Math.floor(i / 2) * (ch + gap);
       var done = !!achDone[a.id];
       var cur = Math.min(a.target, a.cur());
       var d = a.diff || 1;
