@@ -1,4 +1,4 @@
-// 文档图标导出：用 MG.debug.icon 把游戏内图形画到主画布，逐个截图裁剪成 PNG（test/icons/）
+// 文档图标导出：调用 MG.debug.iconData 在离屏 canvas 渲染，返回真透明 PNG dataURL 直存文件（test/icons/）
 const { chromium } = require('playwright-core');
 const fs = require('fs');
 const path = require('path');
@@ -22,7 +22,7 @@ const SPECS = [
 
 (async () => {
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
-  const page = await browser.newPage({ viewport: { width: 420, height: 720 }, deviceScaleFactor: 2 });
+  const page = await browser.newPage({ viewport: { width: 420, height: 720 } });
   let errs = 0;
   page.on('pageerror', e => { errs++; console.log('PAGEERROR', e.message); });
 
@@ -30,13 +30,9 @@ const SPECS = [
   await page.goto('file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/'));
   await page.waitForTimeout(1200);
 
-  // 冻结渲染循环，画布交给 icon 钩子手绘
-  await page.evaluate(() => { MG.debug.headless = true; });
-
-  const CX = 60, CY = 60;
   for (const s of SPECS) {
-    await page.evaluate(([kind, id, x, y]) => { MG.debug.icon(kind, id, x, y); }, [s.kind, s.id, CX, CY]);
-    await page.screenshot({ path: path.join(OUT, s.name + '.png'), clip: { x: CX - 48, y: CY - 48, width: 96, height: 96 } });
+    const dataURL = await page.evaluate(([kind, id]) => MG.debug.iconData(kind, id), [s.kind, s.id]);
+    fs.writeFileSync(path.join(OUT, s.name + '.png'), Buffer.from(dataURL.split(',')[1], 'base64'));
   }
   console.log('导出图标:', SPECS.length, '个');
   console.log('页面错误:', errs);

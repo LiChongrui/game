@@ -2635,13 +2635,18 @@
     ctx.restore();
   }
 
-  // ---------- 文档图标渲染钩子（游戏说明配图用） ----------
-  // 配合 MG.debug.headless=true 冻结渲染循环后调用：把游戏内图形原样画到主画布指定位置，
-  // 再由测试脚本截图裁剪导出 PNG——保证文档图标与游戏内实际观感完全一致。
-  MG.debug.icon = function (kind, id, cx, cy) {
+  // ---------- 文档图标渲染钩子（游戏说明/封面配图用） ----------
+  // 在离屏 canvas 上用游戏本体绘制函数渲染图标，返回真透明底 PNG dataURL——
+  // 保证文档图标与游戏内实际观感完全一致，且不受主画布 CSS 背景污染。
+  MG.debug.iconData = function (kind, id, size) {
+    size = size || 192;
+    var cv = document.createElement('canvas');
+    cv.width = size; cv.height = size;
+    var old = ctx;
+    ctx = cv.getContext('2d'); // 短暂接管模块画笔，绘制完立即归还
     ctx.save();
-    ctx.clearRect(cx - 48, cy - 48, 96, 96);
-    ctx.translate(cx, cy);
+    ctx.translate(size / 2, size / 2);
+    ctx.scale(size / 96, size / 96);
     if (kind === 'tier') {
       // 合成链水滴：标准球体 + 表情/波纹
       drawBall({ x: 0, y: 0, r: 30, tier: id, vx: 0, vy: 0 }, 1);
@@ -2677,4 +2682,6 @@
       ctx.fillText('深渊潜航', 0, 1);
     }
     ctx.restore();
+    ctx = old;
+    return cv.toDataURL('image/png');
   };
