@@ -31,6 +31,7 @@
   // 深海宝箱（无尽模式）：定期沉入一只，限时点击开启随机奖励
   var chest = null;
   var chestTimer = 26 + Math.random() * 20;
+  var questStaleT = 4; // 滞留任务检查计时
   // 随机深海事件（无尽模式）：涌泉 / 甘霖 / 漩涡风暴
   var seaEvent = { timer: 24 + Math.random() * 14, type: null, t: 0, x: 0, y: 0, data: null };
   var rippleMode = false; // 涟漪选位模式：点击画布指定波纹中心
@@ -472,7 +473,7 @@
     for (var i = 0; i < popups.length; i++) {
       var op = popups[i];
       if (op.life > 0.35 && Math.abs(op.x - x) < 220) {
-        while (Math.abs(op.y - y) < 24) y += 26;
+        while (Math.abs(op.y - y) < 28) y += 30;
       }
     }
     popups.push({ x: x, y: y, text: text, life: 1.0, max: 1.0, big: !!isBig, mult: mult || 0, scale: 0.4 });
@@ -650,21 +651,29 @@
   }
 
   // ---------- 任务链 ----------
+  // 当前已解锁的最高水滴档（任务难度随进度缩放的基准）
+  function questMaxTier() {
+    var m = 1;
+    for (var i = 0; i < T.length; i++) if (dexUnlocked[i]) m = i;
+    return m;
+  }
   function makeQuest(depth) {
     questDepth = depth;
+    var mx = questMaxTier(); // 追随玩家进度：低分时出低档任务，深处出高档任务
     var roll = Math.random(), q;
     if (roll < 0.45) {
-      q = { type: 'merge', tier: 1 + Math.floor(Math.random() * 3), need: 3 + Math.min(depth, 4), have: 0 };
+      q = { type: 'merge', tier: Math.max(1, mx - 1 - Math.floor(Math.random() * 2)), need: 3 + Math.min(depth, 4), have: 0 };
       q.text = '合成 ' + q.need + ' 个「' + T[q.tier].name + '」';
     } else if (roll < 0.75) {
       q = { type: 'combo', need: Math.min(3 + Math.floor(depth / 2), 6), have: 0 };
       q.text = '达成 ' + q.need + ' 连击';
     } else {
-      q = { type: 'tier', tier: 4 + Math.min(Math.floor(depth / 2), 2), need: 1, have: 0 };
+      q = { type: 'tier', tier: Math.min(T.length - 1, mx + 1), need: 1, have: 0 };
       q.text = '合成出「' + T[q.tier].name + '」';
     }
     q.rewardScore = C.questScoreBase + depth * C.questScoreStep;
     q.stars = Math.min(3, 1 + Math.floor(depth / 2)); // 难度星级随任务深度递进 1~3
+    q.bornMax = mx; // 记录生成时的进度基准，用于滞留检测
     quest = q;
   }
   function questProgress(nt, comboN) {
@@ -1587,6 +1596,15 @@
     } else {
       chest.t += dt;
       if (chest.t >= chest.life) expireChest();
+    }
+    // 滞留任务刷新：进度远超任务生成时的基准（连跳 3 档）时换一个跟上难度的任务
+    questStaleT -= dt;
+    if (questStaleT <= 0) {
+      questStaleT = 4;
+      if (quest && quest.bornMax != null && questMaxTier() - quest.bornMax >= 3) {
+        makeQuest(questDepth);
+        addPopup(C.W / 2, 266, '任务已更新', false, 0);
+      }
     }
   }
 
