@@ -38,8 +38,9 @@
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
     // 底部按钮/图鉴角标同步贴底（上移 4px 给名称标签留出完整显示空间）
+    // 注意：模块化后 bookBtn 等声明在 systems.js（后加载），早期触发时用 typeof 守卫
     var cy = VH - 36;
-    if (bookBtn) {
+    if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {
       bookBtn.cy = cy; restartBtn.cy = cy;
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
     }

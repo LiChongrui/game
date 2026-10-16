@@ -414,6 +414,7 @@
     if (b.special === 'vortex') drawVortexMark(r);
     else if (b.special === 'cloud') drawCloudMark(r);
     else if (b.special === 'rainbow') drawRainbowMark(r);
+    else if (b.special === 'gale') drawGaleMark(r);
     else if (b.tier <= 4) drawFace(r);
     else drawWaves(r);
     // 符文徽记（右上角小圆牌）
@@ -703,8 +704,24 @@
     }
     ctx.restore();
   }
-  function drawVortexMark(r) {
+  // 疾风滴标记：三条流动风弧
+  function drawGaleMark(r) {
     ctx.save();
+    ctx.strokeStyle = 'rgba(60,150,110,0.9)';
+    ctx.lineWidth = Math.max(2, r * 0.11);
+    ctx.lineCap = 'round';
+    for (var k = 0; k < 3; k++) {
+      var yy = -r * 0.3 + k * r * 0.3;
+      var sway = Math.sin(time * 6 + k) * r * 0.08;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.45 + sway, yy);
+      ctx.quadraticCurveTo(0, yy - r * 0.16, r * 0.45 + sway, yy);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.lineCap = 'butt';
+  }
+  function drawVortexMark(r) {    ctx.save();
     ctx.rotate(time * 4);
     ctx.strokeStyle = 'rgba(94,110,208,0.85)';
     ctx.lineWidth = Math.max(2, r * 0.09);
@@ -1536,62 +1553,44 @@
     if (dexTab === 3) { drawRankTab(); return; }
 
     ctx.textAlign = 'center';
-    ctx.font = '12px system-ui, sans-serif';
-    ctx.fillStyle = '#4A7FA0';
-    // 海域演进进度：当前称号 + 距下一阶段还差多少累计分（已满级则显示"已至最深处"）
-    var stg = seaStage(), stageHint;
-    if (stg < C.seaStages.length - 1) {
-      var nextAt = C.seaStages[stg + 1].at;
-      stageHint = ' · 距「' + C.seaStages[stg + 1].name + '」还需 ' + Math.max(0, nextAt - totalScore()) + ' 分';
-    } else stageHint = ' · 已至最深处';
-    ctx.fillText('「' + C.seaStages[stg].name + '」· 累计 ' + totalScore() + ' 分' + stageHint, C.W / 2, DEX_PANEL.y + 56);
 
-    // 合成链 3×3
+    // 合成链 5×2 紧凑网格（10 档水滴；未解锁只显示剪影，不提示门槛数值）
     for (var t = 0; t < T.length; t++) {
-      var col = t % 3, row = Math.floor(t / 3);
-      var cx0 = DEX_PANEL.x + 14 + col * 118;
-      var cy0 = DEX_PANEL.y + 66 + row * 124;
+      var col = t % 5, row = Math.floor(t / 5);
+      var cx0 = DEX_PANEL.x + 14 + col * 70;
+      var cy0 = DEX_PANEL.y + 64 + row * 108;
       ctx.fillStyle = 'rgba(46,134,180,0.08)';
-      roundRect(cx0, cy0, 110, 112, 8); ctx.fill();
+      roundRect(cx0, cy0, 66, 100, 8); ctx.fill();
       var unlocked = !!dexUnlocked[t];
-      var bx = cx0 + 55, by = cy0 + 38;
+      var bx = cx0 + 33, by = cy0 + 36;
       if (unlocked) {
-        drawBall({ x: bx, y: by, r: 22, tier: t, vx: 0, vy: 0 }, 1);
+        drawBall({ x: bx, y: by, r: 18, tier: t, vx: 0, vy: 0 }, 1);
       } else {
         ctx.fillStyle = '#B8CBD8';
-        ctx.beginPath(); ctx.arc(bx, by, 22, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(bx, by, 18, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#8AA5B8';
-        ctx.font = 'bold 16px system-ui, sans-serif';
+        ctx.font = 'bold 14px system-ui, sans-serif';
         ctx.fillText('?', bx, by + 5);
       }
       ctx.fillStyle = unlocked ? '#155A8A' : '#8AA5B8';
-      ctx.font = 'bold 13px system-ui, sans-serif';
-      ctx.fillText(unlocked ? T[t].name : '？？？', bx, cy0 + 76);
-      ctx.font = '11px system-ui, sans-serif';
+      ctx.font = 'bold 11px system-ui, sans-serif';
+      ctx.fillText(unlocked ? T[t].name : '？？？', bx, cy0 + 70);
+      ctx.font = '9px system-ui, sans-serif';
       ctx.fillStyle = '#4A7FA0';
-      ctx.fillText(unlocked ? ('分值 ' + T[t].score + ' · ×' + (dexCounts[t] || 0)) : '未解锁', bx, cy0 + 92);
-      if (unlocked) {
-        ctx.fillStyle = '#1E7A6F';
-        ctx.fillText('已收录', bx, cy0 + 108);
-      } else if ((C.dexGate[t] || 0) > 0) {
-        // 积分门槛提示：已达门槛但未合成出 → "待合成"；未达门槛 → 显示所需累计分
-        var gate = C.dexGate[t] || 0;
-        ctx.fillStyle = totalScore() >= gate ? '#C97A10' : '#B0584A';
-        ctx.fillText(totalScore() >= gate ? '已达标 · 待合成' : ('累计 ' + gate + ' 分'), bx, cy0 + 108);
-      }
+      ctx.fillText(unlocked ? ('分值 ' + T[t].score + ' · ×' + (dexCounts[t] || 0)) : '未解锁', bx, cy0 + 88);
     }
 
-    // 海域演进全景：四个阶段一屏看全（当前高亮 / 已达成点亮 / 未达成显示门槛）
+    // 海域演进全景：当前高亮 / 已达成点亮 / 未达成显示门槛
     ctx.textAlign = 'center';
     var curStage = seaStage(), tsNow = totalScore();
     ctx.font = '10px system-ui, sans-serif';
     ctx.fillStyle = '#4A7FA0';
     ctx.textAlign = 'left';
-    ctx.fillText('海域演进', DEX_PANEL.x + 14, DEX_PANEL.y + 436);
+    ctx.fillText('海域演进', DEX_PANEL.x + 14, DEX_PANEL.y + 288);
     ctx.textAlign = 'center';
     for (var stg = 0; stg < C.seaStages.length; stg++) {
       var ss = C.seaStages[stg];
-      var sw = 40, sx0 = DEX_PANEL.x + 14 + stg * (sw + 4), sy0 = DEX_PANEL.y + 442;
+      var sw = 40, sx0 = DEX_PANEL.x + 14 + stg * (sw + 4), sy0 = DEX_PANEL.y + 294;
       var isCur = stg === curStage, reached = tsNow >= ss.at;
       ctx.fillStyle = isCur ? '#2E86B4' : (reached ? 'rgba(46,134,180,0.14)' : 'rgba(120,145,165,0.14)');
       roundRect(sx0, sy0, sw, 40, 7); ctx.fill();
@@ -1645,14 +1644,14 @@
     var dsc = SP_DEFS[dexSelSp] || SP_DEFS[0];
     var known = !!dexSpecial[dsc.key];
     ctx.fillStyle = 'rgba(46,134,180,0.10)';
-    roundRect(DEX_PANEL.x + 12, DEX_PANEL.y + 572, DEX_PANEL.w - 24, 44, 8); ctx.fill();
+    roundRect(DEX_PANEL.x + 12, DEX_PANEL.y + 434, DEX_PANEL.w - 24, 44, 8); ctx.fill();
     ctx.fillStyle = known ? '#155A8A' : '#8AA5B8';
     ctx.font = 'bold 12px system-ui, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(known ? dsc.name : '？？？', DEX_PANEL.x + 24, DEX_PANEL.y + 589);
+    ctx.fillText(known ? dsc.name : '？？？', DEX_PANEL.x + 24, DEX_PANEL.y + 451);
     ctx.font = '10px system-ui, sans-serif';
     ctx.fillStyle = '#4A7FA0';
-    ctx.fillText(known ? dsc.desc : '在海域中发现它即可点亮说明', DEX_PANEL.x + 24, DEX_PANEL.y + 606);
+    ctx.fillText(known ? dsc.desc : '在海域中发现它即可点亮说明', DEX_PANEL.x + 24, DEX_PANEL.y + 468);
     ctx.textAlign = 'center';
   }
 
@@ -1661,37 +1660,54 @@
     ctx.textAlign = 'center';
     ctx.font = '11px system-ui, sans-serif';
     ctx.fillStyle = '#4A7FA0';
-    ctx.fillText('达成奖励：得分 +80 · 随机技能充能 +2 · 跨局累计', C.W / 2, DEX_PANEL.y + 56);
+    ctx.fillText('难度分级：★ +60分/充能1 · ★★ +150/2 · ★★★ +400/4 · 跨局累计', C.W / 2, DEX_PANEL.y + 56);
+    // 双列紧凑布局（12 项成就）
+    var cw = 178, ch = 74, gap = 8;
     for (var i = 0; i < ACH_DEFS.length; i++) {
       var a = ACH_DEFS[i];
-      var ry = DEX_PANEL.y + 70 + i * 66;
+      var cx0 = DEX_PANEL.x + 14 + (i % 2) * (cw + gap);
+      var ry = DEX_PANEL.y + 66 + Math.floor(i / 2) * (ch + gap);
       var done = !!achDone[a.id];
       var cur = Math.min(a.target, a.cur());
-      ctx.fillStyle = done ? 'rgba(245,197,66,0.14)' : 'rgba(46,134,180,0.07)';
-      roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 58, 8); ctx.fill();
+      var d = a.diff || 1;
+      ctx.fillStyle = done ? 'rgba(245,197,66,0.14)' : (d === 3 ? 'rgba(150,110,220,0.08)' : 'rgba(46,134,180,0.07)');
+      roundRect(cx0, ry, cw, ch, 8); ctx.fill();
       ctx.textAlign = 'left';
-      ctx.fillStyle = done ? '#B8860B' : '#155A8A';
-      ctx.font = 'bold 13px system-ui, sans-serif';
-      ctx.fillText((done ? '★ ' : '') + a.name + (done ? ' · 已达成' : ''), DEX_PANEL.x + 26, ry + 20);
-      ctx.fillStyle = '#4A7FA0';
-      ctx.font = '11px system-ui, sans-serif';
-      ctx.fillText(a.desc, DEX_PANEL.x + 26, ry + 42);
-      // 永续加成说明（名称行右侧，达成后变为海绿色；避开下方进度条）
-      ctx.fillStyle = done ? '#1E7A6F' : '#9AB4C4';
-      ctx.font = '10px system-ui, sans-serif';
+      // 名称 + 难度星（达成金色，未达成灰蓝）
+      ctx.fillStyle = done ? '#B8860B' : (d === 3 ? '#6B5AA8' : '#155A8A');
+      ctx.font = 'bold 12px system-ui, sans-serif';
+      ctx.fillText((done ? '✓ ' : '') + a.name, cx0 + 10, ry + 17);
       ctx.textAlign = 'right';
-      ctx.fillText(a.perk, DEX_PANEL.x + DEX_PANEL.w - 26, ry + 18);
+      ctx.fillStyle = d === 3 ? '#9B7FD0' : (d === 2 ? '#C99B3F' : '#9AB4C4');
+      ctx.font = '9px system-ui, sans-serif';
+      var starTxt = '';
+      for (var st = 0; st < d; st++) starTxt += '★';
+      ctx.fillText(starTxt, cx0 + cw - 10, ry + 16);
       ctx.textAlign = 'left';
-      // 进度条（右侧）
-      var barX = DEX_PANEL.x + DEX_PANEL.w - 150, barW = 116, barY = ry + 24;
+      // 描述（一行截断：双列较窄，超宽省略）
+      ctx.fillStyle = '#4A7FA0';
+      ctx.font = '9px system-ui, sans-serif';
+      var desc = a.desc;
+      while (ctx.measureText(desc).width > cw - 20 && desc.length > 4) desc = desc.slice(0, -2);
+      if (desc !== a.desc) desc += '…';
+      ctx.fillText(desc, cx0 + 10, ry + 34);
+      // 奖励说明
+      ctx.fillStyle = done ? '#1E7A6F' : '#9AB4C4';
+      ctx.font = '8px system-ui, sans-serif';
+      var perk = a.perk;
+      while (ctx.measureText(perk).width > cw - 20 && perk.length > 4) perk = perk.slice(0, -2);
+      if (perk !== a.perk) perk += '…';
+      ctx.fillText(perk, cx0 + 10, ry + 47);
+      // 进度条
+      var barX = cx0 + 10, barW = cw - 20, barY = ry + 56;
       ctx.fillStyle = 'rgba(46,134,180,0.15)';
-      roundRect(barX, barY, barW, 9, 4.5); ctx.fill();
+      roundRect(barX, barY, barW, 8, 4); ctx.fill();
       ctx.fillStyle = done ? '#F5C542' : '#2E86B4';
-      if (cur > 0) { roundRect(barX, barY, Math.max(6, barW * cur / a.target), 9, 4.5); ctx.fill(); }
-      ctx.textAlign = 'center';
+      if (cur > 0) { roundRect(barX, barY, Math.max(6, barW * cur / a.target), 8, 4); ctx.fill(); }
+      ctx.textAlign = 'right';
       ctx.fillStyle = done ? '#B8860B' : '#4A7FA0';
-      ctx.font = '10px system-ui, sans-serif';
-      if (!done) ctx.fillText(cur + '/' + a.target, barX + barW / 2, barY + 24);
+      ctx.font = '8px system-ui, sans-serif';
+      ctx.fillText(done ? '已达成' : (cur + '/' + a.target), cx0 + cw - 10, barY + 14);
     }
   }
 
@@ -1717,9 +1733,17 @@
       ctx.fillStyle = done ? '#B8860B' : '#155A8A';
       ctx.font = 'bold 13px system-ui, sans-serif';
       ctx.fillText((done ? '✓ ' : '') + t.text, DEX_PANEL.x + 26, ry + 22);
+      // 难度星级（右侧）+ 分级奖励
+      ctx.textAlign = 'right';
+      ctx.fillStyle = (t.stars || 1) === 3 ? '#9B7FD0' : ((t.stars || 1) === 2 ? '#C99B3F' : '#9AB4C4');
+      ctx.font = '10px system-ui, sans-serif';
+      var dstar = '';
+      for (var ds = 0; ds < (t.stars || 1); ds++) dstar += '★';
+      ctx.fillText(dstar, DEX_PANEL.x + DEX_PANEL.w - 26, ry + 20);
+      ctx.textAlign = 'left';
       ctx.fillStyle = '#4A7FA0';
       ctx.font = '11px system-ui, sans-serif';
-      ctx.fillText('奖励 +' + C.daily.rewardScore + ' 分', DEX_PANEL.x + 26, ry + 42);
+      ctx.fillText('奖励 +' + Math.round(C.daily.rewardScore * (1 + ((t.stars || 1) - 1) * 0.5)) + ' 分', DEX_PANEL.x + 26, ry + 42);
       // 进度条
       var barX = DEX_PANEL.x + 26, barW = DEX_PANEL.w - 120, barY = ry + 54;
       ctx.fillStyle = 'rgba(46,134,180,0.15)';

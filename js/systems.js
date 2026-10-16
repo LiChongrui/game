@@ -162,31 +162,31 @@
   }
   function loadDaily() { return MG.platform.getJSON('mg_daily', null); }
   function saveDaily() { MG.platform.setJSON('mg_daily', daily); }
-  function buildDailyTasks(date, rnd) {
-    var pool = [
-      { type: 'merge', tier: 1 + Math.floor(rnd() * 3), need: 6 + Math.floor(rnd() * 5) },
-      { type: 'combo', need: 3 + Math.floor(rnd() * 3) },
-      { type: 'chest', need: 1 },
-      { type: 'tide',  need: 2 },
-      { type: 'iron',  need: 1 }
-    ];
-    // 按种子挑 3 个不同类型：合成/连击固定候选，第三个从宝箱/涨潮/礁石里选
-    var t1 = { type: 'merge', tier: 1 + Math.floor(rnd() * 3), need: 6 + Math.floor(rnd() * 5) };
+  function buildDailyTasks(date, rnd, streakNow) {
+    // 难度随连续天数递进（1x → 3x），星数标记难度，奖励同步分级
+    var f = 1 + Math.min(2, (streakNow || 0) * 0.34);
+    var stars = f < 1.5 ? 1 : (f < 2.5 ? 2 : 3);
+    var mn = function (v) { return Math.max(1, Math.round(v * f)); };
+    var t1 = { type: 'merge', tier: 1 + Math.floor(rnd() * 3), need: mn(6 + Math.floor(rnd() * 5)), stars: stars };
     t1.text = '合成 ' + t1.need + ' 个「' + T[t1.tier].name + '」';
-    var t2 = { type: 'combo', need: 3 + Math.floor(rnd() * 3) };
+    var t2 = { type: 'combo', need: mn(3 + Math.floor(rnd() * 3)), stars: stars };
     t2.text = '达成 ' + t2.need + ' 连击';
-    var extra = [pool[2], pool[3], pool[4]][Math.floor(rnd() * 3)];
-    extra = { type: extra.type, need: extra.need };
-    extra.text = extra.type === 'chest' ? '开启 1 只深海宝箱'
-      : (extra.type === 'tide' ? '经历 ' + extra.need + ' 次涨潮' : '消除 1 对礁石');
-    return [t1, t2, extra];
+    var extras = [
+      { type: 'chest', need: Math.min(3, mn(1)), text: '开启深海宝箱' },
+      { type: 'tide',  need: mn(2), text: '经历涨潮' },
+      { type: 'iron',  need: Math.min(3, mn(1)), text: '消除礁石' }
+    ];
+    var ex = extras[Math.floor(rnd() * extras.length)];
+    var t3 = { type: ex.type, need: ex.need, stars: stars };
+    t3.text = ex.text + ' ×' + t3.need;
+    return [t1, t2, t3];
   }
   var daily = (function () {
     var d = loadDaily(), today = todayStr();
     if (!d || d.date !== today) {
       var streak = (d && d.date === yesterdayStr()) ? (d.streak || 0) : 0; // 断签清零
       var rnd = mulberry(dateSeed(today));
-      var fresh = { date: today, streak: streak, streakToday: false, tasks: buildDailyTasks(today, rnd), prog: [0, 0, 0], done: [false, false, false], allDone: false };
+      var fresh = { date: today, streak: streak, streakToday: false, tasks: buildDailyTasks(today, rnd, streak), prog: [0, 0, 0], done: [false, false, false], allDone: false };
       saveDailyFresh(fresh);
       return fresh;
     }
@@ -202,7 +202,8 @@
       else daily.prog[i] = Math.min(t.need, daily.prog[i] + (n || 1));
       if (daily.prog[i] >= t.need) {
         daily.done[i] = true;
-        var gain = Math.round(C.daily.rewardScore * scoreMult);
+        // 奖励随任务难度星数分级（★ ×1 · ★★ ×1.5 · ★★★ ×2）
+        var gain = Math.round(C.daily.rewardScore * (1 + ((t.stars || 1) - 1) * 0.5) * scoreMult);
         score += gain;
         scoreBump = 0.35;
         addPopup(C.W / 2, 205, '每日任务完成 +' + gain, true, 0);
@@ -337,22 +338,32 @@
 
   function rollTier() {
     // 渐进加压：投放权重随无尽时长向高级演进（线性插值到 spawnWeightsMax）
+    // 投放门槛：累计分未达 spawnGate 的档位不参与投放（达标前静默过滤，不提示数值）
     var rp = endlessRamp(), ws = [], total = 0, i;
     for (i = 0; i < C.spawnWeights.length; i++) {
+      if (C.spawnGate && C.spawnGate[i] && totalScore() < C.spawnGate[i]) { ws.push(0); continue; }
       var w = C.spawnWeights[i] + (C.ramp.spawnWeightsMax[i] - C.spawnWeights[i]) * rp;
       ws.push(w); total += w;
     }
+    if (total <= 0) return 0;
     var r = Math.random() * total;
-    for (i = 0; i < ws.length; i++) { r -= ws[i]; if (r <= 0) return i; }
+    for (i = 0; i < ws.length; i++) { r -= ws[i]; if (r <= 0 && ws[i] > 0) return i; }
+    for (i = ws.length - 1; i >= 0; i--) if (ws[i] > 0) return i;
     return 0;
   }
   function rollSpecial() {
     if (Math.random() >= C.specialChance) return null;
-    var r = Math.random();
-    if (r < 0.30) return 'vortex';
-    if (r < 0.60) return 'cloud';
-    if (r < 0.84) return 'ice';
-    return 'rainbow'; // 彩虹滴：碰到任意水滴直接跳 2 级合成
+    // 投放门槛：累计分未达 specialGate 的特殊滴静默过滤（同礁石思路，高分才见高级滴）
+    var pool = [['vortex', 30], ['cloud', 30], ['ice', 24], ['rainbow', 16], ['gale', 12]], keys = [], ws2 = [], total = 0, i;
+    for (i = 0; i < pool.length; i++) {
+      var gate = (C.specialGate && C.specialGate[pool[i][0]]) || 0;
+      if (totalScore() < gate) continue;
+      keys.push(pool[i][0]); ws2.push(pool[i][1]); total += pool[i][1];
+    }
+    if (!keys.length) return null;
+    var r = Math.random() * total;
+    for (i = 0; i < keys.length; i++) { r -= ws2[i]; if (r <= 0) return keys[i]; }
+    return keys[keys.length - 1];
   }
   function rollIron() {
     if (seaEvent && seaEvent.type === 'storm') return false; // 保底：风暴期间不再落礁石，避免双重失控
@@ -395,10 +406,10 @@
     return b;
   }
   function specialLabel(sp) {
-    return sp === 'vortex' ? '漩涡滴' : (sp === 'cloud' ? '雨云滴' : (sp === 'ice' ? '冰晶滴' : '彩虹滴'));
+    return sp === 'vortex' ? '漩涡滴' : (sp === 'cloud' ? '雨云滴' : (sp === 'ice' ? '冰晶滴' : (sp === 'gale' ? '疾风滴' : '彩虹滴')));
   }
   function specialColor(sp) {
-    return sp === 'vortex' ? '#4A5FC8' : (sp === 'cloud' ? '#3C6EAA' : (sp === 'ice' ? '#2E8FB8' : '#9B4FD0'));
+    return sp === 'vortex' ? '#4A5FC8' : (sp === 'cloud' ? '#3C6EAA' : (sp === 'ice' ? '#2E8FB8' : (sp === 'gale' ? '#3C9B72' : '#9B4FD0')));
   }
 
   function clampAim(x) {
@@ -536,15 +547,19 @@
   }
 
   // ---------- 成就（常驻目标，跨局累计；达成后永久生效的加成见 perk） ----------
+  // 成就难度分级：diff 1=★入门 2=★★进阶 3=★★★传说，奖励按难度递增
   var ACH_DEFS = [
-    { id: 'canghai',  name: '沧海遗珠', desc: '合成出传说中的「沧海」',   target: 1,    perk: '永续：沧海汇入海域得分 +50%', cur: function () { return dexCounts[8] || 0; } },
-    { id: 'combo6',   name: '连浪六叠', desc: '达成 6 连击',              target: 6,    perk: '永续：连击窗口 +0.3 秒', cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
-    { id: 'chest5',   name: '寻宝猎人', desc: '累计开启 5 只深海宝箱',    target: 5,    perk: '永续：宝箱奖励 +50% · 充能 +3', cur: function () { return lifeStats.chest || 0; } },
-    { id: 'tide12',   name: '弄潮儿',   desc: '经历 12 次涨潮',           target: 12,   perk: '永续：潮汐期间合成得分 +10%', cur: function () { return lifeStats.tide || 0; } },
-    { id: 'iron5',    name: '礁石克星', desc: '累计消除 5 对礁石',        target: 5,    perk: '永续：礁石相消得分翻倍', cur: function () { return lifeStats.ironPair || 0; } },
-    { id: 'rainbow5', name: '虹光使者', desc: '触发 5 次彩虹合成',        target: 5,    perk: '永续：彩虹合成得分 +50%', cur: function () { return lifeStats.rainbow || 0; } },
-    { id: 'quest12',  name: '任务大师', desc: '累计完成 12 个任务',       target: 12,   perk: '永续：任务奖励 +30%', cur: function () { return lifeStats.quest || 0; } },
-    { id: 'score2k',  name: '深海富豪', desc: '单局得分达到 2000',        target: 2000, perk: '永续：开局随机技能充能 +2', cur: function () { return Math.max(score, best, lifeStats.best || 0); } }
+    { id: 'score2k',  name: '深海富豪', desc: '单局得分达到 30000',        target: 30000, diff: 1, perk: '永续：开局随机技能充能 +2', cur: function () { return Math.max(score, best, lifeStats.best || 0); } },
+    { id: 'combo6',   name: '连浪六叠', desc: '达成 6 连击',               target: 6,     diff: 1, perk: '永续：连击窗口 +0.3 秒', cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
+    { id: 'chest5',   name: '寻宝猎人', desc: '累计开启 10 只深海宝箱',    target: 10,    diff: 1, perk: '永续：宝箱奖励 +50% · 充能 +3', cur: function () { return lifeStats.chest || 0; } },
+    { id: 'tide12',   name: '弄潮儿',   desc: '经历 25 次涨潮',            target: 25,    diff: 2, perk: '永续：潮汐期间合成得分 +10%', cur: function () { return lifeStats.tide || 0; } },
+    { id: 'iron5',    name: '礁石克星', desc: '累计消除 12 对礁石',        target: 12,    diff: 2, perk: '永续：礁石相消得分翻倍', cur: function () { return lifeStats.ironPair || 0; } },
+    { id: 'rainbow5', name: '虹光使者', desc: '触发 12 次彩虹合成',        target: 12,    diff: 2, perk: '永续：彩虹合成得分 +50%', cur: function () { return lifeStats.rainbow || 0; } },
+    { id: 'quest12',  name: '任务大师', desc: '累计完成 30 个任务',        target: 30,    diff: 2, perk: '永续：任务奖励 +30%', cur: function () { return lifeStats.quest || 0; } },
+    { id: 'canghai',  name: '沧海遗珠', desc: '合成出传说中的「沧海」',    target: 1,     diff: 2, perk: '永续：顶级水滴汇入海域得分 +50%', cur: function () { return dexCounts[8] || 0; } },
+    { id: 'canghai5', name: '沧海成群', desc: '累计合成 5 只「沧海」',     target: 5,     diff: 3, perk: '称号：沧海之主', cur: function () { return dexCounts[8] || 0; } },
+    { id: 'combo12',  name: '惊涛十二叠', desc: '达成 12 连击',            target: 12,    diff: 3, perk: '称号：驭浪者', cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
+    { id: 'score10w', name: '海渊传说', desc: '单局得分达到 100000',       target: 100000, diff: 3, perk: '称号：海渊传说', cur: function () { return Math.max(score, best, lifeStats.best || 0); } }
   ];
   function checkAchievements() {
     lifeStats.best = Math.max(lifeStats.best || 0, best, score);
@@ -553,13 +568,16 @@
       if (achDone[a.id]) continue;
       if (a.cur() < a.target) continue;
       achDone[a.id] = 1;
-      var gain = Math.round(80 * cm(scoreMult));
+      // 奖励按难度分级：★ +60/充能1 · ★★ +150/充能2 · ★★★ +400/充能4
+      var d = a.diff || 1;
+      var base = d === 3 ? 400 : (d === 2 ? 150 : 60);
+      var gain = Math.round(base * cm(scoreMult));
       score += gain;
       scoreBump = 0.4;
       var pick = C.skills[(Math.random() * C.skills.length) | 0];
-      skillCharge[pick.key] += 2;
+      skillCharge[pick.key] += d === 3 ? 4 : (d === 2 ? 2 : 1);
       addPopup(C.W / 2, 240, '成就达成 · ' + a.name + ' +' + gain, true, 0);
-      addPopup(C.W / 2, 266, '「' + pick.name + '」充能 +2', false, 0);
+      addPopup(C.W / 2, 266, '「' + pick.name + '」充能 +' + (d === 3 ? 4 : (d === 2 ? 2 : 1)), false, 0);
       parts.push({ type: 'ring', x: C.W / 2, y: 150, r: 26, life: 0.6, max: 0.6, color: '#F5C542' });
       audio.quest();
       saveDex();
@@ -572,6 +590,7 @@
     { key: 'cloud',   name: '雨云滴', color: '#8FA8BC', desc: '落地后分裂成两颗雾泡，快速补充低级水滴。' },
     { key: 'ice',     name: '冰晶滴', color: '#A8DFF2', desc: '落定后冻结周围水滴，冻结滴可以当临时平台。' },
     { key: 'rainbow', name: '彩虹滴', color: '#E86FA8', desc: '碰到任意水滴使其直接跳 2 级，得分双倍。' },
+    { key: 'gale',    name: '疾风滴', color: '#7FCDA4', desc: '落定瞬间刮起疾风吹开周围水滴，为堆场腾出空间。' },
     { key: 'iron',    name: '礁石',   color: '#6E7B88', desc: '沉重障碍，无法合成；两两相消或用蒸发移除。' },
     { key: 'rune',    name: '符文滴', color: '#B08FD0', desc: '带符文的水滴，合成时为对应技能 +1 充能。' },
     { key: 'chest',   name: '深海宝箱', color: '#C98B3E', desc: '限时沉入场中，点击开启随机奖励。' }
@@ -860,6 +879,16 @@
           updateVortex(b, dt, bs);
         } else if (b.special === 'ice') {
           updateIce(b, bs);
+        } else if (b.special === 'gale') {
+          // 疾风滴：落定瞬间吹开周围水滴（腾出空间，防堆高），随后变回普通水滴
+          if (b.specialT >= 0.45 || b.y + b.r >= C.floorY - 4) {
+            pushNeighbors(b.x, b.y, 130);
+            burst(b.x, b.y, b.tier, false);
+            parts.push({ type: 'ring', x: b.x, y: b.y, r: 16, life: 0.5, max: 0.5, color: '#BFE8D8' });
+            addPopup(b.x, b.y - b.r - 14, '疾风！', false, 0);
+            audio.swirl();
+            b.special = null;
+          }
         }
       }
       // 冻结滴：速度清零 + 倒计时 + 解冻
@@ -1556,7 +1585,7 @@
     { key: 'flow',   cx: 302, cy: 688, r: 20, pressT: 0 }
   ];
   fit(); // 首次适配（按钮已定义，底部元素可同步贴底）
-  var DEX_PANEL = { x: 20, y: 64, w: 380, h: 624 };
+  var DEX_PANEL = { x: 20, y: 64, w: 380, h: 560 };
   var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 60, y: DEX_PANEL.y + 10, w: 50, h: 26 };
   var tabDexBtn = { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 10, w: 66, h: 26 };
   var tabAchBtn = { x: DEX_PANEL.x + 86, y: DEX_PANEL.y + 10, w: 66, h: 26 };
@@ -1564,7 +1593,7 @@
   var tabRankBtn = { x: DEX_PANEL.x + 230, y: DEX_PANEL.y + 10, w: 66, h: 26 };
   var shareCopyBtn = { x: 0, y: 0, w: 150, h: 42 }; // 分享卡片：复制文案按钮（打开时定位）
   function spCellRect(i) {
-    return { x: DEX_PANEL.x + 12 + i * 50, y: DEX_PANEL.y + 490, w: 48, h: 72 };
+    return { x: DEX_PANEL.x + 12 + i * 46, y: DEX_PANEL.y + 346, w: 44, h: 76 };
   }
 
   // 重开确认弹窗
