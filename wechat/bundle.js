@@ -5538,7 +5538,7 @@ MG.config = {
     var cur = seaStage(), ts = totalScore();
     var last = C.seaStages.length - 1;
     var maxed = cur >= last;
-    var sx = 6, sy = 100, sw = C.W - 12, sh = 16;
+    var sx = 12, sy = 100, sw = C.W - 24, sh = 20;
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     roundRect(sx, sy, sw, sh, 8); ctx.fill();
     var frac = 1;
@@ -5560,9 +5560,9 @@ MG.config = {
     var label = maxed ? '已达最深海域 · ' + C.seaStages[last].name
       : '距「' + C.seaStages[cur + 1].name + '」还差 ' + (C.seaStages[cur + 1].at - ts) + ' 分';
     var cx = sx + sw / 2;
-    ctx.strokeText(label, cx, sy + 13);
+    ctx.strokeText(label, cx, sy + 15);
     ctx.fillStyle = '#2C5A78';
-    ctx.fillText(label, cx, sy + 13);
+    ctx.fillText(label, cx, sy + 15);
     if (!maxed) {
       // 右端终点标记：下一海域徽章图标（未抵达灰化态，与左端当前位置彩色徽章呼应）
       drawSeaBadge(cur + 1, sx + sw - 16, sy + sh / 2, false);
