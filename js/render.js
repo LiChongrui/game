@@ -1699,7 +1699,7 @@
     var cur = seaStage(), ts = totalScore();
     var last = C.seaStages.length - 1;
     var maxed = cur >= last;
-    var sx = 12, sy = 100, sw = C.W - 24, sh = 16;
+    var sx = 6, sy = 100, sw = C.W - 12, sh = 16;
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     roundRect(sx, sy, sw, sh, 8); ctx.fill();
     var frac = 1;
