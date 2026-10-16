@@ -1189,9 +1189,13 @@
   }
 
   // ---------- 潮汐 ----------
-  // 潮峰高度：随海域演进逐级上涨（更深的海潮位更高、更危险），封顶防完全没顶
+  // 潮位设计（几何推导）：满潮水面最矮距容器底 1/4 容器高，最高距警戒线 1/4 容器高，
+  // 每推进一个海域在两端之间线性推进——水面永远碰不到警戒线，且随海域可见上涨
   function tideWaterMax() {
-    return Math.min(C.tide.waterMaxCap, C.tide.waterMax + seaStage() * C.tide.waterMaxStep);
+    var H = FLOORY - C.containerTop;
+    var lo = 1 / 4;
+    var hi = (FLOORY - C.dangerY - H / 4) / H;
+    return lo + (hi - lo) * (seaStage() / (C.seaStages.length - 1));
   }
   function tideY() {
     return FLOORY - tide.progress * (FLOORY - C.containerTop) * tideWaterMax();
@@ -1483,6 +1487,7 @@
     for (i = 0; i < SKILL_BTNS.length; i++) ui.skills.push({ key: SKILL_BTNS[i].key, cx: SKILL_BTNS[i].cx, cy: SKILL_BTNS[i].cy });
     return {
       state: state, dangerY: C.dangerY, floorY: C.floorY, pileTop: top, n: phys.bodies.length,
+      dangerAlert: dangerAlert,
       tide: tide.progress, tideRef: tide, level: level, score: score,
       chest: chest ? [Math.round(chest.b.x), Math.round(chest.b.y)] : null,
       chestLife: chest ? Math.round((chest.life - chest.t) * 10) / 10 : null,
