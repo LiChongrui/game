@@ -82,6 +82,7 @@
   var endlessT = 0, rampStage = 0;
   var climaxMark = 0; // 高潮时刻：上次触发时的分数标记
   var tideGateHint = false; // 潮汐限定合成：一次性提示
+  var tideKillHint = false; // 潮汐可致死（浮起越线判负）：一次性提示
   // 首局主动引导：前 5 投分步提示（只出现一次，localStorage 标记）
   var dropCount = 0, tutDone = loadFlag('mg_tut');
   var TUT_STEPS = [
@@ -1188,8 +1189,12 @@
   }
 
   // ---------- 潮汐 ----------
+  // 潮峰高度：随海域演进逐级上涨（更深的海潮位更高、更危险），封顶防完全没顶
+  function tideWaterMax() {
+    return Math.min(C.tide.waterMaxCap, C.tide.waterMax + seaStage() * C.tide.waterMaxStep);
+  }
   function tideY() {
-    return FLOORY - tide.progress * (FLOORY - C.containerTop) * C.tide.waterMax;
+    return FLOORY - tide.progress * (FLOORY - C.containerTop) * tideWaterMax();
   }
   // 波浪振幅随潮汐增强（潮越大浪越涌），物理水面(tideY)保持平，仅视觉起浪
   function tideAmp() {
@@ -1212,6 +1217,7 @@
         tide.phase = 'active';
         tide.timer = C.tide.duration;
         tide.banner = 2.4;
+        if (!tideKillHint) { tideKillHint = true; addPopup(C.W / 2, 250, '潮位渐深 · 浮起越线同样危险', true, 0); }
         audio.tide();
       }
     } else {
@@ -1417,8 +1423,10 @@
 
   // ---------- 失败判定 ----------
   function checkDanger(dt) {
-    // 潮汐涨落期间豁免：浮力把水滴顶过线不是玩家堆太高，潮退后再重新累计
-    if (tide.progress > 0.15) { dangerAlert = 0; return; }
+    // 潮汐期间照常判负：浮起越线同样致命（深水海域潮峰更高，潮汐本身即威胁）。
+    // 但浮力会把整堆水滴像筏子一样整体抬起（堆顶常越过容器口），非玩家堆高——
+    // 判负引信放宽 5 倍且不叠加容器口减半，给足反应时间（配合每局一次深流缓冲）。
+    var tideOn = tide.progress > 0.15;
     var bs = phys.bodies;
     var worst = 0;
     for (var i = 0; i < bs.length; i++) {
@@ -1430,8 +1438,7 @@
       if (top >= C.dangerY) { b.dangerT = 0; continue; } // 线下，重置
       // 越线即计时，不再要求"有支撑"——高压堆里球体持续微颤导致支撑/速度判定
       // 反复失败、计时永远攒不满，是此前"明显越线却迟迟不判负"的根因。
-      // 顶出容器口（高过出生点）视为极端堆高，引信缩短一半。
-      var fuse = top < C.containerTop ? C.dangerTime * 0.55 : C.dangerTime;
+      var fuse = tideOn ? C.dangerTime * 5 : C.dangerTime * (top < C.containerTop ? 0.55 : 1);
       if (sp < C.dangerSpeed * 1.5) {
         b.dangerT += dt;
         if (b.dangerT > fuse) {
@@ -1514,6 +1521,7 @@
     setDrops: function (n) { dropCount = n; },
     tutDone: function () { return tutDone; },
     stage: function () { return { i: seaStage(), name: C.seaStages[seaStage()].name }; },
+    tideY: tideY, // 当前潮面 y（测试钩子：潮位随海域上涨验证用）
     setLife: function (n) { lifeScore = n; runCounted = 0; },
     cm: cm,
     // ---- 蒙特卡洛模拟器钩子（无渲染快进，见 test/simulate.js） ----
