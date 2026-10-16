@@ -28,11 +28,11 @@ const path = require('path');
           if (x >= xm0 && x <= xm1 && r > 200 && g > 225 && b > 235) base++; // 条底半透明白
         }
       }
-      // 右端目的地圆点：物理位置 x≈k*(sx+sw-14)+ox, y≈k*(sy+8)+oyT
-      var ex = Math.round(k * (12 + 396 - 14) + ox), ey = Math.round(k * 114 + oyT);
-      var di = c2.getImageData(ex - 4, ey - 4, 8, 8).data;
+      // 右端下一海域徽章（未抵达灰化态）：灰图标 #8AA5B8=(138,165,184)
+      var ex = Math.round(k * (12 + 396 - 16) + ox), ey = Math.round(k * 114 + oyT);
+      var di = c2.getImageData(ex - 6, ey - 6, 12, 12).data;
       for (var j = 0; j < di.length; j += 4) {
-        if (di[j] < 110 && di[j + 1] > 140 && di[j + 2] > 100) dot++; // 目的地圆点绿 #38A98A=(56,169,138)（背景深蓝 r 高 g 低）
+        if (Math.abs(di[j] - 138) < 45 && Math.abs(di[j + 1] - 165) < 45 && Math.abs(di[j + 2] - 184) < 45 && di[j + 2] > di[j]) dot++;
       }
       return { fill: fill, base: base, dot: dot };
     });
@@ -52,7 +52,7 @@ const path = require('path');
   const bar = await probeBar(page);
   ok(bar.fill > 8, '进度条左端填充存在（新档 frac=0.02，fill=' + bar.fill + '）');
   ok(bar.base > 60, '进度条条底像素存在（base=' + bar.base + '）');
-  ok(bar.dot > 3, '右端下一海域目的地圆点存在（dot=' + bar.dot + '）');
+  ok(bar.dot > 3, '右端下一海域灰化徽章存在（dot=' + bar.dot + '）');
 
   await page.evaluate(() => { MG.debug.setNext({ tier: 2 }); });
   await page.waitForTimeout(400);

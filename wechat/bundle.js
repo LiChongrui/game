@@ -5579,11 +5579,8 @@ MG.config = {
     ctx.fillStyle = '#2C5A78';
     ctx.fillText(label, cx, sy + 13);
     if (!maxed) {
-      // 右端终点标记：下一海域徽章色小圆点（"要去的地方"），避免整条填充撞色
-      var ex = sx + sw - 14, ey = sy + sh / 2;
-      ctx.beginPath(); ctx.arc(ex, ey, 5.5, 0, Math.PI * 2);
-      ctx.fillStyle = SEA_BADGES[cur + 1].c; ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5; ctx.stroke();
+      // 右端终点标记：下一海域徽章图标（未抵达灰化态，与左端当前位置彩色徽章呼应）
+      drawSeaBadge(cur + 1, sx + sw - 16, sy + sh / 2, false);
     }
     // 左端骑线放当前海域徽章——直观标注"当前位置"（与图鉴徽章语言一致）
     drawSeaBadge(cur, sx + 16, sy + sh / 2, true);
