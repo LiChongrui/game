@@ -71,8 +71,7 @@
   var quest = null, questDepth = 0;
 
   // 关卡状态：1 = 限时得分关（低难度），2 = 无尽模式（礁石/潮汐齐全，计时改为累计进行时长）
-  var level = 1, levelTime = C.level1.time, failReason = '', levelBanner = 0;
-  var levelElapsed = 0;                                  // 无尽模式已进行时长
+  var levelElapsed = 0;                                  // 本局已进行时长（顶部计时显示用）
   var lifeScore = 0, runCounted = 0; // 累计分（图鉴门槛用）：刷新页面即重新计，不跨刷新保留
   function totalScore() { return lifeScore + (score - runCounted); }
 
@@ -94,7 +93,7 @@
     '攒满符文即可点亮底部技能按钮'
   ];
   function endlessRamp() {
-    return level === 2 ? Math.min(1, endlessT / (C.ramp.minutes * 60)) : 0;
+    return Math.min(1, endlessT / (C.ramp.minutes * 60));
   }
   // 成就永续加成查询（勋章变成长线）
   function perkOn(id) { return !!achDone[id]; }
@@ -117,8 +116,6 @@
     restart();
     ng.active = affix;                 // restart 会清 active，重设
     C.gravity = GRAV0 * (affix.grav || 1);
-    level = 2;                         // 直入无尽（潮汐/宝箱/事件全开）
-    levelBanner = 2.2;
     addPopup(C.W / 2, 300, '深渊潜航 ·「' + affix.name + '」×' + affix.mult, true, 0);
     ngOpen = false;
   }
@@ -388,8 +385,8 @@
     if (seaEvent && seaEvent.type === 'storm') return false; // 保底：风暴期间不再落礁石，避免双重失控
     var ch = C.iron.chance + (C.ramp.ironChanceMax - C.iron.chance) * endlessRamp();
     if (ng && ng.active && ng.active.ironX) ch *= ng.active.ironX; // 二周目「暗礁密布」
-    return level === 2 && Math.random() < ch;
-  } // 礁石仅无尽模式（概率随渐进加压提升）
+    return Math.random() < ch;
+  } // 礁石概率随渐进加压提升
   // 符文：普通水滴随机附带的道具属性，合成时为对应技能充能（只出已解锁的技能符文）
   function rollRune() {
     if (seaStage() < ((C.specialStage && C.specialStage.rune) || 2)) return null; // 蔚蓝深海起才带符文
@@ -1489,7 +1486,7 @@
     return {
       state: state, dangerY: C.dangerY, floorY: C.floorY, pileTop: top, n: phys.bodies.length,
       dangerAlert: dangerAlert,
-      tide: tide.progress, tideRef: tide, level: level, score: score,
+      tide: tide.progress, tideRef: tide, score: score,
       chest: chest ? [Math.round(chest.b.x), Math.round(chest.b.y)] : null,
       chestLife: chest ? Math.round((chest.life - chest.t) * 10) / 10 : null,
       event: seaEvent.type, eventT: seaEvent.type ? Math.round(seaEvent.t * 10) / 10 : null,
@@ -1514,7 +1511,7 @@
     },
     achCheck: function () { checkAchievements(); },
     bump: bumpStat,
-    forceEndless: function () { level = 2; },
+    forceEndless: function () {}, // 已无关卡制：开局即无尽（保留空钩子兼容旧测试脚本）
     setRamp: function (t) { endlessT = t; },
     grant: function (id) { achDone[id] = 1; saveDex(); },
     addScore: function (n) { score += n; },
@@ -1549,23 +1546,7 @@
     closeDex: function () { dexOpen = false; achOpen = false; }
   };
 
-  // 第 1 关通过：弹出提示进入无尽模式，不清场、不重置，继续当前局面
-  function passLevel1() {
-    var bonus = Math.ceil(levelTime) * C.level1.timeBonusPerSec;
-    level = 2;
-    levelBanner = 3;
-    // 潮汐从本关起效：重新计时首次涨潮，给玩家缓冲
-    tide.phase = 'idle'; tide.timer = C.tide.firstDelay; tide.progress = 0; tide.banner = 0;
-    if (bonus > 0) {
-      score += bonus;
-      scoreBump = 0.4;
-      addPopup(C.W / 2, 296, '时间奖励 +' + bonus, true, 0);
-    }
-    if (score > best) { best = score; saveNum('mg_best', best); }
-    audio.quest();
-  }
-
-  // ---------- 深海宝箱（无尽模式探索要素） ----------
+  // ---------- 深海宝箱（探索要素） ----------
   function spawnChest() {
     discoverSpecial('chest');
     var b = createIron(C.W * (0.2 + Math.random() * 0.6), C.dangerY + 52); // 警戒线下方开阔水域生成，不压坠落区虚影
@@ -1616,7 +1597,6 @@
     dailyProgress('chest');
   }
   function updateChest(dt) {
-    if (level < 2) return;
     if (!chest) {
       chestTimer -= dt;
       if (chestTimer <= 0) spawnChest();
@@ -1689,7 +1669,6 @@
     seaEvent.timer = 30 + Math.random() * 20;
   }
   function updateSeaEvent(dt) {
-    if (level < 2) return;
     if (tide.phase === 'active') return; // 保底：涨潮期间冻结事件节奏，避免双重混乱
     if (!seaEvent.type) {
       seaEvent.timer -= dt;
@@ -1773,7 +1752,6 @@
     evapMode = false; rippleMode = false; flowMode = false; flowPick = null; rainHint = 0;
     auroraNext = 0; // 极光庇护只在单次合成内生效
     tideGateHint = false;
-    level = 1; levelTime = C.level1.time; failReason = ''; levelBanner = 0;
     levelElapsed = 0; runCounted = 0;
     nextTier = rollTier();
     nextSpecial = rollSpecial();
@@ -2079,16 +2057,9 @@
 
     time += dt;
     if (rainHint > 0) rainHint -= dt;
-    if (levelBanner > 0) levelBanner -= dt;
     cooldown = Math.max(0, cooldown - dt);
 
-    // 关卡计时：第 1 关限时得分，达标过关（不清场续无尽），超时判负；无尽模式计时改为累计进行时长
-    if (level === 1) {
-      levelTime -= dt;
-      if (score >= C.level1.target) passLevel1();
-      else if (levelTime <= 0) { levelTime = 0; failReason = 'timeout'; gameOver(); return; }
-    }
-    levelElapsed += dt; // 从第 1 关开局起连续累计，进入无尽模式后时间无缝接着走
+    levelElapsed += dt; // 本局已进行时长（顶部计时显示用）
     checkDexGates();
     // 二周目解锁：累计分抵达最深海域门槛
     if (!ng.unlocked && totalScore() >= C.ng.unlockScore) {
@@ -2110,7 +2081,7 @@
     achTick -= dt;
     if (achTick <= 0) { achTick = 1; checkAchievements(); }
 
-    if (level === 2) updateTide(dt); // 潮汐仅无尽模式（第 1 关风平浪静，降低难度）
+    updateTide(dt);
     phys.step(dt);
     applyBuoyancy(dt);
     updateSpecials(dt);
@@ -2146,12 +2117,10 @@
     }
 
     // 无尽渐进加压计时 + 档位提示 + 高潮时刻
-    if (level === 2) {
-      endlessT += dt;
-      var stg = Math.floor(endlessRamp() * 4);
-      if (stg > rampStage) { rampStage = stg; addPopup(C.W / 2, 250, '海域渐深：潮汐更频 · 礁石更多', true, 0); }
-      if (score - climaxMark >= C.climaxEvery) doClimax();
-    }
+    endlessT += dt;
+    var stgR = Math.floor(endlessRamp() * 4);
+    if (stgR > rampStage) { rampStage = stgR; addPopup(C.W / 2, 250, '海域渐深：潮汐更频 · 礁石更多', true, 0); }
+    if (score - climaxMark >= C.climaxEvery) doClimax();
     // 声音预警：危险→母线低通收紧；潮汐临近/进行→低频隆隆
     var dg = 0;
     for (i = 0; i < phys.bodies.length; i++) {
@@ -2160,7 +2129,7 @@
       if (ddist < 90) dg = Math.max(dg, 1 - Math.max(0, ddist) / 90);
     }
     audio.bgm.setDanger(dg);
-    audio.bgm.setTide(tide.progress, (level === 2 && tide.phase === 'idle' && tide.timer < C.tide.warnTime) ? 1 : 0);
+    audio.bgm.setTide(tide.progress, (tide.phase === 'idle' && tide.timer < C.tide.warnTime) ? 1 : 0);
 
     processMerges();
     updateChest(dt);

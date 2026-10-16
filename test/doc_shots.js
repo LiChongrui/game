@@ -14,16 +14,15 @@ const path = require('path');
   // ① 开始界面
   await shot('menu');
 
-  // ② 对局：投几滴，给技能充能，营造热闹局面
-  const btn = await page.evaluate(() => { const b = MG.debug.menuBtn(); return { x: b.x + b.w / 2, y: b.y + b.h / 2 }; });
-  await page.mouse.click(btn.x, btn.y);
-  await page.waitForTimeout(400);
-  await page.evaluate(() => {
-    MG.debug.setDrops(3);
-    MG.debug.give('swap', 4); MG.debug.give('flow', 6);
-    MG.debug.drop(90); MG.debug.drop(210); MG.debug.drop(330);
-  });
-  await page.waitForTimeout(2500);
+  // ② 对局：交替投普通滴摆出合成现场（开局即无尽模式）
+  await page.mouse.click(210, 426);
+  await page.waitForTimeout(300);
+  const drops = [[2, 120], [3, 200], [2, 300], [3, 150], [4, 260], [2, 350], [3, 110], [4, 240]];
+  for (const [t, x] of drops) {
+    await page.evaluate(([t, x]) => { MG.debug.setNext({ tier: t }); MG.debug.drop(x); }, [t, x]);
+    await page.waitForTimeout(600);
+  }
+  await page.waitForTimeout(1500);
   await shot('play');
 
   // ③ 图鉴·海域演进

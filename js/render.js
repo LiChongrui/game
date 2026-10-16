@@ -1328,7 +1328,6 @@
   }
   // 潮汐信息胶囊（独立放在右上"下一个"预览正下方，不与任务条同排）
   function drawTidePill() {
-    if (level === 1) return; // 第 1 关无潮汐，胶囊隐藏
     var tx = C.W - 122, tw = 92, ty = 66, th = 20; // 中心与预览（W-76）对齐；与任务条同一水平带
     var active = tide.phase === 'active';
     var warn = !active && tide.timer <= C.tide.warnTime;
@@ -1367,71 +1366,19 @@
     ctx.restore();
   }
 
-  // ---------- 顶部中央计时：第 1 关显示倒计时+目标进度，无尽模式显示累计进行时长 ----------
+  // ---------- 顶部中央计时：本局已进行时长 ----------
   function drawLevelHud() {
-    if (level === 2) {
-      // 无尽模式：计时继续（向上累计），提示当前难度阶段
-      var em = Math.floor(levelElapsed / 60), es = Math.floor(levelElapsed % 60);
-      ctx.save();
-      ctx.textAlign = 'center';
-      ctx.lineJoin = 'round';
-      ctx.font = 'bold 15px system-ui, sans-serif';
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-      var etxt = '无尽模式 · 已进行 ' + em + ':' + (es < 10 ? '0' + es : es);
-      ctx.strokeText(etxt, C.W / 2, 20);
-      ctx.fillStyle = '#2E7DA8';
-      ctx.fillText(etxt, C.W / 2, 20);
-      ctx.restore();
-      return;
-    }
-    if (level !== 1) return;
-    var cx = C.W / 2;
-    var m = Math.floor(Math.max(0, levelTime) / 60), s = Math.floor(Math.max(0, levelTime) % 60);
-    var low = levelTime <= 15;
+    var em = Math.floor(levelElapsed / 60), es = Math.floor(levelElapsed % 60);
     ctx.save();
     ctx.textAlign = 'center';
     ctx.lineJoin = 'round';
-    ctx.font = 'bold 16px system-ui, sans-serif';
+    ctx.font = 'bold 15px system-ui, sans-serif';
     ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    var txt = '目标 ' + C.level1.target + ' · 剩余 ' + m + ':' + (s < 10 ? '0' + s : s);
-    ctx.globalAlpha = low ? 0.6 + 0.4 * Math.sin(time * 8) : 1;
-    ctx.strokeText(txt, cx, 20);
-    ctx.fillStyle = low ? '#C0504D' : '#12517E';
-    ctx.fillText(txt, cx, 20);
-    ctx.globalAlpha = 1;
-    // 目标进度条
-    var bw = 150, bx = cx - bw / 2, by = 26;
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    roundRect(bx, by, bw, 7, 3.5); ctx.fill();
-    var prog = Math.min(1, score / C.level1.target);
-    if (prog > 0) {
-      ctx.fillStyle = '#F5A623';
-      roundRect(bx, by, Math.max(6, bw * prog), 7, 3.5); ctx.fill();
-    }
-    ctx.restore();
-  }
-  // 过关横幅
-  function drawLevelBanner() {
-    if (levelBanner <= 0) return;
-    var t = levelBanner / 3; // 1 → 0
-    var a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
-    var scale = 1 + (1 - t) * 0.15;
-    ctx.save();
-    ctx.globalAlpha = a;
-    ctx.textAlign = 'center';
-    ctx.translate(C.W / 2, 250);
-    ctx.scale(scale, scale);
-    ctx.font = 'bold 40px system-ui, sans-serif';
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-    ctx.lineWidth = 6;
-    ctx.strokeText('进入无尽模式', 0, 0);
-    var g = ctx.createLinearGradient(0, -24, 0, 8);
-    g.addColorStop(0, '#F5B93A');
-    g.addColorStop(1, '#C97A10');
-    ctx.fillStyle = g;
-    ctx.fillText('进入无尽模式', 0, 0);
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    var etxt = '已进行 ' + em + ':' + (es < 10 ? '0' + es : es);
+    ctx.strokeText(etxt, C.W / 2, 20);
+    ctx.fillStyle = '#2E7DA8';
+    ctx.fillText(etxt, C.W / 2, 20);
     ctx.restore();
   }
 
@@ -2355,8 +2302,7 @@
     var isNewBest = score >= best && score > 0;
     var statusLine = doubled ? '已双倍结算'
       : (isNewBest ? '★ 新纪录！'
-      : (failReason === 'timeout' ? '时间到 · 距目标还差 ' + (C.level1.target - score) + ' 分'
-      : ('最佳 ' + best)));
+      : ('最佳 ' + best));
     ctx.fillText(statusLine, C.W / 2, py + 126);
     if (maxCombo > 1) {
       ctx.fillText('本局最高连击 ×' + maxCombo + (seaCount > 0 ? ' · 汇入海域 ×' + seaCount : ''), C.W / 2, py + 148);
@@ -2393,7 +2339,7 @@
 
   // ---------- 首局主动引导（前 5 投分步提示，只出现一次） ----------
   function drawTutorial() {
-    if (tutDone || state !== 'play' || level !== 1 || adOverlay || dexOpen || confirmOpen) return;
+    if (tutDone || state !== 'play' || adOverlay || dexOpen || confirmOpen) return;
     var step = Math.min(dropCount, TUT_STEPS.length - 1);
     var ty = 480;
     var pulse = 0.5 + 0.5 * Math.sin(time * 4);
@@ -2626,7 +2572,6 @@
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
     drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）
     drawTideBanner();
-    drawLevelBanner();
     drawSkillBar();
     drawConfirm();
     if (adOverlay) drawAdOverlay();
