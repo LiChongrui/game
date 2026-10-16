@@ -1211,7 +1211,7 @@
     ctx.textAlign = 'center';
     ctx.font = 'bold 14px system-ui, sans-serif';
     var tw = ctx.measureText(label).width + 12;
-    var ly = C.spawnY - r - 6; // 紧贴球顶，明确归属
+    var ly = Math.max(C.containerTop + 14, C.spawnY - r - 6); // 紧贴球顶；大档虚影时钳制在容器内，不越过开口顶到 HUD
     ctx.fillStyle = 'rgba(255,255,255,0.88)';
     roundRect(aimX - tw / 2, ly - 12, tw, 17, 8); ctx.fill();
     ctx.fillStyle = nextIron ? '#6B6353' : (nextSpecial ? specialColor(nextSpecial) : runeColor(nextRune));
@@ -1481,12 +1481,12 @@
 
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
   function drawHUD() {
-    // 计分（左上角悬浮；左端让位给奖杯按钮，从 x48 起）
+    // 计分（左上角悬浮；左端让位给奖杯按钮，从 x48 起）——HUD 整体上移压缩（分数 baseline 30）
     ctx.textAlign = 'left';
     var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
     ctx.lineJoin = 'round';
     ctx.save();
-    ctx.translate(48, 38);
+    ctx.translate(48, 30);
     ctx.scale(bump, bump);
     ctx.font = 'bold 34px system-ui, sans-serif';
     ctx.lineWidth = 4;
@@ -1496,17 +1496,26 @@
     ctx.fillStyle = '#12517E';
     ctx.fillText(txt, 0, 0);
     ctx.restore();
-    // 最佳/海域/词缀：独立第二行（与大分数分行，互不挤压；大分数再宽也不碰右侧预览）
+    // 第二行信息：最佳 + 海域进度（并入一行省出独立进度条的高度）+ 海域加成 + 词缀
     ctx.font = '14px system-ui, sans-serif';
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-    var sub = '最佳 ' + best + ' · ' + C.seaStages[seaStage()].name + (seaCount > 0 ? ' · 海域 ×' + seaCount : '') +
+    var cur = seaStage(), ts = totalScore(), last = C.seaStages.length - 1;
+    var seaTxt = cur >= last ? '已达「' + C.seaStages[last].name + '」'
+      : '距「' + C.seaStages[cur + 1].name + '」还差 ' + (C.seaStages[cur + 1].at - ts) + ' 分';
+    var sub = '最佳 ' + best + ' · ' + seaTxt + (seaCount > 0 ? ' · 海域 ×' + seaCount : '') +
       (ng.active ? ' · 「' + ng.active.name + '」×' + ng.active.mult : '');
-    ctx.strokeText(sub, 48, 58);
+    // 信息行超长时自适应缩字号（后期最佳分/海域名/词缀叠加，保右端不溢出屏幕）
+    var subFont = 14;
+    while (subFont > 11 && ctx.measureText(sub).width > C.W - 62) {
+      subFont--;
+      ctx.font = subFont + 'px system-ui, sans-serif';
+    }
+    ctx.strokeText(sub, 48, 52);
     ctx.fillStyle = ng.active ? '#6B5AA8' : '#3E6E90';
-    ctx.fillText(sub, 48, 58);
+    ctx.fillText(sub, 48, 52);
 
-    // 右上角：下一滴预览 + 静音按钮（主流布局）
+    // 右上角：下一滴预览 + 静音按钮（主流布局，随 HUD 上移）
     ctx.textAlign = 'center';
     ctx.font = 'bold 13px system-ui, sans-serif';
     ctx.lineJoin = 'round';
@@ -1514,18 +1523,18 @@
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     // 甘霖激活时标签替换为绿色脉动"甘霖"，避免悬浮文本遮挡出生区水滴
     if (rainHint > 0) {
-      ctx.strokeText('甘霖 · 下一滴', C.W - 76, 18);
+      ctx.strokeText('甘霖 · 下一滴', C.W - 76, 10);
       ctx.fillStyle = 'rgba(30,122,111,' + (0.55 + 0.45 * Math.sin(time * 8)) + ')';
-      ctx.fillText('甘霖 · 下一滴', C.W - 76, 18);
+      ctx.fillText('甘霖 · 下一滴', C.W - 76, 10);
     } else {
-      ctx.strokeText('下一个', C.W - 76, 18);
+      ctx.strokeText('下一个', C.W - 76, 10);
       ctx.fillStyle = '#3E6E90';
-      ctx.fillText('下一个', C.W - 76, 18);
+      ctx.fillText('下一个', C.W - 76, 10);
     }
     if (nextIron) {
-      drawIronBall({ x: C.W - 76, y: 38, r: 14, vx: 0, vy: 0 }, 0.95);
+      drawIronBall({ x: C.W - 76, y: 30, r: 14, vx: 0, vy: 0 }, 0.95);
     } else {
-      drawBall({ x: C.W - 76, y: 38, r: 15, tier: nextTier, vx: 0, vy: 0, special: nextSpecial, rune: nextRune }, 0.95);
+      drawBall({ x: C.W - 76, y: 30, r: 15, tier: nextTier, vx: 0, vy: 0, special: nextSpecial, rune: nextRune }, 0.95);
     }
 
     // 静音按钮（右上角，小号）
@@ -1563,7 +1572,7 @@
   }
   // 潮汐信息胶囊（右侧，与任务条同行同高，左右对称）
   function drawTidePill() {
-    var tx = C.W - 122, tw = 92, ty = 66, th = 34; // 与任务条(qy66/qh34)同高同排
+    var tx = C.W - 122, tw = 92, ty = 56, th = 32; // 与任务条(qy56/qh32)同高同排
     var active = tide.phase === 'active';
     var warn = !active && tide.timer <= C.tide.warnTime;
     var pulse = 0.5 + 0.5 * Math.sin(time * 6);
@@ -1572,10 +1581,10 @@
     ctx.font = 'bold 15px system-ui, sans-serif';
     if (active) {
       ctx.fillStyle = 'rgba(25,105,185,' + (0.75 + pulse * 0.25) + ')';
-      ctx.fillText('涨潮 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 22);
+      ctx.fillText('涨潮 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 21);
     } else {
       ctx.fillStyle = warn ? 'rgba(200,90,40,' + (0.7 + pulse * 0.3) + ')' : '#4A7FA0';
-      ctx.fillText('潮汐 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 22);
+      ctx.fillText('潮汐 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 21);
     }
   }
   // 涨潮横幅
@@ -1634,16 +1643,16 @@
     ctx.lineWidth = 2.5;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     var etxt = '已进行 ' + em + ':' + (es < 10 ? '0' + es : es);
-    ctx.strokeText(etxt, C.W / 2, 20);
+    ctx.strokeText(etxt, C.W / 2, 16);
     ctx.fillStyle = '#2E7DA8';
-    ctx.fillText(etxt, C.W / 2, 20);
+    ctx.fillText(etxt, C.W / 2, 16);
     // 每日挑战局：计时下方目标进度（systems 的 dchalHud，挑战局外返回 null）
     var chal = dchalHud();
     if (chal) {
       var ctxt = '每日挑战 ' + Math.min(score, chal.goal) + '/' + chal.goal + (chal.done ? ' ✓' : '');
-      ctx.strokeText(ctxt, C.W / 2, 40);
+      ctx.strokeText(ctxt, C.W / 2, 32);
       ctx.fillStyle = chal.done ? '#C9920E' : '#7B6FD0';
-      ctx.fillText(ctxt, C.W / 2, 40);
+      ctx.fillText(ctxt, C.W / 2, 32);
     }
     ctx.restore();
   }
@@ -1683,8 +1692,8 @@
     if (!quest) return;
     ctx.save();
     ctx.textAlign = 'center';
-    // 任务条：第三行左侧（两行：进度 + 星级/奖励，与任务难度匹配）
-    var qw = 206, qx = 12, qy = 66, qh = 34;
+    // 任务条：第三行左侧（两行：进度 + 星级/奖励，与任务难度匹配）——随 HUD 上移
+    var qw = 206, qx = 12, qy = 56, qh = 32;
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     roundRect(qx, qy, qw, qh, 10); ctx.fill();
     var prog = Math.min(1, quest.have / quest.need);
@@ -1698,52 +1707,12 @@
     ctx.fillStyle = '#B8860B';
     ctx.font = '13px system-ui, sans-serif';
     var stars = '★★★'.slice(0, quest.stars || 1);
-    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 30);
+    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 28);
     drawTidePill();
-    drawSeaProgress();
     ctx.restore();
   }
-  // 海域进度条：满宽细条，显示累计分距下一海域的进度
-  // 配色：填充=当前海域深水色（与背景同族），右端小圆点=下一海域徽章色（目的地），左端骑线徽章=当前位置
-  function drawSeaProgress() {
-    var cur = seaStage(), ts = totalScore();
-    var last = C.seaStages.length - 1;
-    var maxed = cur >= last;
-    var sx = 12, sy = 106, sw = C.W - 24, sh = 16;
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    roundRect(sx, sy, sw, sh, 8); ctx.fill();
-    var frac = 1;
-    if (!maxed) {
-      var lo = C.seaStages[cur].at, hi = C.seaStages[cur + 1].at;
-      frac = Math.min(1, Math.max(0.02, (ts - lo) / (hi - lo)));
-    }
-    if (frac > 0) {
-      // 填充=当前海域的深水色（bg[3]，与当前背景同族不撞色）；目的地用右端下一海域色小圆点表达
-      ctx.fillStyle = maxed ? SEA_BADGES[last].c : C.seaStages[cur].bg[3];
-      ctx.globalAlpha = 0.85;
-      roundRect(sx + 2, sy + 2, Math.max(10, (sw - 4) * frac), sh - 4, 6); ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-    ctx.font = 'bold 13px system-ui, sans-serif';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    var label = maxed ? '已达最深海域 · ' + C.seaStages[last].name
-      : '距「' + C.seaStages[cur + 1].name + '」还差 ' + (C.seaStages[cur + 1].at - ts) + ' 分';
-    var cx = sx + sw / 2;
-    ctx.strokeText(label, cx, sy + 13);
-    ctx.fillStyle = '#2C5A78';
-    ctx.fillText(label, cx, sy + 13);
-    if (!maxed) {
-      // 右端终点标记：下一海域徽章色小圆点（"要去的地方"），避免整条填充撞色
-      var ex = sx + sw - 14, ey = sy + sh / 2;
-      ctx.beginPath(); ctx.arc(ex, ey, 5.5, 0, Math.PI * 2);
-      ctx.fillStyle = SEA_BADGES[cur + 1].c; ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5; ctx.stroke();
-    }
-    // 左端骑线放当前海域徽章——直观标注"当前位置"（与图鉴徽章语言一致）
-    drawSeaBadge(cur, sx + 16, sy + sh / 2, true);
-  }
+  // 海域进度已并入 drawHUD 第二行信息（省出独立进度条的高度，顶部元素整体上移）
+  // 左端骑线的海域徽章 drawSeaBadge 仍被图鉴/成就页使用，保留
 
   // ---------- 技能栏 ----------
   function drawSkillIcon(key, cx, cy, color) {

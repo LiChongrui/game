@@ -71,13 +71,14 @@ MG.config = {
   H: 720,
   floorY: 646,         // 容器底 y（下方保留技能栏区域）
 
-  // 容器
+  // 容器（顶部 HUD 压缩上移至 0~88，与坠落区之间留 12px 空隙）
   wall: 0,             // 侧墙厚（0 = 无边框，水滴铺满画布全宽）
-  containerTop: 118,   // 容器顶部开口 y
-  dangerY: 182,        // 危险线 y（堆积超过此线且静止即失败）
+  containerTop: 100,   // 容器顶部开口 y（全部顶部元素在 88 以上，开口之下才是坠落区）
+  dangerY: 164,        // 危险线 y（堆积超过此线且静止即失败；堆叠空间 164~646）
 
   // 投放
-  spawnY: 120,         // 出生点 y（整体在顶部 HUD 之下，最大档水滴也不遮挡任务区）
+  spawnY: 120,         // 出生点 y（坠落高度恒定不随 HUD 变化；前 3 档虚影球顶 ≥92
+                       // 落在开口与 HUD 之间的空隙，仅最大两档虚影与任务条轻微交叠）
   dropCooldown: 0.55,  // 两次投放最小间隔（秒）
 
   // 物理
@@ -410,8 +411,9 @@ MG.config = {
   var BX = 0;             // 游戏区（420 逻辑宽）水平居中偏移
   var FLOORY = C.floorY;  // 容器底 y（游戏块内恒定：646）
   var view = { s: 1 };
-  // 游戏块 = 420×720 固定逻辑区（HUD 118 + 容器 528 + 底部 74），长宽比恒定，所有设备一致；
-  // 高屏多出的高度上下均分给背景延伸（oy 为块在屏幕中的垂直居中偏移，菜单态铺满时为 0）
+  // 游戏块 = 420×720 固定逻辑区（压缩 HUD 100 + 容器 546 + 底部 74），长宽比恒定，
+  // 所有设备一致；顶部元素整体上移压进 0~88，出生点 120 / 坠落高度不随 HUD 变化；
+  // 高屏多出的高度上下均分给背景延伸（oy 为块居中偏移，菜单态铺满时为 0）
   var oy = 0;             // 游戏块垂直居中偏移（逻辑 px，≥0）
   var renderOy = 0;       // 渲染/点击实际使用的偏移：菜单态 0（铺满），其余态 oy
 
@@ -424,11 +426,11 @@ MG.config = {
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
     oy = Math.max(0, (VH - C.H) / 2);      // 游戏块垂直居中：高屏多出的高度上下均分
     // 游戏块内全部恒定（=config 初始值）：容器底/容器顶/警戒线/出生点不随设备变化，
-    // 容器长宽比恒定 420:528——不同设备游戏区大小比例完全一致
+    // 容器长宽比恒定 420:546——不同设备游戏区大小比例完全一致
     FLOORY = C.H - 74;                     // 646
     C.floorY = FLOORY;                     // 同步给物理引擎（每帧读取，水滴落到新地板）
-    C.containerTop = 118;
-    C.dangerY = 182;
+    C.containerTop = 100;
+    C.dangerY = 164;
     C.spawnY = 120;
     canvas.width = Math.round(w * dpr);    // 画布铺满整个窗口（背景全程由游戏自绘）
     canvas.height = Math.round(h * dpr);
@@ -442,7 +444,7 @@ MG.config = {
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
     }
     if (typeof trophyBtn !== 'undefined' && typeof MUTE !== 'undefined') {
-      trophyBtn.cy = 36; MUTE.cy = 36;     // 奖杯/静音：块内左上/右上角落（与分数行同排）
+      trophyBtn.cy = 28; MUTE.cy = 28;     // 奖杯/静音：块内左上/右上角落（与分数行同排，HUD 压缩上移）
     }
   }
   window.addEventListener('resize', fit);
@@ -1296,7 +1298,7 @@ MG.config = {
   }
   function addPopup(x, y, text, isBig, mult) {
     // 公告带（居中 + 设计稿 y 180~320）改为底部锚定：跟随警戒线，不随窗口高度漂移
-    if (x === C.W / 2 && y >= 180 && y <= 320) y = C.dangerY + (y - 182);
+    if (x === C.W / 2 && y >= 180 && y <= 320) y = C.dangerY + (y - 164);
     // 防重叠：与仍在显示中的弹字同带（横向接近）时向下顺移一行，多条同时弹出不再叠字
     for (var i = 0; i < popups.length; i++) {
       var op = popups[i];
@@ -2377,6 +2379,7 @@ MG.config = {
       jellies: jellies.map(function (j) { return { x: Math.round(j.x), y: Math.round(j.y), s: Math.round(j.s) }; }),
       col: colProgress, chestTimer: Math.round(chestTimer * 10) / 10,
       oy: oy, renderOy: renderOy, VH: VH, floorY: C.floorY, containerTop: C.containerTop,
+      dangerY: C.dangerY, spawnY: C.spawnY,
       offline: offlineGain ? { mins: offlineGain.mins, gain: offlineGain.gain } : null
     };
   };
@@ -5043,7 +5046,7 @@ MG.config = {
     ctx.textAlign = 'center';
     ctx.font = 'bold 14px system-ui, sans-serif';
     var tw = ctx.measureText(label).width + 12;
-    var ly = C.spawnY - r - 6; // 紧贴球顶，明确归属
+    var ly = Math.max(C.containerTop + 14, C.spawnY - r - 6); // 紧贴球顶；大档虚影时钳制在容器内，不越过开口顶到 HUD
     ctx.fillStyle = 'rgba(255,255,255,0.88)';
     roundRect(aimX - tw / 2, ly - 12, tw, 17, 8); ctx.fill();
     ctx.fillStyle = nextIron ? '#6B6353' : (nextSpecial ? specialColor(nextSpecial) : runeColor(nextRune));
@@ -5313,12 +5316,12 @@ MG.config = {
 
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
   function drawHUD() {
-    // 计分（左上角悬浮；左端让位给奖杯按钮，从 x48 起）
+    // 计分（左上角悬浮；左端让位给奖杯按钮，从 x48 起）——HUD 整体上移压缩（分数 baseline 30）
     ctx.textAlign = 'left';
     var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
     ctx.lineJoin = 'round';
     ctx.save();
-    ctx.translate(48, 38);
+    ctx.translate(48, 30);
     ctx.scale(bump, bump);
     ctx.font = 'bold 34px system-ui, sans-serif';
     ctx.lineWidth = 4;
@@ -5328,17 +5331,26 @@ MG.config = {
     ctx.fillStyle = '#12517E';
     ctx.fillText(txt, 0, 0);
     ctx.restore();
-    // 最佳/海域/词缀：独立第二行（与大分数分行，互不挤压；大分数再宽也不碰右侧预览）
+    // 第二行信息：最佳 + 海域进度（并入一行省出独立进度条的高度）+ 海域加成 + 词缀
     ctx.font = '14px system-ui, sans-serif';
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-    var sub = '最佳 ' + best + ' · ' + C.seaStages[seaStage()].name + (seaCount > 0 ? ' · 海域 ×' + seaCount : '') +
+    var cur = seaStage(), ts = totalScore(), last = C.seaStages.length - 1;
+    var seaTxt = cur >= last ? '已达「' + C.seaStages[last].name + '」'
+      : '距「' + C.seaStages[cur + 1].name + '」还差 ' + (C.seaStages[cur + 1].at - ts) + ' 分';
+    var sub = '最佳 ' + best + ' · ' + seaTxt + (seaCount > 0 ? ' · 海域 ×' + seaCount : '') +
       (ng.active ? ' · 「' + ng.active.name + '」×' + ng.active.mult : '');
-    ctx.strokeText(sub, 48, 58);
+    // 信息行超长时自适应缩字号（后期最佳分/海域名/词缀叠加，保右端不溢出屏幕）
+    var subFont = 14;
+    while (subFont > 11 && ctx.measureText(sub).width > C.W - 62) {
+      subFont--;
+      ctx.font = subFont + 'px system-ui, sans-serif';
+    }
+    ctx.strokeText(sub, 48, 52);
     ctx.fillStyle = ng.active ? '#6B5AA8' : '#3E6E90';
-    ctx.fillText(sub, 48, 58);
+    ctx.fillText(sub, 48, 52);
 
-    // 右上角：下一滴预览 + 静音按钮（主流布局）
+    // 右上角：下一滴预览 + 静音按钮（主流布局，随 HUD 上移）
     ctx.textAlign = 'center';
     ctx.font = 'bold 13px system-ui, sans-serif';
     ctx.lineJoin = 'round';
@@ -5346,18 +5358,18 @@ MG.config = {
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     // 甘霖激活时标签替换为绿色脉动"甘霖"，避免悬浮文本遮挡出生区水滴
     if (rainHint > 0) {
-      ctx.strokeText('甘霖 · 下一滴', C.W - 76, 18);
+      ctx.strokeText('甘霖 · 下一滴', C.W - 76, 10);
       ctx.fillStyle = 'rgba(30,122,111,' + (0.55 + 0.45 * Math.sin(time * 8)) + ')';
-      ctx.fillText('甘霖 · 下一滴', C.W - 76, 18);
+      ctx.fillText('甘霖 · 下一滴', C.W - 76, 10);
     } else {
-      ctx.strokeText('下一个', C.W - 76, 18);
+      ctx.strokeText('下一个', C.W - 76, 10);
       ctx.fillStyle = '#3E6E90';
-      ctx.fillText('下一个', C.W - 76, 18);
+      ctx.fillText('下一个', C.W - 76, 10);
     }
     if (nextIron) {
-      drawIronBall({ x: C.W - 76, y: 38, r: 14, vx: 0, vy: 0 }, 0.95);
+      drawIronBall({ x: C.W - 76, y: 30, r: 14, vx: 0, vy: 0 }, 0.95);
     } else {
-      drawBall({ x: C.W - 76, y: 38, r: 15, tier: nextTier, vx: 0, vy: 0, special: nextSpecial, rune: nextRune }, 0.95);
+      drawBall({ x: C.W - 76, y: 30, r: 15, tier: nextTier, vx: 0, vy: 0, special: nextSpecial, rune: nextRune }, 0.95);
     }
 
     // 静音按钮（右上角，小号）
@@ -5395,7 +5407,7 @@ MG.config = {
   }
   // 潮汐信息胶囊（右侧，与任务条同行同高，左右对称）
   function drawTidePill() {
-    var tx = C.W - 122, tw = 92, ty = 66, th = 34; // 与任务条(qy66/qh34)同高同排
+    var tx = C.W - 122, tw = 92, ty = 56, th = 32; // 与任务条(qy56/qh32)同高同排
     var active = tide.phase === 'active';
     var warn = !active && tide.timer <= C.tide.warnTime;
     var pulse = 0.5 + 0.5 * Math.sin(time * 6);
@@ -5404,10 +5416,10 @@ MG.config = {
     ctx.font = 'bold 15px system-ui, sans-serif';
     if (active) {
       ctx.fillStyle = 'rgba(25,105,185,' + (0.75 + pulse * 0.25) + ')';
-      ctx.fillText('涨潮 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 22);
+      ctx.fillText('涨潮 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 21);
     } else {
       ctx.fillStyle = warn ? 'rgba(200,90,40,' + (0.7 + pulse * 0.3) + ')' : '#4A7FA0';
-      ctx.fillText('潮汐 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 22);
+      ctx.fillText('潮汐 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 21);
     }
   }
   // 涨潮横幅
@@ -5466,16 +5478,16 @@ MG.config = {
     ctx.lineWidth = 2.5;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     var etxt = '已进行 ' + em + ':' + (es < 10 ? '0' + es : es);
-    ctx.strokeText(etxt, C.W / 2, 20);
+    ctx.strokeText(etxt, C.W / 2, 16);
     ctx.fillStyle = '#2E7DA8';
-    ctx.fillText(etxt, C.W / 2, 20);
+    ctx.fillText(etxt, C.W / 2, 16);
     // 每日挑战局：计时下方目标进度（systems 的 dchalHud，挑战局外返回 null）
     var chal = dchalHud();
     if (chal) {
       var ctxt = '每日挑战 ' + Math.min(score, chal.goal) + '/' + chal.goal + (chal.done ? ' ✓' : '');
-      ctx.strokeText(ctxt, C.W / 2, 40);
+      ctx.strokeText(ctxt, C.W / 2, 32);
       ctx.fillStyle = chal.done ? '#C9920E' : '#7B6FD0';
-      ctx.fillText(ctxt, C.W / 2, 40);
+      ctx.fillText(ctxt, C.W / 2, 32);
     }
     ctx.restore();
   }
@@ -5515,8 +5527,8 @@ MG.config = {
     if (!quest) return;
     ctx.save();
     ctx.textAlign = 'center';
-    // 任务条：第三行左侧（两行：进度 + 星级/奖励，与任务难度匹配）
-    var qw = 206, qx = 12, qy = 66, qh = 34;
+    // 任务条：第三行左侧（两行：进度 + 星级/奖励，与任务难度匹配）——随 HUD 上移
+    var qw = 206, qx = 12, qy = 56, qh = 32;
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     roundRect(qx, qy, qw, qh, 10); ctx.fill();
     var prog = Math.min(1, quest.have / quest.need);
@@ -5530,52 +5542,12 @@ MG.config = {
     ctx.fillStyle = '#B8860B';
     ctx.font = '13px system-ui, sans-serif';
     var stars = '★★★'.slice(0, quest.stars || 1);
-    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 30);
+    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 28);
     drawTidePill();
-    drawSeaProgress();
     ctx.restore();
   }
-  // 海域进度条：满宽细条，显示累计分距下一海域的进度
-  // 配色：填充=当前海域深水色（与背景同族），右端小圆点=下一海域徽章色（目的地），左端骑线徽章=当前位置
-  function drawSeaProgress() {
-    var cur = seaStage(), ts = totalScore();
-    var last = C.seaStages.length - 1;
-    var maxed = cur >= last;
-    var sx = 12, sy = 106, sw = C.W - 24, sh = 16;
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    roundRect(sx, sy, sw, sh, 8); ctx.fill();
-    var frac = 1;
-    if (!maxed) {
-      var lo = C.seaStages[cur].at, hi = C.seaStages[cur + 1].at;
-      frac = Math.min(1, Math.max(0.02, (ts - lo) / (hi - lo)));
-    }
-    if (frac > 0) {
-      // 填充=当前海域的深水色（bg[3]，与当前背景同族不撞色）；目的地用右端下一海域色小圆点表达
-      ctx.fillStyle = maxed ? SEA_BADGES[last].c : C.seaStages[cur].bg[3];
-      ctx.globalAlpha = 0.85;
-      roundRect(sx + 2, sy + 2, Math.max(10, (sw - 4) * frac), sh - 4, 6); ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-    ctx.font = 'bold 13px system-ui, sans-serif';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    var label = maxed ? '已达最深海域 · ' + C.seaStages[last].name
-      : '距「' + C.seaStages[cur + 1].name + '」还差 ' + (C.seaStages[cur + 1].at - ts) + ' 分';
-    var cx = sx + sw / 2;
-    ctx.strokeText(label, cx, sy + 13);
-    ctx.fillStyle = '#2C5A78';
-    ctx.fillText(label, cx, sy + 13);
-    if (!maxed) {
-      // 右端终点标记：下一海域徽章色小圆点（"要去的地方"），避免整条填充撞色
-      var ex = sx + sw - 14, ey = sy + sh / 2;
-      ctx.beginPath(); ctx.arc(ex, ey, 5.5, 0, Math.PI * 2);
-      ctx.fillStyle = SEA_BADGES[cur + 1].c; ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5; ctx.stroke();
-    }
-    // 左端骑线放当前海域徽章——直观标注"当前位置"（与图鉴徽章语言一致）
-    drawSeaBadge(cur, sx + 16, sy + sh / 2, true);
-  }
+  // 海域进度已并入 drawHUD 第二行信息（省出独立进度条的高度，顶部元素整体上移）
+  // 左端骑线的海域徽章 drawSeaBadge 仍被图鉴/成就页使用，保留
 
   // ---------- 技能栏 ----------
   function drawSkillIcon(key, cx, cy, color) {
