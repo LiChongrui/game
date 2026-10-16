@@ -449,9 +449,9 @@
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
 
-    // 底部内反光：径向渐变光晕（无端点痕迹，替代生硬的弧线段）
+    // 底部内反光：径向渐变光晕（裁剪扩到球缘 0.995r：反光与球体边缘连续过渡，不再有"内亮外暗"分界环）
     ctx.save();
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.96, 0, Math.PI * 2); ctx.clip();
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.995, 0, Math.PI * 2); ctx.clip();
     ctx.globalAlpha = alpha * 0.5;
     ctx.fillStyle = grad('bB' + b.tier + '_' + rk, function () {
       var gg = ctx.createRadialGradient(0, r * 1.55, r * 0.1, 0, r * 1.55, r * 1.35);
@@ -654,7 +654,8 @@
 
   function drawWaves(r) {
     ctx.save();
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.94, 0, Math.PI * 2); ctx.clip();
+    // 内部裁剪扩到球缘（0.995r）：内部暗化与球体边缘连续过渡，避免 0.94r 处出现"内暗外亮"分界环
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.995, 0, Math.PI * 2); ctx.clip();
     var wk = Math.round(r * 2) / 2;
     // 设计原则：内部不画任何"线条/实心形状"（硬边贴纸感是丑的根源），
     // 全部用径向渐变光效表达——深度、水面、气泡、光斑皆自然渐隐，边缘永远有过渡。
@@ -738,13 +739,14 @@
       ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
-    // ⑥ 内壁晕影：贴球壁一圈由内向外轻微加深，让所有内部内容在壁边自然消隐，
-    //    同时收拢球体体积感（内部各元素的"边缘过渡"由它统一兜底）
+    // ⑥ 内壁晕影：由内向外轻微加深，一直铺到球缘并与球体边缘色融合——
+    //    内部各元素与球壁之间不再有可见分界（过渡由这条连续渐变统一兜底）
     ctx.fillStyle = grad('wvVin' + wk, function () {
-      var gg = ctx.createRadialGradient(0, 0, r * 0.52, 0, 0, r * 0.94);
+      var gg = ctx.createRadialGradient(0, 0, r * 0.52, 0, 0, r * 0.99);
       gg.addColorStop(0, 'rgba(4,16,44,0)');
-      gg.addColorStop(0.72, 'rgba(4,16,44,0.09)');
-      gg.addColorStop(1, 'rgba(4,16,44,0.26)');
+      gg.addColorStop(0.6, 'rgba(4,16,44,0.07)');
+      gg.addColorStop(0.82, 'rgba(4,16,44,0.18)');
+      gg.addColorStop(1, 'rgba(4,16,44,0.32)');
       return gg;
     });
     ctx.fillRect(-r, -r, r * 2, r * 2);
@@ -2098,7 +2100,9 @@
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
     ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
-    drawPanelHeader(''); // 成就殿堂：页签已含"成就"，页头不再重复标题
+    // 页头标题随页签联动：与页签名错开（页签是入口，标题是场景语境），同图鉴「图鉴」页头的层级感
+    var achTitles = ['成就殿堂', '每日任务', '好友排行榜'];
+    drawPanelHeader(achTitles[dexTab] || '成就殿堂');
     var dailyDot = !(daily.done[0] && daily.done[1] && daily.done[2]) ? 1 : -1;
     drawSegTabs([achTabRect(0), achTabRect(1), achTabRect(2)], ['成就', '每日', '榜单'], dexTab, dailyDot, 'achtabs');
     if (dexTab === 1) drawDailyTab();
