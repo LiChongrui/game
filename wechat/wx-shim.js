@@ -20,13 +20,14 @@
   G.innerWidth = sys.windowWidth;
   G.innerHeight = sys.windowHeight;
   G.devicePixelRatio = Math.min(sys.pixelRatio || 2, 2);
-  if (!G.performance) G.performance = { now: function () { return Date.now(); } };
+  var perf = G.performance;
+  if (!perf) perf = G.performance = { now: function () { return Date.now(); } };
   if (!G.requestAnimationFrame) {
     G.requestAnimationFrame = function (fn) { return setTimeout(function () { fn(Date.now()); }, 16); };
   }
 
   // localStorage → 微信同步存储（platform.js 的 get/set 直接用 localStorage）
-  G.localStorage = {
+  var ls = G.localStorage = {
     getItem: function (k) {
       try { var v = wx.getStorageSync(String(k)); return (v === '' || v == null) ? null : String(v); }
       catch (e) { return null; }
@@ -36,7 +37,7 @@
   };
 
   // navigator：剪贴板接 wx.setClipboardData（分享文案复制直接成功）；振动接短振动
-  G.navigator = {
+  var nav = G.navigator = {
     clipboard: {
       writeText: function (t) {
         try { wx.setClipboardData({ data: String(t) }); } catch (e) {}
@@ -47,7 +48,7 @@
   };
 
   // document：主画布 getElementById('game')；离屏 canvas createElement('canvas')（iconData 调试用）
-  G.document = {
+  var doc = G.document = {
     getElementById: function () { return mainCanvas; },
     createElement: function (tag) {
       if (tag === 'canvas') { var c = wx.createCanvas(); c.style = {}; return c; }
@@ -97,4 +98,9 @@
   bindWxTouch(wx.onTouchEnd, 'pointerup');
   bindWxTouch(wx.onTouchCancel, 'pointercancel');
   // keydown（audio.ensure 兜底）在触屏上不存在，挂空表即可（无触发方，无害）
+
+  // 显式引用：部分小游戏运行环境的 document/window 是只读全局，直接赋值会被静默忽略
+  // （真机实测：document.getElementById is not a function）。构建脚本据此在 bundle 头部
+  // 注入 var 声明（模块作用域遮蔽环境全局），引用这里存好的垫片对象。
+  G.__shim = { window: G, document: doc, localStorage: ls, navigator: nav, performance: perf };
 })();

@@ -1,6 +1,6 @@
 {
   "description": "水滴合成深海 - 微信小游戏",
-  "appid": "touristappid",
+  "appid": "wx1e7fb7195605f928",
   "compileType": "game",
   "projectname": "merge-deep-sea",
   "libVersion": "latest",
@@ -18,11 +18,29 @@
     "packNpmManually": false,
     "minifyWXSS": false,
     "showES6CompileOption": false,
-    "ignoreUploadUnusedFiles": false
+    "ignoreUploadUnusedFiles": false,
+    "compileWorklet": false,
+    "packNpmRelationList": [],
+    "minifyWXML": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
   },
   "condition": {},
   "editorSetting": {
     "tabIndent": "insertSpaces",
     "tabSize": 2
-  }
+  },
+  "simulatorPluginLibVersion": {},
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "isGameTourist": false
 }

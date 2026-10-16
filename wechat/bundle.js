@@ -1,5 +1,13 @@
 // 水滴合成深海 - 微信小游戏 bundle（自动生成，勿手改）
 // 由 tools/build_wechat.js 从 js/ 八模块拼接而来；模块间共享作用域，加载顺序与 index.html 一致。
+// 头部 var 注入：部分小游戏运行环境的 document/window 是只读全局，垫片赋值会被静默忽略
+// （真机实测报 document.getElementById is not a function），故在模块作用域内用 var 显式
+// 遮蔽环境全局，取垫片挂到 GameGlobal.__shim 的对象。
+var window = GameGlobal.__shim.window;
+var document = GameGlobal.__shim.document;
+var localStorage = GameGlobal.__shim.localStorage;
+var navigator = GameGlobal.__shim.navigator;
+var performance = GameGlobal.__shim.performance;
 // ===== js/platform.js =====
 // 水滴合成深海 - 平台适配层
 // 当前为 Web 实现；移植微信小游戏时只需替换本文件内标注 [wx] 的方法体，
