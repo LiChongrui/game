@@ -1520,7 +1520,8 @@
       event: seaEvent.type, eventT: seaEvent.type ? Math.round(seaEvent.t * 10) / 10 : null,
       bodies: bs, ui: ui, stats: lifeStats, ach: achDone, dexSp: dexSpecial,
       modes: { evap: evapMode, ripple: rippleMode, flow: flowMode },
-      stage: seaStage(), daily: { done: daily.done.slice(), streak: daily.streak }, best: best
+      stage: seaStage(), daily: { done: daily.done.slice(), streak: daily.streak }, best: best,
+      jellies: jellies.map(function (j) { return { x: Math.round(j.x), y: Math.round(j.y), s: Math.round(j.s) }; })
     };
   };
   // 测试钩子（仅自动化测试用）：充能 / 成就 / 局面构造 / 加压进度
@@ -2088,13 +2089,14 @@
     if (seaFade) { seaFade.t += dt; if (seaFade.t >= seaFade.dur) seaFade = null; }
     if (state === 'menu') { time += dt; updateFx(dt); return; } // 开始界面：只跑视觉动画
     if (adOverlay) {
+      time += dt; // 广告演示期间环境动画照常流动（原实现整屏静止 1 秒，观感像卡顿了一下）
       adOverlay.t -= dt;
       if (adOverlay.t <= 0) { var cb = adOverlay.cb; adOverlay = null; if (cb) cb(); }
       updateFx(dt);
       return;
     }
     if (dexOpen || achOpen) { updateFx(dt); return; }
-    if (state !== 'play') { updateFx(dt); return; }
+    if (state !== 'play') { time += dt; updateFx(dt); return; } // 结算页：背景保持流动（仅物理冻结）
 
     time += dt;
     if (rainHint > 0) rainHint -= dt;

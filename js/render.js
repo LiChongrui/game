@@ -182,17 +182,19 @@
       ctx.save();
       ctx.translate(jl.x, jl.y);
       ctx.globalAlpha = 0.32;
-      // 触手（5 条，长短错落、摆动相位错开）
+      // 触手（5 条，长短错落、摆动相位错开；根部精确落在裙边波浪线上，x 随伞盖脉动同步收张——不再与身子脱节）
       ctx.strokeStyle = 'rgba(' + jl.tint + ',0.55)';
       ctx.lineWidth = 1.6;
       ctx.lineCap = 'round';
       for (tt = -2; tt <= 2; tt++) {
-        var tx0 = tt * jl.s * 0.28;
+        var tx0 = tt * jl.s * 0.28 * pulse;
+        var tu = (tt * 0.28 + 1) / 2; // 与裙边同参数化：u = (x/宽 + 1)/2
+        var ty0 = Math.sin(tu * Math.PI * 2 + time * 2 + jl.ph) * jl.s * 0.06;
         var tl = jl.s * (1.8 - Math.abs(tt) * 0.2);
         ctx.beginPath();
-        ctx.moveTo(tx0, jl.s * 0.1);
-        ctx.quadraticCurveTo(tx0 + Math.sin(time * 2 + jl.ph + tt * 1.3) * 6, tl * 0.55,
-                             tx0 + Math.sin(time * 1.3 + tt * 1.7) * 9, tl);
+        ctx.moveTo(tx0, ty0 + 1);
+        ctx.quadraticCurveTo(tx0 + Math.sin(time * 2 + jl.ph + tt * 1.3) * 6, ty0 + tl * 0.55,
+                             tx0 + Math.sin(time * 1.3 + tt * 1.7) * 9, ty0 + tl);
         ctx.stroke();
       }
       ctx.lineCap = 'butt';
@@ -495,9 +497,8 @@
     ctx.fillRect(-r, 0, r * 2, r);
     ctx.restore();
 
-    // 边缘高光：两端渐隐的柔光弧
+    // 边缘高光：两端渐隐 + 宽度方向也柔和过渡的柔光弧（多层递缩叠加，单层描边两侧会有硬边界）
     ctx.save();
-    ctx.globalAlpha = alpha * 0.6;
     ctx.strokeStyle = grad('bE' + b.tier + '_' + rk, function () {
       var gg = ctx.createLinearGradient(-r * 0.94, -r * 0.09, r * 0.21, -r * 0.92);
       gg.addColorStop(0, 'rgba(255,255,255,0)');
@@ -505,9 +506,13 @@
       gg.addColorStop(1, 'rgba(255,255,255,0)');
       return gg;
     });
-    ctx.lineWidth = Math.max(1.2, r * 0.055);
     ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.94, Math.PI * 1.03, Math.PI * 1.57); ctx.stroke();
+    var ARC_LAY = [[1, 0.22], [0.6, 0.34], [0.26, 0.5]]; // [宽度比, alpha 比]（中心累计≈1，与原单层峰值一致）
+    for (var al = 0; al < ARC_LAY.length; al++) {
+      ctx.globalAlpha = alpha * 0.6 * ARC_LAY[al][1];
+      ctx.lineWidth = Math.max(1.2, r * 0.055 * ARC_LAY[al][0]);
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.94, Math.PI * 1.03, Math.PI * 1.57); ctx.stroke();
+    }
     ctx.restore();
     ctx.globalAlpha = alpha;
 
