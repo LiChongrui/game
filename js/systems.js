@@ -1548,6 +1548,7 @@
     over: function () { buildOverButtons(); gameOver(); }, // 直达结算页（UI 测试用）
     menuBtn: function () { return menuStartBtn; }, // 开始界面按钮几何（UI 测试用）
     openDex: function () { dexOpen = true; achOpen = false; },
+    dexSecTab: function (i) { return dexSecRect(i); }, // 图鉴分节控件几何（UI 测试用）
     closeDex: function () { dexOpen = false; achOpen = false; }
   };
 
