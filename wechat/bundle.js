@@ -454,7 +454,9 @@ MG.config = {
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
     }
     if (typeof trophyBtn !== 'undefined' && typeof MUTE !== 'undefined') {
-      trophyBtn.cy = 36; MUTE.cy = 36;     // 奖杯/静音：块内左上/右上角落（与分数行同排）
+      // 静音在 drawHUD 内、由 render 对 play 态 translate(0,oy) 下移，故 cy 保持 36；
+      // 奖杯在 HUD 之外（drawSkillBar 绘制路径）不吃该平移，故 cy 直接含胶囊避让偏移。
+      trophyBtn.cy = 36 + oy; MUTE.cy = 36;     // 奖杯/静音：块内左上/右上角落（与分数行同排）
     }
   }
   window.addEventListener('resize', fit);
@@ -2771,7 +2773,7 @@ MG.config = {
     var dx = p.x - c.cx, dy = p.y - c.cy;
     return dx * dx + dy * dy <= (c.r + 6) * (c.r + 6);
   }
-  function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - MUTE.cy; return dx * dx + dy * dy <= (MUTE.r + 6) * (MUTE.r + 6); } // 命中区随按钮半径（与其他圆钮同为 r+6）
+  function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - (MUTE.cy + oy); return dx * dx + dy * dy <= (MUTE.r + 6) * (MUTE.r + 6); } // 命中区随按钮半径（与其他圆钮同为 r+6）；+oy 与 drawHUD 平移一致
   function toLocal(e) {
     var rect = canvas.getBoundingClientRect();
     // 内容层游戏块垂直居中偏移 renderOy（菜单态 0），触摸 y 同量补偿还原块内坐标
@@ -6078,8 +6080,9 @@ MG.config = {
     ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, 0);
     drawBackground();
 
-    // 内容层：游戏块（420×747 ≈ 9:16 恒定比例）垂直居中——菜单态铺满不偏移
-    renderOy = state === 'menu' ? 0 : oy;
+    // 内容层：游戏块（420×747 ≈ 9:16 恒定比例）垂直贴顶铺满——菜单态与游戏态均不整体下移，
+    // 顶部留白交由 HUD 单独 translate(0,oy) 避让胶囊（见 drawHUD 包裹）；其余（面板）态保留原下移。
+    renderOy = (state === 'menu' || state === 'play') ? 0 : oy;
     ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, dpr * renderOy);
     if (shakeT > 0) {
       var s = shakeAmp * (shakeT / 0.4);
@@ -6216,7 +6219,11 @@ MG.config = {
     ctx.fillStyle = vg;
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
 
+    // HUD 整体随胶囊避让下挪 oy：游戏态内容层 renderOy=0（块顶铺满），故 HUD 需单独 +oy 平移，
+    // 使其与改动前（整层下移 oy）屏幕坐标完全一致、且不被胶囊遮挡；其余 overlay 随块内坐标上移贴顶。
+    if (state === 'play') { ctx.save(); ctx.translate(0, oy); }
     drawHUD();
+    if (state === 'play') ctx.restore();
     drawQuest();
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
     drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）

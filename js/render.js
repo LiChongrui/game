@@ -2228,8 +2228,9 @@
     ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, 0);
     drawBackground();
 
-    // 内容层：游戏块（420×747 ≈ 9:16 恒定比例）垂直居中——菜单态铺满不偏移
-    renderOy = state === 'menu' ? 0 : oy;
+    // 内容层：游戏块（420×747 ≈ 9:16 恒定比例）垂直贴顶铺满——菜单态与游戏态均不整体下移，
+    // 顶部留白交由 HUD 单独 translate(0,oy) 避让胶囊（见 drawHUD 包裹）；其余（面板）态保留原下移。
+    renderOy = (state === 'menu' || state === 'play') ? 0 : oy;
     ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, dpr * renderOy);
     if (shakeT > 0) {
       var s = shakeAmp * (shakeT / 0.4);
@@ -2366,7 +2367,11 @@
     ctx.fillStyle = vg;
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
 
+    // HUD 整体随胶囊避让下挪 oy：游戏态内容层 renderOy=0（块顶铺满），故 HUD 需单独 +oy 平移，
+    // 使其与改动前（整层下移 oy）屏幕坐标完全一致、且不被胶囊遮挡；其余 overlay 随块内坐标上移贴顶。
+    if (state === 'play') { ctx.save(); ctx.translate(0, oy); }
     drawHUD();
+    if (state === 'play') ctx.restore();
     drawQuest();
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
     drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）
