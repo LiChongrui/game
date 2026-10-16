@@ -87,9 +87,11 @@
   }
   function touchEvent(e) {
     var t = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]) || {};
+    // y 不在垫片补偿：局内渲染下压 safeTop 的补偿在游戏 toLocal 里按 state 区分
+    // （菜单态铺满全屏不偏移不补偿，垫片无法感知 state）
     return {
       clientX: t.clientX || 0,
-      clientY: (t.clientY || 0) - safeTop, // 渲染整体下压 safeTop，触摸 y 同量补偿保持自洽
+      clientY: t.clientY || 0,
       pointerId: t.identifier || 0,
       preventDefault: function () {}
     };

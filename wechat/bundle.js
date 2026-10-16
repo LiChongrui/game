@@ -411,6 +411,8 @@ MG.config = {
   var FLOORY = C.floorY;  // 容器底 y（底部锚定：VH - 74）
   var view = { s: 1 };
   var safeTop = 0, safeBottom = 0; // 安全区 inset（逻辑 px）：刘海/挖孔顶、手势条底；fit() 从垫片 __safeInset 刷新，Web 端恒 0
+  var botReserve = 0;              // 底部保留余量（设备 px）：只给手势条留少量空间，道具区不必大幅上移
+  var fullVH = C.H;                // 整屏逻辑高度（h/view.s）：菜单态铺满全屏、面板垂直居中的基准
 
   function fit() {
     var w = window.innerWidth, h = window.innerHeight;
@@ -418,9 +420,13 @@ MG.config = {
     // 内容按有效视口缩放、渲染整体下压 safeTop，交互内容全部落在摄像头与手势条之外
     var si = (typeof window.__safeInset === 'object' && window.__safeInset) || {};
     safeTop = si.top || 0; safeBottom = si.bottom || 0;
-    var eh = h - safeTop - safeBottom;     // 有效视口高度（设备 px）
+    // 顶部整体下压避让摄像头；底部只预留少量空间给手势条（道具区上移不需要太多），
+    // 剩余底部区域由道具区底色/海底基色延伸覆盖
+    botReserve = Math.min(safeBottom, 20);
+    var eh = h - safeTop - botReserve;     // 有效视口高度（设备 px）
     view.s = Math.min(w / C.W, eh / C.H);  // 等比缩放，不变形
     VH = eh / view.s;
+    fullVH = h / view.s;                   // 整屏逻辑高度（含顶部挖孔区与底部手势区）
     LW = w / view.s;                       // 逻辑宽度（≥420）
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
     FLOORY = VH - 74;                      // 容器底贴住窗口底部（720-646=74）
@@ -2754,9 +2760,11 @@ MG.config = {
   function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - MUTE.cy; return dx * dx + dy * dy <= 18 * 18; } // 命中区略大于视觉（小按钮易点空）
   function toLocal(e) {
     var rect = canvas.getBoundingClientRect();
+    // 局内/结算渲染整体下压 safeTop，触摸 y 同量补偿；菜单态渲染不偏移，不补偿
+    var topShift = state === 'menu' ? 0 : safeTop;
     return {
       x: (e.clientX - rect.left) / view.s - BX,
-      y: (e.clientY - rect.top) / view.s
+      y: (e.clientY - rect.top - topShift) / view.s
     };
   }
   function hitButton(p) {
@@ -3085,6 +3093,12 @@ MG.config = {
   // ---------- 面板几何（渲染与点击热区共用，一处定义） ----------
   var DEX_PANEL = { x: 20, y: 64, w: 380, h: 560 };
   var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 42, y: DEX_PANEL.y + 8, w: 28, h: 28 }; // 右上 × 关闭（中心 +22px，与页头标题文字对齐）
+  // 面板垂直居中：菜单态 VH 已被 render 换为整屏逻辑高（铺满），局内为安全视口高——
+  // 每帧在绘制前重算 y，弹出的页签始终处于屏幕中央（此前固定 y=64 偏上）
+  function layoutDexPanel() {
+    DEX_PANEL.y = Math.max(10, Math.round((VH - DEX_PANEL.h) / 2));
+    dexCloseBtn.y = DEX_PANEL.y + 8;
+  }
   // 成就页分段页签：成就 / 每日 / 榜单（与图鉴分节同款分段控件样式）
   function achTabRect(i) {
     var segW = Math.floor((DEX_PANEL.w - 30) / 3);
@@ -3209,6 +3223,7 @@ MG.config = {
   }
 
   function drawDex() {
+    layoutDexPanel();
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
     ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
@@ -3392,6 +3407,7 @@ MG.config = {
 
   // 成就页（独立入口，与图鉴拆分）：成就 / 每日 / 榜单
   function drawAchPanel() {
+    layoutDexPanel();
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
     ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
@@ -3899,11 +3915,11 @@ MG.config = {
     // 渐变缓存 key：过渡期按 1/24 步长量化（视觉无级差，缓存不爆炸）
     var sk = sb ? 'F' + sb.from + '_' + sb.to + '_' + Math.round(sb.k * 24) : '' + stg;
     var vk = Math.round(VH), lk = Math.round(LW);
-    // 安全区延伸：渐变纵向拉伸覆盖全屏（顶端色越过挖孔区、底端色越过手势条区），
-    // 背景一条连续渐变铺满整个屏幕，内容区下压后上下多出的空间即海色自然延伸
-    var offTop = safeTop / view.s, offBot = safeBottom / view.s;
-    var bg = grad('bg' + sk + '_' + vk + '_' + Math.round(offTop), function () {
-      var gg = ctx.createLinearGradient(0, -offTop, 0, VH + offBot);
+    // 安全区延伸：背景画在无偏移全屏变换里，渐变纵向铺满整个屏幕（逻辑 0 → h/view.s），
+    // 挖孔区与手势条区由同一条渐变的顶端/底端色自然覆盖，与内容区完全连续、无接缝
+    var fullH = VH + (safeTop + botReserve) / view.s;
+    var bg = grad('bg' + sk + '_' + vk + '_' + Math.round(fullH), function () {
+      var gg = ctx.createLinearGradient(0, 0, 0, fullH);
       gg.addColorStop(0, st.bg[0]);
       gg.addColorStop(0.4, st.bg[1]);
       gg.addColorStop(0.75, st.bg[2]);
@@ -3911,7 +3927,7 @@ MG.config = {
       return gg;
     });
     ctx.fillStyle = bg;
-    ctx.fillRect(0, -offTop - 1, LW, VH + offTop + offBot + 2);
+    ctx.fillRect(0, -1, LW, fullH + 2);
 
     // 顶部阳光光晕 + 两侧柔光（静态光斑，缓存渐变）
     ctx.fillStyle = grad('sun' + lk, function () {
@@ -3946,14 +3962,14 @@ MG.config = {
         gg.addColorStop(1, 'rgba(16,56,96,0)');
         return gg;
       });
-      ctx.fillRect(0, 0, edge, VH);
+      ctx.fillRect(0, 0, edge, fullH);
       ctx.fillStyle = grad('shadeR' + lk + '_' + ek + '_' + sk, function () {
         var gg = ctx.createLinearGradient(LW, 0, LW - edge, 0);
         gg.addColorStop(0, st.shade);
         gg.addColorStop(1, 'rgba(16,56,96,0)');
         return gg;
       });
-      ctx.fillRect(LW - edge, 0, edge, VH);
+      ctx.fillRect(LW - edge, 0, edge, fullH);
     }
 
     // 顶部斜射光柱（缓慢摇曳 + 呼吸明暗，营造水下丁达尔效应）
@@ -5043,8 +5059,8 @@ MG.config = {
   function drawContainer() {
     var floorY = FLOORY, FH = 12;
     // 海底基色：从床面到画布底一条连续渐变（泡沫白 → 青 → 深海青），先铺满；
-    // 纵向延伸到手势条区（内容区被下压后，底部安全区由同色渐变自然延续）
-    var _ob = safeBottom / view.s;
+    // 纵向延伸到手势条区（道具区底色的底层延续，同一条渐变无接缝）
+    var _ob = botExt();
     var bed = grad('bed' + Math.round(VH) + '_' + Math.round(_ob), function () {
       var gg = ctx.createLinearGradient(0, floorY, 0, VH + _ob);
       gg.addColorStop(0, 'rgba(216,236,232,0.95)');
@@ -5472,7 +5488,7 @@ MG.config = {
   function drawConfirm() {
     if (!confirmOpen) return;
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
     var px = 60, py = 300, pw = C.W - 120, ph = 170;
     panel(px, py, pw, ph, 14, 0.97);
     ctx.textAlign = 'center';
@@ -5604,8 +5620,8 @@ MG.config = {
 
   function drawSkillBar() {
     // 道具带：海底基色的柔和延续（同色系微加深，方向与渐变一致，不割裂）；
-    // 纵向延伸到手势条区，按钮本体保持在安全区内
-    var _ob = safeBottom / view.s;
+    // 道具带底色纵向延伸到手势条区（用户要求：延伸的是道具区底色，非背景色），按钮本体只少量上移
+    var _ob = botExt();
     var g = grad('skbar' + Math.round(VH) + '_' + Math.round(_ob), function () {
       var gg = ctx.createLinearGradient(0, VH - 56, 0, VH + _ob);
       gg.addColorStop(0, 'rgba(56,102,130,0)');
@@ -5688,7 +5704,7 @@ MG.config = {
   // 二周目词缀三选一弹窗
   function drawNgPick() {
     ctx.fillStyle = 'rgba(10,40,70,0.66)';
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
     var pw = 330, ph = 348, px = (C.W - pw) / 2, py = (VH - ph) / 2;
     panel(px, py, pw, ph, 14, 0.97);
     ctx.textAlign = 'center';
@@ -5818,7 +5834,7 @@ MG.config = {
     dim.addColorStop(0, 'rgba(6,30,56,0.82)');
     dim.addColorStop(1, 'rgba(4,18,36,0.88)');
     ctx.fillStyle = dim;
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
     ctx.strokeStyle = 'rgba(160,220,255,0.25)';
     ctx.lineWidth = 1.2;
     for (var i = 0; i < 8; i++) {
@@ -5853,7 +5869,7 @@ MG.config = {
   function drawOver() {
     buildOverButtons();
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
 
     var pw = 320, ph = 436, px = (C.W - pw) / 2, py = 150;
     panel(px, py, pw, ph, 16, 0.97);
@@ -5950,9 +5966,8 @@ MG.config = {
     }
 
     ctx.fillStyle = 'rgba(6,28,52,0.42)';
-    // 遮罩延伸到安全区外（内容区被下压后，手势条/挖孔区若不罩住会现出遮罩硬边）
-    var _ot = safeTop / view.s, _ob = safeBottom / view.s;
-    ctx.fillRect(-BX, -_ot, C.W + BX * 2, VH + _ot + _ob);
+    // 菜单态 VH 已换为整屏逻辑高，遮罩直接盖满全屏（无接缝）
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
 
     ctx.textAlign = 'center';
     var pulse = 0.5 + 0.5 * Math.sin(time * 2.4);
@@ -6008,13 +6023,17 @@ MG.config = {
   }
 
   // ---------- 主渲染 ----------
+  // 底部延伸量（逻辑 px）：内容视口之外、到手势条区为止的部分；
+  // 底色类绘制（道具带/海底基色/半透明遮罩）用它延伸到屏幕底，避免硬边
+  function botExt() { return Math.max(0, safeBottom - botReserve) / view.s; }
+
   function render() {
     // 背景：无偏移全屏变换——渐变纵向拉伸到安全区外（挖孔/手势条区由海色自然延伸，无接缝）
     ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, 0);
     drawBackground();
-    // 内容：整体下压 safeTop（顶部元素避让摄像头/挖孔；底部元素抬到手势条上方）。
-    // 触摸侧由垫片对 clientY 做同量补偿，渲染与点击自洽
-    ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, dpr * safeTop);
+    // 内容变换：菜单态不偏移（铺满全屏，原版布局）；局内/结算整体下压 safeTop 避让摄像头。
+    // 触摸侧由 toLocal 按 state 做同量补偿，渲染与点击自洽
+    ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, dpr * (state === 'menu' ? 0 : safeTop));
 
     if (shakeT > 0) {
       var s = shakeAmp * (shakeT / 0.4);
@@ -6026,9 +6045,12 @@ MG.config = {
     ctx.translate(BX, 0);
 
     if (state === 'menu') {
+      var vhSave = VH;
+      VH = fullVH;                 // 菜单铺满全屏：以整屏逻辑高度为底（气泡/遮罩/底部文案锚到真屏底）
       drawMenu();
       drawTrophyBtn();             // 成就殿堂/每日挑战入口（菜单态可点，systems 菜单分支处理）
       if (achOpen) drawAchPanel(); // 面板盖在菜单之上（点击已放行到 achOpen 分支）
+      VH = vhSave;
       ctx.restore(); return;
     } // 开始界面：背景之上画菜单 + 奖杯入口 + 成就殿堂面板
 
@@ -6066,7 +6088,7 @@ MG.config = {
 
     if (evapMode) {
       ctx.fillStyle = 'rgba(10,40,70,0.18)';
-      ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+      ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
       var hb = ballAt(lastPointer);
       if (hb) {
         ctx.save();
@@ -6087,7 +6109,7 @@ MG.config = {
     // 涟漪选位模式：显示波纹中心指示
     if (rippleMode) {
       ctx.fillStyle = 'rgba(10,40,70,0.12)';
-      ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+      ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
       var rx = Math.max(12, Math.min(C.W - 12, lastPointer.x < 0 ? C.W / 2 : lastPointer.x));
       var ry = Math.max(C.containerTop + 30, Math.min(FLOORY - 16, lastPointer.y < 0 ? (C.containerTop + FLOORY) / 2 : lastPointer.y));
       ctx.save();
@@ -6116,7 +6138,7 @@ MG.config = {
     // 水流模式：已选水滴高亮 + 操作提示
     if (flowMode) {
       ctx.fillStyle = 'rgba(10,40,70,0.14)';
-      ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+      ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
       if (flowPick) {
         ctx.save();
         ctx.strokeStyle = '#7FE8F5';
@@ -6144,7 +6166,7 @@ MG.config = {
       return gg;
     });
     ctx.fillStyle = vg;
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
 
     drawHUD();
     drawLevelHud();

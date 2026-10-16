@@ -9,6 +9,12 @@
   // ---------- 面板几何（渲染与点击热区共用，一处定义） ----------
   var DEX_PANEL = { x: 20, y: 64, w: 380, h: 560 };
   var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 42, y: DEX_PANEL.y + 8, w: 28, h: 28 }; // 右上 × 关闭（中心 +22px，与页头标题文字对齐）
+  // 面板垂直居中：菜单态 VH 已被 render 换为整屏逻辑高（铺满），局内为安全视口高——
+  // 每帧在绘制前重算 y，弹出的页签始终处于屏幕中央（此前固定 y=64 偏上）
+  function layoutDexPanel() {
+    DEX_PANEL.y = Math.max(10, Math.round((VH - DEX_PANEL.h) / 2));
+    dexCloseBtn.y = DEX_PANEL.y + 8;
+  }
   // 成就页分段页签：成就 / 每日 / 榜单（与图鉴分节同款分段控件样式）
   function achTabRect(i) {
     var segW = Math.floor((DEX_PANEL.w - 30) / 3);
@@ -133,6 +139,7 @@
   }
 
   function drawDex() {
+    layoutDexPanel();
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
     ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
@@ -316,6 +323,7 @@
 
   // 成就页（独立入口，与图鉴拆分）：成就 / 每日 / 榜单
   function drawAchPanel() {
+    layoutDexPanel();
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
     ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);

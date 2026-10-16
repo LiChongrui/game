@@ -17,6 +17,8 @@
   var FLOORY = C.floorY;  // 容器底 y（底部锚定：VH - 74）
   var view = { s: 1 };
   var safeTop = 0, safeBottom = 0; // 安全区 inset（逻辑 px）：刘海/挖孔顶、手势条底；fit() 从垫片 __safeInset 刷新，Web 端恒 0
+  var botReserve = 0;              // 底部保留余量（设备 px）：只给手势条留少量空间，道具区不必大幅上移
+  var fullVH = C.H;                // 整屏逻辑高度（h/view.s）：菜单态铺满全屏、面板垂直居中的基准
 
   function fit() {
     var w = window.innerWidth, h = window.innerHeight;
@@ -24,9 +26,13 @@
     // 内容按有效视口缩放、渲染整体下压 safeTop，交互内容全部落在摄像头与手势条之外
     var si = (typeof window.__safeInset === 'object' && window.__safeInset) || {};
     safeTop = si.top || 0; safeBottom = si.bottom || 0;
-    var eh = h - safeTop - safeBottom;     // 有效视口高度（设备 px）
+    // 顶部整体下压避让摄像头；底部只预留少量空间给手势条（道具区上移不需要太多），
+    // 剩余底部区域由道具区底色/海底基色延伸覆盖
+    botReserve = Math.min(safeBottom, 20);
+    var eh = h - safeTop - botReserve;     // 有效视口高度（设备 px）
     view.s = Math.min(w / C.W, eh / C.H);  // 等比缩放，不变形
     VH = eh / view.s;
+    fullVH = h / view.s;                   // 整屏逻辑高度（含顶部挖孔区与底部手势区）
     LW = w / view.s;                       // 逻辑宽度（≥420）
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
     FLOORY = VH - 74;                      // 容器底贴住窗口底部（720-646=74）

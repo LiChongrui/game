@@ -21,11 +21,11 @@ function makeStub() {
 // ---------- wx mock ----------
 const storage = {};
 const touchReg = { start: [], move: [], end: [], cancel: [] };
-const SAFE_TOP = 44, SCREEN_H = 720; // 模拟刘海屏：挖孔 44px + 手势条 20px
+const SAFE_TOP = 88, SCREEN_H = 780, SAFE_BOT = 40; // 模拟刘海屏：挖孔 88px + 手势条 40px
 globalThis.wx = {
   getSystemInfoSync: () => ({
-    windowWidth: 420, windowHeight: 720, pixelRatio: 2, screenHeight: SCREEN_H,
-    safeArea: { top: SAFE_TOP, bottom: SCREEN_H - 20, left: 0, right: 420, width: 420, height: SCREEN_H - 20 - SAFE_TOP }
+    windowWidth: 420, windowHeight: SCREEN_H, pixelRatio: 2, screenHeight: SCREEN_H,
+    safeArea: { top: SAFE_TOP, bottom: SCREEN_H - SAFE_BOT, left: 0, right: 420, width: 420, height: SCREEN_H - SAFE_BOT - SAFE_TOP }
   }),
   createCanvas: () => makeStub(),
   getStorageSync: k => (k in storage ? storage[k] : ''),
@@ -63,12 +63,13 @@ setTimeout(() => {
   try {
     out.hasMG = !!globalThis.MG;
     out.hasConfig = !!(globalThis.MG && MG.config);
-    out.safeInset = globalThis.__safeInset;        // 期望 {top:44, bottom:20}
+    out.safeInset = globalThis.__safeInset;        // 期望 {top:88, bottom:40}
     out.state0 = MG.probe().state;                 // 期望 menu
-    // 点「开始游戏」按钮：安全区后 view.s = min(420/420, 656/720) ≈ 0.9111，内容下压 safeTop——
-    // 屏幕坐标 = 逻辑 × view.s + safeTop；垫片补偿 -safeTop 后 toLocal 仍还原逻辑坐标
-    var vs = Math.min(420 / 420, (720 - SAFE_TOP - 20) / 720);
-    tap(210 * vs, 426 * vs + SAFE_TOP);
+    // 点「开始游戏」按钮：菜单态铺满全屏不偏移。botReserve=min(40,20)=20，
+    // view.s = min(1, (780-88-20)/720) = 0.9333；屏幕坐标 = 逻辑 × view.s（无 +safeTop）
+    var vs = Math.min(420 / 420, (SCREEN_H - SAFE_TOP - Math.min(SAFE_BOT, 20)) / 720);
+    out.vs = vs;
+    tap(210 * vs, 426 * vs);
     out.state1 = MG.probe().state;                 // 期望 play
     out.score1 = MG.probe().score;
     out.storageKeys = Object.keys(storage).filter(k => k.indexOf('mg_') === 0).slice(0, 8);

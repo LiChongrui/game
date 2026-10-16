@@ -2037,9 +2037,11 @@
   function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - MUTE.cy; return dx * dx + dy * dy <= 18 * 18; } // 命中区略大于视觉（小按钮易点空）
   function toLocal(e) {
     var rect = canvas.getBoundingClientRect();
+    // 局内/结算渲染整体下压 safeTop，触摸 y 同量补偿；菜单态渲染不偏移，不补偿
+    var topShift = state === 'menu' ? 0 : safeTop;
     return {
       x: (e.clientX - rect.left) / view.s - BX,
-      y: (e.clientY - rect.top) / view.s
+      y: (e.clientY - rect.top - topShift) / view.s
     };
   }
   function hitButton(p) {
