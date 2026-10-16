@@ -1798,7 +1798,7 @@
           var spIdx2 = slots2[sl];
           var isChest2 = spIdx2 === SP_DEFS.length;
           var spDef2 = isChest2 ? null : SP_DEFS[spIdx2];
-          var found2 = isChest2 ? true : !!dexSpecial[spDef2.key];
+          var found2 = !!dexSpecial[isChest2 ? 'chest' : spDef2.key]; // 宝箱同样以首次沉入场中为发现条件
           if (dexSelSp === spIdx2 && dexSelStage < 0) {
             ctx.fillStyle = 'rgba(46,134,180,0.14)';
             roundRect(slotR.x, slotR.y, slotR.w, slotR.h, 8); ctx.fill();
@@ -1855,10 +1855,11 @@
       body = '海域越深水色越暗：潮汐更频、礁石更多，宝箱与稀有滴逐步出现。';
     } else {
       var CHEST_INFO = { key: 'chest', name: '深海宝箱', desc: '沉入海底的木箱，在沉走前点击开启：得分 / 符文充能 / 甘霖预告。' };
-      var dsc = dexSelSp === SP_DEFS.length ? CHEST_INFO : (SP_DEFS[dexSelSp] || SP_DEFS[0]);
-      known = dexSelSp === SP_DEFS.length ? true : !!dexSpecial[dsc.key];
+      var isChestSel = dexSelSp === SP_DEFS.length;
+      var dsc = isChestSel ? CHEST_INFO : (SP_DEFS[dexSelSp] || SP_DEFS[0]);
+      known = !!dexSpecial[isChestSel ? 'chest' : dsc.key];
       title = known ? dsc.name : '？？？';
-      sub = dexSelSp === SP_DEFS.length ? '深海随机事件' : (known ? '已发现' : '未发现');
+      sub = known ? (isChestSel ? '深海随机事件' : '已发现') : '未发现';
       body = known ? dsc.desc : '在海域中发现它即可点亮说明。';
     }
     ctx.fillStyle = 'rgba(46,134,180,0.10)';
