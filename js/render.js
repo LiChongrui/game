@@ -478,17 +478,37 @@
     ctx.restore();
     ctx.globalAlpha = alpha;
 
-    // 双高光（随时间柔和淡入淡出，相位按球错开：不再是一块静止的死白）
+    // 双高光（径向渐变光斑：中心实、边缘渐隐到 0，无硬边界；随时间柔和淡入淡出，每球错相）
     var hp = (b.id || 0) * 1.13;
-    var ha1 = 0.48 + 0.17 * Math.sin(time * 1.7 + hp);
+    var ha1 = 0.5 + 0.17 * Math.sin(time * 1.7 + hp);
     var hs1 = 1 + 0.06 * Math.sin(time * 1.7 + hp); // 呼吸时轻微缩放
-    ctx.fillStyle = 'rgba(255,255,255,' + ha1.toFixed(3) + ')';
-    ctx.beginPath();
-    ctx.ellipse(-r * 0.35, -r * 0.45, r * 0.24 * hs1, r * 0.13 / hs1, -0.6, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.save();
+    ctx.translate(-r * 0.35, -r * 0.45);
+    ctx.rotate(-0.6);
+    ctx.scale(r * 0.26 * hs1, r * 0.15 / hs1);
+    ctx.globalAlpha = alpha * ha1;
+    ctx.fillStyle = grad('bHL' + b.tier + '_' + (Math.round(r * 2) / 2), function () {
+      var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+      gg.addColorStop(0, 'rgba(255,255,255,0.95)');
+      gg.addColorStop(0.42, 'rgba(255,255,255,0.4)');
+      gg.addColorStop(1, 'rgba(255,255,255,0)');
+      return gg;
+    });
+    ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
     var ha2 = 0.3 + 0.15 * Math.sin(time * 2.1 + hp + 1.3);
-    ctx.fillStyle = 'rgba(255,255,255,' + ha2.toFixed(3) + ')';
-    ctx.beginPath(); ctx.arc(r * 0.3, -r * 0.55, r * 0.07, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.translate(r * 0.3, -r * 0.55);
+    ctx.scale(r * 0.09, r * 0.09);
+    ctx.globalAlpha = alpha * ha2;
+    ctx.fillStyle = grad('bHLs', function () {
+      var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+      gg.addColorStop(0, 'rgba(255,255,255,0.95)');
+      gg.addColorStop(1, 'rgba(255,255,255,0)');
+      return gg;
+    });
+    ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
 
     if (b.special === 'vortex') drawVortexMark(r);
     else if (b.special === 'cloud') drawCloudMark(r);
