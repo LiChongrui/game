@@ -26,12 +26,12 @@ const path = require('path');
   console.log('潮面 y：潮汐池', y0.toFixed(1), '→ 深渊王座', y7.toFixed(1), '（警戒线', dangerY + '）');
   const t1 = y7 < y0 - 100 && y7 < dangerY + 30 && y0 > dangerY + 100;
 
-  // ---- ② 潮汐浮起越线致死（深渊王座满潮，潮面 y7 已贴近警戒线）----
+  // ---- ② 潮汐浮起越线致死（深渊王座满潮：水面 y208 在线下 26px，但大滴浮起顶缘越线）----
   await page.evaluate(() => {
-    // 清掉海域演进弹窗期，投几枚大滴进满潮水里，浮起后顶部将越过警戒线
-    MG.debug.spawn(3, 120, 320);
-    MG.debug.spawn(3, 210, 340);
-    MG.debug.spawn(3, 300, 320);
+    // 投几枚大滴（江河 r=66）进满潮水里，浮起后顶部将越过警戒线
+    MG.debug.spawn(6, 120, 320);
+    MG.debug.spawn(6, 210, 340);
+    MG.debug.spawn(6, 300, 320);
   });
   let over = false, waited = 0;
   while (waited < 45000) {
