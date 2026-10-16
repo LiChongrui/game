@@ -223,17 +223,20 @@
     }
 
     // 鱼群剪影（渐变纺锤体 + 贴体叉形尾 + 小背鳍/腹鳍 + 眼点）
+    // 每条鱼带 fade（0~1 淡入淡出）与 tint/tintD（海域专属体色）
     for (i = 0; i < fishes.length; i++) {
       var f = fishes[i];
+      if (f.fade <= 0.01) continue;
       ctx.save();
+      ctx.globalAlpha = Math.min(1, f.fade);
       ctx.translate(f.x, f.y);
       ctx.scale(f.dir, 1);
       var twk = Math.sin(f.tail) * f.s * 0.18;
       // 渐变缓存：坐标在缩放后的局部空间定义，同一鱼的 s 恒定 → 直接复用
-      var bodyG = grad('fish' + Math.round(f.s), function () {
+      var bodyG = grad('fish' + Math.round(f.s) + '_' + f.tint, function () {
         var gg = ctx.createLinearGradient(0, -f.s * 0.45, 0, f.s * 0.45);
-        gg.addColorStop(0, 'rgba(42,108,160,0.28)');
-        gg.addColorStop(1, 'rgba(18,66,110,0.16)');
+        gg.addColorStop(0, 'rgba(' + f.tint + ',0.32)');
+        gg.addColorStop(1, 'rgba(' + f.tintD + ',0.18)');
         return gg;
       });
       ctx.fillStyle = bodyG;
@@ -314,39 +317,73 @@
     drawFlora(BX + C.W + 6, LW - 4, 8);
   }
 
-  // 一条侧边栏的海草/礁石剪影（x0..x1 为侧边栏范围，seed 区分左右两侧形态）
+  // 一条侧边栏的水下植被剪影（x0..x1 为侧边栏范围，seed 区分左右两侧形态）：
+  // 后层长飘带巨藻（填充式渐细叶，随水流整条弯曲）+ 前层短叶海草丛 + 圆润礁石
   function drawFlora(x0, x1, seed) {
     var w = x1 - x0;
     if (w < 24) return; // 手机模式侧边栏宽 0，自动跳过
     var baseY = VH - 3;
-    var n = Math.max(3, Math.min(9, Math.floor(w / 26)));
     var k;
     ctx.lineCap = 'round';
-    for (k = 0; k < n; k++) {
-      var px = x0 + (k + 0.5) * w / n + Math.sin(seed + k * 7.3) * w * 0.12;
-      var h = 36 + ((k * 37 + seed * 13) % 60) + (VH - 720) * 0.12;
-      h = Math.min(h, VH * 0.28);
-      var sway = Math.sin(time * (0.7 + (k % 3) * 0.25) + seed + k) * (6 + h * 0.08);
-      ctx.strokeStyle = 'rgba(16,62,102,' + (0.30 + (k % 2) * 0.10) + ')';
-      ctx.lineWidth = 2.5 + (k % 3);
+    // ---- 后层：巨藻飘带（2~4 条，高、窄、渐细，根部固定梢部摆动） ----
+    var nk = Math.max(2, Math.min(4, Math.floor(w / 42)));
+    for (k = 0; k < nk; k++) {
+      var px = x0 + (k + 0.35) * w / nk + Math.sin(seed * 1.7 + k * 5.3) * w * 0.16;
+      var h = 70 + ((k * 53 + seed * 17) % 55) + (VH - 720) * 0.16;
+      h = Math.min(h, VH * 0.34);
+      var sway = Math.sin(time * (0.5 + (k % 3) * 0.18) + seed + k * 2.2) * (9 + h * 0.06);
+      var wB = 4.5 + (k % 3) * 1.8; // 根部半宽（梢部收敛到 0）
+      var tipX = px + sway, tipY = baseY - h;
+      var midX = px + sway * 0.35, midY = baseY - h * 0.55;
+      var alpha = 0.16 + (k % 2) * 0.05;
+      // 叶片轮廓（左右两条二次曲线在梢部汇合，形成自然渐细）
+      ctx.fillStyle = 'rgba(15,64,94,' + alpha + ')';
       ctx.beginPath();
-      ctx.moveTo(px, baseY);
-      var cx = px, cy = baseY;
-      for (var s2 = 1; s2 <= 3; s2++) {
-        var ny = baseY - (h / 3) * s2;
-        var nx = px + sway * (s2 / 3) * (s2 / 3);
-        ctx.quadraticCurveTo(cx + sway * 0.4, (cy + ny) / 2, nx, ny);
-        cx = nx; cy = ny;
-      }
+      ctx.moveTo(px - wB, baseY);
+      ctx.quadraticCurveTo(midX - wB * 0.5, midY, tipX, tipY);
+      ctx.quadraticCurveTo(midX + wB * 0.5, midY, px + wB, baseY);
+      ctx.closePath(); ctx.fill();
+      // 叶片中脉（细亮线，增加层次）
+      ctx.strokeStyle = 'rgba(210,238,255,' + (alpha * 0.35) + ')';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px, baseY - 2);
+      ctx.quadraticCurveTo(midX, midY, tipX, tipY + 3);
       ctx.stroke();
     }
-    // 底部礁石
-    ctx.fillStyle = 'rgba(12,52,88,0.35)';
-    var rn = Math.max(1, Math.floor(w / 70));
+    // ---- 前层：短叶海草丛（簇状圆头叶，2~3 簇，每簇 3 叶） ----
+    var nc = Math.max(2, Math.min(3, Math.floor(w / 55)));
+    for (k = 0; k < nc; k++) {
+      var cx0 = x0 + (k + 0.5) * w / nc + Math.sin(seed * 2.9 + k * 3.7) * w * 0.12;
+      var ch = 20 + ((k * 31 + seed * 11) % 16);
+      var lf;
+      for (lf = -1; lf <= 1; lf++) {
+        var lh = ch * (lf === 0 ? 1 : 0.72);
+        var lsway = Math.sin(time * (0.8 + (lf + 2) * 0.22) + seed + k * 4 + lf) * (5 + lh * 0.1);
+        var lwB = 2.6;
+        ctx.fillStyle = 'rgba(22,84,110,' + (0.26 + (lf === 0 ? 0.08 : 0)) + ')';
+        ctx.beginPath();
+        ctx.moveTo(cx0 + lf * 5 - lwB, baseY);
+        ctx.quadraticCurveTo(cx0 + lf * 5 - lwB * 0.4 + lsway * 0.4, baseY - lh * 0.6,
+                             cx0 + lf * 5 + lsway, baseY - lh);
+        ctx.quadraticCurveTo(cx0 + lf * 5 + lwB * 0.4 + lsway * 0.4, baseY - lh * 0.6,
+                             cx0 + lf * 5 + lwB, baseY);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+    // ---- 底部礁石（双层：暗底 + 顶部受光面，前后错落） ----
+    var rn = Math.max(1, Math.floor(w / 64));
     for (k = 0; k < rn; k++) {
       var rx = x0 + (k + 0.5) * w / rn + Math.sin(seed * 3 + k * 5.1) * w * 0.1;
-      var rr = 10 + ((k * 53 + seed * 7) % 14);
+      var rr = 11 + ((k * 53 + seed * 7) % 13);
+      // 暗色主体
+      ctx.fillStyle = 'rgba(12,52,88,0.38)';
       ctx.beginPath(); ctx.ellipse(rx, baseY + 4, rr, rr * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(rx - rr * 0.5, baseY + 5, rr * 0.6, rr * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+      // 顶部受光弧
+      ctx.strokeStyle = 'rgba(190,225,250,0.14)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.ellipse(rx, baseY + 1, rr * 0.8, rr * 0.32, 0, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
     }
   }
 
@@ -364,14 +401,16 @@
     var s = popScale(b);
     var r = b.r * s;
     var speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+    // 渲染平滑位（systems 每帧维护；旧存档字段缺失时回退物理位）
+    var bx = b.rx != null ? b.rx : b.x, by = b.ry != null ? b.ry : b.y;
 
     // 落地软阴影（绝对坐标，先画）
-    var floorDist = FLOORY - (b.y + b.r);
+    var floorDist = FLOORY - (by + b.r);
     if (floorDist < 30 && floorDist > -b.r) {
       var sa = 0.18 * (1 - Math.max(0, floorDist) / 30);
       ctx.fillStyle = 'rgba(10,40,70,' + sa + ')';
       ctx.beginPath();
-      ctx.ellipse(b.x, FLOORY - 2, b.r * 0.85, b.r * 0.2, 0, 0, Math.PI * 2);
+      ctx.ellipse(bx, FLOORY - 2, b.r * 0.85, b.r * 0.2, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -391,7 +430,7 @@
     }
 
     // 挤压拉伸：沿平滑变形矢量方向变形（矢量整体插值，方向动态过渡、停稳回圆）
-    ctx.translate(b.x, b.y);
+    ctx.translate(bx, by);
     var k = b.defK || 0;
     if (k > 0.012) {
       ctx.rotate(Math.atan2(b.defY || 0, b.defX || 1));
@@ -473,18 +512,19 @@
   // 礁石（内部名 iron）：岩石球——裂纹 + 苔点（障碍物）
   function drawIronBall(b, alpha) {
     var r = b.r;
+    var bx = b.rx != null ? b.rx : b.x, by = b.ry != null ? b.ry : b.y;
     // 落地软阴影
-    var floorDist = FLOORY - (b.y + b.r);
+    var floorDist = FLOORY - (by + b.r);
     if (floorDist < 30 && floorDist > -b.r) {
       var sa = 0.22 * (1 - Math.max(0, floorDist) / 30);
       ctx.fillStyle = 'rgba(10,20,30,' + sa + ')';
       ctx.beginPath();
-      ctx.ellipse(b.x, FLOORY - 2, b.r * 0.9, b.r * 0.2, 0, 0, Math.PI * 2);
+      ctx.ellipse(bx, FLOORY - 2, b.r * 0.9, b.r * 0.2, 0, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.translate(b.x, b.y);
+    ctx.translate(bx, by);
     // 岩石主体（渐变缓存）
     var rk2 = Math.round(r * 2) / 2;
     var g = grad('iron' + rk2, function () {
@@ -556,15 +596,7 @@
   function drawWaves(r) {
     ctx.save();
     ctx.beginPath(); ctx.arc(0, 0, r * 0.94, 0, Math.PI * 2); ctx.clip();
-    // 底部深海内阴影（增强体积感；渐变缓存）
     var wk = Math.round(r * 2) / 2;
-    ctx.fillStyle = grad('wvS' + wk, function () {
-      var gg = ctx.createRadialGradient(0, r * 0.6, r * 0.12, 0, r * 0.6, r * 0.95);
-      gg.addColorStop(0, 'rgba(0,18,46,0.30)');
-      gg.addColorStop(1, 'rgba(0,18,46,0)');
-      return gg;
-    });
-    ctx.fillRect(-r, -r, r * 2, r * 2);
     // 左上柔光带（渐变缓存）
     ctx.fillStyle = grad('wvH' + wk, function () {
       var gg = ctx.createLinearGradient(-r * 0.7, -r * 0.8, r * 0.1, 0);
@@ -575,30 +607,85 @@
     ctx.beginPath();
     ctx.ellipse(-r * 0.28, -r * 0.42, r * 0.52, r * 0.3, -0.5, 0, Math.PI * 2);
     ctx.fill();
-    // 双层海面波浪（圆头端点，缓慢起伏）
+    // 底部水体（下半球满填深水渐变：底部不再空，观感是一颗"盛满水"的珠子）
+    ctx.fillStyle = grad('wvFill' + wk, function () {
+      var gg = ctx.createLinearGradient(0, 0, 0, r * 0.95);
+      gg.addColorStop(0, 'rgba(6,24,60,0)');
+      gg.addColorStop(0.55, 'rgba(6,24,60,0.14)');
+      gg.addColorStop(1, 'rgba(4,16,44,0.38)');
+      return gg;
+    });
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.94, 0, Math.PI); // 下半球轮廓
+    ctx.closePath(); ctx.fill();
+    // 内部水面：起伏水位线（缓慢呼吸升降），线上高光、线下倒影微光
+    var lv = r * 0.34 + Math.sin(time * 0.8) * r * 0.02;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    // 水面高光线（白，双层：亮主线 + 淡副线）
     for (var row = 0; row < 2; row++) {
-      ctx.strokeStyle = row === 0 ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.26)';
-      ctx.lineWidth = Math.max(2, r * (row === 0 ? 0.05 : 0.035));
-      var baseY = (row === 0 ? -0.16 : 0.04) * r + Math.sin(time * 1.7 + row * 1.3) * r * 0.025;
+      ctx.strokeStyle = row === 0 ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.24)';
+      ctx.lineWidth = Math.max(1.6, r * (row === 0 ? 0.05 : 0.032));
       ctx.beginPath();
-      for (var x = -r * 0.62; x <= r * 0.62; x += 3) {
-        var y = baseY + Math.sin(x * 0.105 + time * 2.1 + row * 1.9) * r * 0.065;
-        if (x <= -r * 0.62 + 0.01) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      for (var x = -r * 0.94; x <= r * 0.94; x += 2) {
+        var limit = Math.sqrt(Math.max(0, r * 0.94 * r * 0.94 - x * x));
+        var y = lv + row * r * 0.07 + Math.sin(x * 0.06 + time * (1.6 + row * 0.5)) * r * 0.045
+                       + Math.sin(x * 0.14 - time * 1.1) * r * 0.018;
+        if (y > limit) y = limit; // 贴球壁不越界
+        if (x <= -r * 0.94 + 0.01) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.stroke();
     }
-    // 上浮小气泡（带高光点）
-    for (var bi = 0; bi < 3; bi++) {
-      var ba = time * (0.45 + bi * 0.19) + bi * 2.3;
-      var bx = Math.sin(ba * 0.9 + bi) * r * 0.28 + (bi - 1) * r * 0.2;
-      var by = r * 0.62 - ((ba * r * 0.16) % (r * 1.1));
-      var br = r * (0.04 + 0.016 * (bi % 3));
-      ctx.fillStyle = 'rgba(255,255,255,0.30)';
+    // 水面下淡淡渐暗倒影带
+    ctx.fillStyle = grad('wvRef' + wk, function () {
+      var gg = ctx.createLinearGradient(0, r * 0.36, 0, r * 0.9);
+      gg.addColorStop(0, 'rgba(200,235,255,0.10)');
+      gg.addColorStop(1, 'rgba(200,235,255,0)');
+      return gg;
+    });
+    ctx.fillRect(-r, r * 0.36, r * 2, r * 0.6);
+    // 上方悬空细波浪（保持水珠内的"流动感"装饰，幅度更小更柔）
+    for (row = 0; row < 2; row++) {
+      ctx.strokeStyle = row === 0 ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.18)';
+      ctx.lineWidth = Math.max(1.6, r * (row === 0 ? 0.04 : 0.028));
+      var baseY2 = (row === 0 ? -0.2 : -0.04) * r + Math.sin(time * 1.5 + row * 1.3) * r * 0.02;
+      ctx.beginPath();
+      for (x = -r * 0.55; x <= r * 0.55; x += 2.5) {
+        var y2 = baseY2 + Math.sin(x * 0.09 + time * 1.9 + row * 1.9) * r * 0.045;
+        if (x <= -r * 0.55 + 0.01) ctx.moveTo(x, y2); else ctx.lineTo(x, y2);
+      }
+      ctx.stroke();
+    }
+    // 底部内缘反光弧（贴内壁的柔光，像光从底部水面折射）
+    ctx.strokeStyle = grad('wvRim' + wk, function () {
+      var gg = ctx.createLinearGradient(-r * 0.75, r * 0.4, r * 0.6, r * 0.95);
+      gg.addColorStop(0, 'rgba(255,255,255,0)');
+      gg.addColorStop(0.45, 'rgba(210,238,255,0.42)');
+      gg.addColorStop(1, 'rgba(255,255,255,0)');
+      return gg;
+    });
+    ctx.lineWidth = Math.max(1.6, r * 0.05);
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.84, Math.PI * 0.22, Math.PI * 0.78); ctx.stroke();
+    // 上浮小气泡（5 枚：升速连续相位错开，大小错落，带高光点）
+    for (var bi = 0; bi < 5; bi++) {
+      var ba = time * (0.4 + bi * 0.14) + bi * 2.4;
+      var prog = (ba % 1.6) / 1.6; // 0..1 循环
+      var bx = Math.sin(ba * 1.3 + bi * 1.7) * r * 0.3 + (bi - 2) * r * 0.16;
+      var by = r * 0.86 - prog * r * 1.5;
+      var br = r * (0.032 + 0.014 * (bi % 3)) * (1 - prog * 0.4);
+      ctx.fillStyle = 'rgba(255,255,255,0.28)';
       ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
       ctx.beginPath(); ctx.arc(bx - br * 0.35, by - br * 0.35, br * 0.32, 0, Math.PI * 2); ctx.fill();
+    }
+    // 水中悬浮微光粒（2 枚缓慢漂移）
+    for (bi = 0; bi < 2; bi++) {
+      var ga2 = 0.14 + 0.18 * Math.max(0, Math.sin(time * 1.1 + bi * 2.6));
+      var gx = Math.sin(time * 0.5 + bi * 3.1) * r * 0.45;
+      var gy = r * (0.1 + bi * 0.28) + Math.sin(time * 0.7 + bi) * r * 0.08;
+      ctx.fillStyle = 'rgba(255,255,255,' + ga2.toFixed(2) + ')';
+      ctx.beginPath(); ctx.arc(gx, gy, Math.max(1, r * 0.028), 0, Math.PI * 2); ctx.fill();
     }
     ctx.lineCap = 'butt';
     ctx.restore();
@@ -624,15 +711,16 @@
   // 深海宝箱：弧顶木盖 + 直壁箱身 + 铜箍铆钉 + 金锁 + 盖缝透光 + 环绕星光 + 剩余时间环（超时会沉走）
   function drawChest(b, alpha) {
     var bob = Math.sin(time * 2.2) * 1.5;
+    var bx = b.rx != null ? b.rx : b.x, by = b.ry != null ? b.ry : b.y;
     ctx.save();
     ctx.globalAlpha = alpha;
     // 落地软阴影
-    var fd = FLOORY - (b.y + b.r);
+    var fd = FLOORY - (by + b.r);
     if (fd < 30 && fd > -b.r) {
       ctx.fillStyle = 'rgba(10,20,30,' + (0.2 * (1 - Math.max(0, fd) / 30)) + ')';
-      ctx.beginPath(); ctx.ellipse(b.x, FLOORY - 2, b.r * 0.95, b.r * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(bx, FLOORY - 2, b.r * 0.95, b.r * 0.2, 0, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.translate(b.x, b.y);
+    ctx.translate(bx, by);
     // 呼吸金光（渐变缓存；脉动走 globalAlpha，不重建渐变）
     var glow = 0.5 + 0.28 * Math.sin(time * 3);
     ctx.globalAlpha = alpha * glow;
@@ -649,35 +737,41 @@
 
     var w = b.r * 1.6, h = b.r * 1.3;
     var seamY = -h * 0.06; // 盖/身分界
-    // 盖（弧顶木盖）——深海蓝绿木色，与整体冷调协调，金饰点睛
+    // 盖（弧顶木盖）——暖金木色：顶部受光亮金 → 盖缝处深琥珀
     ctx.fillStyle = grad('chestLid', function () {
       var gg = ctx.createLinearGradient(0, -h * 0.62, 0, seamY);
-      gg.addColorStop(0, '#4E88A2'); gg.addColorStop(1, '#2F6078');
+      gg.addColorStop(0, '#F4C866'); gg.addColorStop(0.55, '#DDA948'); gg.addColorStop(1, '#B98430');
       return gg;
     });
     ctx.beginPath();
     ctx.moveTo(-w / 2, seamY);
     ctx.quadraticCurveTo(0, -h * 0.72, w / 2, seamY);
     ctx.closePath(); ctx.fill();
-    // 身（直壁木箱，底部圆角）
+    // 盖顶弧形高光（受光面）
+    ctx.strokeStyle = 'rgba(255,240,190,0.5)'; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.34, -h * 0.30);
+    ctx.quadraticCurveTo(0, -h * 0.62, w * 0.34, -h * 0.30);
+    ctx.stroke();
+    // 身（直壁木箱，底部圆角）：中段受光、底角沉入阴影
     ctx.fillStyle = grad('chestBody', function () {
       var gg = ctx.createLinearGradient(0, seamY, 0, h * 0.56);
-      gg.addColorStop(0, '#3A7492'); gg.addColorStop(1, '#224E66');
+      gg.addColorStop(0, '#D8A44C'); gg.addColorStop(0.5, '#C08A38'); gg.addColorStop(1, '#8F5E22');
       return gg;
     });
     roundRect(-w / 2, seamY, w, h * 0.62, 3); ctx.fill();
     // 木板竖缝
-    ctx.strokeStyle = 'rgba(14,44,64,0.4)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(110,66,20,0.45)'; ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(-w * 0.17, seamY + 3); ctx.lineTo(-w * 0.17, h * 0.52);
     ctx.moveTo(w * 0.17, seamY + 3); ctx.lineTo(w * 0.17, h * 0.52);
     ctx.stroke();
-    // 铜箍 ×2（贯穿盖与身）——深蓝底金铆钉
-    ctx.fillStyle = '#1E4258';
+    // 铜箍 ×2（贯穿盖与身）——深古铜底 + 亮金铆钉
+    ctx.fillStyle = '#7A4E1C';
     roundRect(-w * 0.42, -h * 0.36, 4.5, h * 0.9, 2); ctx.fill();
     roundRect(w * 0.42 - 4.5, -h * 0.36, 4.5, h * 0.9, 2); ctx.fill();
     // 铆钉
-    ctx.fillStyle = '#E8C877';
+    ctx.fillStyle = '#FFE6A6';
     ctx.beginPath();
     ctx.arc(-w * 0.42 + 2.2, -h * 0.2, 1.1, 0, Math.PI * 2);
     ctx.arc(w * 0.42 - 2.3, -h * 0.2, 1.1, 0, Math.PI * 2);
@@ -689,9 +783,9 @@
     ctx.fillStyle = 'rgba(255,224,130,' + seamG.toFixed(2) + ')';
     roundRect(-w * 0.4, seamY - 1, w * 0.8, 2.2, 1.1); ctx.fill();
     // 金锁 + 锁孔
-    ctx.fillStyle = '#F2C14E';
+    ctx.fillStyle = '#FFD873';
     roundRect(-4.5, seamY - 3, 9, 10, 2.5); ctx.fill();
-    ctx.fillStyle = '#1E4258';
+    ctx.fillStyle = '#5A3A14';
     ctx.beginPath(); ctx.arc(0, seamY + 1.2, 1.6, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath();
     ctx.moveTo(-0.9, seamY + 2.2); ctx.lineTo(0.9, seamY + 2.2);
@@ -1224,16 +1318,22 @@
     ctx.setLineDash([]);
     ctx.lineCap = 'butt';
     ctx.restore();
-    // 危险时两端亮起三角警示
-    if (glow > 0.3) {
-      var ta = 0.45 + glow * 0.55;
-      ctx.fillStyle = 'rgba(226,75,74,' + ta + ')';
-      ctx.beginPath();
-      ctx.moveTo(4, C.dangerY - 11); ctx.lineTo(14, C.dangerY - 11); ctx.lineTo(9, C.dangerY - 3);
-      ctx.closePath(); ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(C.W - 14, C.dangerY - 11); ctx.lineTo(C.W - 4, C.dangerY - 11); ctx.lineTo(C.W - 9, C.dangerY - 3);
-      ctx.closePath(); ctx.fill();
+    // 危险时两端亮起端点光珠（与警戒线同色的柔光圆点，外圈光晕+内核，随脉动呼吸，
+    // 替代生硬的倒三角警示：融入光带本身，不再有突兀的几何形状）
+    if (glow > 0.05) {
+      var pa = (0.35 + glow * 0.55) * (0.7 + 0.3 * Math.sin(time * 4));
+      for (var side = 0; side < 2; side++) {
+        var ex2 = side ? C.W - 5 : 5;
+        // 外圈柔晕（大而淡）
+        ctx.fillStyle = cCore + (pa * 0.22) + ')';
+        ctx.beginPath(); ctx.arc(ex2, C.dangerY, 10 + glow * 4, 0, Math.PI * 2); ctx.fill();
+        // 中层过渡
+        ctx.fillStyle = cCore + (pa * 0.4) + ')';
+        ctx.beginPath(); ctx.arc(ex2, C.dangerY, 5.5, 0, Math.PI * 2); ctx.fill();
+        // 内核亮点
+        ctx.fillStyle = 'rgba(255,255,255,' + (pa * 0.85) + ')';
+        ctx.beginPath(); ctx.arc(ex2, C.dangerY, 2.2 + glow * 1.2, 0, Math.PI * 2); ctx.fill();
+      }
     }
     // 判定进行中：线上方居中倒计时提示（玩家能看懂"为什么快输了"）
     if (dangerAlert > 0.12) {
@@ -1957,14 +2057,14 @@
     gg.addColorStop(1, 'rgba(255,208,96,0)');
     ctx.fillStyle = gg;
     ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#3E7E98'; // 弧顶木盖（深海蓝绿，与游戏内宝箱一致）
+    ctx.fillStyle = '#E8B54A'; // 弧顶木盖（暖金木色，与游戏内宝箱一致）
     ctx.beginPath(); ctx.moveTo(-15, -2); ctx.quadraticCurveTo(0, -16, 15, -2); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#2A5E78'; // 箱身
+    ctx.fillStyle = '#C08A38'; // 箱身
     roundRect(-15, -2, 30, 13, 2); ctx.fill();
-    ctx.fillStyle = '#1E4258'; // 铜箍 ×2
+    ctx.fillStyle = '#7A4E1C'; // 古铜箍 ×2
     ctx.fillRect(-10, -2, 3, 13);
     ctx.fillRect(7, -2, 3, 13);
-    ctx.fillStyle = '#F2C14E'; // 金锁
+    ctx.fillStyle = '#FFD873'; // 金锁
     roundRect(-3.5, -4, 7, 8, 2); ctx.fill();
     ctx.restore();
   }

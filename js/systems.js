@@ -310,20 +310,36 @@
     });
   }
 
-  // 远景鱼群
+  // 远景鱼群：按海域分化体色/体型/泳速（每片海域有自己的鱼），换海域时旧鱼慢慢淡出、新鱼慢慢淡入
   var fishes = [];
+  // 各海域鱼群外观：tint/tintD 体色（亮/暗）、s 尺寸范围、sp 泳速范围
+  var FISH_LOOK = [
+    { tint: '158,206,228', tintD: '66,120,168', s: [6, 12],  sp: [26, 56] }, // 潮汐池：浅水银蓝小鱼
+    { tint: '122,214,182', tintD: '34,132,110', s: [6, 12],  sp: [28, 58] }, // 珊瑚浅海：青绿雀鲷
+    { tint: '96,164,232',  tintD: '30,88,168',  s: [8, 14],  sp: [34, 66] }, // 蔚蓝深海：群游蓝鱼
+    { tint: '116,124,214', tintD: '52,56,140',  s: [5, 9],   sp: [18, 40] }, // 午夜深渊：暗紫灯笼鱼（小而慢）
+    { tint: '196,212,238', tintD: '110,130,168', s: [10, 16], sp: [22, 44] }, // 月光环礁：银月鱼（大而缓）
+    { tint: '92,112,182',  tintD: '36,48,110',  s: [7, 12],  sp: [30, 62] }, // 海沟之眼：深蓝窄影
+    { tint: '226,142,96',  tintD: '150,62,36',  s: [8, 13],  sp: [30, 60] }, // 热泉裂谷：暖橙耐热鱼
+    { tint: '184,146,236', tintD: '96,62,168',  s: [6, 12],  sp: [24, 50] }  // 深渊王座：幽紫发光鱼
+  ];
+  function fishLook() { return FISH_LOOK[Math.min(seaStage(), FISH_LOOK.length - 1)]; }
   function resetFish(f) {
+    var lk = fishLook();
+    f.stg = seaStage();
     f.dir = Math.random() < 0.5 ? 1 : -1;
     f.x = f.dir > 0 ? -70 : C.W + 70;
     f.y = 160 + Math.random() * 400;
-    f.sp = 24 + Math.random() * 34;
-    f.s = 7 + Math.random() * 9;
+    f.sp = lk.sp[0] + Math.random() * (lk.sp[1] - lk.sp[0]);
+    f.s = lk.s[0] + Math.random() * (lk.s[1] - lk.s[0]);
+    f.tint = lk.tint; f.tintD = lk.tintD;
     f.wob = Math.random() * Math.PI * 2;
   }
   for (var fi = 0; fi < 5; fi++) {
-    var nf = { tail: 0, dir: 1, x: 0, y: 0, sp: 0, s: 0, wob: 0 };
+    var nf = { tail: 0, dir: 1, x: 0, y: 0, sp: 0, s: 0, wob: 0, fade: 0, stg: 0, tint: '', tintD: '' };
     resetFish(nf);
     nf.x = Math.random() * LW;
+    nf.fade = 1; // 开局即在场的鱼不做淡入
     fishes.push(nf);
   }
 
@@ -533,6 +549,12 @@
       f.x += f.dir * f.sp * dt;
       f.y += Math.sin(time * 0.7 + f.wob) * 8 * dt;
       f.tail += dt * 9;
+      // 海域切换：旧鱼 1.6s 缓慢淡出（边游边隐），淡尽后重生为本海域的鱼并 1.6s 淡入
+      var curStg = seaStage();
+      if (f.fade > 0 && f.stg !== curStg) f.fade -= dt / 1.6;
+      else if (f.fade < 1) f.fade += dt / 1.6;
+      if (f.fade <= 0) { f.fade = 0; resetFish(f); }
+      if (f.fade > 1) f.fade = 1;
       if (f.dir > 0 && f.x > C.W + 70) resetFish(f);
       if (f.dir < 0 && f.x < -70) resetFish(f);
     }
@@ -2111,6 +2133,15 @@
     // 速度低于死区直接回正圆，停稳后不再残留椭圆
     for (i = 0; i < phys.bodies.length; i++) {
       b = phys.bodies[i];
+      // 渲染平滑：物理位置 → 渲染位置指数滤波（移动快时紧贴物理位，慢速时滤掉
+      // 碰撞解算带来的亚像素级抖动，视觉上消除"移动不连续/微跳"的生硬感）
+      var spd2 = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+      var rrate = spd2 > 260 ? 46 : 20;
+      var rk = 1 - Math.exp(-rrate * dt);
+      if (b.rx == null) { b.rx = b.x; b.ry = b.y; }
+      b.rx += (b.x - b.rx) * rk;
+      b.ry += (b.y - b.ry) * rk;
+      if (Math.abs(b.x - b.rx) < 0.25 && Math.abs(b.y - b.ry) < 0.25) { b.rx = b.x; b.ry = b.y; }
       var sm = Math.min(1, dt * 6);
       b.svx = (b.svx || 0) + (b.vx - b.svx) * sm;
       b.svy = (b.svy || 0) + (b.vy - b.svy) * sm;
@@ -2129,9 +2160,9 @@
       b = phys.bodies[i];
       if (b.grace > 0) b.grace -= dt;
       if (b.popT > 0) b.popT -= dt;
-      // 运动拖尾采样
+      // 运动拖尾采样（取渲染平滑位，避免拖尾与球体错位/抖动）
       if (!b.trail) b.trail = [];
-      b.trail.push({ x: b.x, y: b.y });
+      b.trail.push({ x: b.rx != null ? b.rx : b.x, y: b.ry != null ? b.ry : b.y });
       if (b.trail.length > 6) b.trail.shift();
     }
 
