@@ -1877,32 +1877,6 @@
     { key: 'flow',   cx: 302, cy: 688, r: 20, pressT: 0 }
   ];
   fit(); // 首次适配（按钮已定义，底部元素可同步贴底）
-  var DEX_PANEL = { x: 20, y: 64, w: 380, h: 560 };
-  var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 42, y: DEX_PANEL.y + 8, w: 28, h: 28 }; // 右上 × 关闭（中心 +22px，与页头标题文字对齐）
-  // 成就页分段页签：成就 / 每日 / 榜单（与图鉴分节同款分段控件样式）
-  function achTabRect(i) {
-    var segW = Math.floor((DEX_PANEL.w - 30) / 3);
-    return { x: DEX_PANEL.x + 15 + i * segW, y: DEX_PANEL.y + 40, w: segW, h: 28 };
-  }
-  var shareCopyBtn = { x: 0, y: 0, w: 150, h: 42 }; // 分享卡片：复制文案按钮（打开时定位）
-  function spSlotRect(stg, s) {
-    // 海域演进行右侧的特殊滴槽位（s=0/1），宝箱也占一个槽位；与 stageRowRect 同基
-    var r = stageRowRect(stg);
-    return { x: r.x + r.w - 196 + s * 98, y: r.y + 4, w: 92, h: 32 };
-  }
-  function tierCellRect(t) {
-    // 合成链分节：3 列 × 3 行（9 档），格高 122 填满说明区以上空间
-    return { x: DEX_PANEL.x + 14 + (t % 3) * 118, y: DEX_PANEL.y + 76 + Math.floor(t / 3) * 130, w: 108, h: 122 };
-  }
-  function stageRowRect(g) {
-    // 海域演进分节：8 行纵向列表（由浅入深），行距 48 填满说明区以上空间
-    return { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 80 + g * 48, w: DEX_PANEL.w - 28, h: 40 };
-  }
-  function dexSecRect(i) {
-    // 分节切换：通栏分段控件（合成链 / 海域演进——特殊滴已并入海域行），样式与顶部页签区分
-    var segW = Math.floor((DEX_PANEL.w - 30) / 2);
-    return { x: DEX_PANEL.x + 15 + i * segW, y: DEX_PANEL.y + 40, w: segW, h: 28 };
-  }
 
   // 重开确认弹窗
   var confirmOpen = false;
