@@ -14,6 +14,11 @@
   // 主画布：wx.createCanvas 首次调用返回主屏画布，之后调用返回离屏画布
   var mainCanvas = wx.createCanvas();
   mainCanvas.style = {}; // core.js fit() 会写 style.width/height，微信无 style，给空对象接住
+  // systems.js toLocal() 用 getBoundingClientRect 把屏幕坐标转逻辑坐标——微信 canvas 没有
+  // 该方法；游戏画布恒铺满窗口且从 (0,0) 起，返回恒等矩形（left/top=0）即可
+  mainCanvas.getBoundingClientRect = function () {
+    return { left: 0, top: 0, width: sys.windowWidth, height: sys.windowHeight };
+  };
 
   // window → GameGlobal（游戏里 window.MG / window.AudioContext 等全部落在这里）
   G.window = G;
