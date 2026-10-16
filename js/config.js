@@ -104,8 +104,8 @@ MG.config = {
   spawnGate: [0, 0, 0, 800, 2500],
   // 特殊滴与海域绑定：抵达该海域后才会刷出（图鉴里未到达海域的特殊滴不显示）
   specialStage: {
-    vortex: 0, chest: 0,          // 潮汐池
-    cloud: 1, iron: 1,            // 珊瑚浅海
+    iron: 0, chest: 0,            // 潮汐池
+    cloud: 1, vortex: 1,          // 珊瑚浅海
     ice: 2, rune: 2,              // 蔚蓝深海
     rainbow: 3, gale: 3,          // 午夜深渊
     magnet: 4, spring: 4,         // 月光环礁

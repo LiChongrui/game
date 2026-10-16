@@ -19,7 +19,7 @@
   var aiming = false;
   var cooldown = 0;
   var combo = 0, comboTimer = 0, maxCombo = 0;
-  var reviveCount = 0, doubled = false; // 每局复活上限 2 次（看广告）
+  var reviveCount = 0, doubled = false; // 每局可无限复活（看广告）
   var runBuffered = false; // 每局一次「深流缓冲」是否已用
   var popups = [], parts = [];
   var rippleQueue = []; // 待发的涟漪次波 { t, x, y }
@@ -384,7 +384,7 @@
     return keys[keys.length - 1];
   }
   function rollIron() {
-    if (seaStage() < ((C.specialStage && C.specialStage.iron) || 1)) return false; // 珊瑚浅海起才落礁石
+    if (seaStage() < ((C.specialStage && C.specialStage.iron != null) ? C.specialStage.iron : 0)) return false; // 潮汐池起就落礁石（注意 0 是合法门槛，不能写 || 兜底）
     if (seaEvent && seaEvent.type === 'storm') return false; // 保底：风暴期间不再落礁石，避免双重失控
     if (ironCount() >= C.iron.maxActive) return false; // 场上已满员：预览不再出礁石，避免落下时被迫转成水滴
     var ch = C.iron.chance + (C.ramp.ironChanceMax - C.iron.chance) * endlessRamp();
@@ -621,11 +621,11 @@
   }
 
   // ---------- 特殊水滴图鉴（发现即点亮；与海域绑定：stage=解锁海域） ----------
-  // 每片海域相对上一片恰好新增 2 种（潮汐池=漩涡滴+深海宝箱，宝箱在图鉴中单列）
+  // 每片海域相对上一片恰好新增 2 种（潮汐池=礁石+深海宝箱，宝箱在图鉴中单列）
   var SP_DEFS = [
-    { key: 'vortex',  stage: 0, name: '漩涡滴', color: '#7B6FD0', desc: '吸附周围水滴后消散，聚拢散滴。' },
+    { key: 'vortex',  stage: 1, name: '漩涡滴', color: '#7B6FD0', desc: '吸附周围水滴后消散，聚拢散滴。' },
     { key: 'cloud',   stage: 1, name: '雨云滴', color: '#8FA8BC', desc: '分裂成两颗雾泡，补充低级滴。' },
-    { key: 'iron',    stage: 1, name: '礁石',   color: '#6E7B88', desc: '沉重障碍，两两相消或蒸发移除。' },
+    { key: 'iron',    stage: 0, name: '礁石',   color: '#6E7B88', desc: '沉重障碍，两两相消或蒸发移除。' },
     { key: 'ice',     stage: 2, name: '冰晶滴', color: '#A8DFF2', desc: '冻结周围水滴，可当临时平台。' },
     { key: 'rune',    stage: 2, name: '符文滴', color: '#B08FD0', desc: '合成时为对应技能 +1 充能。' },
     { key: 'rainbow', stage: 3, name: '彩虹滴', color: '#E86FA8', desc: '使碰到的水滴跳 2 级，得分双倍。' },
@@ -652,7 +652,7 @@
       (per[st] = per[st] || []).push(i);
     }
     for (var k in per) if (per.hasOwnProperty(k)) STAGE_SP_SLOTS[k] = [per[k][0], per[k][1]];
-    STAGE_SP_SLOTS[0] = [spIndexByKey('vortex'), SP_DEFS.length];
+    STAGE_SP_SLOTS[0] = [spIndexByKey('iron'), SP_DEFS.length];
   })();
   function discoverSpecial(sp) {
     if (dexSpecial[sp]) return;
@@ -1783,11 +1783,11 @@
     var bw = 240, bh = 40, gap = 8, x = (C.W - bw) / 2;
     // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中
     var areaTop = 150 + 176, areaBottom = 150 + 436 - 26;
-    var n = (reviveCount < 2 ? 1 : 0) + (doubled ? 0 : 1) + 3; // 复活/双倍/分享/深渊潜航/重开
+    var n = 1 + (doubled ? 0 : 1) + 3; // 复活(无限)/双倍/分享/深渊潜航/重开
     var groupH = n * bh + (n - 1) * gap;
     var y = areaTop + (areaBottom - areaTop - groupH) / 2;
-    if (reviveCount < 2) {
-      overButtons.push({ x: x, y: y, w: bw, h: bh, label: '复活继续（剩 ' + (2 - reviveCount) + ' 次）', action: doRevive, primary: true });
+    {
+      overButtons.push({ x: x, y: y, w: bw, h: bh, label: '复活继续' + (reviveCount > 0 ? '（已复活 ' + reviveCount + ' 次）' : ''), action: doRevive, primary: true });
       y += bh + gap;
     }
     if (!doubled) {

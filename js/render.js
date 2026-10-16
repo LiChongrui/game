@@ -150,11 +150,16 @@
       var bw = 46 + bi * 24;
       var rayA = 0.05 + 0.035 * (0.5 + 0.5 * Math.sin(time * 0.23 + bi * 2.6));
       ctx.save();
-      ctx.globalAlpha = rayA;
       ctx.translate(bx0, -10);
       ctx.rotate(tilt);
-      ctx.fillStyle = ray;
-      ctx.fillRect(-bw / 2, 0, bw, VH * 0.82);
+      // 边缘软化：4 层递缩宽度叠加（外层淡、内层实），左右两侧形成渐变过渡不再生硬
+      var LAYERS = [[1, 0.14], [0.74, 0.2], [0.48, 0.28], [0.24, 0.38]]; // [宽度比, alpha 比]（中心累计≈1）
+      for (var li = 0; li < LAYERS.length; li++) {
+        ctx.globalAlpha = rayA * LAYERS[li][1];
+        ctx.fillStyle = ray;
+        var lw = bw * LAYERS[li][0];
+        ctx.fillRect(-lw / 2, 0, lw, VH * 0.82);
+      }
       ctx.restore();
     }
 
@@ -1428,11 +1433,11 @@
     }
     ctx.fillStyle = '#7A5B10';
     ctx.font = 'bold 15px system-ui, sans-serif';
-    ctx.fillText(quest.text + ' ' + quest.have + '/' + quest.need, qx + qw / 2, qy + 15);
+    ctx.fillText(quest.text + ' ' + quest.have + '/' + quest.need, qx + qw / 2, qy + 14);
     ctx.fillStyle = '#B8860B';
     ctx.font = '13px system-ui, sans-serif';
     var stars = '★★★'.slice(0, quest.stars || 1);
-    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 29);
+    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 30);
     drawTidePill();
     drawSeaProgress();
     ctx.restore();
@@ -1706,23 +1711,35 @@
     ctx.lineCap = 'butt';
   }
   // 通用分段控件：segRects=[{x,w}...]，活动段浅蓝渐变胶囊芯片（描边+垂直居中文字）
-  function drawSegTabs(rects, labels, active, dotIdx) {
+  // 切换时芯片从旧位置平滑滑到新位置（180ms 缓动）；key 区分多套控件各自记忆位置
+  // 时钟用 performance.now（渲染帧钟）：面板打开期间 update 冻结 time，但渲染照跑，动画必须能走
+  var segAnims = {};
+  function drawSegTabs(rects, labels, active, dotIdx, key) {
+    var now = performance.now() / 1000;
     var r0 = rects[0], rl = rects[rects.length - 1];
     ctx.fillStyle = 'rgba(21,90,138,0.10)';
     roundRect(r0.x, r0.y, rl.x + rl.w - r0.x, r0.h, r0.h / 2); ctx.fill();
+    // 芯片滑动动画
+    var st = segAnims[key];
+    if (!st) { st = segAnims[key] = { cur: active, fx: rects[active].x, fw: rects[active].w, t0: -9 }; }
+    if (active !== st.cur) {
+      st.cur = active; st.t0 = now;
+    }
+    var p = Math.min(1, (now - st.t0) / 0.18);
+    p = 1 - (1 - p) * (1 - p) * (1 - p); // easeOutCubic
+    var tx0 = st.fx + (rects[active].x - st.fx) * p;
+    var tw0 = st.fw + (rects[active].w - st.fw) * p;
+    if (p >= 1) { st.fx = rects[active].x; st.fw = rects[active].w; }
+    // 芯片
+    var tg = ctx.createLinearGradient(0, r0.y + 2, 0, r0.y + r0.h - 2);
+    tg.addColorStop(0, '#FFFFFF'); tg.addColorStop(1, '#CFE7F6');
+    ctx.fillStyle = tg;
+    roundRect(tx0 + 2, r0.y + 2, tw0 - 4, r0.h - 4, (r0.h - 4) / 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(46,134,180,0.5)'; ctx.lineWidth = 1; ctx.stroke();
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (var i = 0; i < rects.length; i++) {
       var sr = rects[i];
-      if (i === active) {
-        var tg = ctx.createLinearGradient(0, sr.y + 2, 0, sr.y + sr.h - 2);
-        tg.addColorStop(0, '#FFFFFF'); tg.addColorStop(1, '#CFE7F6');
-        ctx.fillStyle = tg;
-        roundRect(sr.x + 2, sr.y + 2, sr.w - 4, sr.h - 4, (sr.h - 4) / 2); ctx.fill();
-        ctx.strokeStyle = 'rgba(46,134,180,0.5)'; ctx.lineWidth = 1; ctx.stroke();
-        ctx.fillStyle = '#155A8A';
-      } else {
-        ctx.fillStyle = '#5B7E96';
-      }
+      ctx.fillStyle = i === active ? '#155A8A' : '#5B7E96';
       ctx.font = 'bold 15px system-ui, sans-serif';
       ctx.fillText(labels[i], sr.x + sr.w / 2, sr.y + sr.h / 2 + 1);
       if (i === dotIdx && i !== active) { // 未全勤提醒小红点
@@ -1742,7 +1759,7 @@
     // —— 分节切换：通栏分段控件（特殊滴槽位已并入海域演进，不再单列）——
     var secNames = ['合成链', '海域演进'];
     var secRects = [dexSecRect(0), dexSecRect(1)];
-    drawSegTabs(secRects, secNames, dexSec, -1);
+    drawSegTabs(secRects, secNames, dexSec, -1, 'dexsec');
     var curStage = seaStage(), tsNow = totalScore();
     ctx.textAlign = 'center';
 
@@ -1921,7 +1938,7 @@
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
     drawPanelHeader('成就');
     var dailyDot = !(daily.done[0] && daily.done[1] && daily.done[2]) ? 1 : -1;
-    drawSegTabs([achTabRect(0), achTabRect(1), achTabRect(2)], ['成就', '每日', '榜单'], dexTab, dailyDot);
+    drawSegTabs([achTabRect(0), achTabRect(1), achTabRect(2)], ['成就', '每日', '榜单'], dexTab, dailyDot, 'achtabs');
     if (dexTab === 1) drawDailyTab();
     else if (dexTab === 2) drawRankTab();
     else drawAchTab();
@@ -2112,9 +2129,9 @@
       ctx.textAlign = 'left';
       ctx.fillStyle = '#4A7FA0';
       ctx.font = '14px system-ui, sans-serif';
-      ctx.fillText('奖励 +' + Math.round(C.daily.rewardScore * (1 + ((t.stars || 1) - 1) * 0.5)) + ' 分', DEX_PANEL.x + 26, ry + 42);
+      ctx.fillText('奖励 +' + Math.round(C.daily.rewardScore * (1 + ((t.stars || 1) - 1) * 0.5)) + ' 分', DEX_PANEL.x + 26, ry + 46);
       // 进度条
-      var barX = DEX_PANEL.x + 26, barW = DEX_PANEL.w - 120, barY = ry + 54;
+      var barX = DEX_PANEL.x + 26, barW = DEX_PANEL.w - 120, barY = ry + 58;
       ctx.fillStyle = 'rgba(46,134,180,0.15)';
       roundRect(barX, barY, barW, 9, 4.5); ctx.fill();
       if (daily.prog[i] > 0) {

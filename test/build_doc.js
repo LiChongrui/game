@@ -109,9 +109,9 @@ const html = `<!DOCTYPE html>
   <h2>🎁 特殊水滴（15 种，随海域逐级解锁）</h2>
   <table>
     <tr><th style="width:140px">特殊滴</th><th style="width:96px">登场海域</th><th>效果</th></tr>
-    <tr><td><img class="ic" src="${ico('sp_vortex')}" alt="">漩涡滴</td><td>潮汐池</td><td>吸附周围水滴再消散，聚拢散滴</td></tr>
+    <tr><td><img class="ic" src="${ico('sp_vortex')}" alt="">漩涡滴</td><td>珊瑚浅海</td><td>吸附周围水滴再消散，聚拢散滴</td></tr>
     <tr><td><img class="ic" src="${ico('sp_cloud')}" alt="">雨云滴</td><td>潮汐池</td><td>分裂成两颗雾泡，补充低级水滴</td></tr>
-    <tr><td><img class="ic" src="${ico('sp_iron')}" alt="">礁石</td><td>珊瑚浅海</td><td>沉重障碍无法合成；两两相消或蒸发移除</td></tr>
+    <tr><td><img class="ic" src="${ico('sp_iron')}" alt="">礁石</td><td>潮汐池</td><td>沉重障碍无法合成；两两相消或蒸发移除</td></tr>
     <tr><td><img class="ic" src="${ico('sp_ice')}" alt="">冰晶滴</td><td>蔚蓝深海</td><td>冻结周围水滴，冻结滴可当临时平台</td></tr>
     <tr><td><img class="ic" src="${ico('sp_rune')}" alt="">符文滴</td><td>蔚蓝深海</td><td>合成时为对应技能 +1 充能</td></tr>
     <tr><td><img class="ic" src="${ico('sp_rainbow')}" alt="">彩虹滴</td><td>午夜深渊</td><td>碰到的水滴直接跳 2 级，得分双倍</td></tr>
