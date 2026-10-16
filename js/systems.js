@@ -34,7 +34,7 @@
   var chestTimer = 26 + Math.random() * 20;
   var questStaleT = 4; // 滞留任务检查计时
   // 随机深海事件（无尽模式）：涌泉 / 甘霖 / 漩涡风暴
-  var seaEvent = { timer: 24 + Math.random() * 14, type: null, t: 0, x: 0, y: 0, data: null };
+  var seaEvent = { timer: 24 + Math.random() * 14, type: null, t: 0, t0: 6, x: 0, y: 0, data: null };
   var rippleMode = false; // 涟漪选位模式：点击画布指定波纹中心
   var flowMode = false;   // 水流模式：点选两枚水滴交换位置（布局型道具）
   var flowPick = null;    // 水流模式已选中的第一枚水滴
@@ -1572,6 +1572,7 @@
     over: function () { buildOverButtons(); gameOver(); }, // 直达结算页（UI 测试用）
     menuBtn: function () { return menuStartBtn; }, // 开始界面按钮几何（UI 测试用）
     openDex: function () { dexOpen = true; achOpen = false; },
+    forceEvent: function (type) { startSeaEvent(type); }, // 直接触发深海事件（UI 测试用：surge/bless/storm）
     dexSecTab: function (i) { return dexSecRect(i); }, // 图鉴分节控件几何（UI 测试用）
     closeDex: function () { dexOpen = false; achOpen = false; }
   };
@@ -1646,10 +1647,11 @@
   }
 
   // ---------- 随机深海事件（无尽模式趣味变量） ----------
-  function startSeaEvent() {
+  function startSeaEvent(force) {
     var pool = ['surge', 'bless', 'storm'];
-    seaEvent.type = pool[(Math.random() * pool.length) | 0];
+    seaEvent.type = force || pool[(Math.random() * pool.length) | 0];
     seaEvent.t = 6;
+    seaEvent.t0 = 6;
     var names = {
       surge: '深海涌泉！水滴被轻轻托起',
       bless: '海神甘霖！接下来 3 滴同档',
@@ -1712,21 +1714,54 @@
   // 事件视觉（在游戏区坐标系内绘制）
   function drawEventVfx() {
     if (seaEvent.type === 'storm') {
-      var r0 = 90 + Math.sin(time * 3) * 8;
+      // 首尾各 0.8s 淡入淡出，避免漩涡凭空出现/消失
+      var fadeK = Math.min(1, (seaEvent.t0 - seaEvent.t) / 0.8, seaEvent.t / 0.8);
+      if (fadeK <= 0) return;
+      var pulse = 1 + 0.07 * Math.sin(time * 3);
       ctx.save();
+      ctx.globalAlpha = fadeK;
       ctx.translate(seaEvent.x, seaEvent.y);
+      ctx.scale(pulse, pulse * 0.55); // 椭圆压扁：透视俯视感
+      // 柔光漩涡盘（径向渐变，静置营造深度）
+      ctx.fillStyle = grad('stormDisc', function () {
+        var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 110);
+        gg.addColorStop(0, 'rgba(94,110,208,0.30)');
+        gg.addColorStop(0.6, 'rgba(94,110,208,0.13)');
+        gg.addColorStop(1, 'rgba(94,110,208,0)');
+        return gg;
+      });
+      ctx.beginPath(); ctx.arc(0, 0, 110, 0, Math.PI * 2); ctx.fill();
+      // 三条螺旋臂：整臂单路径连续描边 + 沿臂渐隐（与漩涡滴同款手法，无接缝无硬线）
+      ctx.rotate(time * 2.0);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       for (var k = 0; k < 3; k++) {
-        ctx.strokeStyle = 'rgba(96,112,215,' + (0.38 - k * 0.1) + ')';
-        ctx.lineWidth = 2.5;
+        var a0 = k * Math.PI * 2 / 3;
+        var endA = a0 + Math.PI * 1.9;
+        (function (a0, endA, k) {
+          var gx0 = Math.cos(a0) * 16, gy0 = Math.sin(a0) * 16;
+          var gx1 = Math.cos(endA) * 104, gy1 = Math.sin(endA) * 104;
+          ctx.strokeStyle = grad('stormArm' + k, function () {
+            var gg = ctx.createLinearGradient(gx0, gy0, gx1, gy1);
+            gg.addColorStop(0, 'rgba(152,166,240,0.62)');
+            gg.addColorStop(1, 'rgba(112,128,222,0.07)');
+            return gg;
+          });
+        })(a0, endA, k);
+        ctx.lineWidth = 7;
         ctx.beginPath();
-        for (var a2 = 0; a2 < Math.PI * 3.2; a2 += 0.25) {
-          var rr = 6 + (a2 / (Math.PI * 3.2)) * (r0 - 6) + k * 7;
-          var aa2 = a2 + time * (2.4 - k * 0.5);
-          var x2 = Math.cos(aa2) * rr, y2 = Math.sin(aa2) * rr * 0.55;
-          if (a2 === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
+        for (var i2 = 0; i2 <= 40; i2++) {
+          var tt = i2 / 40;
+          var aa = a0 + tt * Math.PI * 1.9;
+          var rr = 16 + 88 * tt;
+          var x2 = Math.cos(aa) * rr, y2 = Math.sin(aa) * rr;
+          if (i2 === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
         }
         ctx.stroke();
       }
+      // 中心亮核（被吸入的光，轻微呼吸）
+      ctx.fillStyle = 'rgba(222,228,255,' + (0.55 + 0.2 * Math.sin(time * 4)).toFixed(2) + ')';
+      ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     } else if (seaEvent.type === 'surge') {
       var g = grad('surge' + Math.round(FLOORY), function () {

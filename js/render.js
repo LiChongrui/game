@@ -1606,8 +1606,8 @@
     ctx.save();
     ctx.textAlign = 'center';
     ctx.lineJoin = 'round';
-    ctx.font = 'bold 15px system-ui, sans-serif';
-    ctx.lineWidth = 3;
+    ctx.font = 'bold 12px system-ui, sans-serif';
+    ctx.lineWidth = 2.5;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     var etxt = '已进行 ' + em + ':' + (es < 10 ? '0' + es : es);
     ctx.strokeText(etxt, C.W / 2, 20);
