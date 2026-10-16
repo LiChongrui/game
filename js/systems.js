@@ -1968,7 +1968,12 @@
       ngOpen = false;
       return;
     }
-    if (ng.unlocked && state === 'play' && inCircle(p, ngBtn)) { ngBtn.pressT = 0.16; openNgPick(); return; }
+    if (state === 'play' && inCircle(p, ngBtn)) {
+      ngBtn.pressT = 0.16;
+      if (ng.unlocked) openNgPick();
+      else addPopup(C.W / 2, FLOORY - 120, '深渊回响 · 累计 5万 分解锁', false, 0);
+      return;
+    }
     if (state === 'play') {
       if (inCircle(p, restartBtn)) { restartBtn.pressT = 0.16; confirmOpen = true; return; }
       for (var i = 0; i < SKILL_BTNS.length; i++) {
