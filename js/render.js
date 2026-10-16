@@ -1437,7 +1437,8 @@
     drawSeaProgress();
     ctx.restore();
   }
-  // 海域进度条：满宽细条，显示累计分距下一海域的进度（颜色=下一海域徽章色）
+  // 海域进度条：满宽细条，显示累计分距下一海域的进度
+  // 配色：填充=当前海域深水色（与背景同族），右端小圆点=下一海域徽章色（目的地），左端骑线徽章=当前位置
   function drawSeaProgress() {
     var cur = seaStage(), ts = totalScore();
     var last = C.seaStages.length - 1;
@@ -1451,8 +1452,9 @@
       frac = Math.min(1, Math.max(0.02, (ts - lo) / (hi - lo)));
     }
     if (frac > 0) {
-      ctx.fillStyle = maxed ? SEA_BADGES[last].c : SEA_BADGES[cur + 1].c;
-      ctx.globalAlpha = 0.8;
+      // 填充=当前海域的深水色（bg[3]，与当前背景同族不撞色）；目的地用右端下一海域色小圆点表达
+      ctx.fillStyle = maxed ? SEA_BADGES[last].c : C.seaStages[cur].bg[3];
+      ctx.globalAlpha = 0.85;
       roundRect(sx + 2, sy + 2, Math.max(10, (sw - 4) * frac), sh - 4, 6); ctx.fill();
       ctx.globalAlpha = 1;
     }
@@ -1466,6 +1468,13 @@
     ctx.strokeText(label, cx, sy + 13);
     ctx.fillStyle = '#2C5A78';
     ctx.fillText(label, cx, sy + 13);
+    if (!maxed) {
+      // 右端终点标记：下一海域徽章色小圆点（"要去的地方"），避免整条填充撞色
+      var ex = sx + sw - 14, ey = sy + sh / 2;
+      ctx.beginPath(); ctx.arc(ex, ey, 5.5, 0, Math.PI * 2);
+      ctx.fillStyle = SEA_BADGES[cur + 1].c; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
     // 左端骑线放当前海域徽章——直观标注"当前位置"（与图鉴徽章语言一致）
     drawSeaBadge(cur, sx + 16, sy + sh / 2, true);
   }
