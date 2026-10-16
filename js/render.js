@@ -323,52 +323,85 @@
     var w = x1 - x0;
     if (w < 24) return; // 手机模式侧边栏宽 0，自动跳过
     var baseY = VH - 3;
-    var k;
+    var k, i, s2;
     ctx.lineCap = 'round';
-    // ---- 后层：巨藻飘带（2~4 条，高、窄、渐细，根部固定梢部摆动） ----
-    var nk = Math.max(2, Math.min(4, Math.floor(w / 42)));
+    // ---- 后层：巨藻（弯曲主茎 + 两排交互披针叶，整株绕根轻摆） ----
+    var nk = Math.max(2, Math.min(3, Math.floor(w / 50)));
     for (k = 0; k < nk; k++) {
-      var px = x0 + (k + 0.35) * w / nk + Math.sin(seed * 1.7 + k * 5.3) * w * 0.16;
-      var h = 70 + ((k * 53 + seed * 17) % 55) + (VH - 720) * 0.16;
-      h = Math.min(h, VH * 0.34);
-      var sway = Math.sin(time * (0.5 + (k % 3) * 0.18) + seed + k * 2.2) * (9 + h * 0.06);
-      var wB = 4.5 + (k % 3) * 1.8; // 根部半宽（梢部收敛到 0）
-      var tipX = px + sway, tipY = baseY - h;
-      var midX = px + sway * 0.35, midY = baseY - h * 0.55;
-      var alpha = 0.16 + (k % 2) * 0.05;
-      // 叶片轮廓（左右两条二次曲线在梢部汇合，形成自然渐细）
-      ctx.fillStyle = 'rgba(15,64,94,' + alpha + ')';
-      ctx.beginPath();
-      ctx.moveTo(px - wB, baseY);
-      ctx.quadraticCurveTo(midX - wB * 0.5, midY, tipX, tipY);
-      ctx.quadraticCurveTo(midX + wB * 0.5, midY, px + wB, baseY);
-      ctx.closePath(); ctx.fill();
-      // 叶片中脉（细亮线，增加层次）
-      ctx.strokeStyle = 'rgba(210,238,255,' + (alpha * 0.35) + ')';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(px, baseY - 2);
-      ctx.quadraticCurveTo(midX, midY, tipX, tipY + 3);
-      ctx.stroke();
+      var px = x0 + (k + 0.5) * w / nk + Math.sin(seed * 1.7 + k * 5.3) * w * 0.15;
+      var h = 95 + ((k * 53 + seed * 17) % 60) + (VH - 720) * 0.16;
+      h = Math.min(h, VH * 0.36);
+      var bend = Math.sin(time * (0.45 + (k % 3) * 0.15) + seed + k * 2.2); // -1..1 摆幅
+      var tone = k % 2 ? '15,64,94' : '22,84,110';
+      ctx.save();
+      ctx.translate(px, baseY);
+      // 主茎采样点（上段弯得多，模拟水流拖曳）
+      var segs = 7, pts = [];
+      for (i = 0; i <= segs; i++) {
+        var t = i / segs;
+        pts.push({ x: bend * h * 0.2 * t * t, y: -h * t });
+      }
+      // 主茎（分段渐细）
+      for (i = 0; i < segs; i++) {
+        ctx.strokeStyle = 'rgba(' + tone + ',0.36)';
+        ctx.lineWidth = 3.6 * (1 - (i / segs) * 0.7);
+        ctx.beginPath();
+        ctx.moveTo(pts[i].x, pts[i].y);
+        ctx.lineTo(pts[i + 1].x, pts[i + 1].y);
+        ctx.stroke();
+      }
+      // 叶片：沿茎两侧交互生长的披针形，越往上越小、色越淡
+      for (i = 1; i <= segs; i++) {
+        var t2 = i / segs;
+        var leafLen = h * 0.17 * (1 - t2 * 0.72);
+        for (s2 = -1; s2 <= 1; s2 += 2) {
+          var ang = (s2 > 0 ? -0.55 : Math.PI + 0.55) + pts[i].x * 0.012; // 斜向上，随茎弯微调
+          var bx2 = pts[i].x, by2 = pts[i].y;
+          var ex2 = bx2 + Math.cos(ang) * leafLen;
+          var ey2 = by2 + Math.sin(ang) * leafLen;
+          var c1x = bx2 + Math.cos(ang) * leafLen * 0.45 - Math.sin(ang) * leafLen * 0.18;
+          var c1y = by2 + Math.sin(ang) * leafLen * 0.45 + Math.cos(ang) * leafLen * 0.18;
+          var c2x = bx2 + Math.cos(ang) * leafLen * 0.45 + Math.sin(ang) * leafLen * 0.18;
+          var c2y = by2 + Math.sin(ang) * leafLen * 0.45 - Math.cos(ang) * leafLen * 0.18;
+          ctx.fillStyle = 'rgba(' + tone + ',' + (0.34 - t2 * 0.1) + ')';
+          ctx.beginPath();
+          ctx.moveTo(bx2, by2);
+          ctx.quadraticCurveTo(c1x, c1y, ex2, ey2);
+          ctx.quadraticCurveTo(c2x, c2y, bx2, by2);
+          ctx.closePath(); ctx.fill();
+        }
+      }
+      // 顶芽（梢端小亮点）
+      var tp = pts[segs];
+      ctx.fillStyle = 'rgba(70,132,158,0.42)';
+      ctx.beginPath(); ctx.arc(tp.x, tp.y, 2.2, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
     }
-    // ---- 前层：短叶海草丛（簇状圆头叶，2~3 簇，每簇 3 叶） ----
-    var nc = Math.max(2, Math.min(3, Math.floor(w / 55)));
+    // ---- 前层：圆头短叶草丛（后排深色衬托 + 前排亮色，各 3 叶扇形） ----
+    var nc = Math.max(2, Math.min(3, Math.floor(w / 52)));
     for (k = 0; k < nc; k++) {
       var cx0 = x0 + (k + 0.5) * w / nc + Math.sin(seed * 2.9 + k * 3.7) * w * 0.12;
-      var ch = 20 + ((k * 31 + seed * 11) % 16);
-      var lf;
-      for (lf = -1; lf <= 1; lf++) {
-        var lh = ch * (lf === 0 ? 1 : 0.72);
-        var lsway = Math.sin(time * (0.8 + (lf + 2) * 0.22) + seed + k * 4 + lf) * (5 + lh * 0.1);
-        var lwB = 2.6;
-        ctx.fillStyle = 'rgba(22,84,110,' + (0.26 + (lf === 0 ? 0.08 : 0)) + ')';
-        ctx.beginPath();
-        ctx.moveTo(cx0 + lf * 5 - lwB, baseY);
-        ctx.quadraticCurveTo(cx0 + lf * 5 - lwB * 0.4 + lsway * 0.4, baseY - lh * 0.6,
-                             cx0 + lf * 5 + lsway, baseY - lh);
-        ctx.quadraticCurveTo(cx0 + lf * 5 + lwB * 0.4 + lsway * 0.4, baseY - lh * 0.6,
-                             cx0 + lf * 5 + lwB, baseY);
-        ctx.closePath(); ctx.fill();
+      var chh = 26 + ((k * 31 + seed * 11) % 18);
+      var rows = [
+        { hMul: 0.68, col: 'rgba(13,58,86,0.30)', off: 6, ph: 2.1 },
+        { hMul: 1.0, col: 'rgba(30,104,132,0.34)', off: 0, ph: 0 }
+      ];
+      for (var rw = 0; rw < rows.length; rw++) {
+        var row = rows[rw];
+        for (var lf = 0; lf < 3; lf++) {
+          var lh = chh * row.hMul * (lf === 1 ? 1 : 0.74);
+          var lx = cx0 + row.off + (lf - 1) * 9;
+          var lsway = Math.sin(time * (0.7 + rw * 0.2 + lf * 0.13) + seed + k * 4 + row.ph) * (4 + lh * 0.12);
+          var wb2 = 3.4;
+          ctx.fillStyle = row.col;
+          ctx.beginPath();
+          ctx.moveTo(lx - wb2, baseY);
+          ctx.quadraticCurveTo(lx - wb2 * 0.5 + lsway * 0.35, baseY - lh * 0.62, lx + lsway, baseY - lh);
+          ctx.quadraticCurveTo(lx + wb2 * 0.5 + lsway * 0.35, baseY - lh * 0.62, lx + wb2, baseY);
+          ctx.closePath(); ctx.fill();
+          // 圆头梢端
+          ctx.beginPath(); ctx.arc(lx + lsway, baseY - lh, wb2 * 0.55, 0, Math.PI * 2); ctx.fill();
+        }
       }
     }
     // ---- 底部礁石（双层：暗底 + 顶部受光面，前后错落） ----
@@ -1052,20 +1085,49 @@
     ctx.restore();
     ctx.lineCap = 'butt';
   }
-  function drawVortexMark(r) {    ctx.save();
-    ctx.rotate(time * 4);
-    ctx.strokeStyle = 'rgba(94,110,208,0.85)';
-    ctx.lineWidth = Math.max(2, r * 0.09);
+  function drawVortexMark(r) {
+    ctx.save();
+    // 底盘：径向渐变柔光漩涡盘（静置不转，营造深度）
+    ctx.fillStyle = grad('vtxDisc', function () {
+      var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.82);
+      gg.addColorStop(0, 'rgba(94,110,208,0.30)');
+      gg.addColorStop(0.6, 'rgba(94,110,208,0.13)');
+      gg.addColorStop(1, 'rgba(94,110,208,0)');
+      return gg;
+    });
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.82, 0, Math.PI * 2); ctx.fill();
+    // 三条螺旋臂：整臂单路径连续描边（无接缝），透明度沿臂渐隐，整体缓慢旋转
+    ctx.rotate(time * 2.4);
     ctx.lineCap = 'round';
-    ctx.beginPath();
-    for (var a = 0; a < Math.PI * 3.2; a += 0.25) {
-      var rr = r * 0.62 * (a / (Math.PI * 3.2));
-      var x = Math.cos(a) * rr, y = Math.sin(a) * rr;
-      if (a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    ctx.lineJoin = 'round';
+    for (var arm = 0; arm < 3; arm++) {
+      var a0 = arm * Math.PI * 2 / 3;
+      var endA = a0 + Math.PI * 1.9;
+      (function (a0, endA, arm) {
+        var gx0 = Math.cos(a0) * r * 0.14, gy0 = Math.sin(a0) * r * 0.14;
+        var gx1 = Math.cos(endA) * r * 0.66, gy1 = Math.sin(endA) * r * 0.66;
+        ctx.strokeStyle = grad('vtxArm' + arm, function () {
+          var gg = ctx.createLinearGradient(gx0, gy0, gx1, gy1);
+          gg.addColorStop(0, 'rgba(152,166,240,0.9)');
+          gg.addColorStop(1, 'rgba(112,128,222,0.10)');
+          return gg;
+        });
+      })(a0, endA, arm);
+      ctx.lineWidth = Math.max(1.5, r * 0.085);
+      ctx.beginPath();
+      for (var i2 = 0; i2 <= 40; i2++) {
+        var tt = i2 / 40;
+        var aa = a0 + tt * Math.PI * 1.9;
+        var rr2 = r * (0.14 + 0.52 * tt);
+        var x2 = Math.cos(aa) * rr2, y2 = Math.sin(aa) * rr2;
+        if (i2 === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
+      }
+      ctx.stroke();
     }
-    ctx.stroke();
+    // 中心亮核（被吸入的光）
+    ctx.fillStyle = 'rgba(222,228,255,0.92)';
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.09, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
-    ctx.lineCap = 'butt';
   }
   function drawCloudMark(r) {
     ctx.fillStyle = 'rgba(255,255,255,0.95)';
