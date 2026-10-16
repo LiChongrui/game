@@ -987,6 +987,7 @@
       var d = (phys.bodies[i].y - phys.bodies[i].r) - C.dangerY;
       if (d < 90) glow = Math.max(glow, 1 - Math.max(0, d) / 90);
     }
+    glow = Math.max(glow, dangerAlert * 0.95); // 越线判定进行中：警戒线强制进入红色警示态
     var pulse = 0.65 + 0.35 * Math.sin(time * 4);
     var a = 0.22 + glow * 0.6 * pulse;
     // 警戒范围：与深海背景融合的暗色渐晕（危险度越高才越透出暖色警示）
@@ -1042,6 +1043,18 @@
       ctx.moveTo(C.W - 14, C.dangerY - 11); ctx.lineTo(C.W - 4, C.dangerY - 11); ctx.lineTo(C.W - 9, C.dangerY - 3);
       ctx.closePath(); ctx.fill();
     }
+    // 判定进行中：线上方居中倒计时提示（玩家能看懂"为什么快输了"）
+    if (dangerAlert > 0.12) {
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 12px system-ui, sans-serif';
+      var wa = Math.min(1, dangerAlert * 1.5) * (0.65 + 0.35 * Math.sin(time * 8));
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(255,255,255,' + wa + ')';
+      ctx.lineWidth = 3;
+      ctx.strokeText('堆高越线', C.W / 2, C.dangerY - 14);
+      ctx.fillStyle = 'rgba(196,48,42,' + wa + ')';
+      ctx.fillText('堆高越线', C.W / 2, C.dangerY - 14);
+    }
   }
 
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
@@ -1061,19 +1074,15 @@
     ctx.fillStyle = '#12517E';
     ctx.fillText(txt, 0, 0);
     ctx.restore();
-    // 最佳/海域：紧跟在大分数右侧（同一行，不与下方任务条交叠）
+    // 最佳/海域/词缀：独立第二行（与大分数分行，互不挤压；大分数再宽也不碰右侧预览）
     ctx.font = '11px system-ui, sans-serif';
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-    var sub = '最佳 ' + best + ' · ' + C.seaStages[seaStage()].name + (seaCount > 0 ? ' · 海域 ×' + seaCount : '');
-    var scoreTxt = String(Math.round(displayScore));
-    ctx.font = 'bold 27px system-ui, sans-serif';
-    var sw = ctx.measureText(scoreTxt).width;
-    ctx.font = '11px system-ui, sans-serif';
-    var sx = 16 + sw + 10;
-    ctx.strokeText(sub, sx, 38);
-    ctx.fillStyle = '#3E6E90';
-    ctx.fillText(sub, sx, 38);
+    var sub = '最佳 ' + best + ' · ' + C.seaStages[seaStage()].name + (seaCount > 0 ? ' · 海域 ×' + seaCount : '') +
+      (ng.active ? ' · 「' + ng.active.name + '」×' + ng.active.mult : '');
+    ctx.strokeText(sub, 16, 58);
+    ctx.fillStyle = ng.active ? '#6B5AA8' : '#3E6E90';
+    ctx.fillText(sub, 16, 58);
 
     // 右上角：下一滴预览 + 静音按钮（主流布局）
     ctx.textAlign = 'center';
@@ -1133,7 +1142,7 @@
   // 潮汐信息胶囊（独立放在右上"下一个"预览正下方，不与任务条同排）
   function drawTidePill() {
     if (level === 1) return; // 第 1 关无潮汐，胶囊隐藏
-    var tx = C.W - 122, tw = 92, ty = 62, th = 20; // 中心与预览（W-76）对齐
+    var tx = C.W - 122, tw = 92, ty = 66, th = 20; // 中心与预览（W-76）对齐；与任务条同一水平带
     var active = tide.phase === 'active';
     var warn = !active && tide.timer <= C.tide.warnTime;
     var pulse = 0.5 + 0.5 * Math.sin(time * 6);
@@ -1274,8 +1283,8 @@
     if (!quest) return;
     ctx.save();
     ctx.textAlign = 'center';
-    // 任务条：第二行左侧（潮汐胶囊独立画在右上预览下方）
-    var qw = 206, qx = 12, qy = 44;
+    // 任务条：第三行左侧（第二行是最佳/海域副信息；与潮汐胶囊同一水平带）
+    var qw = 206, qx = 12, qy = 66;
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     roundRect(qx, qy, qw, 20, 10); ctx.fill();
     var prog = Math.min(1, quest.have / quest.need);
@@ -1345,6 +1354,10 @@
     ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.8;
     ctx.strokeRect(bx - 8, by - 6, 16, 12);
     ctx.beginPath(); ctx.moveTo(bx, by - 6); ctx.lineTo(bx, by + 6); ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(240,250,252,0.95)';
+    ctx.font = '10px system-ui, sans-serif';
+    ctx.fillText('图鉴', bx, by + bookBtn.r + 6);
 
     // 重开按钮（↻ 循环箭头，点击弹确认）
     drawCircleBtn(restartBtn, '#5E90B4', 0.85, false, 0);
@@ -1359,6 +1372,9 @@
     ctx.lineTo(rx0 + ax - 4, ry0 + ay - 3);
     ctx.lineTo(rx0 + ax + 1, ry0 + ay + 6);
     ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(240,250,252,0.95)';
+    ctx.font = '10px system-ui, sans-serif';
+    ctx.fillText('重开', rx0, ry0 + restartBtn.r + 6);
 
     ctx.textAlign = 'center';
     for (var i = 0; i < SKILL_BTNS.length; i++) {
@@ -1401,32 +1417,15 @@
       ctx.fillText(cfg.name, btn.cx, btn.cy + btn.r + (unl ? 6 : 12));
     }
 
-    // 二周目「深渊回响」入口（解锁后显示）：紫色圆钮 + 渊字
+    // 二周目「深渊回响」入口（解锁后显示）：紫色圆钮 + 渊字 + 用途标注
     if (ng.unlocked && state === 'play') {
       drawCircleBtn(ngBtn, '#6B5AA8', 0.95, false, 0);
       ctx.fillStyle = '#FFFFFF';
       ctx.font = 'bold 13px system-ui, sans-serif';
       ctx.fillText('渊', ngBtn.cx, ngBtn.cy + 5);
-      // 当前词缀局：HUD 顶部紫标
-      if (ng.active) {
-        ctx.fillStyle = 'rgba(107,90,168,0.85)';
-        roundRect(C.W - 128, 58, 108, 22, 6); ctx.fill();
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = '10px system-ui, sans-serif';
-        ctx.fillText('「' + ng.active.name + '」×' + ng.active.mult, C.W - 74, 73);
-      }
-    }
-
-    if (seaCount > 0) {
-      ctx.save();
-      ctx.translate(C.W - 64, VH - 36);
-      ctx.rotate(Math.sin(time * 2) * 0.05);
-      ctx.fillStyle = 'rgba(30,122,111,0.9)';
-      ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 11px system-ui, sans-serif';
-      ctx.fillText('海', 0, 4);
-      ctx.restore();
+      ctx.fillStyle = 'rgba(240,250,252,0.95)';
+      ctx.font = '10px system-ui, sans-serif';
+      ctx.fillText('回响', ngBtn.cx, ngBtn.cy + ngBtn.r + 6);
     }
   }
   // 二周目词缀三选一弹窗
@@ -1592,7 +1591,7 @@
     ctx.textAlign = 'center';
     for (var stg = 0; stg < C.seaStages.length; stg++) {
       var ss = C.seaStages[stg];
-      var sw = 53, sx0 = DEX_PANEL.x + 14 + stg * (sw + 6), sy0 = DEX_PANEL.y + 442;
+      var sw = 40, sx0 = DEX_PANEL.x + 14 + stg * (sw + 4), sy0 = DEX_PANEL.y + 442;
       var isCur = stg === curStage, reached = tsNow >= ss.at;
       ctx.fillStyle = isCur ? '#2E86B4' : (reached ? 'rgba(46,134,180,0.14)' : 'rgba(120,145,165,0.14)');
       roundRect(sx0, sy0, sw, 40, 7); ctx.fill();
@@ -1601,11 +1600,12 @@
         roundRect(sx0 + 0.5, sy0 + 0.5, sw - 1, 39, 7); ctx.stroke();
       }
       ctx.fillStyle = isCur ? '#FFFFFF' : (reached ? '#155A8A' : '#8AA5B8');
-      ctx.font = 'bold 11px system-ui, sans-serif';
+      ctx.font = 'bold 10px system-ui, sans-serif';
       ctx.fillText(ss.name, sx0 + sw / 2, sy0 + 17);
       ctx.font = '9px system-ui, sans-serif';
       ctx.fillStyle = isCur ? 'rgba(255,255,255,0.85)' : (reached ? '#1E7A6F' : '#B0584A');
-      var gateTxt = stg === 0 ? '起点' : (reached ? '已抵达' : (ss.at >= 10000 ? (ss.at / 10000) + '万解锁' : ss.at + '分解锁'));
+      // 门槛紧凑文案（8 格布局每格只有 40px：分数只留数字单位）
+      var gateTxt = stg === 0 ? '起点' : (reached ? '已抵达' : (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at + '分'));
       ctx.fillText(gateTxt, sx0 + sw / 2, sy0 + 32);
     }
 

@@ -25,6 +25,7 @@
   var time = 0;
   var overButtons = [];
   var shakeT = 0, shakeAmp = 0;
+  var dangerAlert = 0; // 越线判定进度 0..1（checkDanger 每帧写入，警戒线渲染读取）
 
   var skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
   // 深海宝箱（无尽模式）：定期沉入一只，限时点击开启随机奖励
@@ -1173,53 +1174,39 @@
   }
 
   // ---------- 失败判定 ----------
-  // 预计算"有支撑"集合：贴底，或下方紧贴别的球。悬空/被顶起/弹跳中的球不算堆积越线。
-  function computeSupported(bs) {
-    var sup = [], i, j;
-    for (i = 0; i < bs.length; i++) sup.push(false);
-    for (i = 0; i < bs.length; i++) {
-      var b = bs[i];
-      if (b.y + b.r >= C.floorY - 2.5) { sup[i] = true; continue; }
-      for (j = 0; j < bs.length; j++) {
-        if (j === i) continue;
-        var o = bs[j];
-        if (o.y <= b.y) continue; // 只认位于下方的支撑
-        var dx = o.x - b.x, dy = o.y - b.y;
-        var minD = b.r + o.r + 2.5;
-        if (dx * dx + dy * dy <= minD * minD) { sup[i] = true; break; }
-      }
-    }
-    return sup;
-  }
   function checkDanger(dt) {
     // 潮汐涨落期间豁免：浮力把水滴顶过线不是玩家堆太高，潮退后再重新累计
-    if (tide.progress > 0.15) return;
+    if (tide.progress > 0.15) { dangerAlert = 0; return; }
     var bs = phys.bodies;
-    var sup = computeSupported(bs);
+    var worst = 0;
     for (var i = 0; i < bs.length; i++) {
       var b = bs[i];
       if (b.frozen > 0) continue; // 冻结滴视为"封存"，不判负
       if (b.grace > 0) { b.dangerT = 0; continue; }
       var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-      var above = (b.y - b.r) < C.dangerY;
-      if (above && sup[i] && sp < C.dangerSpeed * 2) {
-        // 越线 + 有支撑 + 基本静止（阈值放宽一倍：堆顶微颤不算"在动"）
+      var top = b.y - b.r;
+      if (top >= C.dangerY) { b.dangerT = 0; continue; } // 线下，重置
+      // 越线即计时，不再要求"有支撑"——高压堆里球体持续微颤导致支撑/速度判定
+      // 反复失败、计时永远攒不满，是此前"明显越线却迟迟不判负"的根因。
+      // 顶出容器口（高过出生点）视为极端堆高，引信缩短一半。
+      var fuse = top < C.containerTop ? C.dangerTime * 0.55 : C.dangerTime;
+      if (sp < C.dangerSpeed * 1.5) {
         b.dangerT += dt;
-        if (b.dangerT > C.dangerTime) {
-          // 每局一次「深流缓冲」：首次判负改为全局 4 秒宽限，缓解前期暴毙挫败感
+        if (b.dangerT > fuse) {
+          // 每局一次「深流缓冲」：首次判负改为全局 3 秒宽限，缓解前期暴毙挫败感
           if (!runBuffered) {
             runBuffered = true;
-            for (var j = 0; j < bs.length; j++) { bs[j].dangerT = 0; bs[j].grace = 4; }
-            addPopup(C.W / 2, C.dangerY + 66, '深流缓冲 · 宽限 4 秒', true, 0);
-          } else { gameOver(); return; }
+            for (var j = 0; j < bs.length; j++) { bs[j].dangerT = 0; bs[j].grace = 3; }
+            addPopup(C.W / 2, C.dangerY + 66, '深流缓冲 · 宽限 3 秒', true, 0);
+          } else { dangerAlert = 0; gameOver(); return; }
         }
-      } else if (above) {
-        // 越线但悬空/被明显扰动：计时缓慢消退而非清零，避免永远攒不满
-        b.dangerT = Math.max(0, b.dangerT - dt * 2);
       } else {
-        b.dangerT = 0; // 回到线下，重置
+        // 被明显扰动（弹飞/合成反冲）：计时缓慢消退而非清零
+        b.dangerT = Math.max(0, b.dangerT - dt * 2);
       }
+      worst = Math.max(worst, b.dangerT / C.dangerTime);
     }
+    dangerAlert = Math.min(1, worst); // 0..1，供警戒线渲染加强警示
   }
   function gameOver() {
     state = 'over';
