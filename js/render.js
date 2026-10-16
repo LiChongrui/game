@@ -2110,7 +2110,7 @@
     else drawAchTab();
   }
 
-  // 图鉴用迷你宝箱图标（木箱 + 铜箍 + 金锁 + 呼吸金晕，与场上宝箱同款观感；sc 可缩放）
+  // 图鉴/海域演进用迷你宝箱图标：与场上宝箱（drawChest）同款金色渐变+铜箍铆钉+缝光+金锁+描金边，缩比复刻
   function drawChestIcon(cx, cy, sc) {
     ctx.save();
     ctx.translate(cx, cy);
@@ -2121,15 +2121,67 @@
     gg.addColorStop(1, 'rgba(255,208,96,0)');
     ctx.fillStyle = gg;
     ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#E8B54A'; // 弧顶木盖（暖金木色，与游戏内宝箱一致）
-    ctx.beginPath(); ctx.moveTo(-15, -2); ctx.quadraticCurveTo(0, -16, 15, -2); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#C08A38'; // 箱身
-    roundRect(-15, -2, 30, 13, 2); ctx.fill();
-    ctx.fillStyle = '#7A4E1C'; // 古铜箍 ×2
-    ctx.fillRect(-10, -2, 3, 13);
-    ctx.fillRect(7, -2, 3, 13);
-    ctx.fillStyle = '#FFD873'; // 金锁
-    roundRect(-3.5, -4, 7, 8, 2); ctx.fill();
+    // 与场上宝箱同构（w=1.6r, h=1.3r, r=18）：同渐变同细节
+    var w = 28.8, h = 23.4, seamY = -h * 0.06;
+    ctx.fillStyle = grad('chestLidI', function () {
+      var gg2 = ctx.createLinearGradient(0, -h * 0.62, 0, seamY);
+      gg2.addColorStop(0, '#F4C866'); gg2.addColorStop(0.55, '#DDA948'); gg2.addColorStop(1, '#B98430');
+      return gg2;
+    });
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, seamY);
+    ctx.quadraticCurveTo(0, -h * 0.72, w / 2, seamY);
+    ctx.closePath(); ctx.fill();
+    // 盖顶弧形高光
+    ctx.strokeStyle = 'rgba(255,240,190,0.5)'; ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.34, -h * 0.30);
+    ctx.quadraticCurveTo(0, -h * 0.62, w * 0.34, -h * 0.30);
+    ctx.stroke();
+    // 箱身（中段受光、底角沉影）
+    ctx.fillStyle = grad('chestBodyI', function () {
+      var gg2 = ctx.createLinearGradient(0, seamY, 0, h * 0.56);
+      gg2.addColorStop(0, '#D8A44C'); gg2.addColorStop(0.5, '#C08A38'); gg2.addColorStop(1, '#8F5E22');
+      return gg2;
+    });
+    roundRect(-w / 2, seamY, w, h * 0.62, 2.5); ctx.fill();
+    // 木板竖缝
+    ctx.strokeStyle = 'rgba(110,66,20,0.45)'; ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.17, seamY + 2); ctx.lineTo(-w * 0.17, h * 0.52);
+    ctx.moveTo(w * 0.17, seamY + 2); ctx.lineTo(w * 0.17, h * 0.52);
+    ctx.stroke();
+    // 铜箍 ×2 + 亮金铆钉
+    ctx.fillStyle = '#7A4E1C';
+    roundRect(-w * 0.42, -h * 0.36, 3.6, h * 0.9, 1.6); ctx.fill();
+    roundRect(w * 0.42 - 3.6, -h * 0.36, 3.6, h * 0.9, 1.6); ctx.fill();
+    ctx.fillStyle = '#FFE6A6';
+    ctx.beginPath();
+    ctx.arc(-w * 0.42 + 1.8, -h * 0.2, 0.9, 0, Math.PI * 2);
+    ctx.arc(w * 0.42 - 1.8, -h * 0.2, 0.9, 0, Math.PI * 2);
+    ctx.arc(-w * 0.42 + 1.8, h * 0.34, 0.9, 0, Math.PI * 2);
+    ctx.arc(w * 0.42 - 1.8, h * 0.34, 0.9, 0, Math.PI * 2);
+    ctx.fill();
+    // 盖缝透光（呼吸）
+    var seamG = 0.26 + 0.24 * Math.sin(time * 3 + 1);
+    ctx.fillStyle = 'rgba(255,224,130,' + seamG.toFixed(2) + ')';
+    roundRect(-w * 0.4, seamY - 1, w * 0.8, 2, 1); ctx.fill();
+    // 金锁 + 锁孔
+    ctx.fillStyle = '#FFD873';
+    roundRect(-3.6, seamY - 2.5, 7.2, 8, 2); ctx.fill();
+    ctx.fillStyle = '#5A3A14';
+    ctx.beginPath(); ctx.arc(0, seamY + 1, 1.3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-0.7, seamY + 1.8); ctx.lineTo(0.7, seamY + 1.8);
+    ctx.lineTo(0.45, seamY + 4.2); ctx.lineTo(-0.45, seamY + 4.2);
+    ctx.closePath(); ctx.fill();
+    // 描金边（盖弧 + 箱身）
+    ctx.strokeStyle = 'rgba(242,193,78,0.85)'; ctx.lineWidth = 1.1;
+    roundRect(-w / 2, seamY, w, h * 0.62, 2.5); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, seamY);
+    ctx.quadraticCurveTo(0, -h * 0.72, w / 2, seamY);
+    ctx.stroke();
     ctx.restore();
   }
 
