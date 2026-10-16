@@ -5325,38 +5325,31 @@ MG.config = {
     for (var fi = C.seaStages.length - 1; fi >= 0; fi--) {
       if (careerPeak >= C.seaStages[fi].at) { farIdx = fi; break; }
     }
-    ctx.font = 'bold 13px system-ui, sans-serif';
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    var top1 = '最高 ' + best + ' · 最远 ' + C.seaStages[farIdx].name;
-    var t1Font = 13;
-    while (t1Font > 10 && ctx.measureText(top1).width > 268) { // 右端到下一滴预览左侧(329)为止，防溢出
-      t1Font--;
-      ctx.font = 'bold ' + t1Font + 'px system-ui, sans-serif';
-    }
-    ctx.strokeText(top1, 48, 30);
-    ctx.fillStyle = '#3E6E90';
-    ctx.fillText(top1, 48, 30);
-    // 第一组第二行（更弱的信息）：海域加成 / 词缀；每日挑战局显示目标进度
     var chal = dchalHud();
-    var top2 = (chal ? '每日挑战 ' + Math.min(score, chal.goal) + '/' + chal.goal + (chal.done ? ' ✓' : '') : '') +
-      (seaCount > 0 ? (chal ? ' · ' : '') + '海域 ×' + seaCount : '') +
+    // 统计最佳结果：沿用原样式（14px/原描边/原色/超宽自适应缩字号），与成就殿堂按钮垂直居中对齐（cy36 → baseline41）
+    ctx.font = '14px system-ui, sans-serif';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    var top1 = '最高 ' + best + ' · 最远 ' + C.seaStages[farIdx].name +
+      (seaCount > 0 ? ' · 海域 ×' + seaCount : '') +
+      (chal ? ' · 每日挑战 ' + Math.min(score, chal.goal) + '/' + chal.goal + (chal.done ? ' ✓' : '') : '') +
       (ng.active ? ' · 「' + ng.active.name + '」×' + ng.active.mult : '');
-    if (top2) {
-      ctx.font = '11px system-ui, sans-serif';
-      ctx.lineWidth = 2.5;
-      ctx.strokeText(top2, 48, 46);
-      ctx.fillStyle = chal && !chal.done ? '#7B6FD0' : (ng.active ? '#6B5AA8' : '#4A7FA0');
-      ctx.fillText(top2, 48, 46);
+    var t1Font = 14;
+    while (t1Font > 11 && ctx.measureText(top1).width > 272) { // 右端让位下一滴预览(x329 起)，不越界
+      t1Font--;
+      ctx.font = t1Font + 'px system-ui, sans-serif';
     }
+    ctx.strokeText(top1, 48, 41);
+    ctx.fillStyle = chal && !chal.done ? '#7B6FD0' : (ng.active ? '#6B5AA8' : '#3E6E90');
+    ctx.fillText(top1, 48, 41);
 
     // 第二组（中轴）：当前得分居中 + 正下方海域进度条（分数涨→进度前进，垂直联动）
     var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
     ctx.save();
     ctx.textAlign = 'center';
-    ctx.translate(C.W / 2, 64);
+    ctx.translate(C.W / 2, 66);
     ctx.scale(bump, bump);
-    ctx.font = 'bold 30px system-ui, sans-serif';
+    ctx.font = 'bold 28px system-ui, sans-serif';
     ctx.lineWidth = 4;
     ctx.strokeStyle = 'rgba(255,255,255,0.85)';
     var txt = String(Math.round(displayScore));
