@@ -623,16 +623,20 @@
     var wk = Math.round(r * 2) / 2;
     // 设计原则：内部不画任何"线条/实心形状"（硬边贴纸感是丑的根源），
     // 全部用径向渐变光效表达——深度、水面、气泡、光斑皆自然渐隐，边缘永远有过渡。
-    // ① 左上天光（保留柔光带）
+    // ① 左上天光（径向渐变光斑：四周全部渐隐，替代线性渐变实心椭圆的可见轮廓）
+    ctx.save();
+    ctx.translate(-r * 0.28, -r * 0.42);
+    ctx.rotate(-0.5);
+    ctx.scale(r * 0.52, r * 0.3);
     ctx.fillStyle = grad('wvH' + wk, function () {
-      var gg = ctx.createLinearGradient(-r * 0.7, -r * 0.8, r * 0.1, 0);
-      gg.addColorStop(0, 'rgba(255,255,255,0.22)');
+      var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+      gg.addColorStop(0, 'rgba(255,255,255,0.24)');
+      gg.addColorStop(0.55, 'rgba(255,255,255,0.10)');
       gg.addColorStop(1, 'rgba(255,255,255,0)');
       return gg;
     });
-    ctx.beginPath();
-    ctx.ellipse(-r * 0.28, -r * 0.42, r * 0.52, r * 0.3, -0.5, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
     // ② 底部深水暗晕：暗调自下而上消散（深度感，全软边）
     ctx.fillStyle = grad('wvDeep' + wk, function () {
       var gg = ctx.createRadialGradient(0, r * 1.18, r * 0.08, 0, r * 1.18, r * 1.1);
