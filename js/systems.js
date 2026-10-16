@@ -356,11 +356,13 @@
   }
   function rollSpecial() {
     if (Math.random() >= C.specialChance) return null;
-    // 投放门槛：累计分未达 specialGate 的特殊滴静默过滤（同礁石思路，高分才见高级滴）
-    var pool = [['vortex', 30], ['cloud', 30], ['ice', 24], ['rainbow', 16], ['gale', 12]], keys = [], ws2 = [], total = 0, i;
+    // 与海域绑定：未抵达对应海域的特殊滴静默过滤（越深的海，特殊滴越多越强）
+    var pool = [['vortex', 30], ['cloud', 24], ['ice', 20], ['rainbow', 14], ['gale', 12],
+      ['magnet', 10], ['spring', 10], ['thunder', 9], ['pearl', 9],
+      ['magma', 8], ['geyser', 8], ['void', 6], ['aurora', 6]];
+    var cur = seaStage(), keys = [], ws2 = [], total = 0, i;
     for (i = 0; i < pool.length; i++) {
-      var gate = (C.specialGate && C.specialGate[pool[i][0]]) || 0;
-      if (totalScore() < gate) continue;
+      if (cur < ((C.specialStage && C.specialStage[pool[i][0]]) || 0)) continue;
       keys.push(pool[i][0]); ws2.push(pool[i][1]); total += pool[i][1];
     }
     if (!keys.length) return null;
@@ -369,6 +371,7 @@
     return keys[keys.length - 1];
   }
   function rollIron() {
+    if (seaStage() < ((C.specialStage && C.specialStage.iron) || 1)) return false; // 珊瑚浅海起才落礁石
     if (seaEvent && seaEvent.type === 'storm') return false; // 保底：风暴期间不再落礁石，避免双重失控
     var ch = C.iron.chance + (C.ramp.ironChanceMax - C.iron.chance) * endlessRamp();
     if (ng && ng.active && ng.active.ironX) ch *= ng.active.ironX; // 二周目「暗礁密布」
@@ -376,6 +379,7 @@
   } // 礁石仅无尽模式（概率随渐进加压提升）
   // 符文：普通水滴随机附带的道具属性，合成时为对应技能充能（只出已解锁的技能符文）
   function rollRune() {
+    if (seaStage() < ((C.specialStage && C.specialStage.rune) || 2)) return null; // 蔚蓝深海起才带符文
     if (Math.random() >= C.rune.chance) return null;
     var keys = [], ws = [], total = 0, k;
     for (k in C.rune.weights) {
@@ -409,10 +413,12 @@
     return b;
   }
   function specialLabel(sp) {
-    return sp === 'vortex' ? '漩涡滴' : (sp === 'cloud' ? '雨云滴' : (sp === 'ice' ? '冰晶滴' : (sp === 'gale' ? '疾风滴' : '彩虹滴')));
+    var i = spIndexByKey(sp);
+    return i >= 0 ? SP_DEFS[i].name : sp;
   }
   function specialColor(sp) {
-    return sp === 'vortex' ? '#4A5FC8' : (sp === 'cloud' ? '#3C6EAA' : (sp === 'ice' ? '#2E8FB8' : (sp === 'gale' ? '#3C9B72' : '#9B4FD0')));
+    var i = spIndexByKey(sp);
+    return i >= 0 ? SP_DEFS[i].color : '#4A5FC8';
   }
 
   function clampAim(x) {
@@ -599,27 +605,46 @@
     }
   }
 
-  // ---------- 特殊水滴图鉴（发现即点亮） ----------
+  // ---------- 特殊水滴图鉴（发现即点亮；与海域绑定：stage=解锁海域） ----------
+  // 每片海域相对上一片恰好新增 2 种（潮汐池=漩涡滴+深海宝箱，宝箱在图鉴中单列）
   var SP_DEFS = [
-    { key: 'vortex',  name: '漩涡滴', color: '#7B6FD0', desc: '落地后吸附周围水滴再消散，可用来聚拢散滴。' },
-    { key: 'cloud',   name: '雨云滴', color: '#8FA8BC', desc: '落地后分裂成两颗雾泡，快速补充低级水滴。' },
-    { key: 'ice',     name: '冰晶滴', color: '#A8DFF2', desc: '落定后冻结周围水滴，冻结滴可以当临时平台。' },
-    { key: 'rainbow', name: '彩虹滴', color: '#E86FA8', desc: '碰到任意水滴使其直接跳 2 级，得分双倍。' },
-    { key: 'gale',    name: '疾风滴', color: '#7FCDA4', desc: '落定瞬间刮起疾风吹开周围水滴，为堆场腾出空间。' },
-    { key: 'iron',    name: '礁石',   color: '#6E7B88', desc: '沉重障碍，无法合成；两两相消或用蒸发移除。' },
-    { key: 'rune',    name: '符文滴', color: '#B08FD0', desc: '带符文的水滴，合成时为对应技能 +1 充能。' },
-    { key: 'chest',   name: '深海宝箱', color: '#C98B3E', desc: '限时沉入场中，点击开启随机奖励。' }
+    { key: 'vortex',  stage: 0, name: '漩涡滴', color: '#7B6FD0', desc: '落地后吸附周围水滴再消散，可用来聚拢散滴。' },
+    { key: 'cloud',   stage: 1, name: '雨云滴', color: '#8FA8BC', desc: '落地后分裂成两颗雾泡，快速补充低级水滴。' },
+    { key: 'iron',    stage: 1, name: '礁石',   color: '#6E7B88', desc: '沉重障碍，无法合成；两两相消或用蒸发移除。' },
+    { key: 'ice',     stage: 2, name: '冰晶滴', color: '#A8DFF2', desc: '落定后冻结周围水滴，冻结滴可以当临时平台。' },
+    { key: 'rune',    stage: 2, name: '符文滴', color: '#B08FD0', desc: '带符文的水滴，合成时为对应技能 +1 充能。' },
+    { key: 'rainbow', stage: 3, name: '彩虹滴', color: '#E86FA8', desc: '碰到任意水滴使其直接跳 2 级，得分双倍。' },
+    { key: 'gale',    stage: 3, name: '疾风滴', color: '#7FCDA4', desc: '落定瞬间刮起疾风吹开周围水滴，为堆场腾出空间。' },
+    { key: 'magnet',  stage: 4, name: '磁石滴', color: '#6A8FD8', desc: '更强更久的磁场漩涡，把大范围的水滴聚到一起。' },
+    { key: 'spring',  stage: 4, name: '甘霖滴', color: '#8FD8B8', desc: '落定即降甘霖：下一滴变成场上最多的那个档位。' },
+    { key: 'thunder', stage: 5, name: '雷霆滴', color: '#F2C14E', desc: '落定引下一道雷：让场上一对同档水滴直接合成。' },
+    { key: 'pearl',   stage: 5, name: '珍珠滴', color: '#F0E6D2', desc: '落定祝福最多的档位：该档水滴全体升 1 级。' },
+    { key: 'magma',   stage: 6, name: '熔岩滴', color: '#E2703A', desc: '落定烧毁周围礁石与最低两档水滴，折算得分。' },
+    { key: 'geyser',  stage: 6, name: '间歇泉滴', color: '#5FC8D8', desc: '落定向上喷出垂直水柱，冲开上方水滴腾出空间。' },
+    { key: 'void',    stage: 7, name: '虚空滴', color: '#4A3A6A', desc: '吞噬场上最低档的水滴（至多 5 颗），折算高分。' },
+    { key: 'aurora',  stage: 7, name: '极光滴', color: '#9BE8D8', desc: '落定后获得极光庇护：下一次合成得分 ×3。' }
   ];
+  function spIndexByKey(key) {
+    for (var i = 0; i < SP_DEFS.length; i++) if (SP_DEFS[i].key === key) return i;
+    return -1;
+  }
+  // 海域 → 图鉴两个槽位的 dexSelSp 索引（潮汐池槽 2 = 深海宝箱虚拟位 SP_DEFS.length）
+  var STAGE_SP_SLOTS = {};
+  (function () {
+    var per = {}, i;
+    for (i = 0; i < SP_DEFS.length; i++) {
+      var st = SP_DEFS[i].stage;
+      (per[st] = per[st] || []).push(i);
+    }
+    for (var k in per) if (per.hasOwnProperty(k)) STAGE_SP_SLOTS[k] = [per[k][0], per[k][1]];
+    STAGE_SP_SLOTS[0] = [spIndexByKey('vortex'), SP_DEFS.length];
+  })();
   function discoverSpecial(sp) {
     if (dexSpecial[sp]) return;
     dexSpecial[sp] = 1;
     saveDex();
-    for (var i = 0; i < SP_DEFS.length; i++) {
-      if (SP_DEFS[i].key === sp) {
-        addPopup(C.W / 2, 240, '图鉴新发现 · ' + SP_DEFS[i].name, true, 0);
-        break;
-      }
-    }
+    var i = spIndexByKey(sp);
+    addPopup(C.W / 2, 240, '图鉴新发现 · ' + (i >= 0 ? SP_DEFS[i].name : '深海宝箱'), true, 0);
   }
 
   // ---------- 任务链 ----------
@@ -812,7 +837,8 @@
     nb.grace = 0.25;
     nb.popT = 0.28;
 
-    var gain2 = Math.round(T[nt].score * cm(mult * scoreMult * perkMult())); // 成就加成：弄潮儿潮汐期间 +10%；总倍率封顶
+    var gain2 = Math.round(T[nt].score * cm(mult * scoreMult * perkMult() * (auroraNext || 1))); // 成就加成：弄潮儿潮汐期间 +10%；极光庇护 ×3；总倍率封顶
+    if (auroraNext) { auroraNext = 0; parts.push({ type: 'ring', x: mx, y: my, r: T[nt].r + 8, life: 0.5, max: 0.5, color: '#9BE8D8' }); }
     score += gain2;
     scoreBump = 0.3;
     if (score > best) { best = score; saveNum('mg_best', best); }
@@ -883,16 +909,20 @@
   }
 
   // ---------- 特殊水滴 ----------
+  var auroraNext = 0; // 极光庇护：下一次合成得分倍数（极光滴设置，用后清零）
   function updateSpecials(dt) {
     var bs = phys.bodies, i;
     for (i = bs.length - 1; i >= 0; i--) {
       var b = bs[i];
+      if (!b) continue; // 雷霆/熔岩/虚空会在遍历中移除其他水滴，索引可能位移（最多漏拍一帧，下帧补上）
       if (b.special) {
         b.specialT += dt;
         if (b.special === 'cloud') {
           if (b.specialT >= C.cloud.splitDelay) splitCloud(b);
         } else if (b.special === 'vortex') {
-          updateVortex(b, dt, bs);
+          updateVortex(b, dt, bs, C.vortex, '#8FA8E8');
+        } else if (b.special === 'magnet') {
+          updateVortex(b, dt, bs, C.magnet, '#9BC0F0'); // 磁石滴：同漩涡逻辑，范围/力度更大
         } else if (b.special === 'ice') {
           updateIce(b, bs);
         } else if (b.special === 'gale') {
@@ -905,6 +935,20 @@
             audio.swirl();
             b.special = null;
           }
+        } else if (b.special === 'spring') {
+          if (b.specialT >= 0.45 || b.y + b.r >= C.floorY - 4) triggerSpring(b);
+        } else if (b.special === 'thunder') {
+          if (b.specialT >= 0.45 || b.y + b.r >= C.floorY - 4) triggerThunder(b);
+        } else if (b.special === 'pearl') {
+          if (b.specialT >= 0.45 || b.y + b.r >= C.floorY - 4) triggerPearl(b);
+        } else if (b.special === 'magma') {
+          if (b.specialT >= 0.45 || b.y + b.r >= C.floorY - 4) triggerMagma(b);
+        } else if (b.special === 'geyser') {
+          if (b.specialT >= 0.45 || b.y + b.r >= C.floorY - 4) triggerGeyser(b);
+        } else if (b.special === 'void') {
+          if (b.specialT >= 0.45 || b.y + b.r >= C.floorY - 4) triggerVoid(b);
+        } else if (b.special === 'aurora') {
+          if (b.specialT >= 0.45 || b.y + b.r >= C.floorY - 4) triggerAurora(b);
         }
       }
       // 冻结滴：速度清零 + 倒计时 + 解冻
@@ -921,15 +965,16 @@
       }
     }
   }
-  function updateVortex(b, dt, bs) {
-    if (b.specialT >= C.vortex.delay && b.specialT < C.vortex.delay + C.vortex.life) {
+  function updateVortex(b, dt, bs, P, pcolor) {
+    P = P || C.vortex; pcolor = pcolor || '#8FA8E8';
+    if (b.specialT >= P.delay && b.specialT < P.delay + P.life) {
       for (var j = 0; j < bs.length; j++) {
         var o = bs[j];
         if (o === b || o.special || o.frozen > 0 || o.iron) continue;
         var dx = b.x - o.x, dy = b.y - o.y;
         var d = Math.sqrt(dx * dx + dy * dy);
-        if (d > 1 && d < C.vortex.pullR) {
-          var f = C.vortex.pullF * (1 - d / C.vortex.pullR);
+        if (d > 1 && d < P.pullR) {
+          var f = P.pullF * (1 - d / P.pullR);
           o.vx += dx / d * f * dt * 10;
           o.vy += dy / d * f * dt * 10;
         }
@@ -937,10 +982,10 @@
       if (Math.random() < 0.3) {
         var ang = Math.random() * Math.PI * 2;
         parts.push({ type: 'dot', x: b.x + Math.cos(ang) * b.r, y: b.y + Math.sin(ang) * b.r,
-          vx: Math.cos(ang + 2) * 60, vy: Math.sin(ang + 2) * 60, r: 2, life: 0.3, max: 0.3, color: '#8FA8E8' });
+          vx: Math.cos(ang + 2) * 60, vy: Math.sin(ang + 2) * 60, r: 2, life: 0.3, max: 0.3, color: pcolor });
       }
     }
-    if (b.specialT >= C.vortex.delay + C.vortex.life) dissolveVortex(b);
+    if (b.specialT >= P.delay + P.life) dissolveVortex(b, P);
   }
   function updateIce(b, bs) {
     var speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
@@ -955,8 +1000,9 @@
     addPopup(b.x, b.y - 20, '雨云化雨', false, 0);
     audio.blip(520, 0.2, 'sine', 0.13, 1.8);
   }
-  function dissolveVortex(b) {
-    var gain = Math.round(C.vortex.score * scoreMult);
+  function dissolveVortex(b, P) {
+    P = P || C.vortex;
+    var gain = Math.round((P.score || C.vortex.score) * scoreMult);
     score += gain;
     scoreBump = 0.25;
     addPopup(b.x, b.y - b.r - 10, '+' + gain, false, 0);
@@ -964,6 +1010,137 @@
     parts.push({ type: 'ring', x: b.x, y: b.y, r: 16, life: 0.45, max: 0.45, color: '#8FA8E8' });
     phys.remove(b);
     audio.swirl();
+  }
+
+  // —— 深海新特殊滴（月光环礁起逐海域解锁，全部"落定即触发"）——
+  // 甘霖滴：下一滴变为场上最多的档位
+  function triggerSpring(b) {
+    var t = mostCommonTier();
+    b.special = null;
+    if (t >= 0 && t !== nextTier) {
+      nextTier = t;
+      rainHint = 2.5;
+      aimX = clampAim(aimX);
+    }
+    addPopup(b.x, b.y - b.r - 14, '甘霖降临！', false, 0);
+    parts.push({ type: 'ring', x: b.x, y: b.y, r: 18, life: 0.5, max: 0.5, color: '#BFE8D0' });
+    audio.quest();
+  }
+  // 雷霆滴：场上一对同档水滴直接合成（选距离最近的一对）
+  function triggerThunder(b) {
+    var bs = phys.bodies, best = null, i, j;
+    for (i = 0; i < bs.length; i++) {
+      var a = bs[i];
+      if (a === b || a.iron || a.chest || a.special || a.frozen > 0) continue;
+      for (j = 0; j < bs.length; j++) {
+        var o = bs[j];
+        if (o === a || o.iron || o.chest || o.special || o.frozen > 0 || o.tier !== a.tier) continue;
+        var d = Math.abs(a.x - o.x) + Math.abs(a.y - o.y);
+        if (!best || d < best.d) best = { a: a, o: o, d: d };
+      }
+    }
+    b.special = null;
+    if (!best) { addPopup(b.x, b.y - b.r - 14, '雷落空了…', false, 0); return; }
+    parts.push({ type: 'ring', x: best.a.x, y: best.a.y, r: best.a.r, life: 0.5, max: 0.5, color: '#F2C14E' });
+    parts.push({ type: 'ring', x: best.o.x, y: best.o.y, r: best.o.r, life: 0.5, max: 0.5, color: '#F2C14E' });
+    addPopup(C.W / 2, 250, '雷霆引合！', true, 0);
+    addShake(2, 0.2);
+    audio.freeze();
+    doMerge(best.a, best.o);
+  }
+  // 珍珠滴：场上最多的档位全体 +1 级
+  function triggerPearl(b) {
+    var t = mostCommonTier(), n = 0;
+    b.special = null;
+    if (t < 0 || t >= T.length - 1) { addPopup(b.x, b.y - b.r - 14, '珍珠黯淡了…', false, 0); return; }
+    var bs = phys.bodies;
+    for (var i = 0; i < bs.length; i++) {
+      var o = bs[i];
+      if (o.tier !== t || o.iron || o.chest || o.special || o.frozen > 0) continue;
+      o.tier += 1; o.popT = 0.3; n++;
+      parts.push({ type: 'ring', x: o.x, y: o.y, r: o.r * 0.6, life: 0.45, max: 0.45, color: '#F0E6D2' });
+    }
+    addPopup(C.W / 2, 250, '珍珠祝福！「' + T[t].name + '」全体 +1', true, 0);
+    audio.quest();
+  }
+  // 熔岩滴：烧毁周围礁石与最低两档水滴，折算得分
+  function triggerMagma(b) {
+    var bs = phys.bodies, R = C.magmaR, burn = [], i;
+    for (i = 0; i < bs.length; i++) {
+      var o = bs[i];
+      if (o === b) continue;
+      var dx = o.x - b.x, dy = o.y - b.y;
+      if (dx * dx + dy * dy > R * R) continue;
+      if ((o.iron && !o.chest) || (!o.iron && !o.special && !o.chest && o.frozen <= 0 && o.tier <= 2)) burn.push(o);
+    }
+    b.special = null;
+    var gain = 0;
+    for (i = 0; i < burn.length; i++) {
+      var t2 = burn[i].iron ? 0 : burn[i].tier;
+      gain += Math.round((C.magmaScore + T[t2].score * 2) * scoreMult);
+      burst(burn[i].x, burn[i].y, Math.max(0, t2), false);
+      phys.remove(burn[i]);
+    }
+    score += gain; scoreBump = 0.3;
+    addPopup(b.x, b.y - b.r - 14, burn.length ? '熔岩灼烧 ×' + burn.length + ' +' + gain : '熔岩熄灭', burn.length, 0);
+    if (burn.length) addShake(3, 0.25);
+    parts.push({ type: 'ring', x: b.x, y: b.y, r: R * 0.7, life: 0.5, max: 0.5, color: '#F2A05E' });
+    audio.freeze();
+  }
+  // 间歇泉滴：垂直水柱冲开上方水滴
+  function triggerGeyser(b) {
+    var bs = phys.bodies, n = 0;
+    for (var i = 0; i < bs.length; i++) {
+      var o = bs[i];
+      if (o === b || o.y >= b.y) continue;
+      if (Math.abs(o.x - b.x) > C.geyserW) continue;
+      o.vy -= C.geyserF * (1 - Math.min(1, (b.y - o.y) / 260));
+      n++;
+    }
+    b.special = null;
+    for (var k = 0; k < 10; k++) {
+      parts.push({ type: 'dot', x: b.x + (Math.random() - 0.5) * 26, y: b.y - Math.random() * 160,
+        vx: (Math.random() - 0.5) * 30, vy: -140 - Math.random() * 160,
+        r: 1.5 + Math.random() * 2.5, life: 0.6, max: 0.6, color: '#BFF0F8' });
+    }
+    addPopup(b.x, b.y - b.r - 14, n ? '间歇泉！' : '泉眼枯了', false, 0);
+    audio.swirl();
+  }
+  // 虚空滴：吞噬场上最低档水滴（至多 voidN 颗），折算高分
+  function triggerVoid(b) {
+    var bs = phys.bodies, victims = [], i;
+    for (i = 0; i < bs.length; i++) {
+      var o = bs[i];
+      if (o === b || o.iron || o.chest || o.special || o.frozen > 0) continue;
+      victims.push(o);
+    }
+    victims.sort(function (a, c) { return a.tier - c.tier; });
+    b.special = null;
+    var gain = 0, n = 0;
+    for (i = 0; i < victims.length && n < C.voidN; i++, n++) {
+      gain += Math.round(C.voidScore * (1 + victims[i].tier * 0.3) * scoreMult);
+      suckIn(b.x, b.y, Math.max(0, victims[i].tier));
+      phys.remove(victims[i]);
+    }
+    score += gain; scoreBump = 0.3;
+    if (gain > 0) addPopup(b.x, b.y - b.r - 14, '虚空吞噬 ×' + n + ' +' + gain, true, 0);
+    else addPopup(b.x, b.y - b.r - 14, '虚空空空如也', false, 0);
+    phys.remove(b);
+    parts.push({ type: 'ring', x: b.x, y: b.y, r: 20, life: 0.55, max: 0.55, color: '#8A7FD4' });
+    audio.swirl();
+  }
+  // 极光滴：下一次合成得分 ×3
+  function triggerAurora(b) {
+    b.special = null;
+    auroraNext = C.auroraMult;
+    for (var k = 0; k < 10; k++) {
+      var ang = Math.random() * Math.PI;
+      parts.push({ type: 'dot', x: b.x + Math.cos(ang) * 20, y: b.y - Math.random() * 40,
+        vx: (Math.random() - 0.5) * 60, vy: -60 - Math.random() * 100,
+        r: 2 + Math.random() * 2, life: 0.8, max: 0.8, color: k % 2 ? '#9BE8D8' : '#C8B8F0' });
+    }
+    addPopup(C.W / 2, 250, '极光庇护！下次合成 ×3', true, 0);
+    audio.quest();
   }
   function freezeAround(b, bs) {
     b.special = null;
@@ -1547,6 +1724,7 @@
     skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
     seaCount = 0; scoreMult = 1;
     evapMode = false; rippleMode = false; flowMode = false; flowPick = null; rainHint = 0;
+    auroraNext = 0; // 极光庇护只在单次合成内生效
     tideGateHint = false;
     level = 1; levelTime = C.level1.time; failReason = ''; levelBanner = 0;
     levelElapsed = 0; runCounted = 0;
@@ -1608,9 +1786,20 @@
   var tabDailyBtn = { x: DEX_PANEL.x + 158, y: DEX_PANEL.y + 10, w: 66, h: 26 };
   var tabRankBtn = { x: DEX_PANEL.x + 230, y: DEX_PANEL.y + 10, w: 66, h: 26 };
   var shareCopyBtn = { x: 0, y: 0, w: 150, h: 42 }; // 分享卡片：复制文案按钮（打开时定位）
-  function spCellRect(i) {
-    // 特殊·宝箱分节：5 列 × 2 行（8 种特殊滴 + 深海宝箱）
-    return { x: DEX_PANEL.x + 14 + (i % 5) * 72, y: DEX_PANEL.y + 76 + Math.floor(i / 5) * 118, w: 64, h: 110 };
+  function spRowRect(i) {
+    // 特殊·宝箱分节：按海域分组行（每行 = 一片海域 + 它的 2 种特殊滴）
+    return { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 76 + i * 44, w: DEX_PANEL.w - 28, h: 40 };
+  }
+  function spSlotRect(i, s) {
+    // 行内特殊滴槽位（s=0/1），宝箱也占一个槽位
+    var r = spRowRect(i);
+    return { x: r.x + 124 + s * 106, y: r.y + 4, w: 102, h: 32 };
+  }
+  function spVisibleStages() {
+    // 只显示已抵达海域 + 下一海域（更深的特殊滴不剧透）
+    var arr = [], m = Math.min(seaStage() + 1, C.seaStages.length - 1);
+    for (var i = 0; i <= m; i++) arr.push(i);
+    return arr;
   }
   function tierCellRect(t) {
     // 合成链分节：3 列 × 3 行（9 档）
@@ -1741,8 +1930,17 @@
             if (inRect(p, stageRowRect(st))) { dexSelStage = st; dexSelTier = -1; audio.blip(620, 0.08, 'sine', 0.06, 0.3); return; }
           }
         } else {
-          for (var si = 0; si <= SP_DEFS.length; si++) { // 末位是深海宝箱格
-            if (inRect(p, spCellRect(si))) { dexSelSp = si; dexSelTier = -1; dexSelStage = -1; audio.blip(620, 0.08, 'sine', 0.06, 0.3); return; }
+          // 特殊·宝箱：按海域分组行，点槽位选中说明（宝箱 = SP_DEFS.length 虚拟位）
+          var vis = spVisibleStages();
+          for (var vr = 0; vr < vis.length; vr++) {
+            for (var slot = 0; slot < 2; slot++) {
+              if (inRect(p, spSlotRect(vr, slot))) {
+                var spKeys = STAGE_SP_SLOTS[vis[vr]] || STAGE_SP_SLOTS[0];
+                dexSelSp = slot === 0 ? spKeys[0] : spKeys[1];
+                dexSelTier = -1; dexSelStage = -1;
+                audio.blip(620, 0.08, 'sine', 0.06, 0.3); return;
+              }
+            }
           }
         }
       }

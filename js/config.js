@@ -109,7 +109,23 @@ MG.config = {
   dexGate: [0, 0, 0, 0, 0, 500, 3000, 10000, 30000],
   // 投放门槛：直接投放的水滴档位/特殊滴需累计分达标才会刷出（图鉴不显示门槛数值）
   spawnGate: [0, 0, 0, 800, 2500],
-  specialGate: { vortex: 0, cloud: 1500, ice: 4000, rainbow: 8000, gale: 12000 },
+  // 特殊滴与海域绑定：抵达该海域后才会刷出（图鉴里未到达海域的特殊滴不显示）
+  specialStage: {
+    vortex: 0, chest: 0,          // 潮汐池
+    cloud: 1, iron: 1,            // 珊瑚浅海
+    ice: 2, rune: 2,              // 蔚蓝深海
+    rainbow: 3, gale: 3,          // 午夜深渊
+    magnet: 4, spring: 4,         // 月光环礁
+    thunder: 5, pearl: 5,         // 海沟之眼
+    magma: 6, geyser: 6,          // 热泉裂谷
+    void: 7, aurora: 7            // 深渊王座
+  },
+  // 新特殊滴行为参数
+  magnet:   { delay: 0.4, life: 1.8, pullR: 210, pullF: 105, score: 150 },
+  magmaR: 95, magmaScore: 70,   // 熔岩滴：烧毁半径 / 每个目标折算分
+  geyserW: 120, geyserF: 400,   // 间歇泉：水柱半宽 / 上冲力
+  voidN: 5, voidScore: 90,      // 虚空滴：吞噬数量上限 / 每颗折算分
+  auroraMult: 3,                // 极光滴：下一次合成得分倍数
 
   // 潮汐系统（周期性涨潮：水滴受浮力上浮重排）
   tide: {

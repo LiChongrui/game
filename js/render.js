@@ -415,6 +415,14 @@
     else if (b.special === 'cloud') drawCloudMark(r);
     else if (b.special === 'rainbow') drawRainbowMark(r);
     else if (b.special === 'gale') drawGaleMark(r);
+    else if (b.special === 'magnet') drawMagnetMark(r);
+    else if (b.special === 'spring') drawSpringMark(r);
+    else if (b.special === 'thunder') drawThunderMark(r);
+    else if (b.special === 'pearl') drawPearlMark(r);
+    else if (b.special === 'magma') drawMagmaMark(r);
+    else if (b.special === 'geyser') drawGeyserMark(r);
+    else if (b.special === 'void') drawVoidMark(r);
+    else if (b.special === 'aurora') drawAuroraMark(r);
     else if (b.tier <= 4) drawFace(r);
     else drawWaves(r);
     // 符文徽记（右上角小圆牌）
@@ -716,6 +724,137 @@
       ctx.beginPath();
       ctx.moveTo(-r * 0.45 + sway, yy);
       ctx.quadraticCurveTo(0, yy - r * 0.16, r * 0.45 + sway, yy);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.lineCap = 'butt';
+  }
+  // 磁石滴标记：马蹄磁铁（U 形 + 两极白端）
+  function drawMagnetMark(r) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(240,248,255,0.95)';
+    ctx.lineWidth = Math.max(2.4, r * 0.24);
+    ctx.lineCap = 'butt';
+    ctx.beginPath(); ctx.arc(0, -r * 0.08, r * 0.4, Math.PI, Math.PI * 2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.4, -r * 0.08); ctx.lineTo(-r * 0.4, r * 0.38);
+    ctx.moveTo(r * 0.4, -r * 0.08); ctx.lineTo(r * 0.4, r * 0.38);
+    ctx.stroke();
+    ctx.strokeStyle = '#FF8FA0';
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.4, r * 0.26); ctx.lineTo(-r * 0.4, r * 0.38);
+    ctx.moveTo(r * 0.4, r * 0.26); ctx.lineTo(r * 0.4, r * 0.38);
+    ctx.stroke();
+    ctx.restore();
+    ctx.lineCap = 'butt';
+  }
+  // 甘霖滴标记：新芽（茎 + 双叶）
+  function drawSpringMark(r) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(46,120,80,0.9)';
+    ctx.lineWidth = Math.max(1.6, r * 0.09);
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, r * 0.45); ctx.quadraticCurveTo(r * 0.05, 0, 0, -r * 0.2); ctx.stroke();
+    ctx.fillStyle = 'rgba(120,200,150,0.95)';
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 0.1);
+    ctx.quadraticCurveTo(-r * 0.55, -r * 0.35, -r * 0.5, -r * 0.62);
+    ctx.quadraticCurveTo(-r * 0.05, -r * 0.5, 0, -r * 0.1);
+    ctx.moveTo(0, -r * 0.2);
+    ctx.quadraticCurveTo(r * 0.5, -r * 0.5, r * 0.55, -r * 0.75);
+    ctx.quadraticCurveTo(r * 0.08, -r * 0.65, 0, -r * 0.2);
+    ctx.fill();
+    ctx.restore();
+    ctx.lineCap = 'butt';
+  }
+  // 雷霆滴标记：闪电
+  function drawThunderMark(r) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,244,200,0.98)';
+    ctx.beginPath();
+    ctx.moveTo(r * 0.14, -r * 0.58);
+    ctx.lineTo(-r * 0.28, r * 0.06);
+    ctx.lineTo(-r * 0.02, r * 0.06);
+    ctx.lineTo(-r * 0.14, r * 0.58);
+    ctx.lineTo(r * 0.3, -r * 0.1);
+    ctx.lineTo(r * 0.04, -r * 0.1);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  // 珍珠滴标记：贝壳托珠
+  function drawPearlMark(r) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(210,190,150,0.95)';
+    ctx.lineWidth = Math.max(1.6, r * 0.09);
+    ctx.beginPath(); ctx.arc(0, r * 0.16, r * 0.42, 0, Math.PI); ctx.stroke(); // 贝壳碗
+    ctx.fillStyle = 'rgba(255,255,255,0.98)';
+    ctx.beginPath(); ctx.arc(0, r * 0.08, r * 0.2, 0, Math.PI * 2); ctx.fill(); // 珍珠
+    ctx.fillStyle = 'rgba(180,160,120,0.9)';
+    ctx.beginPath(); ctx.arc(-r * 0.06, r * 0.02, r * 0.05, 0, Math.PI * 2); ctx.fill(); // 珠光
+    ctx.restore();
+  }
+  // 熔岩滴标记：火苗
+  function drawMagmaMark(r) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,236,200,0.95)';
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 0.52);
+    ctx.quadraticCurveTo(r * 0.42, -r * 0.02, r * 0.2, r * 0.42);
+    ctx.lineTo(-r * 0.2, r * 0.42);
+    ctx.quadraticCurveTo(-r * 0.42, -r * 0.02, 0, -r * 0.52);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(230,110,50,0.9)';
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 0.16);
+    ctx.quadraticCurveTo(r * 0.18, r * 0.12, 0, r * 0.4);
+    ctx.quadraticCurveTo(-r * 0.18, r * 0.12, 0, -r * 0.16);
+    ctx.fill();
+    ctx.restore();
+  }
+  // 间歇泉滴标记：三根上冲水柱
+  function drawGeyserMark(r) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(235,252,255,0.95)';
+    ctx.lineWidth = Math.max(1.8, r * 0.11);
+    ctx.lineCap = 'round';
+    var xs = [-r * 0.38, 0, r * 0.38];
+    for (var k = 0; k < 3; k++) {
+      var h = (k === 1 ? 0.62 : 0.4) * r, x = xs[k];
+      ctx.beginPath();
+      ctx.moveTo(x, r * 0.45);
+      ctx.lineTo(x, r * 0.45 - h - r * 0.2);
+      ctx.moveTo(x - r * 0.12, r * 0.42 - h);
+      ctx.lineTo(x, r * 0.28 - h);
+      ctx.lineTo(x + r * 0.12, r * 0.42 - h);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.lineCap = 'butt';
+  }
+  // 虚空滴标记：漩涡眼（双螺旋弧）
+  function drawVoidMark(r) {
+    ctx.save();
+    ctx.rotate(time * 2.2);
+    ctx.strokeStyle = 'rgba(200,190,240,0.9)';
+    ctx.lineWidth = Math.max(1.8, r * 0.1);
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.42, 0.4, 3.4); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.18, 3.6, 6.6); ctx.stroke();
+    ctx.restore();
+    ctx.lineCap = 'butt';
+  }
+  // 极光滴标记：双条极光带
+  function drawAuroraMark(r) {
+    ctx.save();
+    ctx.lineCap = 'round';
+    var cols = ['rgba(155,232,216,0.95)', 'rgba(200,184,240,0.95)'];
+    for (var k = 0; k < 2; k++) {
+      ctx.strokeStyle = cols[k];
+      ctx.lineWidth = Math.max(2.2, r * 0.16);
+      var ox = (k - 0.5) * r * 0.42, sw = Math.sin(time * 5 + k * 2) * r * 0.08;
+      ctx.beginPath();
+      ctx.moveTo(ox - r * 0.12, r * 0.45);
+      ctx.quadraticCurveTo(ox - r * 0.3 + sw, 0, ox + r * 0.08, -r * 0.48);
       ctx.stroke();
     }
     ctx.restore();
@@ -1617,59 +1756,82 @@
           ctx.strokeStyle = '#2E86B4'; ctx.lineWidth = 1.5;
           roundRect(sRow.x + 0.5, sRow.y + 0.5, sRow.w - 1, sRow.h - 1, 9); ctx.stroke();
         }
-        // 海域专属徽章：当前海域外圈白芯脉冲环 / 已抵达实色彩徽 / 未抵达灰色空徽
+        // 海域专属徽章：当前=脉冲环+彩徽 / 已抵达=彩徽 / 下一海域=灰徽（图标+名字预告） / 更深海域不显示图标
         var dotX = sRow.x + 22, dotY = sRow.y + sRow.h / 2;
+        var isNext = stg === curStage + 1;
         if (isCur) {
           ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.5;
           ctx.beginPath(); ctx.arc(dotX, dotY, 12.5 + Math.sin(time * 4) * 1.2, 0, Math.PI * 2); ctx.stroke();
         }
-        drawSeaBadge(stg, dotX, dotY, reached || isCur);
-        ctx.fillStyle = isCur ? '#FFFFFF' : (reached ? '#155A8A' : '#8AA5B8');
+        if (isCur || reached || isNext) drawSeaBadge(stg, dotX, dotY, reached || isCur);
+        ctx.fillStyle = isCur ? '#FFFFFF' : (reached ? '#155A8A' : (isNext ? '#8AA5B8' : '#8AA5B8'));
         ctx.font = 'bold 13px system-ui, sans-serif';
-        ctx.fillText(reached || isCur ? ss.name : '？？？', dotX + 16, dotY + 5);
+        ctx.fillText(isCur || reached || isNext ? ss.name : '？？？', dotX + 16, dotY + 5);
         ctx.textAlign = 'right';
         ctx.font = '10px system-ui, sans-serif';
-        ctx.fillStyle = isCur ? 'rgba(255,255,255,0.92)' : (reached ? '#1E7A6F' : '#B0584A');
-        var gateTxt = isCur ? '当前海域' : (reached ? '已抵达' : ('累计 ' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + ' 分解锁'));
+        ctx.fillStyle = isCur ? 'rgba(255,255,255,0.92)' : (reached ? '#1E7A6F' : (isNext ? '#7A98AC' : '#B0584A'));
+        var gateTxt = isCur ? '当前海域' : (reached ? '已抵达' : (isNext ? '下一海域' : ('累计 ' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + ' 分解锁')));
         ctx.fillText(gateTxt, sRow.x + sRow.w - 14, dotY + 4);
         ctx.textAlign = 'left';
       }
       ctx.textAlign = 'center';
     } else {
 
-      // 特殊水滴与深海宝箱 5×2 松格（实际形态：水滴本体+专属标记 / 迷你木箱）
+      // 特殊·宝箱按海域分组行：每行 = 海域徽章 + 名称 + 2 个槽位
+      // 已抵达海域：发现的显实际形态，未发现的显"？"；下一海域：灰度实际形态+名字预告；更深海域不剧透
       ctx.textAlign = 'left';
-      for (var s = 0; s <= SP_DEFS.length; s++) { // 末位是深海宝箱
-        var isChest = s === SP_DEFS.length;
-        var sp = isChest ? null : SP_DEFS[s], pRect = spCellRect(s);
-        var found = isChest ? true : !!dexSpecial[sp.key];
-        var sel = dexSelSp === s;
-        ctx.fillStyle = sel ? 'rgba(46,134,180,0.18)' : 'rgba(46,134,180,0.06)';
-        roundRect(pRect.x, pRect.y, pRect.w, pRect.h, 10); ctx.fill();
-        if (sel) {
-          ctx.strokeStyle = '#2E86B4'; ctx.lineWidth = 1.5;
-          roundRect(pRect.x + 0.5, pRect.y + 0.5, pRect.w - 1, pRect.h - 1, 10); ctx.stroke();
+      var visRows = spVisibleStages();
+      for (var vr = 0; vr < visRows.length; vr++) {
+        var stg2 = visRows[vr];
+        var sRow2 = spRowRect(vr);
+        var curStg2 = stg2 === curStage, reachedStg2 = tsNow >= C.seaStages[stg2].at;
+        var nextStg2 = stg2 === curStage + 1;
+        var rowCy = sRow2.y + sRow2.h / 2;
+        ctx.fillStyle = curStg2 ? '#2E86B4' : (reachedStg2 ? 'rgba(46,134,180,0.09)' : 'rgba(120,145,165,0.10)');
+        roundRect(sRow2.x, sRow2.y, sRow2.w, sRow2.h, 9); ctx.fill();
+        drawSeaBadge(stg2, sRow2.x + 20, rowCy, reachedStg2 || curStg2);
+        ctx.fillStyle = curStg2 ? '#FFFFFF' : (reachedStg2 ? '#155A8A' : '#8AA5B8');
+        ctx.font = 'bold 12px system-ui, sans-serif';
+        ctx.fillText(C.seaStages[stg2].name, sRow2.x + 36, rowCy + 4);
+        var slots2 = STAGE_SP_SLOTS[stg2] || STAGE_SP_SLOTS[0];
+        for (var sl = 0; sl < 2; sl++) {
+          var slotR = spSlotRect(vr, sl);
+          var spIdx2 = slots2[sl];
+          var isChest2 = spIdx2 === SP_DEFS.length;
+          var spDef2 = isChest2 ? null : SP_DEFS[spIdx2];
+          var found2 = isChest2 ? true : !!dexSpecial[spDef2.key];
+          if (dexSelSp === spIdx2) {
+            ctx.fillStyle = 'rgba(46,134,180,0.14)';
+            roundRect(slotR.x, slotR.y, slotR.w, slotR.h, 8); ctx.fill();
+            ctx.strokeStyle = '#2E86B4'; ctx.lineWidth = 1.2;
+            roundRect(slotR.x + 0.5, slotR.y + 0.5, slotR.w - 1, slotR.h - 1, 8); ctx.stroke();
+          }
+          var cx2 = slotR.x + 16, cy2 = slotR.y + slotR.h / 2;
+          ctx.save();
+          if (nextStg2 && !curStg2) ctx.filter = 'grayscale(1) opacity(0.75)'; // 下一海域：灰色预告
+          if (found2 || nextStg2) {
+            drawSpForm(spIdx2, cx2, cy2);
+            ctx.filter = 'none';
+          } else {
+            ctx.filter = 'none';
+            ctx.fillStyle = 'rgba(120,145,165,0.22)';
+            ctx.beginPath(); ctx.arc(cx2, cy2, 9, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#8AA5B8';
+            ctx.font = 'bold 10px system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('?', cx2, cy2 + 3.5);
+            ctx.textAlign = 'left';
+          }
+          ctx.restore();
+          ctx.fillStyle = (found2 || nextStg2) ? (reachedStg2 ? '#155A8A' : '#8AA5B8') : '#8AA5B8';
+          ctx.font = '9px system-ui, sans-serif';
+          ctx.fillText((found2 || nextStg2) ? (isChest2 ? '深海宝箱' : spDef2.name) : '？？？', slotR.x + 30, rowCy + 3);
         }
-        var sx = pRect.x + pRect.w / 2, sy = pRect.y + 42;
-        if (isChest) {
-          drawChestIcon(sx, sy);
-        } else if (found) {
-          // 与场上一致的实际形态：水滴本体 + 专属标记（冰晶滴带冻结外壳）
-          drawBall({ x: sx, y: sy, r: 15, tier: 1, vx: 0, vy: 0, special: sp.key, frozen: sp.key === 'ice' ? 1 : 0 }, 1);
-        } else {
-          ctx.fillStyle = '#C3D2DC';
-          ctx.beginPath(); ctx.arc(sx, sy, 15, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = '#8AA5B8';
-          ctx.font = 'bold 14px system-ui, sans-serif';
-          ctx.fillText('?', sx, sy + 5);
-        }
-        ctx.textAlign = 'center';
-        ctx.fillStyle = found ? '#155A8A' : '#8AA5B8';
-        ctx.font = 'bold 10px system-ui, sans-serif';
-        ctx.fillText(isChest ? '深海宝箱' : (found ? sp.name : '？？？'), sx, pRect.y + 82);
-        ctx.font = '9px system-ui, sans-serif';
-        ctx.fillStyle = found ? '#1E7A6F' : '#B0584A';
-        ctx.fillText(found ? '已发现' : '未发现', sx, pRect.y + 97);
+      }
+      if (curStage + 1 < C.seaStages.length - 1) {
+        ctx.font = '10px system-ui, sans-serif';
+        ctx.fillStyle = '#8AA5B8';
+        ctx.fillText('……更深海域的特殊滴，抵达后揭晓', DEX_PANEL.x + 20, spRowRect(visRows.length).y + 22);
       }
     }
 
@@ -1696,7 +1858,7 @@
       body = known ? dsc.desc : '在海域中发现它即可点亮说明。';
     }
     ctx.fillStyle = 'rgba(46,134,180,0.10)';
-    roundRect(DEX_PANEL.x + 12, DEX_PANEL.y + 452, DEX_PANEL.w - 24, 92, 8); ctx.fill();
+    roundRect(DEX_PANEL.x + 12, DEX_PANEL.y + 452, DEX_PANEL.w - 24, 70, 8); ctx.fill();
     ctx.textAlign = 'left';
     ctx.fillStyle = known ? '#155A8A' : '#8AA5B8';
     ctx.font = 'bold 13px system-ui, sans-serif';
@@ -1709,10 +1871,11 @@
     ctx.textAlign = 'center';
   }
 
-  // 图鉴用迷你宝箱图标（木箱 + 铜箍 + 金锁 + 呼吸金晕，与场上宝箱同款观感）
-  function drawChestIcon(cx, cy) {
+  // 图鉴用迷你宝箱图标（木箱 + 铜箍 + 金锁 + 呼吸金晕，与场上宝箱同款观感；sc 可缩放）
+  function drawChestIcon(cx, cy, sc) {
     ctx.save();
     ctx.translate(cx, cy);
+    ctx.scale(sc || 1, sc || 1);
     var glow = 0.3 + 0.15 * Math.sin(time * 3);
     var gg = ctx.createRadialGradient(0, 0, 2, 0, 0, 22);
     gg.addColorStop(0, 'rgba(255,208,96,' + glow + ')');
@@ -1797,6 +1960,15 @@
         ctx.lineTo(5, 3.5); ctx.closePath(); ctx.fill(); break;
     }
     ctx.restore();
+  }
+
+  // 图鉴内特殊滴的实际形态（小尺寸）：礁石=岩石 / 符文滴=水滴+符文牌 / 宝箱=迷你木箱 / 其余=水滴+专属标记
+  function drawSpForm(spIdx, x, y) {
+    if (spIdx === SP_DEFS.length) { drawChestIcon(x, y, 0.55); return; }
+    var key = SP_DEFS[spIdx].key;
+    if (key === 'iron') { drawIronBall({ x: x, y: y, r: 11, vx: 0, vy: 0 }, 1); return; }
+    if (key === 'rune') { drawBall({ x: x, y: y, r: 11, tier: 1, vx: 0, vy: 0, rune: 'ripple' }, 1); return; }
+    drawBall({ x: x, y: y, r: 11, tier: 1, vx: 0, vy: 0, special: key, frozen: key === 'ice' ? 1 : 0 }, 1);
   }
 
   // 成就页签：常驻目标列表（跨局累计，达成给分与充能奖励）
