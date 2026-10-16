@@ -67,14 +67,7 @@
   // try/catch + 空值守卫（core.js audio 段），桥不兼容时只静音不崩。
   G.AudioContext = function () { return wx.createWebAudioContext(); };
 
-  // 安全区：safeArea.top 之下是摄像头/挖孔区，screenHeight - safeArea.bottom 是手势横条区
-  // （均为逻辑 px）。core.js fit() 读 __safeInset 把内容压进安全区，触摸 y 同步补偿。
-  var safeTop = 0, safeBottom = 0;
-  if (sys.safeArea && sys.screenHeight) {
-    safeTop = Math.max(0, sys.safeArea.top);
-    safeBottom = Math.max(0, sys.screenHeight - sys.safeArea.bottom);
-  }
-  G.__safeInset = { top: safeTop, bottom: safeBottom };
+  // 安全区不做任何处理：刘海/挖孔与手势条按正常区域对待（用户定版），全屏铺满
 
   // ---------- 事件桥：pointer* → wx.onTouch* ----------
   // canvas 与 window 各留一张 handler 表；touchend 同时喂 pointerup（canvas 的 tryDrop 与

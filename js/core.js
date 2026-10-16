@@ -16,24 +16,12 @@
   var BX = 0;             // 游戏区（420 逻辑宽）水平居中偏移
   var FLOORY = C.floorY;  // 容器底 y（底部锚定：VH - 74）
   var view = { s: 1 };
-  var safeTop = 0, safeBottom = 0; // 安全区 inset（逻辑 px）：刘海/挖孔顶、手势条底；fit() 从垫片 __safeInset 刷新，Web 端恒 0
-  var topBand = 44;                // 顶部刘海带（设备 px）：默认按有刘海预留 44px，奖杯/静音排在带内不浪费空间
-  var botReserve = 0;              // 底部保留余量（设备 px）：只给手势条留少量空间，道具区不必大幅上移
-  var fullVH = C.H;                // 整屏逻辑高度（h/view.s）：菜单态铺满全屏、面板垂直居中的基准
 
   function fit() {
     var w = window.innerWidth, h = window.innerHeight;
-    // 安全区：微信垫片提供 __safeInset（top=摄像头/挖孔区、bottom=手势横条区），Web 端无垫片为 0。
-    // 顶部默认按有刘海预留 44px（topBand），奖杯/静音排在刘海行内——挖孔带不再是空白区
-    var si = (typeof window.__safeInset === 'object' && window.__safeInset) || {};
-    safeTop = si.top || 0; safeBottom = si.bottom || 0;
-    topBand = Math.max(safeTop, 44);
-    // 底部只预留少量空间给手势条（道具区上移不需要太多），剩余由道具区底色/海底基色延伸覆盖
-    botReserve = Math.min(safeBottom, 20);
-    var eh = h - topBand - botReserve;     // 有效视口高度（设备 px）
-    view.s = Math.min(w / C.W, eh / C.H);  // 等比缩放，不变形
-    VH = eh / view.s;
-    fullVH = h / view.s;                   // 整屏逻辑高度（含顶部挖孔区与底部手势区）
+    // 全屏铺满：刘海/挖孔、手势条区域都按正常区域对待，不做任何安全区缩进
+    view.s = Math.min(w / C.W, h / C.H);   // 等比缩放，不变形
+    VH = h / view.s;
     LW = w / view.s;                       // 逻辑宽度（≥420）
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
     FLOORY = VH - 74;                      // 容器底贴住窗口底部（720-646=74）
@@ -47,9 +35,7 @@
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // 刘海行：奖杯/静音挂进挖孔带（左右角落，负逻辑 y=带中心）——菜单态奖杯用 menuTrophy 固定位
-    var ny = -topBand / view.s / 2 + 2;
-    // 道具按钮：从贴底上移，在容器底~屏底带内近似垂直居中（含下方名称标签的空间）
+    // 底部按钮/图鉴角标同步贴底：道具按钮上移，在容器底~屏底带内近似垂直居中（含名称标签空间）
     var cy = VH - 46;
     // 注意：模块化后 bookBtn 等声明在 systems.js（后加载），早期触发时用 typeof 守卫
     if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {
@@ -57,7 +43,7 @@
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
     }
     if (typeof trophyBtn !== 'undefined' && typeof MUTE !== 'undefined') {
-      trophyBtn.cy = ny; MUTE.cy = ny;
+      trophyBtn.cy = 36; MUTE.cy = 36;     // 奖杯/静音回到正常左上/右上角落（与分数行同排）
     }
   }
   window.addEventListener('resize', fit);

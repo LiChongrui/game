@@ -82,11 +82,8 @@
     // 渐变缓存 key：过渡期按 1/24 步长量化（视觉无级差，缓存不爆炸）
     var sk = sb ? 'F' + sb.from + '_' + sb.to + '_' + Math.round(sb.k * 24) : '' + stg;
     var vk = Math.round(VH), lk = Math.round(LW);
-    // 安全区延伸：背景画在无偏移全屏变换里，渐变纵向铺满整个屏幕（逻辑 0 → h/view.s），
-    // 挖孔区与手势条区由同一条渐变的顶端/底端色自然覆盖，与内容区完全连续、无接缝
-    var fullH = VH + (safeTop + botReserve) / view.s;
-    var bg = grad('bg' + sk + '_' + vk + '_' + Math.round(fullH), function () {
-      var gg = ctx.createLinearGradient(0, 0, 0, fullH);
+    var bg = grad('bg' + sk + '_' + vk, function () {
+      var gg = ctx.createLinearGradient(0, 0, 0, VH);
       gg.addColorStop(0, st.bg[0]);
       gg.addColorStop(0.4, st.bg[1]);
       gg.addColorStop(0.75, st.bg[2]);
@@ -94,7 +91,7 @@
       return gg;
     });
     ctx.fillStyle = bg;
-    ctx.fillRect(0, -1, LW, fullH + 2);
+    ctx.fillRect(0, -1, LW, VH + 2);
 
     // 顶部阳光光晕 + 两侧柔光（静态光斑，缓存渐变）
     ctx.fillStyle = grad('sun' + lk, function () {
@@ -129,14 +126,14 @@
         gg.addColorStop(1, 'rgba(16,56,96,0)');
         return gg;
       });
-      ctx.fillRect(0, 0, edge, fullH);
+      ctx.fillRect(0, 0, edge, VH);
       ctx.fillStyle = grad('shadeR' + lk + '_' + ek + '_' + sk, function () {
         var gg = ctx.createLinearGradient(LW, 0, LW - edge, 0);
         gg.addColorStop(0, st.shade);
         gg.addColorStop(1, 'rgba(16,56,96,0)');
         return gg;
       });
-      ctx.fillRect(LW - edge, 0, edge, fullH);
+      ctx.fillRect(LW - edge, 0, edge, VH);
     }
 
     // 顶部斜射光柱（缓慢摇曳 + 呼吸明暗，营造水下丁达尔效应）
@@ -1225,11 +1222,9 @@
   // ---------- 容器：玻璃质感 + 底部焦散 ----------
   function drawContainer() {
     var floorY = FLOORY, FH = 12;
-    // 海底基色：从床面到画布底一条连续渐变（泡沫白 → 青 → 深海青），先铺满；
-    // 纵向延伸到手势条区（道具区底色的底层延续，同一条渐变无接缝）
-    var _ob = botExt();
-    var bed = grad('bed' + Math.round(VH) + '_' + Math.round(_ob), function () {
-      var gg = ctx.createLinearGradient(0, floorY, 0, VH + _ob);
+    // 海底基色：从床面到画布底一条连续渐变（泡沫白 → 青 → 深海青），先铺满
+    var bed = grad('bed' + Math.round(VH), function () {
+      var gg = ctx.createLinearGradient(0, floorY, 0, VH);
       gg.addColorStop(0, 'rgba(216,236,232,0.95)');
       gg.addColorStop(0.3, 'rgba(170,208,204,0.95)');
       gg.addColorStop(0.62, 'rgba(112,158,174,0.95)');
@@ -1237,7 +1232,7 @@
       return gg;
     });
     ctx.fillStyle = bed;
-    ctx.fillRect(0, floorY + 4, C.W, VH - floorY - 4 + _ob);
+    ctx.fillRect(0, floorY + 4, C.W, VH - floorY - 4);
     // 床面：圆角横条（半透明玻璃质感，透出海底基色，不再有硬边界）
     var fg = grad('fg' + Math.round(VH), function () {
       var gg = ctx.createLinearGradient(0, floorY, 0, floorY + FH + 6);
@@ -1485,12 +1480,12 @@
 
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
   function drawHUD() {
-    // 计分（左上角悬浮；奖杯已上移到刘海行，分数从 x20 起）
+    // 计分（左上角悬浮；左端让位给奖杯按钮，从 x48 起）
     ctx.textAlign = 'left';
     var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
     ctx.lineJoin = 'round';
     ctx.save();
-    ctx.translate(20, 32);
+    ctx.translate(48, 38);
     ctx.scale(bump, bump);
     ctx.font = 'bold 34px system-ui, sans-serif';
     ctx.lineWidth = 4;
@@ -1506,9 +1501,9 @@
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     var sub = '最佳 ' + best + ' · ' + C.seaStages[seaStage()].name + (seaCount > 0 ? ' · 海域 ×' + seaCount : '') +
       (ng.active ? ' · 「' + ng.active.name + '」×' + ng.active.mult : '');
-    ctx.strokeText(sub, 20, 52);
+    ctx.strokeText(sub, 48, 58);
     ctx.fillStyle = ng.active ? '#6B5AA8' : '#3E6E90';
-    ctx.fillText(sub, 20, 52);
+    ctx.fillText(sub, 48, 58);
 
     // 右上角：下一滴预览 + 静音按钮（主流布局）
     ctx.textAlign = 'center';
@@ -1656,7 +1651,7 @@
   function drawConfirm() {
     if (!confirmOpen) return;
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
     var px = 60, py = 300, pw = C.W - 120, ph = 170;
     panel(px, py, pw, ph, 14, 0.97);
     ctx.textAlign = 'center';
@@ -1787,17 +1782,15 @@
   }
 
   function drawSkillBar() {
-    // 道具带：海底基色的柔和延续（同色系微加深，方向与渐变一致，不割裂）；
-    // 道具带底色纵向延伸到手势条区（用户要求：延伸的是道具区底色，非背景色），按钮本体只少量上移
-    var _ob = botExt();
-    var g = grad('skbar' + Math.round(VH) + '_' + Math.round(_ob), function () {
-      var gg = ctx.createLinearGradient(0, VH - 56, 0, VH + _ob);
+    // 道具带：海底基色的柔和延续（同色系微加深，方向与渐变一致，不割裂）
+    var g = grad('skbar' + Math.round(VH), function () {
+      var gg = ctx.createLinearGradient(0, VH - 56, 0, VH);
       gg.addColorStop(0, 'rgba(56,102,130,0)');
       gg.addColorStop(1, 'rgba(36,78,106,0.3)');
       return gg;
     });
     ctx.fillStyle = g;
-    ctx.fillRect(0, VH - 56, C.W, 56 + _ob);
+    ctx.fillRect(0, VH - 56, C.W, 56);
 
     var readyPulse = 0.5 + 0.5 * Math.sin(time * 5);
 
@@ -1872,7 +1865,7 @@
   // 二周目词缀三选一弹窗
   function drawNgPick() {
     ctx.fillStyle = 'rgba(10,40,70,0.66)';
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
     var pw = 330, ph = 348, px = (C.W - pw) / 2, py = (VH - ph) / 2;
     panel(px, py, pw, ph, 14, 0.97);
     ctx.textAlign = 'center';
@@ -2002,7 +1995,7 @@
     dim.addColorStop(0, 'rgba(6,30,56,0.82)');
     dim.addColorStop(1, 'rgba(4,18,36,0.88)');
     ctx.fillStyle = dim;
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
     ctx.strokeStyle = 'rgba(160,220,255,0.25)';
     ctx.lineWidth = 1.2;
     for (var i = 0; i < 8; i++) {
@@ -2037,7 +2030,7 @@
   function drawOver() {
     buildOverButtons();
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
 
     var pw = 320, ph = 436, px = (C.W - pw) / 2, py = 150;
     panel(px, py, pw, ph, 16, 0.97);
@@ -2135,7 +2128,7 @@
 
     ctx.fillStyle = 'rgba(6,28,52,0.42)';
     // 菜单态 VH 已换为整屏逻辑高，遮罩直接盖满全屏（无接缝）
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
 
     ctx.textAlign = 'center';
     var pulse = 0.5 + 0.5 * Math.sin(time * 2.4);
@@ -2191,17 +2184,10 @@
   }
 
   // ---------- 主渲染 ----------
-  // 底部延伸量（逻辑 px）：内容视口之外、到手势条区为止的部分；
-  // 底色类绘制（道具带/海底基色/半透明遮罩）用它延伸到屏幕底，避免硬边
-  function botExt() { return Math.max(0, safeBottom - botReserve) / view.s; }
-
   function render() {
-    // 背景：无偏移全屏变换——渐变纵向拉伸到安全区外（挖孔/手势条区由海色自然延伸，无接缝）
+    // 全屏铺满：刘海/手势条按正常区域对待，不做安全区偏移，单一变换贯穿整帧
     ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, 0);
     drawBackground();
-    // 内容变换：菜单态不偏移（铺满全屏，原版布局）；局内/结算整体下压 safeTop 避让摄像头。
-    // 触摸侧由 toLocal 按 state 做同量补偿，渲染与点击自洽
-    ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, dpr * (state === 'menu' ? 0 : safeTop));
 
     if (shakeT > 0) {
       var s = shakeAmp * (shakeT / 0.4);
@@ -2213,12 +2199,9 @@
     ctx.translate(BX, 0);
 
     if (state === 'menu') {
-      var vhSave = VH;
-      VH = fullVH;                 // 菜单铺满全屏：以整屏逻辑高度为底（气泡/遮罩/底部文案锚到真屏底）
       drawMenu();
       drawTrophyBtn(menuTrophy);   // 成就殿堂/每日挑战入口（菜单态固定位，systems 菜单分支处理）
       if (achOpen) drawAchPanel(); // 面板盖在菜单之上（点击已放行到 achOpen 分支）
-      VH = vhSave;
       ctx.restore(); return;
     } // 开始界面：背景之上画菜单 + 奖杯入口 + 成就殿堂面板
 
@@ -2256,7 +2239,7 @@
 
     if (evapMode) {
       ctx.fillStyle = 'rgba(10,40,70,0.18)';
-      ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
+      ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
       var hb = ballAt(lastPointer);
       if (hb) {
         ctx.save();
@@ -2277,7 +2260,7 @@
     // 涟漪选位模式：显示波纹中心指示
     if (rippleMode) {
       ctx.fillStyle = 'rgba(10,40,70,0.12)';
-      ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
+      ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
       var rx = Math.max(12, Math.min(C.W - 12, lastPointer.x < 0 ? C.W / 2 : lastPointer.x));
       var ry = Math.max(C.containerTop + 30, Math.min(FLOORY - 16, lastPointer.y < 0 ? (C.containerTop + FLOORY) / 2 : lastPointer.y));
       ctx.save();
@@ -2306,7 +2289,7 @@
     // 水流模式：已选水滴高亮 + 操作提示
     if (flowMode) {
       ctx.fillStyle = 'rgba(10,40,70,0.14)';
-      ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
+      ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
       if (flowPick) {
         ctx.save();
         ctx.strokeStyle = '#7FE8F5';
@@ -2334,7 +2317,7 @@
       return gg;
     });
     ctx.fillStyle = vg;
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH + botExt());
+    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
 
     drawHUD();
     drawLevelHud();

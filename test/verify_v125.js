@@ -21,11 +21,10 @@ function makeStub() {
 // ---------- wx mock ----------
 const storage = {};
 const touchReg = { start: [], move: [], end: [], cancel: [] };
-const SAFE_TOP = 88, SCREEN_H = 780, SAFE_BOT = 40; // 模拟刘海屏：挖孔 88px + 手势条 40px
+const SCREEN_H = 780; // 高屏（高度受限）：view.s = 420/420 < 780/720? 否→min 取 0.9333
 globalThis.wx = {
   getSystemInfoSync: () => ({
-    windowWidth: 420, windowHeight: SCREEN_H, pixelRatio: 2, screenHeight: SCREEN_H,
-    safeArea: { top: SAFE_TOP, bottom: SCREEN_H - SAFE_BOT, left: 0, right: 420, width: 420, height: SCREEN_H - SAFE_BOT - SAFE_TOP }
+    windowWidth: 420, windowHeight: SCREEN_H, pixelRatio: 2, screenHeight: SCREEN_H
   }),
   createCanvas: () => makeStub(),
   getStorageSync: k => (k in storage ? storage[k] : ''),
@@ -63,11 +62,10 @@ setTimeout(() => {
   try {
     out.hasMG = !!globalThis.MG;
     out.hasConfig = !!(globalThis.MG && MG.config);
-    out.safeInset = globalThis.__safeInset;        // 期望 {top:88, bottom:40}
+    out.noSafeInset = globalThis.__safeInset == null; // 安全区机制已移除
     out.state0 = MG.probe().state;                 // 期望 menu
-    // 点「开始游戏」按钮：菜单态铺满全屏不偏移。botReserve=min(40,20)=20，
-    // view.s = min(1, (780-88-20)/720) = 0.9333；屏幕坐标 = 逻辑 × view.s（无 +safeTop）
-    var vs = Math.min(420 / 420, (SCREEN_H - SAFE_TOP - Math.min(SAFE_BOT, 20)) / 720);
+    // 点「开始游戏」按钮：全屏铺满，view.s = min(420/420, 780/720) = 1，无偏移
+    var vs = Math.min(420 / 420, SCREEN_H / 720);
     out.vs = vs;
     tap(210 * vs, 426 * vs);
     out.state1 = MG.probe().state;                 // 期望 play
