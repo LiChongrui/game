@@ -1,4 +1,4 @@
-// 滴水成海 - render：绘制工具与全部渲染（背景 / 水滴 / 宝箱 / HUD / 面板 / 结算）
+// 水滴合成深海 - render：绘制工具与全部渲染（背景 / 水滴 / 宝箱 / HUD / 面板 / 结算）
 // 模块加载顺序 3/4（依赖 core+systems 的状态与画布上下文；顶层仅有渐变缓存初始化）。
 // 全部 UI 画在 canvas 内（含按钮命中判定），便于后续原样移植到微信小游戏（无 DOM 环境）
   // ---------- 渲染工具 ----------
@@ -2183,7 +2183,7 @@
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 25px system-ui, sans-serif';
-    ctx.fillText('滴水成海 · 深海战报', C.W / 2, py + 40);
+    ctx.fillText('水滴合成深海 · 深海战报', C.W / 2, py + 40);
     ctx.font = '14px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.fillText(C.seaStages[seaStage()].name + ' · ' + daily.date, C.W / 2, py + 66);
@@ -2441,12 +2441,12 @@
     // 标题（双描层：暗色投影 + 白蓝渐变）
     ctx.font = 'bold 46px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
-    ctx.fillText('滴水成海', C.W / 2 + 2, 220);
+    ctx.fillText('水滴合成深海', C.W / 2 + 2, 220);
     var tg = ctx.createLinearGradient(0, 180, 0, 224);
     tg.addColorStop(0, '#FFFFFF');
     tg.addColorStop(1, '#BDE8FF');
     ctx.fillStyle = tg;
-    ctx.fillText('滴水成海', C.W / 2, 218);
+    ctx.fillText('水滴合成深海', C.W / 2, 218);
     ctx.font = '16px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(230,246,255,0.85)';
     ctx.fillText('合成大水滴 · 汇入无垠深海', C.W / 2, 252);

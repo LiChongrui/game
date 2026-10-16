@@ -42,7 +42,7 @@ const coverHTML = `<!DOCTYPE html>
   <div class="bub" style="left:60px;top:52px;width:26px;height:26px;opacity:.5"></div>
 
   <div class="left">
-    <h1>滴水成海</h1>
+    <h1>水滴合成深海</h1>
     <div class="tag">一缕雾泡 · 汇入深渊王座</div>
     <div class="url"><span class="dot"></span>game.luosgeo.com</div>
   </div>
@@ -69,7 +69,7 @@ const squareHTML = `<!DOCTYPE html>
   <div class="bub" style="right:20px;top:60px;width:10px;height:10px"></div>
   <div class="bub" style="right:34px;bottom:24px;width:8px;height:8px"></div>
   <img class="drop" src="tier3.png">
-  <div class="nm">滴水成海</div>
+  <div class="nm">水滴合成深海</div>
   <div class="sub">合成 · 潜入深渊王座</div>
 </body></html>`;
 

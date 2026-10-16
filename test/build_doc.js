@@ -1,4 +1,4 @@
-// 生成《滴水成海》游戏说明文档（单文件 HTML，截图/图标 base64 内嵌；图标由 doc_icons.js 预先导出到 test/icons/）
+// 生成《水滴合成深海》游戏说明文档（单文件 HTML，截图/图标 base64 内嵌；图标由 doc_icons.js 预先导出到 test/icons/）
 const fs = require('fs');
 const path = require('path');
 
@@ -55,12 +55,12 @@ const html = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>滴水成海 · 游戏说明</title>
+<title>水滴合成深海 · 游戏说明</title>
 <style>${css}</style>
 </head>
 <body>
 <header>
-  <h1>滴水成海</h1>
+  <h1>水滴合成深海</h1>
   <p class="tag">同种水滴相融合成 · 从一缕雾泡汇入深渊王座</p>
   <a class="play" href="https://game.luosgeo.com" target="_blank">▶ 在线试玩：game.luosgeo.com</a>
 </header>
@@ -181,7 +181,7 @@ const html = `<!DOCTYPE html>
 </section>
 
 <footer>
-  滴水成海 · Merge Ocean — v99 · 更新于 2026-10-16<br>
+  水滴合成深海 · Merge Ocean — v99 · 更新于 2026-10-16<br>
   在线试玩 <b>https://game.luosgeo.com</b> · 纯静态零依赖，也可本地打开 index.html 游玩
 </footer>
 </div>
