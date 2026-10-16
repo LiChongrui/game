@@ -1710,10 +1710,51 @@
     var stars = '★★★'.slice(0, quest.stars || 1);
     ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 30);
     drawTidePill();
+    drawSeaProgress();
     ctx.restore();
   }
-  // 海域进度已并入 drawHUD 第二行信息（省出独立进度条的高度，顶部元素整体上移）
-  // 左端骑线的海域徽章 drawSeaBadge 仍被图鉴/成就页使用，保留
+  // 海域进度条：满宽细条（y106~122，位于 HUD 底沿 100 与容器开口 145 之间的空隙带；
+  // 出生点 147 在条下方 25px，条不压坠落区），显示累计分距下一海域的进度
+  // 配色：填充=当前海域深水色（与背景同族），右端小圆点=下一海域徽章色（目的地），左端骑线徽章=当前位置
+  function drawSeaProgress() {
+    var cur = seaStage(), ts = totalScore();
+    var last = C.seaStages.length - 1;
+    var maxed = cur >= last;
+    var sx = 12, sy = 106, sw = C.W - 24, sh = 16;
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    roundRect(sx, sy, sw, sh, 8); ctx.fill();
+    var frac = 1;
+    if (!maxed) {
+      var lo = C.seaStages[cur].at, hi = C.seaStages[cur + 1].at;
+      frac = Math.min(1, Math.max(0.02, (ts - lo) / (hi - lo)));
+    }
+    if (frac > 0) {
+      // 填充=当前海域的深水色（bg[3]，与当前背景同族不撞色）；目的地用右端下一海域色小圆点表达
+      ctx.fillStyle = maxed ? SEA_BADGES[last].c : C.seaStages[cur].bg[3];
+      ctx.globalAlpha = 0.85;
+      roundRect(sx + 2, sy + 2, Math.max(10, (sw - 4) * frac), sh - 4, 6); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.font = 'bold 13px system-ui, sans-serif';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    var label = maxed ? '已达最深海域 · ' + C.seaStages[last].name
+      : '距「' + C.seaStages[cur + 1].name + '」还差 ' + (C.seaStages[cur + 1].at - ts) + ' 分';
+    var cx = sx + sw / 2;
+    ctx.strokeText(label, cx, sy + 13);
+    ctx.fillStyle = '#2C5A78';
+    ctx.fillText(label, cx, sy + 13);
+    if (!maxed) {
+      // 右端终点标记：下一海域徽章色小圆点（"要去的地方"），避免整条填充撞色
+      var ex = sx + sw - 14, ey = sy + sh / 2;
+      ctx.beginPath(); ctx.arc(ex, ey, 5.5, 0, Math.PI * 2);
+      ctx.fillStyle = SEA_BADGES[cur + 1].c; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    // 左端骑线放当前海域徽章——直观标注"当前位置"（与图鉴徽章语言一致）
+    drawSeaBadge(cur, sx + 16, sy + sh / 2, true);
+  }
 
   // ---------- 技能栏 ----------
   function drawSkillIcon(key, cx, cy, color) {
