@@ -104,7 +104,7 @@
   // 技能渐进解锁：按累计得分逐个点亮（换滴开局即有，涟漪/蒸发/水流递进）
   function skillUnlocked(key) { return totalScore() >= (C.skillUnlock[key] || 0); }
 
-  // ---------- 二周目「深渊回响」（达成最深海域解锁：带词缀的高危高收益无尽局） ----------
+  // ---------- 二周目「深渊潜航」（累计 5 万解锁：带词缀的高危高收益无尽局，结算页开启） ----------
   var ng = { unlocked: loadFlag('mg_ng'), active: null };
   var ngOpen = false, ngPicks = [];   // 词缀三选一弹窗
   var ngPickRects = [];               // 三张词缀卡的命中区（draw 时填充）
@@ -117,7 +117,7 @@
     C.gravity = GRAV0 * (affix.grav || 1);
     level = 2;                         // 直入无尽（潮汐/宝箱/事件全开）
     levelBanner = 2.2;
-    addPopup(C.W / 2, 300, '深渊回响 ·「' + affix.name + '」×' + affix.mult, true, 0);
+    addPopup(C.W / 2, 300, '深渊潜航 ·「' + affix.name + '」×' + affix.mult, true, 0);
     ngOpen = false;
   }
   function ngEndRun() {
@@ -1519,7 +1519,8 @@
       for (var i = 0; i < C.ng.affixes.length; i++) if (C.ng.affixes[i].id === id) af = C.ng.affixes[i];
       if (af) ngStartRun(af);
       return af ? af.name : null;
-    }
+    },
+    over: function () { buildOverButtons(); gameOver(); } // 直达结算页（UI 测试用）
   };
 
   // 第 1 关通过：弹出提示进入无尽模式，不清场、不重置，继续当前局面
@@ -1768,10 +1769,10 @@
 
   function buildOverButtons() {
     overButtons = [];
-    var bw = 240, bh = 48, gap = 14, x = (C.W - bw) / 2;
+    var bw = 240, bh = 40, gap = 8, x = (C.W - bw) / 2;
     // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中
     var areaTop = 150 + 176, areaBottom = 150 + 436 - 26;
-    var n = (reviveCount < 2 ? 1 : 0) + (doubled ? 0 : 1) + 2; // 复活/双倍/分享/重开
+    var n = (reviveCount < 2 ? 1 : 0) + (doubled ? 0 : 1) + 3; // 复活/双倍/分享/深渊潜航/重开
     var groupH = n * bh + (n - 1) * gap;
     var y = areaTop + (areaBottom - areaTop - groupH) / 2;
     if (reviveCount < 2) {
@@ -1784,6 +1785,13 @@
     }
     overButtons.push({ x: x, y: y, w: bw, h: bh, label: '分享战报', action: openShare });
     y += bh + gap;
+    // 深渊潜航：结算页模式入口（主流 NG+ 设计——局末选择下一局模式）
+    if (ng.unlocked) {
+      overButtons.push({ x: x, y: y, w: bw, h: bh, label: ng.active ? '深渊潜航 · 换词缀再战' : '深渊潜航 · 词缀无尽局', action: openNgPick, variant: 'ng' });
+    } else {
+      overButtons.push({ x: x, y: y, w: bw, h: bh, label: '深渊潜航 · 累计5万解锁', action: function () { addPopup(C.W / 2, 620, '深渊潜航：累计 5万 分解锁', false, 0); }, variant: 'locked' });
+    }
+    y += bh + gap;
     overButtons.push({ x: x, y: y, w: bw, h: bh, label: '重新开始', action: restart });
   }
 
@@ -1792,7 +1800,7 @@
   var bookBtn = { cx: 46, cy: 688, r: 20, pressT: 0 };
   var trophyBtn = { cx: 24, cy: 36, r: 14, pressT: 0 }; // 成就页入口（奖杯，左上角，与右上静音钮对称）
   var restartBtn = { cx: C.W - 24, cy: 688, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
-  var ngBtn = { cx: 258, cy: 76, r: 12, pressT: 0 }; // 二周目「深渊回响」入口（顶栏中段：任务条与潮汐胶囊之间的空档）
+  // 「深渊潜航」无局内悬浮钮：入口在结算页按钮组（主流 NG+ 模式选择设计）
   var SKILL_BTNS = [
     { key: 'swap',   cx: 116, cy: 688, r: 20, pressT: 0 },
     { key: 'ripple', cx: 178, cy: 688, r: 20, pressT: 0 },
@@ -1960,18 +1968,12 @@
     if (inMute(p)) { MUTE.pressT = 0.16; audio.muted = !audio.muted; saveFlag('mg_mute', audio.muted); if (audio.muted) audio.bgm.stop(); else audio.bgm.start(); return; }
     if (inCircle(p, bookBtn)) { bookBtn.pressT = 0.16; dexOpen = true; achOpen = false; return; }
     if (inCircle(p, trophyBtn)) { trophyBtn.pressT = 0.16; achOpen = true; dexOpen = false; dexTab = 0; return; }
-    // 二周目「深渊回响」：词缀三选一弹窗（点卡片开跑，点外关闭）
+    // 「深渊潜航」：词缀三选一弹窗（结算页/局内点卡片开跑，点外关闭）
     if (ngOpen) {
       for (var ni = 0; ni < ngPickRects.length; ni++) {
         if (inRect(p, ngPickRects[ni])) { ngStartRun(ngPicks[ni]); return; }
       }
       ngOpen = false;
-      return;
-    }
-    if (state === 'play' && inCircle(p, ngBtn)) {
-      ngBtn.pressT = 0.16;
-      if (ng.unlocked) openNgPick();
-      else addPopup(C.W / 2, FLOORY - 120, '深渊回响 · 累计 5万 分解锁', false, 0);
       return;
     }
     if (state === 'play') {
@@ -2054,7 +2056,7 @@
     if (!ng.unlocked && totalScore() >= C.ng.unlockScore) {
       ng.unlocked = true;
       saveFlag('mg_ng', 1);
-      addPopup(C.W / 2, 260, '解锁「深渊回响」：顶栏「渊」钮开启二周目', true, 0);
+      addPopup(C.W / 2, 260, '解锁「深渊潜航」：本局结束后可在结算页开启', true, 0);
       audio.quest();
     }
     // 海域演进：累计分跨过里程碑 → 世界换色 + 弹报

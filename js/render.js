@@ -1590,24 +1590,7 @@
       ctx.fillText(cfg.name, btn.cx, btn.cy + btn.r + 12);
     }
 
-    // 二周目「深渊回响」入口：顶栏中段空档；解锁后紫色渊字钮，未解锁灰色锁钮+解锁提示
-    if (state === 'play') {
-      if (ng.unlocked) {
-        drawCircleBtn(ngBtn, '#6B5AA8', 0.95, false, 0);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 11px system-ui, sans-serif';
-        ctx.fillText('渊', ngBtn.cx, ngBtn.cy + 4);
-      } else {
-        drawCircleBtn(ngBtn, '#6E7B88', 0.62, false, 0);
-        ctx.strokeStyle = 'rgba(255,255,255,0.92)'; ctx.lineWidth = 1.4;
-        ctx.beginPath(); ctx.arc(ngBtn.cx, ngBtn.cy - 2.5, 2.6, Math.PI, 0); ctx.stroke();
-        ctx.fillStyle = 'rgba(255,255,255,0.92)';
-        roundRect(ngBtn.cx - 3.8, ngBtn.cy - 2.5, 7.6, 6.4, 1.8); ctx.fill();
-        ctx.fillStyle = 'rgba(240,250,252,0.85)';
-        ctx.font = '7.5px system-ui, sans-serif';
-        ctx.fillText('5万解锁', ngBtn.cx, ngBtn.cy + 22);
-      }
-    }
+    // 「深渊潜航」入口已移至结算页按钮组（局内不再挂悬浮钮）
   }
   // 二周目词缀三选一弹窗
   function drawNgPick() {
@@ -1618,7 +1601,7 @@
     ctx.textAlign = 'center';
     ctx.fillStyle = '#5B4A94';
     ctx.font = 'bold 20px system-ui, sans-serif';
-    ctx.fillText('深渊回响', C.W / 2, py + 36);
+    ctx.fillText('深渊潜航', C.W / 2, py + 36);
     ctx.font = '11px system-ui, sans-serif';
     ctx.fillStyle = '#4A7FA0';
     ctx.fillText('选一条海况词缀，立即重开一局无尽模式', C.W / 2, py + 58);
@@ -2347,7 +2330,14 @@
 
     for (var i = 0; i < overButtons.length; i++) {
       var b = overButtons[i];
-      if (b.primary) {
+      if (b.variant === 'ng') { // 深渊潜航：紫色渐变（区别于普通按钮）
+        var ngg = ctx.createLinearGradient(b.x, b.y, b.x, b.y + b.h);
+        ngg.addColorStop(0, '#8A6FD0');
+        ngg.addColorStop(1, '#6B5AA8');
+        ctx.fillStyle = ngg;
+      } else if (b.variant === 'locked') { // 未解锁：灰显预告
+        ctx.fillStyle = '#C4D2DC';
+      } else if (b.primary) {
         var g = ctx.createLinearGradient(b.x, b.y, b.x, b.y + b.h);
         g.addColorStop(0, '#3B9BD0');
         g.addColorStop(1, '#2578A8');
@@ -2356,11 +2346,11 @@
         ctx.fillStyle = '#FFFFFF';
       }
       roundRect(b.x, b.y, b.w, b.h, 12); ctx.fill();
-      ctx.strokeStyle = b.primary ? 'rgba(255,255,255,0.5)' : '#2E86B4';
+      ctx.strokeStyle = (b.primary || b.variant === 'ng') ? 'rgba(255,255,255,0.5)' : (b.variant === 'locked' ? '#9AB0C0' : '#2E86B4');
       ctx.lineWidth = 1.5;
       roundRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1, 12); ctx.stroke();
-      ctx.fillStyle = b.primary ? '#FFFFFF' : '#2E86B4';
-      ctx.font = '16px system-ui, sans-serif';
+      ctx.fillStyle = b.variant === 'locked' ? '#5E7488' : ((b.primary || b.variant === 'ng') ? '#FFFFFF' : '#2E86B4');
+      ctx.font = '15px system-ui, sans-serif';
       ctx.textBaseline = 'middle';
       ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 + 1);
       ctx.textBaseline = 'alphabetic';
