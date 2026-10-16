@@ -533,7 +533,7 @@
     ctx.restore();
   }
 
-  // 礁石（内部名 iron）：岩石球——裂纹 + 苔点（障碍物）
+  // 礁石（内部名 iron）：岩石球——内部全部径向渐变光效（天光/岩缝暗斑/苔藓绿斑/内壁晕影），无线描无实心填充
   function drawIronBall(b, alpha) {
     var r = b.r;
     var bx = b.rx != null ? b.rx : b.x, by = b.ry != null ? b.ry : b.y;
@@ -549,48 +549,83 @@
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(bx, by);
-    // 岩石主体（渐变缓存）
+    // 岩石主体（径向渐变：左上受光暖灰 → 右下沉暗，渐变缓存）
     var rk2 = Math.round(r * 2) / 2;
     var g = grad('iron' + rk2, function () {
       var gg = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r * 1.05);
-      gg.addColorStop(0, '#D2CCBC');
-      gg.addColorStop(0.45, '#9A9282');
-      gg.addColorStop(1, '#645C4D');
+      gg.addColorStop(0, '#D5CFC0');
+      gg.addColorStop(0.45, '#999180');
+      gg.addColorStop(1, '#5E574A');
       return gg;
     });
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-    // 深色外圈
-    ctx.strokeStyle = '#4A4437';
-    ctx.lineWidth = Math.max(1.5, r * 0.07);
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.96, 0, Math.PI * 2); ctx.stroke();
-    // 顶部高光
-    ctx.globalAlpha = alpha * 0.4;
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = r * 0.1;
-    ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.7, Math.PI * 1.15, Math.PI * 1.5); ctx.stroke();
-    ctx.lineCap = 'butt';
-    ctx.globalAlpha = alpha;
-    // 裂纹
-    ctx.strokeStyle = 'rgba(62,54,40,0.5)';
-    ctx.lineWidth = Math.max(1, r * 0.05);
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.55, -r * 0.1);
-    ctx.lineTo(-r * 0.2, r * 0.05);
-    ctx.lineTo(-r * 0.32, r * 0.35);
-    ctx.moveTo(r * 0.15, -r * 0.52);
-    ctx.lineTo(r * 0.3, -r * 0.22);
-    ctx.lineTo(r * 0.55, -r * 0.1);
-    ctx.stroke();
-    // 苔点
-    ctx.fillStyle = 'rgba(110,135,80,0.5)';
-    var mos = [[-0.45, 0.35], [0.5, 0.25], [0.05, -0.62], [-0.2, 0.55], [0.35, -0.4]];
-    for (var mi = 0; mi < mos.length; mi++) {
-      ctx.beginPath();
-      ctx.arc(mos[mi][0] * r, mos[mi][1] * r, r * 0.06, 0, Math.PI * 2);
-      ctx.fill();
+    // 内部光效统一裁剪进岩体，边缘自然收进
+    ctx.save();
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.99, 0, Math.PI * 2); ctx.clip();
+    // ① 左上天光（径向光斑：四周渐隐，替代描边弧高光）
+    ctx.save();
+    ctx.translate(-r * 0.34, -r * 0.4);
+    ctx.rotate(-0.55);
+    ctx.scale(r * 0.5, r * 0.3);
+    ctx.fillStyle = grad('ironSky' + rk2, function () {
+      var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+      gg.addColorStop(0, 'rgba(255,250,235,0.34)');
+      gg.addColorStop(0.55, 'rgba(255,250,235,0.13)');
+      gg.addColorStop(1, 'rgba(255,250,235,0)');
+      return gg;
+    });
+    ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // ② 岩缝暗斑：三道斜向椭圆暗晕暗示裂缝走向（不描线，柔边过渡）
+    var cks = [
+      [-0.28, 0.04, 0.44, 0.1, -0.5],
+      [0.27, -0.3, 0.36, 0.09, 0.42],
+      [0.12, 0.44, 0.3, 0.08, 0.15]
+    ];
+    for (var ci = 0; ci < cks.length; ci++) {
+      var ck = cks[ci];
+      ctx.save();
+      ctx.translate(ck[0] * r, ck[1] * r);
+      ctx.rotate(ck[4]);
+      ctx.scale(r * ck[2], r * ck[3]);
+      ctx.fillStyle = grad('ironCk' + ci + '_' + rk2, function () {
+        var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+        gg.addColorStop(0, 'rgba(46,38,28,0.4)');
+        gg.addColorStop(0.5, 'rgba(46,38,28,0.18)');
+        gg.addColorStop(1, 'rgba(46,38,28,0)');
+        return gg;
+      });
+      ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
     }
+    // ③ 苔藓斑（径向渐变绿晕：中心浓边缘透明，大小/纵比错落）
+    var mos = [[-0.45, 0.38, 0.2], [0.5, 0.28, 0.17], [0.02, -0.6, 0.13], [-0.22, 0.6, 0.15], [0.38, -0.38, 0.12]];
+    for (var mi = 0; mi < mos.length; mi++) {
+      var mp = mos[mi];
+      ctx.save();
+      ctx.translate(mp[0] * r, mp[1] * r);
+      ctx.scale(r * mp[2], r * mp[2] * (0.72 + 0.2 * (mi % 2)));
+      ctx.fillStyle = grad('ironMo' + mi + '_' + rk2, function () {
+        var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+        gg.addColorStop(0, 'rgba(118,146,84,0.5)');
+        gg.addColorStop(0.6, 'rgba(118,146,84,0.24)');
+        gg.addColorStop(1, 'rgba(118,146,84,0)');
+        return gg;
+      });
+      ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    // ④ 内壁晕影：由内向外轻微加深（体积感 + 所有内容在球壁处统一收边）
+    ctx.fillStyle = grad('ironVg' + rk2, function () {
+      var gg = ctx.createRadialGradient(0, 0, r * 0.5, 0, 0, r);
+      gg.addColorStop(0, 'rgba(20,16,10,0)');
+      gg.addColorStop(0.75, 'rgba(20,16,10,0.14)');
+      gg.addColorStop(1, 'rgba(20,16,10,0.42)');
+      return gg;
+    });
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    ctx.restore(); // 内部裁剪
     // 可能被冰晶冻住
     if (b.frozen > 0) drawFrozenShell(b, r);
     ctx.restore();
