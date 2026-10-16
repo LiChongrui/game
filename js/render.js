@@ -1485,12 +1485,12 @@
 
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
   function drawHUD() {
-    // 计分（左上角悬浮；左端让位给奖杯按钮，从 x48 起）
+    // 计分（左上角悬浮；奖杯已上移到刘海行，分数从 x20 起）
     ctx.textAlign = 'left';
     var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
     ctx.lineJoin = 'round';
     ctx.save();
-    ctx.translate(48, 38);
+    ctx.translate(20, 32);
     ctx.scale(bump, bump);
     ctx.font = 'bold 34px system-ui, sans-serif';
     ctx.lineWidth = 4;
@@ -1506,9 +1506,9 @@
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     var sub = '最佳 ' + best + ' · ' + C.seaStages[seaStage()].name + (seaCount > 0 ? ' · 海域 ×' + seaCount : '') +
       (ng.active ? ' · 「' + ng.active.name + '」×' + ng.active.mult : '');
-    ctx.strokeText(sub, 48, 58);
+    ctx.strokeText(sub, 20, 52);
     ctx.fillStyle = ng.active ? '#6B5AA8' : '#3E6E90';
-    ctx.fillText(sub, 48, 58);
+    ctx.fillText(sub, 20, 52);
 
     // 右上角：下一滴预览 + 静音按钮（主流布局）
     ctx.textAlign = 'center';
@@ -1606,10 +1606,11 @@
   }
 
   // ---------- 顶部中央计时：本局已进行时长 ----------
-  // 成就殿堂入口按钮（🏆 奖杯，每日未全勤显红点）——游玩态技能栏与菜单态共用
-  function drawTrophyBtn() {
-    drawCircleBtn(trophyBtn, '#B8912F', 0.9, false, 0);
-    var tx = trophyBtn.cx, ty = trophyBtn.cy;
+  // 成就殿堂入口按钮（🏆 奖杯，每日未全勤显红点）——局内刘海行（trophyBtn）与菜单态（menuTrophy）共用
+  function drawTrophyBtn(btn) {
+    btn = btn || trophyBtn;
+    drawCircleBtn(btn, '#B8912F', 0.9, false, 0);
+    var tx = btn.cx, ty = btn.cy;
     ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(tx - 6, ty - 8); ctx.lineTo(tx + 6, ty - 8); ctx.lineTo(tx + 5, ty - 1);
@@ -1624,7 +1625,7 @@
     ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
     if (!(daily.done[0] && daily.done[1] && daily.done[2])) {
       ctx.fillStyle = '#E2705E';
-      ctx.beginPath(); ctx.arc(tx + trophyBtn.r - 3, ty - trophyBtn.r + 3, 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(tx + btn.r - 3, ty - btn.r + 3, 3.2, 0, Math.PI * 2); ctx.fill();
     }
   }
 
@@ -1807,7 +1808,7 @@
     ctx.beginPath(); ctx.moveTo(bx, by - 6); ctx.lineTo(bx, by + 6); ctx.stroke();
 
     // 成就页入口（🏆 奖杯，图鉴旁；每日未全勤显红点）
-    drawTrophyBtn();
+    drawTrophyBtn(trophyBtn);
 
     // 重开按钮（↻ 循环箭头，点击弹确认）
     drawCircleBtn(restartBtn, '#5E90B4', 0.85, false, 0);
@@ -2215,7 +2216,7 @@
       var vhSave = VH;
       VH = fullVH;                 // 菜单铺满全屏：以整屏逻辑高度为底（气泡/遮罩/底部文案锚到真屏底）
       drawMenu();
-      drawTrophyBtn();             // 成就殿堂/每日挑战入口（菜单态可点，systems 菜单分支处理）
+      drawTrophyBtn(menuTrophy);   // 成就殿堂/每日挑战入口（菜单态固定位，systems 菜单分支处理）
       if (achOpen) drawAchPanel(); // 面板盖在菜单之上（点击已放行到 achOpen 分支）
       VH = vhSave;
       ctx.restore(); return;

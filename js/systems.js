@@ -655,6 +655,7 @@
     // 按钮按压反馈计时
     if (bookBtn.pressT > 0) bookBtn.pressT -= dt;
     if (trophyBtn.pressT > 0) trophyBtn.pressT -= dt;
+    if (menuTrophy.pressT > 0) menuTrophy.pressT -= dt;
     if (MUTE.pressT > 0) MUTE.pressT -= dt;
     if (restartBtn.pressT > 0) restartBtn.pressT -= dt;
     for (i = 0; i < SKILL_BTNS.length; i++) if (SKILL_BTNS[i].pressT > 0) SKILL_BTNS[i].pressT -= dt;
@@ -2011,7 +2012,8 @@
   // ---------- 命中区域（圆形按钮） ----------
   var MUTE = { cx: C.W - 24, cy: 36, r: 13, pressT: 0 };
   var bookBtn = { cx: 46, cy: 688, r: 20, pressT: 0 };
-  var trophyBtn = { cx: 24, cy: 36, r: 14, pressT: 0 }; // 成就页入口（奖杯，左上角，与右上静音钮对称）
+  var trophyBtn = { cx: 24, cy: 36, r: 14, pressT: 0 }; // 成就页入口（奖杯；局内由 fit() 挂到刘海行，cy 为负）
+  var menuTrophy = { cx: 24, cy: 36, r: 14, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）
   var restartBtn = { cx: C.W - 24, cy: 688, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
   // 「深渊潜航」无局内悬浮钮：入口在结算页按钮组（主流 NG+ 模式选择设计）
   var SKILL_BTNS = [
@@ -2118,7 +2120,7 @@
     // 开始界面：响应「开始游戏」与奖杯（每日挑战从菜单发起，成就殿堂随时可看）；
     // 面板打开时放行到下方 dexOpen/achOpen 分支，否则面板内点击会被这里提前吞掉
     if (state === 'menu' && !achOpen && !dexOpen) {
-      if (inCircle(p, trophyBtn)) { trophyBtn.pressT = 0.16; achOpen = true; dexOpen = false; dexTab = 1; return; }
+      if (inCircle(p, menuTrophy)) { menuTrophy.pressT = 0.16; achOpen = true; dexOpen = false; dexTab = 1; return; }
       if (inRect(p, menuStartBtn)) {
         menuStartBtn.pressT = 0.2;
         audio.blip(660, 0.12, 'sine', 0.1, 0.4);

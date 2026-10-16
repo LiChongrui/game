@@ -17,19 +17,20 @@
   var FLOORY = C.floorY;  // 容器底 y（底部锚定：VH - 74）
   var view = { s: 1 };
   var safeTop = 0, safeBottom = 0; // 安全区 inset（逻辑 px）：刘海/挖孔顶、手势条底；fit() 从垫片 __safeInset 刷新，Web 端恒 0
+  var topBand = 44;                // 顶部刘海带（设备 px）：默认按有刘海预留 44px，奖杯/静音排在带内不浪费空间
   var botReserve = 0;              // 底部保留余量（设备 px）：只给手势条留少量空间，道具区不必大幅上移
   var fullVH = C.H;                // 整屏逻辑高度（h/view.s）：菜单态铺满全屏、面板垂直居中的基准
 
   function fit() {
     var w = window.innerWidth, h = window.innerHeight;
-    // 安全区：微信垫片提供 __safeInset（top=摄像头/挖孔区、bottom=手势横条区），Web 端无垫片为 0；
-    // 内容按有效视口缩放、渲染整体下压 safeTop，交互内容全部落在摄像头与手势条之外
+    // 安全区：微信垫片提供 __safeInset（top=摄像头/挖孔区、bottom=手势横条区），Web 端无垫片为 0。
+    // 顶部默认按有刘海预留 44px（topBand），奖杯/静音排在刘海行内——挖孔带不再是空白区
     var si = (typeof window.__safeInset === 'object' && window.__safeInset) || {};
     safeTop = si.top || 0; safeBottom = si.bottom || 0;
-    // 顶部整体下压避让摄像头；底部只预留少量空间给手势条（道具区上移不需要太多），
-    // 剩余底部区域由道具区底色/海底基色延伸覆盖
+    topBand = Math.max(safeTop, 44);
+    // 底部只预留少量空间给手势条（道具区上移不需要太多），剩余由道具区底色/海底基色延伸覆盖
     botReserve = Math.min(safeBottom, 20);
-    var eh = h - safeTop - botReserve;     // 有效视口高度（设备 px）
+    var eh = h - topBand - botReserve;     // 有效视口高度（设备 px）
     view.s = Math.min(w / C.W, eh / C.H);  // 等比缩放，不变形
     VH = eh / view.s;
     fullVH = h / view.s;                   // 整屏逻辑高度（含顶部挖孔区与底部手势区）
@@ -37,22 +38,26 @@
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
     FLOORY = VH - 74;                      // 容器底贴住窗口底部（720-646=74）
     C.floorY = FLOORY;                     // 同步给物理引擎（每帧读取，水滴落到新地板）
-    // 警戒线以下区域大小固定（容器高度不变，与 720 标准布局完全一致）：
-    // 多出来的高度全部留在警戒线之上（水滴滴落区域拉伸）
-    C.dangerY = FLOORY - (646 - 182);      // 警戒线 = 容器底 - 464
-    C.containerTop = FLOORY - (646 - 118); // 容器顶开口 = 容器底 - 528
-    C.spawnY = FLOORY - (646 - 120);       // 出生点 = 容器底 - 526（掉落位置相对警戒线固定，游戏区高宽比恒定）
+    // 顶部 HUD 区固定 118 逻辑 px：容器顶/警戒线/出生点全部恒定（=config 初始值，不再随 FLOORY 推算），
+    // 高屏多出来的高度全部给容器长高——HUD 与容器之间不再出现大片空白
+    C.containerTop = 118;
+    C.dangerY = 182;
+    C.spawnY = 120;
     canvas.width = Math.round(w * dpr);    // 画布铺满整个窗口（背景全程由游戏自绘）
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // 底部按钮/图鉴角标同步贴底（上移 4px 给名称标签留出完整显示空间）
+    // 刘海行：奖杯/静音挂进挖孔带（左右角落，负逻辑 y=带中心）——菜单态奖杯用 menuTrophy 固定位
+    var ny = -topBand / view.s / 2 + 2;
+    // 道具按钮：从贴底上移，在容器底~屏底带内近似垂直居中（含下方名称标签的空间）
+    var cy = VH - 46;
     // 注意：模块化后 bookBtn 等声明在 systems.js（后加载），早期触发时用 typeof 守卫
-    var cy = VH - 36;
     if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {
       bookBtn.cy = cy; restartBtn.cy = cy;
-      // trophyBtn 固定在左上角（与右上静音钮对称），不参与贴底
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
+    }
+    if (typeof trophyBtn !== 'undefined' && typeof MUTE !== 'undefined') {
+      trophyBtn.cy = ny; MUTE.cy = ny;
     }
   }
   window.addEventListener('resize', fit);

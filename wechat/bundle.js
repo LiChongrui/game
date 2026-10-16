@@ -411,19 +411,20 @@ MG.config = {
   var FLOORY = C.floorY;  // 容器底 y（底部锚定：VH - 74）
   var view = { s: 1 };
   var safeTop = 0, safeBottom = 0; // 安全区 inset（逻辑 px）：刘海/挖孔顶、手势条底；fit() 从垫片 __safeInset 刷新，Web 端恒 0
+  var topBand = 44;                // 顶部刘海带（设备 px）：默认按有刘海预留 44px，奖杯/静音排在带内不浪费空间
   var botReserve = 0;              // 底部保留余量（设备 px）：只给手势条留少量空间，道具区不必大幅上移
   var fullVH = C.H;                // 整屏逻辑高度（h/view.s）：菜单态铺满全屏、面板垂直居中的基准
 
   function fit() {
     var w = window.innerWidth, h = window.innerHeight;
-    // 安全区：微信垫片提供 __safeInset（top=摄像头/挖孔区、bottom=手势横条区），Web 端无垫片为 0；
-    // 内容按有效视口缩放、渲染整体下压 safeTop，交互内容全部落在摄像头与手势条之外
+    // 安全区：微信垫片提供 __safeInset（top=摄像头/挖孔区、bottom=手势横条区），Web 端无垫片为 0。
+    // 顶部默认按有刘海预留 44px（topBand），奖杯/静音排在刘海行内——挖孔带不再是空白区
     var si = (typeof window.__safeInset === 'object' && window.__safeInset) || {};
     safeTop = si.top || 0; safeBottom = si.bottom || 0;
-    // 顶部整体下压避让摄像头；底部只预留少量空间给手势条（道具区上移不需要太多），
-    // 剩余底部区域由道具区底色/海底基色延伸覆盖
+    topBand = Math.max(safeTop, 44);
+    // 底部只预留少量空间给手势条（道具区上移不需要太多），剩余由道具区底色/海底基色延伸覆盖
     botReserve = Math.min(safeBottom, 20);
-    var eh = h - safeTop - botReserve;     // 有效视口高度（设备 px）
+    var eh = h - topBand - botReserve;     // 有效视口高度（设备 px）
     view.s = Math.min(w / C.W, eh / C.H);  // 等比缩放，不变形
     VH = eh / view.s;
     fullVH = h / view.s;                   // 整屏逻辑高度（含顶部挖孔区与底部手势区）
@@ -431,22 +432,26 @@ MG.config = {
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
     FLOORY = VH - 74;                      // 容器底贴住窗口底部（720-646=74）
     C.floorY = FLOORY;                     // 同步给物理引擎（每帧读取，水滴落到新地板）
-    // 警戒线以下区域大小固定（容器高度不变，与 720 标准布局完全一致）：
-    // 多出来的高度全部留在警戒线之上（水滴滴落区域拉伸）
-    C.dangerY = FLOORY - (646 - 182);      // 警戒线 = 容器底 - 464
-    C.containerTop = FLOORY - (646 - 118); // 容器顶开口 = 容器底 - 528
-    C.spawnY = FLOORY - (646 - 120);       // 出生点 = 容器底 - 526（掉落位置相对警戒线固定，游戏区高宽比恒定）
+    // 顶部 HUD 区固定 118 逻辑 px：容器顶/警戒线/出生点全部恒定（=config 初始值，不再随 FLOORY 推算），
+    // 高屏多出来的高度全部给容器长高——HUD 与容器之间不再出现大片空白
+    C.containerTop = 118;
+    C.dangerY = 182;
+    C.spawnY = 120;
     canvas.width = Math.round(w * dpr);    // 画布铺满整个窗口（背景全程由游戏自绘）
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // 底部按钮/图鉴角标同步贴底（上移 4px 给名称标签留出完整显示空间）
+    // 刘海行：奖杯/静音挂进挖孔带（左右角落，负逻辑 y=带中心）——菜单态奖杯用 menuTrophy 固定位
+    var ny = -topBand / view.s / 2 + 2;
+    // 道具按钮：从贴底上移，在容器底~屏底带内近似垂直居中（含下方名称标签的空间）
+    var cy = VH - 46;
     // 注意：模块化后 bookBtn 等声明在 systems.js（后加载），早期触发时用 typeof 守卫
-    var cy = VH - 36;
     if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {
       bookBtn.cy = cy; restartBtn.cy = cy;
-      // trophyBtn 固定在左上角（与右上静音钮对称），不参与贴底
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
+    }
+    if (typeof trophyBtn !== 'undefined' && typeof MUTE !== 'undefined') {
+      trophyBtn.cy = ny; MUTE.cy = ny;
     }
   }
   window.addEventListener('resize', fit);
@@ -1378,6 +1383,7 @@ MG.config = {
     // 按钮按压反馈计时
     if (bookBtn.pressT > 0) bookBtn.pressT -= dt;
     if (trophyBtn.pressT > 0) trophyBtn.pressT -= dt;
+    if (menuTrophy.pressT > 0) menuTrophy.pressT -= dt;
     if (MUTE.pressT > 0) MUTE.pressT -= dt;
     if (restartBtn.pressT > 0) restartBtn.pressT -= dt;
     for (i = 0; i < SKILL_BTNS.length; i++) if (SKILL_BTNS[i].pressT > 0) SKILL_BTNS[i].pressT -= dt;
@@ -2734,7 +2740,8 @@ MG.config = {
   // ---------- 命中区域（圆形按钮） ----------
   var MUTE = { cx: C.W - 24, cy: 36, r: 13, pressT: 0 };
   var bookBtn = { cx: 46, cy: 688, r: 20, pressT: 0 };
-  var trophyBtn = { cx: 24, cy: 36, r: 14, pressT: 0 }; // 成就页入口（奖杯，左上角，与右上静音钮对称）
+  var trophyBtn = { cx: 24, cy: 36, r: 14, pressT: 0 }; // 成就页入口（奖杯；局内由 fit() 挂到刘海行，cy 为负）
+  var menuTrophy = { cx: 24, cy: 36, r: 14, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）
   var restartBtn = { cx: C.W - 24, cy: 688, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
   // 「深渊潜航」无局内悬浮钮：入口在结算页按钮组（主流 NG+ 模式选择设计）
   var SKILL_BTNS = [
@@ -2841,7 +2848,7 @@ MG.config = {
     // 开始界面：响应「开始游戏」与奖杯（每日挑战从菜单发起，成就殿堂随时可看）；
     // 面板打开时放行到下方 dexOpen/achOpen 分支，否则面板内点击会被这里提前吞掉
     if (state === 'menu' && !achOpen && !dexOpen) {
-      if (inCircle(p, trophyBtn)) { trophyBtn.pressT = 0.16; achOpen = true; dexOpen = false; dexTab = 1; return; }
+      if (inCircle(p, menuTrophy)) { menuTrophy.pressT = 0.16; achOpen = true; dexOpen = false; dexTab = 1; return; }
       if (inRect(p, menuStartBtn)) {
         menuStartBtn.pressT = 0.2;
         audio.blip(660, 0.12, 'sine', 0.1, 0.4);
@@ -5318,12 +5325,12 @@ MG.config = {
 
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
   function drawHUD() {
-    // 计分（左上角悬浮；左端让位给奖杯按钮，从 x48 起）
+    // 计分（左上角悬浮；奖杯已上移到刘海行，分数从 x20 起）
     ctx.textAlign = 'left';
     var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
     ctx.lineJoin = 'round';
     ctx.save();
-    ctx.translate(48, 38);
+    ctx.translate(20, 32);
     ctx.scale(bump, bump);
     ctx.font = 'bold 34px system-ui, sans-serif';
     ctx.lineWidth = 4;
@@ -5339,9 +5346,9 @@ MG.config = {
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     var sub = '最佳 ' + best + ' · ' + C.seaStages[seaStage()].name + (seaCount > 0 ? ' · 海域 ×' + seaCount : '') +
       (ng.active ? ' · 「' + ng.active.name + '」×' + ng.active.mult : '');
-    ctx.strokeText(sub, 48, 58);
+    ctx.strokeText(sub, 20, 52);
     ctx.fillStyle = ng.active ? '#6B5AA8' : '#3E6E90';
-    ctx.fillText(sub, 48, 58);
+    ctx.fillText(sub, 20, 52);
 
     // 右上角：下一滴预览 + 静音按钮（主流布局）
     ctx.textAlign = 'center';
@@ -5439,10 +5446,11 @@ MG.config = {
   }
 
   // ---------- 顶部中央计时：本局已进行时长 ----------
-  // 成就殿堂入口按钮（🏆 奖杯，每日未全勤显红点）——游玩态技能栏与菜单态共用
-  function drawTrophyBtn() {
-    drawCircleBtn(trophyBtn, '#B8912F', 0.9, false, 0);
-    var tx = trophyBtn.cx, ty = trophyBtn.cy;
+  // 成就殿堂入口按钮（🏆 奖杯，每日未全勤显红点）——局内刘海行（trophyBtn）与菜单态（menuTrophy）共用
+  function drawTrophyBtn(btn) {
+    btn = btn || trophyBtn;
+    drawCircleBtn(btn, '#B8912F', 0.9, false, 0);
+    var tx = btn.cx, ty = btn.cy;
     ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(tx - 6, ty - 8); ctx.lineTo(tx + 6, ty - 8); ctx.lineTo(tx + 5, ty - 1);
@@ -5457,7 +5465,7 @@ MG.config = {
     ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
     if (!(daily.done[0] && daily.done[1] && daily.done[2])) {
       ctx.fillStyle = '#E2705E';
-      ctx.beginPath(); ctx.arc(tx + trophyBtn.r - 3, ty - trophyBtn.r + 3, 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(tx + btn.r - 3, ty - btn.r + 3, 3.2, 0, Math.PI * 2); ctx.fill();
     }
   }
 
@@ -5640,7 +5648,7 @@ MG.config = {
     ctx.beginPath(); ctx.moveTo(bx, by - 6); ctx.lineTo(bx, by + 6); ctx.stroke();
 
     // 成就页入口（🏆 奖杯，图鉴旁；每日未全勤显红点）
-    drawTrophyBtn();
+    drawTrophyBtn(trophyBtn);
 
     // 重开按钮（↻ 循环箭头，点击弹确认）
     drawCircleBtn(restartBtn, '#5E90B4', 0.85, false, 0);
@@ -6048,7 +6056,7 @@ MG.config = {
       var vhSave = VH;
       VH = fullVH;                 // 菜单铺满全屏：以整屏逻辑高度为底（气泡/遮罩/底部文案锚到真屏底）
       drawMenu();
-      drawTrophyBtn();             // 成就殿堂/每日挑战入口（菜单态可点，systems 菜单分支处理）
+      drawTrophyBtn(menuTrophy);   // 成就殿堂/每日挑战入口（菜单态固定位，systems 菜单分支处理）
       if (achOpen) drawAchPanel(); // 面板盖在菜单之上（点击已放行到 achOpen 分支）
       VH = vhSave;
       ctx.restore(); return;
