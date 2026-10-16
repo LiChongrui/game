@@ -547,8 +547,11 @@
     score += bonus;
     scoreBump = 0.3;
     if (score > best) { best = score; saveNum('mg_best', best); }
-    addPopup(px === undefined ? C.W / 2 : px, py === undefined ? 240 : py,
-      '图鉴解锁 · ' + T[t].name + ' +' + bonus, true, 0);
+    // 初始几档（无积分门槛）是开局常态，不再弹"图鉴解锁"提示，避免刷屏
+    if (C.dexGate[t]) {
+      addPopup(px === undefined ? C.W / 2 : px, py === undefined ? 240 : py,
+        '图鉴解锁 · ' + T[t].name + ' +' + bonus, true, 0);
+    }
     saveDex();
   }
   // 累计得分跨过门槛时补解锁（如先合出了高级、后攒够积分）
@@ -1618,8 +1621,9 @@
     return { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 76 + g * 44, w: DEX_PANEL.w - 28, h: 40 };
   }
   function dexSecRect(i) {
-    // 分节切换胶囊：合成链 / 海域演进 / 特殊·宝箱
-    return { x: DEX_PANEL.x + 14 + i * 120, y: DEX_PANEL.y + 44, w: 112, h: 24 };
+    // 分节切换：通栏分段控件（合成链 / 海域演进 / 特殊·宝箱），样式与顶部页签区分
+    var segW = Math.floor((DEX_PANEL.w - 30) / 3);
+    return { x: DEX_PANEL.x + 15 + i * segW, y: DEX_PANEL.y + 44, w: segW, h: 24 };
   }
 
   // 重开确认弹窗

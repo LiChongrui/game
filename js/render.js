@@ -1546,13 +1546,20 @@
     if (dexTab === 2) { drawDailyTab(); return; }
     if (dexTab === 3) { drawRankTab(); return; }
 
-    // —— 分节切换胶囊：合成链 / 海域演进 / 特殊·宝箱 ——
+    // —— 分节切换：通栏分段控件（与顶部独立胶囊页签样式区分）——
     var secNames = ['合成链', '海域演进', '特殊·宝箱'];
+    var seg0 = dexSecRect(0), seg2 = dexSecRect(2);
+    ctx.fillStyle = 'rgba(21,90,138,0.10)';
+    roundRect(seg0.x, seg0.y, seg2.x + seg2.w - seg0.x, seg0.h, 12); ctx.fill();
     for (var sc = 0; sc < 3; sc++) {
       var sr = dexSecRect(sc);
-      ctx.fillStyle = sc === dexSec ? '#2E86B4' : 'rgba(46,134,180,0.10)';
-      roundRect(sr.x, sr.y, sr.w, sr.h, 12); ctx.fill();
-      ctx.fillStyle = sc === dexSec ? '#FFFFFF' : '#4A7FA0';
+      if (sc === dexSec) { // 活动段 = 白色内嵌芯片
+        ctx.fillStyle = '#FFFFFF';
+        roundRect(sr.x + 2, sr.y + 2, sr.w - 4, sr.h - 4, 9); ctx.fill();
+        ctx.fillStyle = '#155A8A';
+      } else {
+        ctx.fillStyle = '#5B7E96';
+      }
       ctx.font = 'bold 12px system-ui, sans-serif';
       ctx.fillText(secNames[sc], sr.x + sr.w / 2, sr.y + 16);
     }
@@ -1595,26 +1602,28 @@
         var ss = C.seaStages[stg];
         var sRow = stageRowRect(stg);
         var isCur = stg === curStage, reached = tsNow >= ss.at, sel = dexSelStage === stg;
-        ctx.fillStyle = isCur ? '#2E86B4' : (reached ? 'rgba(46,134,180,0.12)' : 'rgba(120,145,165,0.10)');
-        roundRect(sRow.x, sRow.y, sRow.w, sRow.h, 9); ctx.fill();
+        if (isCur) {
+          ctx.fillStyle = '#2E86B4';
+        } else if (reached) { // 已抵达：铺该海域专属色的浅底
+          ctx.globalAlpha = 0.13;
+          ctx.fillStyle = (SEA_BADGES[stg] || SEA_BADGES[0]).c;
+          roundRect(sRow.x, sRow.y, sRow.w, sRow.h, 9); ctx.fill();
+          ctx.globalAlpha = 1;
+        } else {
+          ctx.fillStyle = 'rgba(120,145,165,0.10)';
+        }
+        if (isCur || !reached) { roundRect(sRow.x, sRow.y, sRow.w, sRow.h, 9); ctx.fill(); }
         if (sel) {
           ctx.strokeStyle = '#2E86B4'; ctx.lineWidth = 1.5;
           roundRect(sRow.x + 0.5, sRow.y + 0.5, sRow.w - 1, sRow.h - 1, 9); ctx.stroke();
         }
-        // 状态点：当前=白芯脉冲环 / 已抵达=实心 / 未抵达=灰色空环
+        // 海域专属徽章：当前海域外圈白芯脉冲环 / 已抵达实色彩徽 / 未抵达灰色空徽
         var dotX = sRow.x + 22, dotY = sRow.y + sRow.h / 2;
         if (isCur) {
           ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.5;
-          ctx.beginPath(); ctx.arc(dotX, dotY, 5 + Math.sin(time * 4) * 1.2, 0, Math.PI * 2); ctx.stroke();
-          ctx.fillStyle = '#FFFFFF';
-          ctx.beginPath(); ctx.arc(dotX, dotY, 2.4, 0, Math.PI * 2); ctx.fill();
-        } else if (reached) {
-          ctx.fillStyle = '#2E86B4';
-          ctx.beginPath(); ctx.arc(dotX, dotY, 5, 0, Math.PI * 2); ctx.fill();
-        } else {
-          ctx.strokeStyle = '#8AA5B8'; ctx.lineWidth = 1.5;
-          ctx.beginPath(); ctx.arc(dotX, dotY, 4, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.arc(dotX, dotY, 12.5 + Math.sin(time * 4) * 1.2, 0, Math.PI * 2); ctx.stroke();
         }
+        drawSeaBadge(stg, dotX, dotY, reached || isCur);
         ctx.fillStyle = isCur ? '#FFFFFF' : (reached ? '#155A8A' : '#8AA5B8');
         ctx.font = 'bold 13px system-ui, sans-serif';
         ctx.fillText(reached || isCur ? ss.name : '？？？', dotX + 16, dotY + 5);
@@ -1662,9 +1671,6 @@
         ctx.fillStyle = found ? '#1E7A6F' : '#B0584A';
         ctx.fillText(found ? '已发现' : '未发现', sx, pRect.y + 97);
       }
-      ctx.font = '10px system-ui, sans-serif';
-      ctx.fillStyle = '#8AA5B8';
-      ctx.fillText('点击条目在下方查看玩法说明', DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + 336);
     }
 
     // —— 说明区：合成链 / 海域 / 特殊·宝箱 三类条目通用 ——
@@ -1700,8 +1706,6 @@
     ctx.fillText(sub, DEX_PANEL.x + 24, DEX_PANEL.y + 490);
     ctx.fillStyle = '#4A7FA0';
     ctx.fillText(body, DEX_PANEL.x + 24, DEX_PANEL.y + 510);
-    ctx.fillStyle = '#8AA5B8';
-    ctx.fillText('点击任意条目切换说明', DEX_PANEL.x + 24, DEX_PANEL.y + 528);
     ctx.textAlign = 'center';
   }
 
@@ -1724,6 +1728,74 @@
     ctx.fillRect(7, -2, 3, 13);
     ctx.fillStyle = '#F2C14E'; // 金锁
     roundRect(-3.5, -4, 7, 8, 2); ctx.fill();
+    ctx.restore();
+  }
+
+  // 海域徽章：每片海域专属颜色 + 图形（图鉴列表用，便于一眼区分）
+  var SEA_BADGES = [
+    { c: '#3BB8D8', g: 'pool' },    // 潮汐池：波浪
+    { c: '#E8836A', g: 'coral' },   // 珊瑚浅海：珊瑚枝
+    { c: '#2E9BD4', g: 'bubbles' }, // 蔚蓝深海：气泡
+    { c: '#4A5FB4', g: 'star' },    // 午夜深渊：夜星
+    { c: '#C9A84C', g: 'moon' },    // 月光环礁：月牙
+    { c: '#2A4C8A', g: 'eye' },     // 海沟之眼：海之眼
+    { c: '#D4622A', g: 'vent' },    // 热泉裂谷：热泉火苗
+    { c: '#8A5FB4', g: 'crown' }    // 深渊王座：王冠
+  ];
+  function drawSeaBadge(stg, x, y, reached) {
+    var ic = SEA_BADGES[stg] || SEA_BADGES[0];
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2);
+    if (reached) {
+      ctx.fillStyle = ic.c; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1; ctx.stroke();
+    } else {
+      ctx.fillStyle = 'rgba(120,145,165,0.16)'; ctx.fill();
+      ctx.strokeStyle = '#8AA5B8'; ctx.lineWidth = 1; ctx.stroke();
+    }
+    var fg = reached ? '#FFFFFF' : '#8AA5B8';
+    ctx.strokeStyle = fg; ctx.fillStyle = fg;
+    ctx.lineWidth = 1.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    switch (ic.g) {
+      case 'pool': // 双波浪线
+        ctx.moveTo(-5.5, -2.5); ctx.quadraticCurveTo(-2.8, -5.5, 0, -2.5); ctx.quadraticCurveTo(2.8, 0.5, 5.5, -2.5);
+        ctx.moveTo(-5.5, 3.5); ctx.quadraticCurveTo(-2.8, 0.5, 0, 3.5); ctx.quadraticCurveTo(2.8, 6.5, 5.5, 3.5);
+        ctx.stroke(); break;
+      case 'coral': // 珊瑚枝
+        ctx.moveTo(0, 5); ctx.lineTo(0, -1);
+        ctx.moveTo(0, 0); ctx.lineTo(-3.5, -4.5);
+        ctx.moveTo(0, 1); ctx.lineTo(3.5, -2.5);
+        ctx.moveTo(-3.5, -4.5); ctx.lineTo(-2, -5.5);
+        ctx.stroke(); break;
+      case 'bubbles': // 三粒气泡
+        ctx.arc(-2.5, 3, 1.7, 0, Math.PI * 2);
+        ctx.moveTo(1.8, -0.5); ctx.arc(0.8, -0.5, 1.1, 0, Math.PI * 2);
+        ctx.moveTo(3.4, -3.8); ctx.arc(3, -3.8, 0.6, 0, Math.PI * 2);
+        ctx.stroke(); break;
+      case 'star': // 四角夜星
+        ctx.moveTo(0, -5); ctx.quadraticCurveTo(0.9, -0.9, 5, 0);
+        ctx.quadraticCurveTo(0.9, 0.9, 0, 5);
+        ctx.quadraticCurveTo(-0.9, 0.9, -5, 0);
+        ctx.quadraticCurveTo(-0.9, -0.9, 0, -5);
+        ctx.fill(); break;
+      case 'moon': // 月牙（叠圆裁出）
+        ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = reached ? ic.c : 'rgba(120,145,165,0.16)'; // 补底圆与徽底同色，未抵达不显彩
+        ctx.beginPath(); ctx.arc(2.2, -1.6, 4.4, 0, Math.PI * 2); ctx.fill(); break;
+      case 'eye': // 海之眼
+        ctx.ellipse(0, 0, 5.2, 3.1, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, 1.7, 0, Math.PI * 2); ctx.fill(); break;
+      case 'vent': // 热泉火苗
+        ctx.moveTo(0, -5.5); ctx.quadraticCurveTo(4.5, -0.5, 2.2, 4.5);
+        ctx.lineTo(-2.2, 4.5); ctx.quadraticCurveTo(-4.5, -0.5, 0, -5.5);
+        ctx.fill(); break;
+      case 'crown': // 王冠
+        ctx.moveTo(-5, 3.5); ctx.lineTo(-5, -2); ctx.lineTo(-2.2, 0.2);
+        ctx.lineTo(0, -4.2); ctx.lineTo(2.2, 0.2); ctx.lineTo(5, -2);
+        ctx.lineTo(5, 3.5); ctx.closePath(); ctx.fill(); break;
+    }
     ctx.restore();
   }
 
