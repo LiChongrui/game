@@ -1939,11 +1939,10 @@
     });
   }
   function doDouble() {
-    ads.show('结算双倍', function () {
-      doubled = true;
-      score *= 2;
-      if (score > best) { best = score; saveNum('mg_best', best); }
-    });
+    // 不再看广告：直接双倍（广告占位已按需求移除）
+    doubled = true;
+    score *= 2;
+    if (score > best) { best = score; saveNum('mg_best', best); }
   }
   function restart() {
     ngEndRun(); // 二周目词缀只在单局内生效（普通重开回到常态）
@@ -1987,9 +1986,9 @@
 
   function buildOverButtons() {
     overButtons = [];
-    var bw = 240, bh = 40, gap = 8, x = (C.W - bw) / 2;
-    // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中
-    var areaTop = 150 + 176, areaBottom = 150 + 436 - 26;
+    var bw = 240, bh = 42, gap = 10, x = (C.W - bw) / 2;
+    // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中（面板 py134/ph472，见 render.drawOver）
+    var areaTop = 134 + 186, areaBottom = 134 + 472 - 22;
     var n = 1 + (doubled ? 0 : 1) + 3; // 复活(无限)/双倍/分享/深渊潜航/重开
     var groupH = n * bh + (n - 1) * gap;
     var y = areaTop + (areaBottom - areaTop - groupH) / 2;
@@ -1998,7 +1997,7 @@
       y += bh + gap;
     }
     if (!doubled) {
-      overButtons.push({ x: x, y: y, w: bw, h: bh, label: '结算双倍（看广告）', action: doDouble });
+      overButtons.push({ x: x, y: y, w: bw, h: bh, label: '结算双倍', action: doDouble });
       y += bh + gap;
     }
     overButtons.push({ x: x, y: y, w: bw, h: bh, label: '分享战报', action: openShare });
@@ -2014,10 +2013,10 @@
   }
 
   // ---------- 命中区域（圆形按钮） ----------
-  var MUTE = { cx: C.W - 24, cy: 36, r: 13, pressT: 0 };
+  var MUTE = { cx: C.W - 24, cy: 36, r: 20, pressT: 0 };
   var bookBtn = { cx: 46, cy: 688, r: 20, pressT: 0 };
-  var trophyBtn = { cx: 24, cy: 36, r: 14, pressT: 0 }; // 成就页入口（奖杯；局内由 fit() 挂到刘海行，cy 为负）
-  var menuTrophy = { cx: 24, cy: 36, r: 14, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）
+  var trophyBtn = { cx: 24, cy: 36, r: 20, pressT: 0 }; // 成就页入口（奖杯；局内由 fit() 挂到刘海行，cy 为负）——与底部圆钮（图鉴/道具/重开一排）同径
+  var menuTrophy = { cx: 24, cy: 36, r: 20, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——与底部圆钮同径
   var restartBtn = { cx: C.W - 24, cy: 688, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
   // 「深渊潜航」无局内悬浮钮：入口在结算页按钮组（主流 NG+ 模式选择设计）
   // 底部一排共 6 个按钮（图鉴 + 4 道具 + 重开），中心等距 70px 均匀排列：46/116/186/256/326/396
@@ -2041,7 +2040,7 @@
     var dx = p.x - c.cx, dy = p.y - c.cy;
     return dx * dx + dy * dy <= (c.r + 6) * (c.r + 6);
   }
-  function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - MUTE.cy; return dx * dx + dy * dy <= 18 * 18; } // 命中区略大于视觉（小按钮易点空）
+  function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - MUTE.cy; return dx * dx + dy * dy <= (MUTE.r + 6) * (MUTE.r + 6); } // 命中区随按钮半径（与其他圆钮同为 r+6）
   function toLocal(e) {
     var rect = canvas.getBoundingClientRect();
     // 内容层游戏块垂直居中偏移 renderOy（菜单态 0），触摸 y 同量补偿还原块内坐标

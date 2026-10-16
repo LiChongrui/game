@@ -1547,7 +1547,8 @@
     drawMiniBtn(MUTE);
     ctx.save();
     ctx.translate(MUTE.cx, MUTE.cy);
-    ctx.scale(0.8, 0.8);
+    var ms = MUTE.r / 13 * 0.8;    // 图标随按钮半径等比缩放（按钮放大后图标同步放大）
+    ctx.scale(ms, ms);
     var mx = 0, my = 0;
     ctx.fillStyle = '#3E6E90';
     ctx.beginPath();
@@ -1622,21 +1623,27 @@
     btn = btn || trophyBtn;
     drawCircleBtn(btn, '#B8912F', 0.9, false, 0);
     var tx = btn.cx, ty = btn.cy;
+    // 图标随按钮半径等比缩放（按钮放大后图标同步放大，不留空壳感）
+    ctx.save();
+    ctx.translate(tx, ty);
+    var ts = btn.r / 14;
+    ctx.scale(ts, ts);
     ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath();
-    ctx.moveTo(tx - 6, ty - 8); ctx.lineTo(tx + 6, ty - 8); ctx.lineTo(tx + 5, ty - 1);
-    ctx.quadraticCurveTo(tx, ty + 4, tx - 5, ty - 1);
+    ctx.moveTo(-6, -8); ctx.lineTo(6, -8); ctx.lineTo(5, -1);
+    ctx.quadraticCurveTo(0, 4, -5, -1);
     ctx.closePath(); ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(tx - 6, ty - 6); ctx.quadraticCurveTo(tx - 10, ty - 6, tx - 8, ty - 1);
-    ctx.moveTo(tx + 6, ty - 6); ctx.quadraticCurveTo(tx + 10, ty - 6, tx + 8, ty - 1);
-    ctx.moveTo(tx, ty + 3); ctx.lineTo(tx, ty + 6);
-    ctx.moveTo(tx - 4, ty + 7); ctx.lineTo(tx + 4, ty + 7);
+    ctx.moveTo(-6, -6); ctx.quadraticCurveTo(-10, -6, -8, -1);
+    ctx.moveTo(6, -6); ctx.quadraticCurveTo(10, -6, 8, -1);
+    ctx.moveTo(0, 3); ctx.lineTo(0, 6);
+    ctx.moveTo(-4, 7); ctx.lineTo(4, 7);
     ctx.stroke();
+    ctx.restore();
     ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
     if (!(daily.done[0] && daily.done[1] && daily.done[2])) {
       ctx.fillStyle = '#E2705E';
-      ctx.beginPath(); ctx.arc(tx + btn.r - 3, ty - btn.r + 3, 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(tx + btn.r - 3, ty - btn.r + 3, 3.4, 0, Math.PI * 2); ctx.fill();
     }
   }
 
@@ -2060,25 +2067,26 @@
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
 
-    var pw = 320, ph = 436, px = (C.W - pw) / 2, py = 150;
+    // 结算海报：面板加高放宽（436→472、上移至134），统计区与按钮组均拉开呼吸感
+    var pw = 320, ph = 472, px = (C.W - pw) / 2, py = 134;
     panel(px, py, pw, ph, 16, 0.97);
 
     ctx.textAlign = 'center';
     ctx.fillStyle = '#155A8A';
     ctx.font = 'bold 28px system-ui, sans-serif';
-    ctx.fillText('本局结束', C.W / 2, py + 44);
+    ctx.fillText('本局结束', C.W / 2, py + 46);
     ctx.font = 'bold 53px system-ui, sans-serif';
     ctx.fillStyle = '#0F4C79';
-    ctx.fillText(String(score), C.W / 2, py + 98);
+    ctx.fillText(String(score), C.W / 2, py + 104);
     ctx.font = '18px system-ui, sans-serif';
     ctx.fillStyle = '#4A7FA0';
     var isNewBest = score >= best && score > 0;
     var statusLine = doubled ? '已双倍结算'
       : (isNewBest ? '★ 新纪录！'
       : ('最佳 ' + best));
-    ctx.fillText(statusLine, C.W / 2, py + 126);
+    ctx.fillText(statusLine, C.W / 2, py + 136);
     if (maxCombo > 1) {
-      ctx.fillText('本局最高连击 ×' + maxCombo + (seaCount > 0 ? ' · 汇入海域 ×' + seaCount : ''), C.W / 2, py + 148);
+      ctx.fillText('本局最高连击 ×' + maxCombo + (seaCount > 0 ? ' · 汇入海域 ×' + seaCount : ''), C.W / 2, py + 160);
     }
 
     for (var i = 0; i < overButtons.length; i++) {

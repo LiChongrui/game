@@ -2666,11 +2666,10 @@ MG.config = {
     });
   }
   function doDouble() {
-    ads.show('结算双倍', function () {
-      doubled = true;
-      score *= 2;
-      if (score > best) { best = score; saveNum('mg_best', best); }
-    });
+    // 不再看广告：直接双倍（广告占位已按需求移除）
+    doubled = true;
+    score *= 2;
+    if (score > best) { best = score; saveNum('mg_best', best); }
   }
   function restart() {
     ngEndRun(); // 二周目词缀只在单局内生效（普通重开回到常态）
@@ -2714,9 +2713,9 @@ MG.config = {
 
   function buildOverButtons() {
     overButtons = [];
-    var bw = 240, bh = 40, gap = 8, x = (C.W - bw) / 2;
-    // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中
-    var areaTop = 150 + 176, areaBottom = 150 + 436 - 26;
+    var bw = 240, bh = 42, gap = 10, x = (C.W - bw) / 2;
+    // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中（面板 py134/ph472，见 render.drawOver）
+    var areaTop = 134 + 186, areaBottom = 134 + 472 - 22;
     var n = 1 + (doubled ? 0 : 1) + 3; // 复活(无限)/双倍/分享/深渊潜航/重开
     var groupH = n * bh + (n - 1) * gap;
     var y = areaTop + (areaBottom - areaTop - groupH) / 2;
@@ -2725,7 +2724,7 @@ MG.config = {
       y += bh + gap;
     }
     if (!doubled) {
-      overButtons.push({ x: x, y: y, w: bw, h: bh, label: '结算双倍（看广告）', action: doDouble });
+      overButtons.push({ x: x, y: y, w: bw, h: bh, label: '结算双倍', action: doDouble });
       y += bh + gap;
     }
     overButtons.push({ x: x, y: y, w: bw, h: bh, label: '分享战报', action: openShare });
@@ -2741,10 +2740,10 @@ MG.config = {
   }
 
   // ---------- 命中区域（圆形按钮） ----------
-  var MUTE = { cx: C.W - 24, cy: 36, r: 13, pressT: 0 };
+  var MUTE = { cx: C.W - 24, cy: 36, r: 20, pressT: 0 };
   var bookBtn = { cx: 46, cy: 688, r: 20, pressT: 0 };
-  var trophyBtn = { cx: 24, cy: 36, r: 14, pressT: 0 }; // 成就页入口（奖杯；局内由 fit() 挂到刘海行，cy 为负）
-  var menuTrophy = { cx: 24, cy: 36, r: 14, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）
+  var trophyBtn = { cx: 24, cy: 36, r: 20, pressT: 0 }; // 成就页入口（奖杯；局内由 fit() 挂到刘海行，cy 为负）——与底部圆钮（图鉴/道具/重开一排）同径
+  var menuTrophy = { cx: 24, cy: 36, r: 20, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——与底部圆钮同径
   var restartBtn = { cx: C.W - 24, cy: 688, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
   // 「深渊潜航」无局内悬浮钮：入口在结算页按钮组（主流 NG+ 模式选择设计）
   // 底部一排共 6 个按钮（图鉴 + 4 道具 + 重开），中心等距 70px 均匀排列：46/116/186/256/326/396
@@ -2768,7 +2767,7 @@ MG.config = {
     var dx = p.x - c.cx, dy = p.y - c.cy;
     return dx * dx + dy * dy <= (c.r + 6) * (c.r + 6);
   }
-  function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - MUTE.cy; return dx * dx + dy * dy <= 18 * 18; } // 命中区略大于视觉（小按钮易点空）
+  function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - MUTE.cy; return dx * dx + dy * dy <= (MUTE.r + 6) * (MUTE.r + 6); } // 命中区随按钮半径（与其他圆钮同为 r+6）
   function toLocal(e) {
     var rect = canvas.getBoundingClientRect();
     // 内容层游戏块垂直居中偏移 renderOy（菜单态 0），触摸 y 同量补偿还原块内坐标
@@ -5394,7 +5393,8 @@ MG.config = {
     drawMiniBtn(MUTE);
     ctx.save();
     ctx.translate(MUTE.cx, MUTE.cy);
-    ctx.scale(0.8, 0.8);
+    var ms = MUTE.r / 13 * 0.8;    // 图标随按钮半径等比缩放（按钮放大后图标同步放大）
+    ctx.scale(ms, ms);
     var mx = 0, my = 0;
     ctx.fillStyle = '#3E6E90';
     ctx.beginPath();
@@ -5469,21 +5469,27 @@ MG.config = {
     btn = btn || trophyBtn;
     drawCircleBtn(btn, '#B8912F', 0.9, false, 0);
     var tx = btn.cx, ty = btn.cy;
+    // 图标随按钮半径等比缩放（按钮放大后图标同步放大，不留空壳感）
+    ctx.save();
+    ctx.translate(tx, ty);
+    var ts = btn.r / 14;
+    ctx.scale(ts, ts);
     ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath();
-    ctx.moveTo(tx - 6, ty - 8); ctx.lineTo(tx + 6, ty - 8); ctx.lineTo(tx + 5, ty - 1);
-    ctx.quadraticCurveTo(tx, ty + 4, tx - 5, ty - 1);
+    ctx.moveTo(-6, -8); ctx.lineTo(6, -8); ctx.lineTo(5, -1);
+    ctx.quadraticCurveTo(0, 4, -5, -1);
     ctx.closePath(); ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(tx - 6, ty - 6); ctx.quadraticCurveTo(tx - 10, ty - 6, tx - 8, ty - 1);
-    ctx.moveTo(tx + 6, ty - 6); ctx.quadraticCurveTo(tx + 10, ty - 6, tx + 8, ty - 1);
-    ctx.moveTo(tx, ty + 3); ctx.lineTo(tx, ty + 6);
-    ctx.moveTo(tx - 4, ty + 7); ctx.lineTo(tx + 4, ty + 7);
+    ctx.moveTo(-6, -6); ctx.quadraticCurveTo(-10, -6, -8, -1);
+    ctx.moveTo(6, -6); ctx.quadraticCurveTo(10, -6, 8, -1);
+    ctx.moveTo(0, 3); ctx.lineTo(0, 6);
+    ctx.moveTo(-4, 7); ctx.lineTo(4, 7);
     ctx.stroke();
+    ctx.restore();
     ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
     if (!(daily.done[0] && daily.done[1] && daily.done[2])) {
       ctx.fillStyle = '#E2705E';
-      ctx.beginPath(); ctx.arc(tx + btn.r - 3, ty - btn.r + 3, 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(tx + btn.r - 3, ty - btn.r + 3, 3.4, 0, Math.PI * 2); ctx.fill();
     }
   }
 
@@ -5907,25 +5913,26 @@ MG.config = {
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
 
-    var pw = 320, ph = 436, px = (C.W - pw) / 2, py = 150;
+    // 结算海报：面板加高放宽（436→472、上移至134），统计区与按钮组均拉开呼吸感
+    var pw = 320, ph = 472, px = (C.W - pw) / 2, py = 134;
     panel(px, py, pw, ph, 16, 0.97);
 
     ctx.textAlign = 'center';
     ctx.fillStyle = '#155A8A';
     ctx.font = 'bold 28px system-ui, sans-serif';
-    ctx.fillText('本局结束', C.W / 2, py + 44);
+    ctx.fillText('本局结束', C.W / 2, py + 46);
     ctx.font = 'bold 53px system-ui, sans-serif';
     ctx.fillStyle = '#0F4C79';
-    ctx.fillText(String(score), C.W / 2, py + 98);
+    ctx.fillText(String(score), C.W / 2, py + 104);
     ctx.font = '18px system-ui, sans-serif';
     ctx.fillStyle = '#4A7FA0';
     var isNewBest = score >= best && score > 0;
     var statusLine = doubled ? '已双倍结算'
       : (isNewBest ? '★ 新纪录！'
       : ('最佳 ' + best));
-    ctx.fillText(statusLine, C.W / 2, py + 126);
+    ctx.fillText(statusLine, C.W / 2, py + 136);
     if (maxCombo > 1) {
-      ctx.fillText('本局最高连击 ×' + maxCombo + (seaCount > 0 ? ' · 汇入海域 ×' + seaCount : ''), C.W / 2, py + 148);
+      ctx.fillText('本局最高连击 ×' + maxCombo + (seaCount > 0 ? ' · 汇入海域 ×' + seaCount : ''), C.W / 2, py + 160);
     }
 
     for (var i = 0; i < overButtons.length; i++) {
