@@ -331,7 +331,7 @@
     var nk = Math.max(2, Math.min(3, Math.floor(w / 50)));
     for (k = 0; k < nk; k++) {
       var px = x0 + (k + 0.5) * w / nk + Math.sin(seed * 1.7 + k * 5.3) * w * 0.15;
-      var h = 95 + ((k * 53 + seed * 17) % 60) + (VH - 720) * 0.16;
+      var h = 95 + ((k * 53 + seed * 17) % 60) + (VH - 747) * 0.16;
       h = Math.min(h, VH * 0.36);
       var bend = Math.sin(time * (0.45 + (k % 3) * 0.15) + seed + k * 2.2); // -1..1 摆幅
       var tone = k % 2 ? '15,64,94' : '22,84,110';
@@ -1282,9 +1282,10 @@
     ctx.beginPath(); ctx.ellipse(C.W * 0.74, sy0 + 14, 115, 15, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = 'rgba(228,240,234,0.55)';
     ctx.beginPath(); ctx.ellipse(C.W * 0.47, sy0 + 18, 85, 11, 0, 0, Math.PI * 2); ctx.fill();
-    // 卵石（块内坐标，贴容器底；块底以下的屏底延伸由海底基色渐变覆盖）
+    // 卵石（块内坐标，贴容器底；装饰 y 以 FLOORY=646 时代为基准，随床面整体下移，
+    // 块底以下的屏底延伸由海底基色渐变覆盖）
     ctx.fillStyle = 'rgba(110,150,168,0.4)';
-    var yoff = 0;
+    var yoff = (floorY + FH + 6) - 664;
     var peb = [[24, 688, 3], [66, 700, 2], [112, 686, 2.5], [172, 702, 2], [246, 690, 2.5], [306, 700, 2], [352, 686, 2.5], [404, 696, 2.2]];
     for (var pi = 0; pi < peb.length; pi++) {
       ctx.beginPath(); ctx.arc(peb[pi][0], peb[pi][1] + yoff, peb[pi][2], 0, Math.PI * 2); ctx.fill();
@@ -1481,12 +1482,12 @@
 
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
   function drawHUD() {
-    // 计分（左上角悬浮；左端让位给奖杯按钮，从 x48 起）——HUD 整体上移压缩（分数 baseline 30）
+    // 计分（左上角悬浮；左端让位给奖杯按钮，从 x48 起）
     ctx.textAlign = 'left';
     var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
     ctx.lineJoin = 'round';
     ctx.save();
-    ctx.translate(48, 30);
+    ctx.translate(48, 38);
     ctx.scale(bump, bump);
     ctx.font = 'bold 34px system-ui, sans-serif';
     ctx.lineWidth = 4;
@@ -1511,9 +1512,9 @@
       subFont--;
       ctx.font = subFont + 'px system-ui, sans-serif';
     }
-    ctx.strokeText(sub, 48, 52);
+    ctx.strokeText(sub, 48, 58);
     ctx.fillStyle = ng.active ? '#6B5AA8' : '#3E6E90';
-    ctx.fillText(sub, 48, 52);
+    ctx.fillText(sub, 48, 58);
 
     // 右上角：下一滴预览 + 静音按钮（主流布局，随 HUD 上移）
     ctx.textAlign = 'center';
@@ -1523,18 +1524,18 @@
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     // 甘霖激活时标签替换为绿色脉动"甘霖"，避免悬浮文本遮挡出生区水滴
     if (rainHint > 0) {
-      ctx.strokeText('甘霖 · 下一滴', C.W - 76, 10);
+      ctx.strokeText('甘霖 · 下一滴', C.W - 76, 18);
       ctx.fillStyle = 'rgba(30,122,111,' + (0.55 + 0.45 * Math.sin(time * 8)) + ')';
-      ctx.fillText('甘霖 · 下一滴', C.W - 76, 10);
+      ctx.fillText('甘霖 · 下一滴', C.W - 76, 18);
     } else {
-      ctx.strokeText('下一个', C.W - 76, 10);
+      ctx.strokeText('下一个', C.W - 76, 18);
       ctx.fillStyle = '#3E6E90';
-      ctx.fillText('下一个', C.W - 76, 10);
+      ctx.fillText('下一个', C.W - 76, 18);
     }
     if (nextIron) {
-      drawIronBall({ x: C.W - 76, y: 30, r: 14, vx: 0, vy: 0 }, 0.95);
+      drawIronBall({ x: C.W - 76, y: 38, r: 14, vx: 0, vy: 0 }, 0.95);
     } else {
-      drawBall({ x: C.W - 76, y: 30, r: 15, tier: nextTier, vx: 0, vy: 0, special: nextSpecial, rune: nextRune }, 0.95);
+      drawBall({ x: C.W - 76, y: 38, r: 15, tier: nextTier, vx: 0, vy: 0, special: nextSpecial, rune: nextRune }, 0.95);
     }
 
     // 静音按钮（右上角，小号）
@@ -1572,7 +1573,7 @@
   }
   // 潮汐信息胶囊（右侧，与任务条同行同高，左右对称）
   function drawTidePill() {
-    var tx = C.W - 122, tw = 92, ty = 56, th = 32; // 与任务条(qy56/qh32)同高同排
+    var tx = C.W - 122, tw = 92, ty = 66, th = 34; // 与任务条(qy66/qh34)同高同排
     var active = tide.phase === 'active';
     var warn = !active && tide.timer <= C.tide.warnTime;
     var pulse = 0.5 + 0.5 * Math.sin(time * 6);
@@ -1581,10 +1582,10 @@
     ctx.font = 'bold 15px system-ui, sans-serif';
     if (active) {
       ctx.fillStyle = 'rgba(25,105,185,' + (0.75 + pulse * 0.25) + ')';
-      ctx.fillText('涨潮 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 21);
+      ctx.fillText('涨潮 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 22);
     } else {
       ctx.fillStyle = warn ? 'rgba(200,90,40,' + (0.7 + pulse * 0.3) + ')' : '#4A7FA0';
-      ctx.fillText('潮汐 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 21);
+      ctx.fillText('潮汐 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 22);
     }
   }
   // 涨潮横幅
@@ -1643,16 +1644,16 @@
     ctx.lineWidth = 2.5;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     var etxt = '已进行 ' + em + ':' + (es < 10 ? '0' + es : es);
-    ctx.strokeText(etxt, C.W / 2, 16);
+    ctx.strokeText(etxt, C.W / 2, 20);
     ctx.fillStyle = '#2E7DA8';
-    ctx.fillText(etxt, C.W / 2, 16);
+    ctx.fillText(etxt, C.W / 2, 20);
     // 每日挑战局：计时下方目标进度（systems 的 dchalHud，挑战局外返回 null）
     var chal = dchalHud();
     if (chal) {
       var ctxt = '每日挑战 ' + Math.min(score, chal.goal) + '/' + chal.goal + (chal.done ? ' ✓' : '');
-      ctx.strokeText(ctxt, C.W / 2, 32);
+      ctx.strokeText(ctxt, C.W / 2, 40);
       ctx.fillStyle = chal.done ? '#C9920E' : '#7B6FD0';
-      ctx.fillText(ctxt, C.W / 2, 32);
+      ctx.fillText(ctxt, C.W / 2, 40);
     }
     ctx.restore();
   }
@@ -1692,8 +1693,8 @@
     if (!quest) return;
     ctx.save();
     ctx.textAlign = 'center';
-    // 任务条：第三行左侧（两行：进度 + 星级/奖励，与任务难度匹配）——随 HUD 上移
-    var qw = 206, qx = 12, qy = 56, qh = 32;
+    // 任务条：第三行左侧（两行：进度 + 星级/奖励，与任务难度匹配）
+    var qw = 206, qx = 12, qy = 66, qh = 34;
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     roundRect(qx, qy, qw, qh, 10); ctx.fill();
     var prog = Math.min(1, quest.have / quest.need);
@@ -1707,7 +1708,7 @@
     ctx.fillStyle = '#B8860B';
     ctx.font = '13px system-ui, sans-serif';
     var stars = '★★★'.slice(0, quest.stars || 1);
-    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 28);
+    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 30);
     drawTidePill();
     ctx.restore();
   }
@@ -2159,7 +2160,7 @@
     ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, 0);
     drawBackground();
 
-    // 内容层：游戏块（420×720 恒定比例）垂直居中——菜单态铺满不偏移
+    // 内容层：游戏块（420×747 ≈ 9:16 恒定比例）垂直居中——菜单态铺满不偏移
     renderOy = state === 'menu' ? 0 : oy;
     ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, dpr * renderOy);
     if (shakeT > 0) {

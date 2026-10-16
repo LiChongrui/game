@@ -68,17 +68,16 @@ window.MG = window.MG || {};
 MG.config = {
   // 逻辑分辨率（画布固定，CSS 等比缩放）
   W: 420,
-  H: 720,
-  floorY: 646,         // 容器底 y（下方保留技能栏区域）
+  H: 747,              // 9:16（420×16/9≈746.7，取 747，偏差 0.04%）
+  floorY: 673,         // 容器底 y（下方保留技能栏区域）
 
-  // 容器（顶部 HUD 压缩上移至 0~88，与坠落区之间留 12px 空隙）
+  // 容器（顶部 HUD 恢复舒适行距 0~100，与坠落区留 8px 空隙，观感和谐）
   wall: 0,             // 侧墙厚（0 = 无边框，水滴铺满画布全宽）
-  containerTop: 100,   // 容器顶部开口 y（全部顶部元素在 88 以上，开口之下才是坠落区）
-  dangerY: 164,        // 危险线 y（堆积超过此线且静止即失败；堆叠空间 164~646）
+  containerTop: 108,   // 容器顶部开口 y
+  dangerY: 172,        // 危险线 y（堆积超过此线且静止即失败；堆叠空间 172~673）
 
   // 投放
-  spawnY: 120,         // 出生点 y（坠落高度恒定不随 HUD 变化；前 3 档虚影球顶 ≥92
-                       // 落在开口与 HUD 之间的空隙，仅最大两档虚影与任务条轻微交叠）
+  spawnY: 120,         // 出生点 y（坠落高度恒定，不随 HUD/块高变化）
   dropCooldown: 0.55,  // 两次投放最小间隔（秒）
 
   // 物理
@@ -400,19 +399,19 @@ MG.config = {
   var T = C.tiers;
 
   // ---------- 画布 ----------
-  // 逻辑高度动态（VH ≥ 720）：顶部元素（HUD/出生区/警戒线）按顶部坐标绘制，
+  // 逻辑高度动态（VH ≥ 747）：顶部元素（HUD/出生区/警戒线）按顶部坐标绘制，
   // 底部元素（海底/技能栏/按钮）按 VH-偏移 贴底，中间水域随窗口高度自适应；
   // 画布 CSS 高度恒等于窗口高度，CSS 宽度=游戏区宽度（两侧为页面深海背景）
   var canvas = document.getElementById('game');
   var ctx = canvas.getContext('2d');
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
-  var VH = C.H;           // 当前逻辑高度（全屏：h/view.s，≥720）
+  var VH = C.H;           // 当前逻辑高度（全屏：h/view.s，≥747）
   var LW = C.W;           // 当前逻辑宽度（≥ C.W，宽窗口下两侧为延伸海水）
   var BX = 0;             // 游戏区（420 逻辑宽）水平居中偏移
-  var FLOORY = C.floorY;  // 容器底 y（游戏块内恒定：646）
+  var FLOORY = C.floorY;  // 容器底 y（游戏块内恒定：673）
   var view = { s: 1 };
-  // 游戏块 = 420×720 固定逻辑区（压缩 HUD 100 + 容器 546 + 底部 74），长宽比恒定，
-  // 所有设备一致；顶部元素整体上移压进 0~88，出生点 120 / 坠落高度不随 HUD 变化；
+  // 游戏块 = 420×747 固定逻辑区（9:16；顶部 HUD 108 + 容器 565 + 底部 74），长宽比恒定，
+  // 所有设备一致；顶部 HUD 行距舒适不压紧，出生点 120 / 坠落高度恒定；
   // 高屏多出的高度上下均分给背景延伸（oy 为块居中偏移，菜单态铺满时为 0）
   var oy = 0;             // 游戏块垂直居中偏移（逻辑 px，≥0）
   var renderOy = 0;       // 渲染/点击实际使用的偏移：菜单态 0（铺满），其余态 oy
@@ -426,11 +425,11 @@ MG.config = {
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
     oy = Math.max(0, (VH - C.H) / 2);      // 游戏块垂直居中：高屏多出的高度上下均分
     // 游戏块内全部恒定（=config 初始值）：容器底/容器顶/警戒线/出生点不随设备变化，
-    // 容器长宽比恒定 420:546——不同设备游戏区大小比例完全一致
-    FLOORY = C.H - 74;                     // 646
+    // 容器长宽比恒定 420:565——不同设备游戏区大小比例完全一致
+    FLOORY = C.H - 74;                     // 673
     C.floorY = FLOORY;                     // 同步给物理引擎（每帧读取，水滴落到新地板）
-    C.containerTop = 100;
-    C.dangerY = 164;
+    C.containerTop = 108;
+    C.dangerY = 172;
     C.spawnY = 120;
     canvas.width = Math.round(w * dpr);    // 画布铺满整个窗口（背景全程由游戏自绘）
     canvas.height = Math.round(h * dpr);
@@ -444,7 +443,7 @@ MG.config = {
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
     }
     if (typeof trophyBtn !== 'undefined' && typeof MUTE !== 'undefined') {
-      trophyBtn.cy = 28; MUTE.cy = 28;     // 奖杯/静音：块内左上/右上角落（与分数行同排，HUD 压缩上移）
+      trophyBtn.cy = 36; MUTE.cy = 36;     // 奖杯/静音：块内左上/右上角落（与分数行同排）
     }
   }
   window.addEventListener('resize', fit);
@@ -1298,7 +1297,7 @@ MG.config = {
   }
   function addPopup(x, y, text, isBig, mult) {
     // 公告带（居中 + 设计稿 y 180~320）改为底部锚定：跟随警戒线，不随窗口高度漂移
-    if (x === C.W / 2 && y >= 180 && y <= 320) y = C.dangerY + (y - 164);
+    if (x === C.W / 2 && y >= 180 && y <= 320) y = C.dangerY + (y - 172);
     // 防重叠：与仍在显示中的弹字同带（横向接近）时向下顺移一行，多条同时弹出不再叠字
     for (var i = 0; i < popups.length; i++) {
       var op = popups[i];
@@ -3094,7 +3093,7 @@ MG.config = {
   // ---------- 面板几何（渲染与点击热区共用，一处定义） ----------
   var DEX_PANEL = { x: 20, y: 64, w: 380, h: 560 };
   var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 42, y: DEX_PANEL.y + 8, w: 28, h: 28 }; // 右上 × 关闭（中心 +22px，与页头标题文字对齐）
-  // 面板垂直居中：菜单态（铺满）以整屏 VH 为基准；局内游戏块为固定 720 逻辑（居中块=屏幕中心，
+  // 面板垂直居中：菜单态（铺满）以整屏 VH 为基准；局内游戏块为固定 747 逻辑（9:16，居中块=屏幕中心，
   // 块内 (C.H-h)/2 + 偏移 renderOy 恰好落在屏幕中央）——每帧绘制前重算，页签始终处于屏幕中央
   function layoutDexPanel() {
     var base = state === 'menu' ? VH : C.H;
@@ -4166,7 +4165,7 @@ MG.config = {
     var nk = Math.max(2, Math.min(3, Math.floor(w / 50)));
     for (k = 0; k < nk; k++) {
       var px = x0 + (k + 0.5) * w / nk + Math.sin(seed * 1.7 + k * 5.3) * w * 0.15;
-      var h = 95 + ((k * 53 + seed * 17) % 60) + (VH - 720) * 0.16;
+      var h = 95 + ((k * 53 + seed * 17) % 60) + (VH - 747) * 0.16;
       h = Math.min(h, VH * 0.36);
       var bend = Math.sin(time * (0.45 + (k % 3) * 0.15) + seed + k * 2.2); // -1..1 摆幅
       var tone = k % 2 ? '15,64,94' : '22,84,110';
@@ -5117,9 +5116,10 @@ MG.config = {
     ctx.beginPath(); ctx.ellipse(C.W * 0.74, sy0 + 14, 115, 15, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = 'rgba(228,240,234,0.55)';
     ctx.beginPath(); ctx.ellipse(C.W * 0.47, sy0 + 18, 85, 11, 0, 0, Math.PI * 2); ctx.fill();
-    // 卵石（块内坐标，贴容器底；块底以下的屏底延伸由海底基色渐变覆盖）
+    // 卵石（块内坐标，贴容器底；装饰 y 以 FLOORY=646 时代为基准，随床面整体下移，
+    // 块底以下的屏底延伸由海底基色渐变覆盖）
     ctx.fillStyle = 'rgba(110,150,168,0.4)';
-    var yoff = 0;
+    var yoff = (floorY + FH + 6) - 664;
     var peb = [[24, 688, 3], [66, 700, 2], [112, 686, 2.5], [172, 702, 2], [246, 690, 2.5], [306, 700, 2], [352, 686, 2.5], [404, 696, 2.2]];
     for (var pi = 0; pi < peb.length; pi++) {
       ctx.beginPath(); ctx.arc(peb[pi][0], peb[pi][1] + yoff, peb[pi][2], 0, Math.PI * 2); ctx.fill();
@@ -5316,12 +5316,12 @@ MG.config = {
 
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
   function drawHUD() {
-    // 计分（左上角悬浮；左端让位给奖杯按钮，从 x48 起）——HUD 整体上移压缩（分数 baseline 30）
+    // 计分（左上角悬浮；左端让位给奖杯按钮，从 x48 起）
     ctx.textAlign = 'left';
     var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
     ctx.lineJoin = 'round';
     ctx.save();
-    ctx.translate(48, 30);
+    ctx.translate(48, 38);
     ctx.scale(bump, bump);
     ctx.font = 'bold 34px system-ui, sans-serif';
     ctx.lineWidth = 4;
@@ -5346,9 +5346,9 @@ MG.config = {
       subFont--;
       ctx.font = subFont + 'px system-ui, sans-serif';
     }
-    ctx.strokeText(sub, 48, 52);
+    ctx.strokeText(sub, 48, 58);
     ctx.fillStyle = ng.active ? '#6B5AA8' : '#3E6E90';
-    ctx.fillText(sub, 48, 52);
+    ctx.fillText(sub, 48, 58);
 
     // 右上角：下一滴预览 + 静音按钮（主流布局，随 HUD 上移）
     ctx.textAlign = 'center';
@@ -5358,18 +5358,18 @@ MG.config = {
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     // 甘霖激活时标签替换为绿色脉动"甘霖"，避免悬浮文本遮挡出生区水滴
     if (rainHint > 0) {
-      ctx.strokeText('甘霖 · 下一滴', C.W - 76, 10);
+      ctx.strokeText('甘霖 · 下一滴', C.W - 76, 18);
       ctx.fillStyle = 'rgba(30,122,111,' + (0.55 + 0.45 * Math.sin(time * 8)) + ')';
-      ctx.fillText('甘霖 · 下一滴', C.W - 76, 10);
+      ctx.fillText('甘霖 · 下一滴', C.W - 76, 18);
     } else {
-      ctx.strokeText('下一个', C.W - 76, 10);
+      ctx.strokeText('下一个', C.W - 76, 18);
       ctx.fillStyle = '#3E6E90';
-      ctx.fillText('下一个', C.W - 76, 10);
+      ctx.fillText('下一个', C.W - 76, 18);
     }
     if (nextIron) {
-      drawIronBall({ x: C.W - 76, y: 30, r: 14, vx: 0, vy: 0 }, 0.95);
+      drawIronBall({ x: C.W - 76, y: 38, r: 14, vx: 0, vy: 0 }, 0.95);
     } else {
-      drawBall({ x: C.W - 76, y: 30, r: 15, tier: nextTier, vx: 0, vy: 0, special: nextSpecial, rune: nextRune }, 0.95);
+      drawBall({ x: C.W - 76, y: 38, r: 15, tier: nextTier, vx: 0, vy: 0, special: nextSpecial, rune: nextRune }, 0.95);
     }
 
     // 静音按钮（右上角，小号）
@@ -5407,7 +5407,7 @@ MG.config = {
   }
   // 潮汐信息胶囊（右侧，与任务条同行同高，左右对称）
   function drawTidePill() {
-    var tx = C.W - 122, tw = 92, ty = 56, th = 32; // 与任务条(qy56/qh32)同高同排
+    var tx = C.W - 122, tw = 92, ty = 66, th = 34; // 与任务条(qy66/qh34)同高同排
     var active = tide.phase === 'active';
     var warn = !active && tide.timer <= C.tide.warnTime;
     var pulse = 0.5 + 0.5 * Math.sin(time * 6);
@@ -5416,10 +5416,10 @@ MG.config = {
     ctx.font = 'bold 15px system-ui, sans-serif';
     if (active) {
       ctx.fillStyle = 'rgba(25,105,185,' + (0.75 + pulse * 0.25) + ')';
-      ctx.fillText('涨潮 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 21);
+      ctx.fillText('涨潮 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 22);
     } else {
       ctx.fillStyle = warn ? 'rgba(200,90,40,' + (0.7 + pulse * 0.3) + ')' : '#4A7FA0';
-      ctx.fillText('潮汐 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 21);
+      ctx.fillText('潮汐 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 22);
     }
   }
   // 涨潮横幅
@@ -5478,16 +5478,16 @@ MG.config = {
     ctx.lineWidth = 2.5;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     var etxt = '已进行 ' + em + ':' + (es < 10 ? '0' + es : es);
-    ctx.strokeText(etxt, C.W / 2, 16);
+    ctx.strokeText(etxt, C.W / 2, 20);
     ctx.fillStyle = '#2E7DA8';
-    ctx.fillText(etxt, C.W / 2, 16);
+    ctx.fillText(etxt, C.W / 2, 20);
     // 每日挑战局：计时下方目标进度（systems 的 dchalHud，挑战局外返回 null）
     var chal = dchalHud();
     if (chal) {
       var ctxt = '每日挑战 ' + Math.min(score, chal.goal) + '/' + chal.goal + (chal.done ? ' ✓' : '');
-      ctx.strokeText(ctxt, C.W / 2, 32);
+      ctx.strokeText(ctxt, C.W / 2, 40);
       ctx.fillStyle = chal.done ? '#C9920E' : '#7B6FD0';
-      ctx.fillText(ctxt, C.W / 2, 32);
+      ctx.fillText(ctxt, C.W / 2, 40);
     }
     ctx.restore();
   }
@@ -5527,8 +5527,8 @@ MG.config = {
     if (!quest) return;
     ctx.save();
     ctx.textAlign = 'center';
-    // 任务条：第三行左侧（两行：进度 + 星级/奖励，与任务难度匹配）——随 HUD 上移
-    var qw = 206, qx = 12, qy = 56, qh = 32;
+    // 任务条：第三行左侧（两行：进度 + 星级/奖励，与任务难度匹配）
+    var qw = 206, qx = 12, qy = 66, qh = 34;
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     roundRect(qx, qy, qw, qh, 10); ctx.fill();
     var prog = Math.min(1, quest.have / quest.need);
@@ -5542,7 +5542,7 @@ MG.config = {
     ctx.fillStyle = '#B8860B';
     ctx.font = '13px system-ui, sans-serif';
     var stars = '★★★'.slice(0, quest.stars || 1);
-    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 28);
+    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 30);
     drawTidePill();
     ctx.restore();
   }
@@ -5994,7 +5994,7 @@ MG.config = {
     ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, 0);
     drawBackground();
 
-    // 内容层：游戏块（420×720 恒定比例）垂直居中——菜单态铺满不偏移
+    // 内容层：游戏块（420×747 ≈ 9:16 恒定比例）垂直居中——菜单态铺满不偏移
     renderOy = state === 'menu' ? 0 : oy;
     ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, dpr * renderOy);
     if (shakeT > 0) {

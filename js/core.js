@@ -5,19 +5,19 @@
   var T = C.tiers;
 
   // ---------- 画布 ----------
-  // 逻辑高度动态（VH ≥ 720）：顶部元素（HUD/出生区/警戒线）按顶部坐标绘制，
+  // 逻辑高度动态（VH ≥ 747）：顶部元素（HUD/出生区/警戒线）按顶部坐标绘制，
   // 底部元素（海底/技能栏/按钮）按 VH-偏移 贴底，中间水域随窗口高度自适应；
   // 画布 CSS 高度恒等于窗口高度，CSS 宽度=游戏区宽度（两侧为页面深海背景）
   var canvas = document.getElementById('game');
   var ctx = canvas.getContext('2d');
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
-  var VH = C.H;           // 当前逻辑高度（全屏：h/view.s，≥720）
+  var VH = C.H;           // 当前逻辑高度（全屏：h/view.s，≥747）
   var LW = C.W;           // 当前逻辑宽度（≥ C.W，宽窗口下两侧为延伸海水）
   var BX = 0;             // 游戏区（420 逻辑宽）水平居中偏移
-  var FLOORY = C.floorY;  // 容器底 y（游戏块内恒定：646）
+  var FLOORY = C.floorY;  // 容器底 y（游戏块内恒定：673）
   var view = { s: 1 };
-  // 游戏块 = 420×720 固定逻辑区（压缩 HUD 100 + 容器 546 + 底部 74），长宽比恒定，
-  // 所有设备一致；顶部元素整体上移压进 0~88，出生点 120 / 坠落高度不随 HUD 变化；
+  // 游戏块 = 420×747 固定逻辑区（9:16；顶部 HUD 108 + 容器 565 + 底部 74），长宽比恒定，
+  // 所有设备一致；顶部 HUD 行距舒适不压紧，出生点 120 / 坠落高度恒定；
   // 高屏多出的高度上下均分给背景延伸（oy 为块居中偏移，菜单态铺满时为 0）
   var oy = 0;             // 游戏块垂直居中偏移（逻辑 px，≥0）
   var renderOy = 0;       // 渲染/点击实际使用的偏移：菜单态 0（铺满），其余态 oy
@@ -31,11 +31,11 @@
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
     oy = Math.max(0, (VH - C.H) / 2);      // 游戏块垂直居中：高屏多出的高度上下均分
     // 游戏块内全部恒定（=config 初始值）：容器底/容器顶/警戒线/出生点不随设备变化，
-    // 容器长宽比恒定 420:546——不同设备游戏区大小比例完全一致
-    FLOORY = C.H - 74;                     // 646
+    // 容器长宽比恒定 420:565——不同设备游戏区大小比例完全一致
+    FLOORY = C.H - 74;                     // 673
     C.floorY = FLOORY;                     // 同步给物理引擎（每帧读取，水滴落到新地板）
-    C.containerTop = 100;
-    C.dangerY = 164;
+    C.containerTop = 108;
+    C.dangerY = 172;
     C.spawnY = 120;
     canvas.width = Math.round(w * dpr);    // 画布铺满整个窗口（背景全程由游戏自绘）
     canvas.height = Math.round(h * dpr);
@@ -49,7 +49,7 @@
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
     }
     if (typeof trophyBtn !== 'undefined' && typeof MUTE !== 'undefined') {
-      trophyBtn.cy = 28; MUTE.cy = 28;     // 奖杯/静音：块内左上/右上角落（与分数行同排，HUD 压缩上移）
+      trophyBtn.cy = 36; MUTE.cy = 36;     // 奖杯/静音：块内左上/右上角落（与分数行同排）
     }
   }
   window.addEventListener('resize', fit);

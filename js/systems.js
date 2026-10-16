@@ -577,7 +577,7 @@
   }
   function addPopup(x, y, text, isBig, mult) {
     // 公告带（居中 + 设计稿 y 180~320）改为底部锚定：跟随警戒线，不随窗口高度漂移
-    if (x === C.W / 2 && y >= 180 && y <= 320) y = C.dangerY + (y - 164);
+    if (x === C.W / 2 && y >= 180 && y <= 320) y = C.dangerY + (y - 172);
     // 防重叠：与仍在显示中的弹字同带（横向接近）时向下顺移一行，多条同时弹出不再叠字
     for (var i = 0; i < popups.length; i++) {
       var op = popups[i];
