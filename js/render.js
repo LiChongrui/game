@@ -1523,27 +1523,18 @@
     ctx.restore();
     ctx.textAlign = 'left';
 
-    // 右上角：下一滴预览 + 静音按钮（主流布局，随 HUD 上移）
+    // 右上角：计时（下一滴预览已移除——容器内虚影已直观展示下一滴，此处改回计时）
+    // 与左侧统计行同排、与静音按钮(cy36)垂直居中对齐
     ctx.textAlign = 'center';
-    ctx.font = 'bold 13px system-ui, sans-serif';
     ctx.lineJoin = 'round';
-    ctx.lineWidth = 3;
+    ctx.font = 'bold 12px system-ui, sans-serif';
+    ctx.lineWidth = 2.5;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-    // 甘霖激活时标签替换为绿色脉动"甘霖"，避免悬浮文本遮挡出生区水滴
-    if (rainHint > 0) {
-      ctx.strokeText('甘霖 · 下一滴', C.W - 76, 18);
-      ctx.fillStyle = 'rgba(30,122,111,' + (0.55 + 0.45 * Math.sin(time * 8)) + ')';
-      ctx.fillText('甘霖 · 下一滴', C.W - 76, 18);
-    } else {
-      ctx.strokeText('下一个', C.W - 76, 18);
-      ctx.fillStyle = '#3E6E90';
-      ctx.fillText('下一个', C.W - 76, 18);
-    }
-    if (nextIron) {
-      drawIronBall({ x: C.W - 76, y: 38, r: 14, vx: 0, vy: 0 }, 0.95);
-    } else {
-      drawBall({ x: C.W - 76, y: 38, r: 15, tier: nextTier, vx: 0, vy: 0, special: nextSpecial, rune: nextRune }, 0.95);
-    }
+    var em = Math.floor(levelElapsed / 60), es = Math.floor(levelElapsed % 60);
+    var etxt = '已进行 ' + em + ':' + (es < 10 ? '0' + es : es);
+    ctx.strokeText(etxt, C.W - 78, 41);
+    ctx.fillStyle = '#2E7DA8';
+    ctx.fillText(etxt, C.W - 78, 41);
 
     // 静音按钮（右上角，小号）
     drawMiniBtn(MUTE);
