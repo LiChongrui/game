@@ -2151,6 +2151,9 @@
       ctx.fillText('历史最佳 ' + best, C.W / 2, 294);
     }
 
+    // 离线收益告知卡（有离线收益时显示，开局自动入账）
+    drawOfflineCard();
+
     // 开始按钮（呼吸光圈 + 主色渐变）
     var b = menuStartBtn;
     ctx.save();

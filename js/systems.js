@@ -59,6 +59,20 @@
   })();
   var achDone = dexLoaded.ach;     // 已达成成就 { id: 1 }
   var colClaimed = dexLoaded.col;  // 图鉴收集里程碑领取记录 { m25:1, m50:1, ... }
+  // ---------- 离线收益：按离开时长结算（开局自动入账，走普通过分管线可联动图鉴/收集） ----------
+  var offlineGain = (function () {
+    var seen = parseInt(MG.platform.get('mg_seen')) || 0;
+    var now = Date.now();
+    saveNum('mg_seen', now);   // 启动即刷新心跳
+    if (!seen) return null;    // 首次游玩无收益
+    var rawMins = Math.floor((now - seen) / 60000);
+    if (rawMins < C.offline.minMins) return null; // 太短不触发（防刷新页面反复白嫖）
+    var mins = Math.min(rawMins, C.offline.capMins);
+    var anchor = Math.max(parseInt(MG.platform.get('mg_best')) || 0, lifeStats.best || 0);
+    var perMin = C.offline.perMinBase + Math.floor(anchor * C.offline.bestRatio);
+    return { mins: rawMins, gain: perMin * mins };
+  })();
+  var seenTick = 0; // 游玩期心跳计时（30s 刷 mg_seen，防“玩数小时后关页”把旧 seen 算成长离线）
   function bumpStat(k, n) {
     lifeStats[k] = (lifeStats[k] || 0) + (n || 1);
     saveDex();
@@ -1641,7 +1655,8 @@
       modes: { evap: evapMode, ripple: rippleMode, flow: flowMode },
       stage: seaStage(), daily: { done: daily.done.slice(), streak: daily.streak }, best: best,
       jellies: jellies.map(function (j) { return { x: Math.round(j.x), y: Math.round(j.y), s: Math.round(j.s) }; }),
-      col: colProgress, chestTimer: Math.round(chestTimer * 10) / 10
+      col: colProgress, chestTimer: Math.round(chestTimer * 10) / 10,
+      offline: offlineGain ? { mins: offlineGain.mins, gain: offlineGain.gain } : null
     };
   };
   // 测试钩子（仅自动化测试用）：充能 / 成就 / 局面构造 / 加压进度
@@ -1930,6 +1945,14 @@
     phys.bodies.length = 0;
     confirmOpen = false;
     score = 0; displayScore = 0; scoreBump = 0;
+    if (offlineGain) { // 离线收益：开局自动入账
+      score += offlineGain.gain; displayScore = score;
+      var om = offlineGain.mins;
+      addPopup(C.W / 2, 300, '离线收益 · 离开 ' + (om >= 60 ? Math.floor(om / 60) + ' 时 ' + (om % 60) + ' 分' : om + ' 分钟') + '，深海攒下 ' + offlineGain.gain + ' 分', true, 0);
+      parts.push({ type: 'ring', x: C.W / 2, y: 300, r: 46, life: 0.9, max: 0.9, color: '#F2C14E' });
+      audio.blip(880, 0.16, 'sine', 0.1, 0.5);
+      offlineGain = null;
+    }
     combo = 0; comboTimer = 0; cooldown = 0; maxCombo = 0;
     reviveCount = 0; doubled = false;
     runBuffered = false; // 新局重置深流缓冲
@@ -2256,6 +2279,7 @@
     }
     achTick -= dt;
     if (achTick <= 0) { achTick = 1; checkAchievements(); checkCollection(); checkDailyChallenge(); }
+    if ((seenTick += dt) >= 30) { seenTick = 0; saveNum('mg_seen', Date.now()); } // 离线收益心跳
 
     updateTide(dt);
     phys.step(dt);

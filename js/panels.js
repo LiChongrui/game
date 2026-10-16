@@ -537,6 +537,31 @@
 
   // 每日页签：3 个按日期生成的任务（独立说明行已删，卡片上移放大）
   // 每日挑战卡（每日页签顶部）：今日海况词缀 + 目标分 + 开始按钮（热区 dchalBtnRect，systems 处理点击）
+  // 菜单态离线收益告知卡（自动入账、无点击）：历史最佳行与开始按钮之间的空档，金色宝箱色系
+  function drawOfflineCard() {
+    if (state !== 'menu' || !offlineGain) return;
+    var w = 300, h = 62, x = (C.W - w) / 2, y = 316;
+    var og = ctx.createLinearGradient(0, y, 0, y + h);
+    og.addColorStop(0, 'rgba(245,197,66,0.16)');
+    og.addColorStop(1, 'rgba(217,169,63,0.08)');
+    ctx.fillStyle = og;
+    roundRect(x, y, w, h, 10); ctx.fill();
+    ctx.strokeStyle = 'rgba(245,197,66,0.55)'; ctx.lineWidth = 1.2;
+    roundRect(x, y, w, h, 10); ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#F5C542';
+    ctx.font = 'bold 15px system-ui, sans-serif';
+    ctx.fillText('宝箱 · 离线收益', C.W / 2, y + 22);
+    var om = offlineGain.mins;
+    ctx.fillStyle = 'rgba(240,250,255,0.92)';
+    ctx.font = '13px system-ui, sans-serif';
+    ctx.fillText('离开 ' + (om >= 60 ? Math.floor(om / 60) + ' 时 ' + (om % 60) + ' 分' : om + ' 分钟') + ' · 深海攒下 ' + offlineGain.gain + ' 分', C.W / 2, y + 43);
+    ctx.fillStyle = 'rgba(200,225,245,0.55)';
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillText('开始游戏后自动入账', C.W / 2, y + 57);
+    ctx.textAlign = 'left';
+  }
+
   function drawDchalCard() {
     var ci = dchalInfo();
     var cx = DEX_PANEL.x + 14, cy = DEX_PANEL.y + 74, cw = DEX_PANEL.w - 28, chh = 96;
