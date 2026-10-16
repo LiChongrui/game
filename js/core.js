@@ -62,6 +62,23 @@
     MG.platform.setJSON('mg_dex', { u: dexUnlocked, c: dexCounts, sp: dexSpecial, stats: lifeStats, ach: achDone });
   }
 
+  // ---------- 存档版本（迁移机制） ----------
+  // 每次发布含破坏性存档改动的版本，SAVE_VERSION +1 并在迁移链里追加一步变换；
+  // 读取端（loadNum/loadFlag/loadDex）全部带默认值，因此未知字段天然兼容。
+  var SAVE_VERSION = 1;
+  function migrateSave() {
+    var ver = parseInt(MG.platform.get('mg_ver'), 10);
+    if (isNaN(ver)) ver = 0;
+    if (ver > SAVE_VERSION) return; // 更高版本存档（回滚到旧客户端）：原样保留，只读不写降级字段
+    // ---- 迁移链（从 ver 逐级升到 SAVE_VERSION） ----
+    // v0 → v1：v0 时代键名与当前一致（mg_best/mg_peak/mg_life/mg_dex/mg_mute/mg_tut/mg_ng…），
+    //          无字段变换，仅补打版本标记，legacy 存档天然兼容。
+    // if (ver < 2) { ...未来变换... }
+    MG.platform.set('mg_ver', String(SAVE_VERSION));
+  }
+  migrateSave(); // 必须先于 systems.js 的任何读档执行（core 在 systems 之前加载）
+
+
   // ---------- 音效（WebAudio 合成，无素材文件） ----------
   var audio = {
     ctx: null,
