@@ -71,15 +71,15 @@ MG.config = {
   H: 747,              // 9:16（420×16/9≈746.7，取 747，偏差 0.04%）
   floorY: 673,         // 容器底 y（下方保留技能栏区域）
 
-  // 容器（高度恢复 528 与 720 时代一致：顶部 HUD 0~100 行距舒适，开口 145 之上留 45px
-  // 空隙带供水滴出生/虚影悬停，坠落区不被挤压）
+  // 容器（适度压缩给顶部宽松：开口 190、容器 190~673 = 483px；顶部 HUD 区扩至 0~164，
+  // 三组（统计/得分+进度条/任务+潮汐）行距舒适，开口上方留 26px 空隙带供水滴出生/虚影悬停）
   wall: 0,             // 侧墙厚（0 = 无边框，水滴铺满画布全宽）
-  containerTop: 145,   // 容器顶部开口 y（容器 145~673 = 528px 恒定）
-  dangerY: 209,        // 危险线 y（堆积超过此线且静止即失败；堆叠空间 209~673 = 464px）
+  containerTop: 190,   // 容器顶部开口 y（容器 190~673 = 483px）
+  dangerY: 254,        // 危险线 y（堆积超过此线且静止即失败；堆叠空间 254~673 = 419px）
 
   // 投放
-  // 投放：坠落高度 = 最大可投放水滴底部接触警戒线时的球心位置（dangerY209 - 溪流 r45 = 164）
-  spawnY: 164,
+  // 投放：坠落高度 = 最大可投放水滴底部接触警戒线时的球心位置（dangerY254 - 溪流 r45 = 209）
+  spawnY: 209,
   dropCooldown: 0.55,  // 两次投放最小间隔（秒）
 
   // 物理
@@ -412,8 +412,8 @@ MG.config = {
   var BX = 0;             // 游戏区（420 逻辑宽）水平居中偏移
   var FLOORY = C.floorY;  // 容器底 y（游戏块内恒定：673）
   var view = { s: 1 };
-  // 游戏块 = 420×747 固定逻辑区（9:16；顶部 HUD 0~100 + 出生空隙带 + 容器 528 + 底部 74），
-  // 长宽比恒定，所有设备一致；容器高度 528 与出生点距容器底 526 两条核心几何与 720 时代完全一致；
+  // 游戏块 = 420×747 固定逻辑区（9:16；顶部 HUD 0~164 + 出生空隙带 26 + 容器 483 + 底部 74），
+  // 长宽比恒定，所有设备一致；坠落高度 = 最大可投放滴底触警戒线时的球心（dangerY - 45）；
   // 高屏多出的高度上下均分给背景延伸（oy 为块居中偏移，菜单态铺满时为 0）
   var oy = 0;             // 游戏块垂直居中偏移（逻辑 px，≥0）
   var renderOy = 0;       // 渲染/点击实际使用的偏移：菜单态 0（铺满），其余态 oy
@@ -427,13 +427,14 @@ MG.config = {
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
     oy = Math.max(0, (VH - C.H) / 2);      // 游戏块垂直居中：高屏多出的高度上下均分
     // 游戏块内全部恒定（=config 初始值）：容器底/容器顶/警戒线/出生点不随设备变化，
-    // 容器长宽比恒定 420:528（与 720 时代一致）——不同设备游戏区大小比例完全一致
+    // 容器 420:483 恒定——不同设备游戏区大小比例完全一致；底部带 74 不变
     FLOORY = C.H - 74;                     // 673
     C.floorY = FLOORY;                     // 同步给物理引擎（每帧读取，水滴落到新地板）
-    C.containerTop = 145;
-    C.dangerY = 209;
+    // 容器适度压缩给顶部宽松：容器 190~673 = 483px（块高/底部带 74 不变）
+    C.containerTop = 190;
+    C.dangerY = 254;
     // 坠落高度：最大可投放水滴（tiers 前 5 档中的溪流 r45）底部接触警戒线时的球心位置
-    C.spawnY = C.dangerY - C.tiers[4].r;   // 209 - 45 = 164
+    C.spawnY = C.dangerY - C.tiers[4].r;   // 254 - 45 = 209
     canvas.width = Math.round(w * dpr);    // 画布铺满整个窗口（背景全程由游戏自绘）
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';
@@ -1300,6 +1301,7 @@ MG.config = {
   }
   function addPopup(x, y, text, isBig, mult) {
     // 公告带（居中 + 设计稿 y 180~320）改为底部锚定：跟随警戒线，不随窗口高度漂移
+    // 基准 209 = 旧版设计稿警戒线，随 dangerY 平移（容器压缩/警戒线变动时公告带自动跟随）
     if (x === C.W / 2 && y >= 180 && y <= 320) y = C.dangerY + (y - 209);
     // 防重叠：与仍在显示中的弹字同带（横向接近）时向下顺移一行，多条同时弹出不再叠字
     for (var i = 0; i < popups.length; i++) {
@@ -5348,9 +5350,9 @@ MG.config = {
     var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
     ctx.save();
     ctx.textAlign = 'center';
-    ctx.translate(C.W / 2, 66);
+    ctx.translate(C.W / 2, 88);
     ctx.scale(bump, bump);
-    ctx.font = 'bold 28px system-ui, sans-serif';
+    ctx.font = 'bold 34px system-ui, sans-serif';
     ctx.lineWidth = 4;
     ctx.strokeStyle = 'rgba(255,255,255,0.85)';
     var txt = String(Math.round(displayScore));
@@ -5409,7 +5411,7 @@ MG.config = {
   }
   // 潮汐信息胶囊（右侧，与任务条同行同高，左右对称）
   function drawTidePill() {
-    var tx = C.W - 122, tw = 92, ty = 94, th = 32; // 第三组：与任务条(qy94/qh32)同高同排，整体上移后贴空隙带
+    var tx = C.W - 122, tw = 92, ty = 130, th = 34; // 第三组：与任务条(qy130/qh34)同高同排
     var active = tide.phase === 'active';
     var warn = !active && tide.timer <= C.tide.warnTime;
     var pulse = 0.5 + 0.5 * Math.sin(time * 6);
@@ -5510,7 +5512,7 @@ MG.config = {
     ctx.save();
     ctx.textAlign = 'center';
     // 任务条：第三组左侧（两行：进度 + 星级/奖励，与任务难度匹配）
-    var qw = 206, qx = 12, qy = 94, qh = 32;
+    var qw = 206, qx = 12, qy = 130, qh = 34;
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     roundRect(qx, qy, qw, qh, 10); ctx.fill();
     var prog = Math.min(1, quest.have / quest.need);
@@ -5520,23 +5522,23 @@ MG.config = {
     }
     ctx.fillStyle = '#7A5B10';
     ctx.font = 'bold 15px system-ui, sans-serif';
-    ctx.fillText(quest.text + ' ' + quest.have + '/' + quest.need, qx + qw / 2, qy + 13);
+    ctx.fillText(quest.text + ' ' + quest.have + '/' + quest.need, qx + qw / 2, qy + 14);
     ctx.fillStyle = '#B8860B';
     ctx.font = '13px system-ui, sans-serif';
     var stars = '★★★'.slice(0, quest.stars || 1);
-    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 28);
+    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 30);
     drawTidePill();
     drawSeaProgress();
     ctx.restore();
   }
-  // 海域进度条：满宽细条（y106~122，位于 HUD 底沿 100 与容器开口 145 之间的空隙带；
+  // 海域进度条：满宽细条（y100~116，位于当前得分下方、任务条之上的宽松段；容器开口 190）
   // 出生点 147 在条下方 25px，条不压坠落区），显示累计分距下一海域的进度
   // 配色：填充=当前海域深水色（与背景同族），右端小圆点=下一海域徽章色（目的地），左端骑线徽章=当前位置
   function drawSeaProgress() {
     var cur = seaStage(), ts = totalScore();
     var last = C.seaStages.length - 1;
     var maxed = cur >= last;
-    var sx = 12, sy = 72, sw = C.W - 24, sh = 16;
+    var sx = 12, sy = 100, sw = C.W - 24, sh = 16;
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     roundRect(sx, sy, sw, sh, 8); ctx.fill();
     var frac = 1;

@@ -1511,9 +1511,9 @@
     var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
     ctx.save();
     ctx.textAlign = 'center';
-    ctx.translate(C.W / 2, 66);
+    ctx.translate(C.W / 2, 88);
     ctx.scale(bump, bump);
-    ctx.font = 'bold 28px system-ui, sans-serif';
+    ctx.font = 'bold 34px system-ui, sans-serif';
     ctx.lineWidth = 4;
     ctx.strokeStyle = 'rgba(255,255,255,0.85)';
     var txt = String(Math.round(displayScore));
@@ -1572,7 +1572,7 @@
   }
   // 潮汐信息胶囊（右侧，与任务条同行同高，左右对称）
   function drawTidePill() {
-    var tx = C.W - 122, tw = 92, ty = 94, th = 32; // 第三组：与任务条(qy94/qh32)同高同排，整体上移后贴空隙带
+    var tx = C.W - 122, tw = 92, ty = 130, th = 34; // 第三组：与任务条(qy130/qh34)同高同排
     var active = tide.phase === 'active';
     var warn = !active && tide.timer <= C.tide.warnTime;
     var pulse = 0.5 + 0.5 * Math.sin(time * 6);
@@ -1673,7 +1673,7 @@
     ctx.save();
     ctx.textAlign = 'center';
     // 任务条：第三组左侧（两行：进度 + 星级/奖励，与任务难度匹配）
-    var qw = 206, qx = 12, qy = 94, qh = 32;
+    var qw = 206, qx = 12, qy = 130, qh = 34;
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     roundRect(qx, qy, qw, qh, 10); ctx.fill();
     var prog = Math.min(1, quest.have / quest.need);
@@ -1683,23 +1683,23 @@
     }
     ctx.fillStyle = '#7A5B10';
     ctx.font = 'bold 15px system-ui, sans-serif';
-    ctx.fillText(quest.text + ' ' + quest.have + '/' + quest.need, qx + qw / 2, qy + 13);
+    ctx.fillText(quest.text + ' ' + quest.have + '/' + quest.need, qx + qw / 2, qy + 14);
     ctx.fillStyle = '#B8860B';
     ctx.font = '13px system-ui, sans-serif';
     var stars = '★★★'.slice(0, quest.stars || 1);
-    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 28);
+    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 30);
     drawTidePill();
     drawSeaProgress();
     ctx.restore();
   }
-  // 海域进度条：满宽细条（y106~122，位于 HUD 底沿 100 与容器开口 145 之间的空隙带；
+  // 海域进度条：满宽细条（y100~116，位于当前得分下方、任务条之上的宽松段；容器开口 190）
   // 出生点 147 在条下方 25px，条不压坠落区），显示累计分距下一海域的进度
   // 配色：填充=当前海域深水色（与背景同族），右端小圆点=下一海域徽章色（目的地），左端骑线徽章=当前位置
   function drawSeaProgress() {
     var cur = seaStage(), ts = totalScore();
     var last = C.seaStages.length - 1;
     var maxed = cur >= last;
-    var sx = 12, sy = 72, sw = C.W - 24, sh = 16;
+    var sx = 12, sy = 100, sw = C.W - 24, sh = 16;
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     roundRect(sx, sy, sw, sh, 8); ctx.fill();
     var frac = 1;
