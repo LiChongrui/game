@@ -2743,11 +2743,12 @@ MG.config = {
   var menuTrophy = { cx: 24, cy: 36, r: 14, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）
   var restartBtn = { cx: C.W - 24, cy: 688, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
   // 「深渊潜航」无局内悬浮钮：入口在结算页按钮组（主流 NG+ 模式选择设计）
+  // 底部一排共 6 个按钮（图鉴 + 4 道具 + 重开），中心等距 70px 均匀排列：46/116/186/256/326/396
   var SKILL_BTNS = [
     { key: 'swap',   cx: 116, cy: 688, r: 20, pressT: 0 },
-    { key: 'ripple', cx: 178, cy: 688, r: 20, pressT: 0 },
-    { key: 'evap',   cx: 240, cy: 688, r: 20, pressT: 0 },
-    { key: 'flow',   cx: 302, cy: 688, r: 20, pressT: 0 }
+    { key: 'ripple', cx: 186, cy: 688, r: 20, pressT: 0 },
+    { key: 'evap',   cx: 256, cy: 688, r: 20, pressT: 0 },
+    { key: 'flow',   cx: 326, cy: 688, r: 20, pressT: 0 }
   ];
   fit(); // 首次适配（按钮已定义，底部元素可同步贴底）
 

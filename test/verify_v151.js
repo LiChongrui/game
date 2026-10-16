@@ -54,6 +54,14 @@ const path = require('path');
   ok(bar.base > 60, '进度条条底像素存在（base=' + bar.base + '）');
   ok(bar.dot > 3, '右端下一海域灰化徽章存在（dot=' + bar.dot + '）');
 
+  // 底部按钮均匀排列：图鉴 + 4 道具 + 重开 = 6 个，中心等距 70
+  const bxs = await page.evaluate(() => {
+    return [window.bookBtn.cx].concat(window.SKILL_BTNS.map(function (b) { return b.cx; })).concat([window.restartBtn.cx]);
+  });
+  const gaps = bxs.slice(1).map((v, i) => v - bxs[i]);
+  ok(gaps.every(v => Math.abs(v - 70) < 0.01), '底部 6 按钮中心等距 70（' + bxs.join('/') + ' gaps=' + gaps.join(',') + '）');
+  ok(bxs[0] === 46 && bxs[bxs.length - 1] === 396, '首尾按钮贴边不变（46 / 396）');
+
   await page.evaluate(() => { MG.debug.setNext({ tier: 2 }); });
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(__dirname, 'v140_play_780.png') });
