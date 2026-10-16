@@ -39,12 +39,12 @@ const path = require('path');
   await page.evaluate(() => MG.debug.closeDex());
 
   // ④ 深渊王座满潮（海域主题色 + 潮面）
-  await page.evaluate(() => { MG.debug.forceEndless(); const t = MG.probe().tideRef; t.phase = 'active'; t.timer = 9999; t.progress = 1; t.banner = 0; MG.debug.setLife(300100); });
+  await page.evaluate(() => { MG.debug.forceEndless(); const t = MG.probe().tideRef; t.phase = 'active'; t.timer = 5; t.progress = 1; t.banner = 0; MG.debug.setLife(300100); });
   await page.waitForTimeout(2600); // 等海域换色渐变走完
   await shot('tide');
 
-  // ⑤ 结算页
-  await page.evaluate(() => { MG.debug.addScore(28600); MG.debug.over(); });
+  // ⑤ 结算页（先把钉死的满潮恢复成正常倒计时，避免截图里出现 9997s）
+  await page.evaluate(() => { const t = MG.probe().tideRef; t.phase = 'idle'; t.timer = 18; t.progress = 0; MG.debug.addScore(28600); MG.debug.over(); });
   await page.waitForTimeout(400);
   await shot('over');
 
