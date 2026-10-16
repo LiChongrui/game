@@ -67,6 +67,15 @@
   // try/catch + 空值守卫（core.js audio 段），桥不兼容时只静音不崩。
   G.AudioContext = function () { return wx.createWebAudioContext(); };
 
+  // 安全区：safeArea.top 之下是摄像头/挖孔区，screenHeight - safeArea.bottom 是手势横条区
+  // （均为逻辑 px）。core.js fit() 读 __safeInset 把内容压进安全区，触摸 y 同步补偿。
+  var safeTop = 0, safeBottom = 0;
+  if (sys.safeArea && sys.screenHeight) {
+    safeTop = Math.max(0, sys.safeArea.top);
+    safeBottom = Math.max(0, sys.screenHeight - sys.safeArea.bottom);
+  }
+  G.__safeInset = { top: safeTop, bottom: safeBottom };
+
   // ---------- 事件桥：pointer* → wx.onTouch* ----------
   // canvas 与 window 各留一张 handler 表；touchend 同时喂 pointerup（canvas 的 tryDrop 与
   // window 的 audio.ensure 各取所需），多点触控取 changedTouches[0]。
@@ -79,7 +88,8 @@
   function touchEvent(e) {
     var t = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]) || {};
     return {
-      clientX: t.clientX || 0, clientY: t.clientY || 0,
+      clientX: t.clientX || 0,
+      clientY: (t.clientY || 0) - safeTop, // 渲染整体下压 safeTop，触摸 y 同量补偿保持自洽
       pointerId: t.identifier || 0,
       preventDefault: function () {}
     };

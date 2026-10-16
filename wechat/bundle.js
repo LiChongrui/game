@@ -410,11 +410,17 @@ MG.config = {
   var BX = 0;             // 游戏区（420 逻辑宽）水平居中偏移
   var FLOORY = C.floorY;  // 容器底 y（底部锚定：VH - 74）
   var view = { s: 1 };
+  var safeTop = 0, safeBottom = 0; // 安全区 inset（逻辑 px）：刘海/挖孔顶、手势条底；fit() 从垫片 __safeInset 刷新，Web 端恒 0
 
   function fit() {
     var w = window.innerWidth, h = window.innerHeight;
-    view.s = Math.min(w / C.W, h / C.H);   // 等比缩放，不变形
-    VH = h / view.s;
+    // 安全区：微信垫片提供 __safeInset（top=摄像头/挖孔区、bottom=手势横条区），Web 端无垫片为 0；
+    // 内容按有效视口缩放、渲染整体下压 safeTop，交互内容全部落在摄像头与手势条之外
+    var si = (typeof window.__safeInset === 'object' && window.__safeInset) || {};
+    safeTop = si.top || 0; safeBottom = si.bottom || 0;
+    var eh = h - safeTop - safeBottom;     // 有效视口高度（设备 px）
+    view.s = Math.min(w / C.W, eh / C.H);  // 等比缩放，不变形
+    VH = eh / view.s;
     LW = w / view.s;                       // 逻辑宽度（≥420）
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
     FLOORY = VH - 74;                      // 容器底贴住窗口底部（720-646=74）
@@ -3904,6 +3910,17 @@ MG.config = {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, LW, VH);
 
+    // 安全区延伸：内容视口被 fit() 压进安全区内（safeTop/safeBottom 逻辑 px），
+    // 顶部/底部 inset 区用渐变端点色补齐，避免摄像头/手势条区域露黑
+    if (safeTop > 0) {
+      ctx.fillStyle = st.bg[0];
+      ctx.fillRect(0, -safeTop / view.s, LW, safeTop / view.s + 1);
+    }
+    if (safeBottom > 0) {
+      ctx.fillStyle = st.bg[3];
+      ctx.fillRect(0, VH - 1, LW, safeBottom / view.s + 2);
+    }
+
     // 顶部阳光光晕 + 两侧柔光（静态光斑，缓存渐变）
     ctx.fillStyle = grad('sun' + lk, function () {
       var gg = ctx.createRadialGradient(LW * 0.5, -30, 20, LW * 0.5, -30, 300);
@@ -5994,8 +6011,9 @@ MG.config = {
 
   // ---------- 主渲染 ----------
   function render() {
-    // 逻辑坐标 → 设备像素：dpr × view.s（画布铺满窗口后，缩放必须在变换里完成）
-    ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, 0);
+    // 逻辑坐标 → 设备像素：dpr × view.s，整体下压 safeTop（安全区：摄像头/挖孔避让）；
+    // 触摸侧由垫片对 clientY 做同量补偿，渲染与点击自洽
+    ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, dpr * safeTop);
 
     if (shakeT > 0) {
       var s = shakeAmp * (shakeT / 0.4);

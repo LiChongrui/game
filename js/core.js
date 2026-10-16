@@ -16,11 +16,17 @@
   var BX = 0;             // 游戏区（420 逻辑宽）水平居中偏移
   var FLOORY = C.floorY;  // 容器底 y（底部锚定：VH - 74）
   var view = { s: 1 };
+  var safeTop = 0, safeBottom = 0; // 安全区 inset（逻辑 px）：刘海/挖孔顶、手势条底；fit() 从垫片 __safeInset 刷新，Web 端恒 0
 
   function fit() {
     var w = window.innerWidth, h = window.innerHeight;
-    view.s = Math.min(w / C.W, h / C.H);   // 等比缩放，不变形
-    VH = h / view.s;
+    // 安全区：微信垫片提供 __safeInset（top=摄像头/挖孔区、bottom=手势横条区），Web 端无垫片为 0；
+    // 内容按有效视口缩放、渲染整体下压 safeTop，交互内容全部落在摄像头与手势条之外
+    var si = (typeof window.__safeInset === 'object' && window.__safeInset) || {};
+    safeTop = si.top || 0; safeBottom = si.bottom || 0;
+    var eh = h - safeTop - safeBottom;     // 有效视口高度（设备 px）
+    view.s = Math.min(w / C.W, eh / C.H);  // 等比缩放，不变形
+    VH = eh / view.s;
     LW = w / view.s;                       // 逻辑宽度（≥420）
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
     FLOORY = VH - 74;                      // 容器底贴住窗口底部（720-646=74）

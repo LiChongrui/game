@@ -21,8 +21,12 @@ function makeStub() {
 // ---------- wx mock ----------
 const storage = {};
 const touchReg = { start: [], move: [], end: [], cancel: [] };
+const SAFE_TOP = 44, SCREEN_H = 720; // 模拟刘海屏：挖孔 44px + 手势条 20px
 globalThis.wx = {
-  getSystemInfoSync: () => ({ windowWidth: 420, windowHeight: 720, pixelRatio: 2 }),
+  getSystemInfoSync: () => ({
+    windowWidth: 420, windowHeight: 720, pixelRatio: 2, screenHeight: SCREEN_H,
+    safeArea: { top: SAFE_TOP, bottom: SCREEN_H - 20, left: 0, right: 420, width: 420, height: SCREEN_H - 20 - SAFE_TOP }
+  }),
   createCanvas: () => makeStub(),
   getStorageSync: k => (k in storage ? storage[k] : ''),
   setStorageSync: (k, v) => { storage[k] = String(v); },
@@ -59,9 +63,12 @@ setTimeout(() => {
   try {
     out.hasMG = !!globalThis.MG;
     out.hasConfig = !!(globalThis.MG && MG.config);
+    out.safeInset = globalThis.__safeInset;        // 期望 {top:44, bottom:20}
     out.state0 = MG.probe().state;                 // 期望 menu
-    // 点「开始游戏」按钮（菜单中心 210,426）→ 经 wx.onTouchStart/End → canvas pointerdown/up → restart
-    tap(210, 426);
+    // 点「开始游戏」按钮：安全区后 view.s = min(420/420, 656/720) ≈ 0.9111，内容下压 safeTop——
+    // 屏幕坐标 = 逻辑 × view.s + safeTop；垫片补偿 -safeTop 后 toLocal 仍还原逻辑坐标
+    var vs = Math.min(420 / 420, (720 - SAFE_TOP - 20) / 720);
+    tap(210 * vs, 426 * vs + SAFE_TOP);
     out.state1 = MG.probe().state;                 // 期望 play
     out.score1 = MG.probe().score;
     out.storageKeys = Object.keys(storage).filter(k => k.indexOf('mg_') === 0).slice(0, 8);
