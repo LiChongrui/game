@@ -1768,7 +1768,7 @@
       for (var stg = 0; stg < C.seaStages.length; stg++) {
         var ss = C.seaStages[stg];
         var sRow = stageRowRect(stg);
-        var isCur = stg === curStage, reached = tsNow >= ss.at, sel = dexSelStage === stg;
+        var isCur = stg === curStage, reached = Math.max(tsNow, careerPeak) >= ss.at, sel = dexSelStage === stg;
         var isNext = stg === curStage + 1, hiddenStg = !isCur && !reached && !isNext;
         var rowCy = sRow.y + sRow.h / 2;
         if (isCur) {
@@ -1824,7 +1824,7 @@
             roundRect(slotR.x + 0.5, slotR.y + 0.5, slotR.w - 1, slotR.h - 1, 8); ctx.stroke();
           }
           var cx2 = slotR.x + 14, cy2 = rowCy;
-          if (hiddenStg || isNext) { // 更深海域 + 下一海域：虚线空位 + "？？？"（特殊滴内容不剧透，海域名/解锁积分仍可见）
+          if ((hiddenStg || isNext) && !reached) { // 生涯未抵达：虚线空位 + "？？？"（特殊滴内容不剧透，海域名/解锁积分仍可见）
             ctx.save();
             ctx.setLineDash([3, 3]);
             ctx.strokeStyle = '#A8BCCB'; ctx.lineWidth = 1;
@@ -1872,7 +1872,7 @@
       body = tu ? '与同档水滴相触合成更高阶；「沧海」会汇入海域折算得分。' : '继续在海里合成更深处的水滴，遇见它便会点亮。';
     } else if (dexSelStage >= 0) {
       var stgS = C.seaStages[dexSelStage];
-      var stgReached = tsNow >= stgS.at, stgCur = dexSelStage === curStage;
+      var stgReached = Math.max(tsNow, careerPeak) >= stgS.at, stgCur = dexSelStage === curStage;
       title = stgReached || stgCur ? stgS.name : '？？？';
       sub = stgCur ? '当前海域' : (stgReached ? '已抵达' : ('累计 ' + (stgS.at >= 10000 ? (stgS.at / 10000) + '万' : stgS.at) + ' 分解锁'));
       body = '海域越深水色越暗：潮汐更频、礁石更多，宝箱与稀有滴逐步出现。';

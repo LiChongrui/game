@@ -42,6 +42,9 @@
   var dexUnlocked = dexLoaded.u;
   var dexCounts = dexLoaded.c;
   var dexSpecial = dexLoaded.sp;   // 特殊水滴发现记录 { vortex:1, iron:1, ... }
+  // 生涯最高累计分（跨刷新持久）：图鉴"已抵达"按它判定——发现过的收集永不回退；
+  // 本局玩法（背景海域/特殊滴池/潮位）仍按会话内 totalScore 重新潜入，两者各司其职
+  var careerPeak = parseFloat(MG.platform.get('mg_peak')) || 0;
   var dexTab = 0;                  // 图鉴页签：0=图鉴 1=成就 2=每日 3=榜单
   var dexSelSp = -1;               // 图鉴页当前选中的特殊滴说明（-1=未选）
   var dexSec = 0;                  // 图鉴主页分节：0=合成链 1=海域演进（特殊滴槽位并入海域行）
@@ -1462,6 +1465,8 @@
   function gameOver() {
     state = 'over';
     lifeScore += score - runCounted; runCounted = score; // 累计分只记增量（复活续局不重复计）
+    careerPeak = Math.max(careerPeak, lifeScore); // 生涯峰值只涨不跌（图鉴"已抵达"的判定基准）
+    saveNum('mg_peak', careerPeak);
     saveNum('mg_life', lifeScore);
     saveNum('mg_best', best);
     checkAchievements();
@@ -1958,6 +1963,8 @@
           for (var st = 0; st < C.seaStages.length; st++) {
             for (var slot = 0; slot < 2; slot++) {
               if (inRect(p, spSlotRect(st, slot))) {
+                // 生涯未抵达的海域：槽位是"？？？"悬念位，点击落到整行（显示海域说明），不选中滴
+                if (Math.max(totalScore(), careerPeak) < C.seaStages[st].at) break;
                 var spKeys = STAGE_SP_SLOTS[st] || STAGE_SP_SLOTS[0];
                 dexSelSp = slot === 0 ? spKeys[0] : spKeys[1];
                 dexSelTier = -1; dexSelStage = -1;
@@ -1979,7 +1986,18 @@
       return;
     }
     if (inMute(p)) { MUTE.pressT = 0.16; audio.muted = !audio.muted; saveFlag('mg_mute', audio.muted); if (audio.muted) audio.bgm.stop(); else audio.bgm.start(); return; }
-    if (inCircle(p, bookBtn)) { bookBtn.pressT = 0.16; dexOpen = true; achOpen = false; return; }
+    if (inCircle(p, bookBtn)) {
+      bookBtn.pressT = 0.16; dexOpen = true; achOpen = false;
+      // 默认选中与分节匹配的条目（说明区开局即有内容，不显"未发现"空态）
+      dexSelTier = -1; dexSelSp = -1; dexSelStage = -1;
+      if (dexSec === 0) {
+        for (var dt = T.length - 1; dt >= 0; dt--) if (dexUnlocked[dt]) { dexSelTier = dt; break; }
+        if (dexSelTier < 0) dexSelTier = 0;
+      } else {
+        dexSelStage = seaStage();
+      }
+      return;
+    }
     if (inCircle(p, trophyBtn)) { trophyBtn.pressT = 0.16; achOpen = true; dexOpen = false; dexTab = 0; return; }
     // 「深渊潜航」：词缀三选一弹窗（结算页/局内点卡片开跑，点外关闭）
     if (ngOpen) {
