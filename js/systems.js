@@ -1842,7 +1842,7 @@
   ];
   fit(); // 首次适配（按钮已定义，底部元素可同步贴底）
   var DEX_PANEL = { x: 20, y: 64, w: 380, h: 560 };
-  var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 42, y: DEX_PANEL.y + 12, w: 28, h: 28 }; // 右上 × 关闭
+  var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 42, y: DEX_PANEL.y + 8, w: 28, h: 28 }; // 右上 × 关闭（中心 +22px，与页头标题文字对齐）
   // 成就页分段页签：成就 / 每日 / 榜单（与图鉴分节同款分段控件样式）
   function achTabRect(i) {
     var segW = Math.floor((DEX_PANEL.w - 30) / 3);
