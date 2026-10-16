@@ -82,8 +82,11 @@
     // 渐变缓存 key：过渡期按 1/24 步长量化（视觉无级差，缓存不爆炸）
     var sk = sb ? 'F' + sb.from + '_' + sb.to + '_' + Math.round(sb.k * 24) : '' + stg;
     var vk = Math.round(VH), lk = Math.round(LW);
-    var bg = grad('bg' + sk + '_' + vk, function () {
-      var gg = ctx.createLinearGradient(0, 0, 0, VH);
+    // 安全区延伸：背景画在无偏移全屏变换里，渐变纵向铺满整个屏幕（逻辑 0 → h/view.s），
+    // 挖孔区与手势条区由同一条渐变的顶端/底端色自然覆盖，与内容区完全连续、无接缝
+    var fullH = VH + (safeTop + safeBottom) / view.s;
+    var bg = grad('bg' + sk + '_' + vk + '_' + Math.round(fullH), function () {
+      var gg = ctx.createLinearGradient(0, 0, 0, fullH);
       gg.addColorStop(0, st.bg[0]);
       gg.addColorStop(0.4, st.bg[1]);
       gg.addColorStop(0.75, st.bg[2]);
@@ -91,18 +94,7 @@
       return gg;
     });
     ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, LW, VH);
-
-    // 安全区延伸：内容视口被 fit() 压进安全区内（safeTop/safeBottom 逻辑 px），
-    // 顶部/底部 inset 区用渐变端点色补齐，避免摄像头/手势条区域露黑
-    if (safeTop > 0) {
-      ctx.fillStyle = st.bg[0];
-      ctx.fillRect(0, -safeTop / view.s, LW, safeTop / view.s + 1);
-    }
-    if (safeBottom > 0) {
-      ctx.fillStyle = st.bg[3];
-      ctx.fillRect(0, VH - 1, LW, safeBottom / view.s + 2);
-    }
+    ctx.fillRect(0, -1, LW, fullH + 2);
 
     // 顶部阳光光晕 + 两侧柔光（静态光斑，缓存渐变）
     ctx.fillStyle = grad('sun' + lk, function () {
@@ -1233,9 +1225,11 @@
   // ---------- 容器：玻璃质感 + 底部焦散 ----------
   function drawContainer() {
     var floorY = FLOORY, FH = 12;
-    // 海底基色：从床面到画布底一条连续渐变（泡沫白 → 青 → 深海青），先铺满
-    var bed = grad('bed' + Math.round(VH), function () {
-      var gg = ctx.createLinearGradient(0, floorY, 0, VH);
+    // 海底基色：从床面到画布底一条连续渐变（泡沫白 → 青 → 深海青），先铺满；
+    // 纵向延伸到手势条区（内容区被下压后，底部安全区由同色渐变自然延续）
+    var _ob = safeBottom / view.s;
+    var bed = grad('bed' + Math.round(VH) + '_' + Math.round(_ob), function () {
+      var gg = ctx.createLinearGradient(0, floorY, 0, VH + _ob);
       gg.addColorStop(0, 'rgba(216,236,232,0.95)');
       gg.addColorStop(0.3, 'rgba(170,208,204,0.95)');
       gg.addColorStop(0.62, 'rgba(112,158,174,0.95)');
@@ -1243,7 +1237,7 @@
       return gg;
     });
     ctx.fillStyle = bed;
-    ctx.fillRect(0, floorY + 4, C.W, VH - floorY - 4);
+    ctx.fillRect(0, floorY + 4, C.W, VH - floorY - 4 + _ob);
     // 床面：圆角横条（半透明玻璃质感，透出海底基色，不再有硬边界）
     var fg = grad('fg' + Math.round(VH), function () {
       var gg = ctx.createLinearGradient(0, floorY, 0, floorY + FH + 6);
@@ -1792,15 +1786,17 @@
   }
 
   function drawSkillBar() {
-    // 道具带：海底基色的柔和延续（同色系微加深，方向与渐变一致，不割裂）
-    var g = grad('skbar' + Math.round(VH), function () {
-      var gg = ctx.createLinearGradient(0, VH - 56, 0, VH);
+    // 道具带：海底基色的柔和延续（同色系微加深，方向与渐变一致，不割裂）；
+    // 纵向延伸到手势条区，按钮本体保持在安全区内
+    var _ob = safeBottom / view.s;
+    var g = grad('skbar' + Math.round(VH) + '_' + Math.round(_ob), function () {
+      var gg = ctx.createLinearGradient(0, VH - 56, 0, VH + _ob);
       gg.addColorStop(0, 'rgba(56,102,130,0)');
       gg.addColorStop(1, 'rgba(36,78,106,0.3)');
       return gg;
     });
     ctx.fillStyle = g;
-    ctx.fillRect(0, VH - 56, C.W, 56);
+    ctx.fillRect(0, VH - 56, C.W, 56 + _ob);
 
     var readyPulse = 0.5 + 0.5 * Math.sin(time * 5);
 
@@ -2137,7 +2133,9 @@
     }
 
     ctx.fillStyle = 'rgba(6,28,52,0.42)';
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    // 遮罩延伸到安全区外（内容区被下压后，手势条/挖孔区若不罩住会现出遮罩硬边）
+    var _ot = safeTop / view.s, _ob = safeBottom / view.s;
+    ctx.fillRect(-BX, -_ot, C.W + BX * 2, VH + _ot + _ob);
 
     ctx.textAlign = 'center';
     var pulse = 0.5 + 0.5 * Math.sin(time * 2.4);
@@ -2194,7 +2192,10 @@
 
   // ---------- 主渲染 ----------
   function render() {
-    // 逻辑坐标 → 设备像素：dpr × view.s，整体下压 safeTop（安全区：摄像头/挖孔避让）；
+    // 背景：无偏移全屏变换——渐变纵向拉伸到安全区外（挖孔/手势条区由海色自然延伸，无接缝）
+    ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, 0);
+    drawBackground();
+    // 内容：整体下压 safeTop（顶部元素避让摄像头/挖孔；底部元素抬到手势条上方）。
     // 触摸侧由垫片对 clientY 做同量补偿，渲染与点击自洽
     ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, dpr * safeTop);
 
@@ -2202,8 +2203,6 @@
       var s = shakeAmp * (shakeT / 0.4);
       ctx.translate((Math.random() - 0.5) * 2 * s, (Math.random() - 0.5) * 2 * s);
     }
-
-    drawBackground();
 
     // 游戏区（420 逻辑宽）水平居中：整体平移 BX，两侧为延伸海水
     ctx.save();
