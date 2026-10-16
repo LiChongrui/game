@@ -1466,6 +1466,8 @@
     ctx.strokeText(label, cx, sy + 13);
     ctx.fillStyle = '#2C5A78';
     ctx.fillText(label, cx, sy + 13);
+    // 左端骑线放当前海域徽章——直观标注"当前位置"（与图鉴徽章语言一致）
+    drawSeaBadge(cur, sx + 16, sy + sh / 2, true);
   }
 
   // ---------- 技能栏 ----------
@@ -1770,10 +1772,14 @@
         var isNext = stg === curStage + 1, hiddenStg = !isCur && !reached && !isNext;
         var rowCy = sRow.y + sRow.h / 2;
         if (isCur) {
-          ctx.fillStyle = (SEA_BADGES[stg] || SEA_BADGES[0]).c; // 当前海域行铺该海域主题色
-        } else if (reached) { // 已抵达：铺该海域专属色的浅底
-          ctx.globalAlpha = 0.13;
-          ctx.fillStyle = (SEA_BADGES[stg] || SEA_BADGES[0]).c;
+          // 当前海域行铺该海域背景主题色（bg 渐变中段→深段，与游戏内一致）
+          var rowG = ctx.createLinearGradient(sRow.x, 0, sRow.x + sRow.w, 0);
+          rowG.addColorStop(0, ss.bg[2]);
+          rowG.addColorStop(1, ss.bg[3]);
+          ctx.fillStyle = rowG;
+        } else if (reached) { // 已抵达：铺该海域背景主题色的浅底
+          ctx.globalAlpha = 0.45;
+          ctx.fillStyle = ss.bg[1];
           roundRect(sRow.x, sRow.y, sRow.w, sRow.h, 9); ctx.fill();
           ctx.globalAlpha = 1;
         } else {
@@ -1793,10 +1799,15 @@
         if (isCur || reached || isNext) drawSeaBadge(stg, dotX, dotY, reached || isCur);
         ctx.fillStyle = isCur ? '#FFFFFF' : (reached ? '#155A8A' : '#8AA5B8');
         ctx.font = 'bold 15px system-ui, sans-serif';
+        if (isCur) {
+          ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,50,80,0.35)';
+          ctx.strokeText(isCur || reached || isNext ? ss.name : '？？？', dotX + 15, rowCy - 3);
+        }
         ctx.fillText(isCur || reached || isNext ? ss.name : '？？？', dotX + 15, rowCy - 3);
         ctx.font = '11px system-ui, sans-serif';
         ctx.fillStyle = isCur ? 'rgba(255,255,255,0.92)' : (reached ? '#1E7A6F' : (isNext ? '#7A98AC' : '#B0584A'));
         var gateTxt = isCur ? '当前海域' : (reached ? '已抵达' : (isNext ? '下一海域 · 累计' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + '分' : '累计 ' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + ' 分解锁'));
+        if (isCur) ctx.strokeText(gateTxt, dotX + 15, rowCy + 11);
         ctx.fillText(gateTxt, dotX + 15, rowCy + 11);
         // 右侧：该海域的 2 个特殊滴槽位（点击查看说明）
         var slots2 = STAGE_SP_SLOTS[stg] || STAGE_SP_SLOTS[0];
