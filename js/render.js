@@ -621,7 +621,9 @@
     ctx.save();
     ctx.beginPath(); ctx.arc(0, 0, r * 0.94, 0, Math.PI * 2); ctx.clip();
     var wk = Math.round(r * 2) / 2;
-    // 左上柔光带（天光，渐变缓存）
+    // 设计原则：内部不画任何"线条/实心形状"（硬边贴纸感是丑的根源），
+    // 全部用径向渐变光效表达——深度、水面、气泡、光斑皆自然渐隐，边缘永远有过渡。
+    // ① 左上天光（保留柔光带）
     ctx.fillStyle = grad('wvH' + wk, function () {
       var gg = ctx.createLinearGradient(-r * 0.7, -r * 0.8, r * 0.1, 0);
       gg.addColorStop(0, 'rgba(255,255,255,0.22)');
@@ -631,88 +633,82 @@
     ctx.beginPath();
     ctx.ellipse(-r * 0.28, -r * 0.42, r * 0.52, r * 0.3, -0.5, 0, Math.PI * 2);
     ctx.fill();
-    // 水位（缓慢呼吸升降，常年在球心附近）+ 波面函数（双正弦叠加，长周期小幅度 → 平滑）
-    var lv = -r * 0.02 + Math.sin(time * 0.6) * r * 0.025;
-    function yw(x) {
-      return lv + Math.sin(x * 0.040 + time * 1.1) * r * 0.045
-                + Math.sin(x * 0.093 - time * 0.7) * r * 0.018;
-    }
-    // 水体：水面线以下整体渐深（受光微亮 → 深处浓暗），一笔画到球壁由裁剪收边，无生硬边界
-    ctx.fillStyle = grad('wvFill' + wk, function () {
-      var gg = ctx.createLinearGradient(0, -r * 0.02, 0, r * 0.95);
-      gg.addColorStop(0, 'rgba(214,242,255,0.12)');
-      gg.addColorStop(0.3, 'rgba(70,130,196,0.10)');
-      gg.addColorStop(1, 'rgba(4,18,48,0.34)');
+    // ② 底部深水暗晕：暗调自下而上消散（深度感，全软边）
+    ctx.fillStyle = grad('wvDeep' + wk, function () {
+      var gg = ctx.createRadialGradient(0, r * 1.18, r * 0.08, 0, r * 1.18, r * 1.1);
+      gg.addColorStop(0, 'rgba(3,14,38,0.44)');
+      gg.addColorStop(0.55, 'rgba(6,26,64,0.16)');
+      gg.addColorStop(1, 'rgba(6,26,64,0)');
       return gg;
     });
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.95, yw(-r * 0.95));
-    for (var x = -r * 0.95; x <= r * 0.95; x += 2) ctx.lineTo(x, yw(x));
-    ctx.lineTo(r * 0.95, r * 0.95); ctx.lineTo(-r * 0.95, r * 0.95);
-    ctx.closePath(); ctx.fill();
-    // 水面高光主线（clip 在球壁处自然收尾）+ 正下方次级微光
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-    ctx.lineWidth = Math.max(1.6, r * 0.042);
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.95, yw(-r * 0.95));
-    for (x = -r * 0.95; x <= r * 0.95; x += 2) ctx.lineTo(x, yw(x));
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
-    ctx.lineWidth = Math.max(1.2, r * 0.026);
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.9, yw(-r * 0.9) + r * 0.065);
-    for (x = -r * 0.9; x <= r * 0.9; x += 2) ctx.lineTo(x, yw(x) + r * 0.065);
-    ctx.stroke();
-    // 水中光柱：两道从水面斜射向下的柔光，缓慢摆动（丁达尔小景）
-    var ray2 = grad('wvRay' + wk, function () {
-      var gg = ctx.createLinearGradient(0, 0, 0, r);
-      gg.addColorStop(0, 'rgba(220,245,255,0.15)');
-      gg.addColorStop(1, 'rgba(220,245,255,0)');
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+    // ③ 水面月光带：水面高度一团横向拉长的柔光椭圆（缓慢漂移呼吸），
+    //    不画线，光斑本身即是"水面"的暗示；气泡升到此处即没，语义闭环
+    var lv = -r * 0.04 + Math.sin(time * 0.5) * r * 0.03;
+    ctx.save();
+    ctx.translate(Math.sin(time * 0.23) * r * 0.06, lv);
+    ctx.scale(r * 0.6, r * 0.15);
+    ctx.fillStyle = grad('wvSheen' + wk, function () {
+      var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+      gg.addColorStop(0, 'rgba(235,250,255,0.30)');
+      gg.addColorStop(0.55, 'rgba(235,250,255,0.11)');
+      gg.addColorStop(1, 'rgba(235,250,255,0)');
       return gg;
     });
-    for (var bi = 0; bi < 2; bi++) {
+    ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // ④ 焦散光斑：3 枚小柔光在水面下缓慢游移闪烁（水面折射的光，软边）
+    for (var ci = 0; ci < 3; ci++) {
+      var ca = time * (0.3 + ci * 0.12) + ci * 2.4;
+      var cx2 = Math.sin(ca * 1.1 + ci * 2.0) * r * 0.4;
+      var cy2 = lv + r * (0.16 + 0.05 * Math.sin(ca * 0.9 + ci));
+      var cs = r * (0.085 + 0.03 * (ci % 2)) * (0.8 + 0.2 * Math.sin(ca * 2.2));
       ctx.save();
-      var bx0 = (bi ? 0.3 : -0.26) * r + Math.sin(time * 0.5 + bi * 2.2) * r * 0.05;
-      ctx.translate(bx0, lv + r * 0.03);
-      ctx.rotate((bi ? 0.32 : -0.2) + Math.sin(time * 0.4 + bi * 1.7) * 0.05);
-      var bw2 = r * (bi ? 0.2 : 0.15);
-      ctx.fillStyle = ray2;
-      ctx.fillRect(-bw2 / 2, 0, bw2, r * 0.7);
+      ctx.translate(cx2, cy2);
+      ctx.scale(cs, cs * 0.55);
+      ctx.globalAlpha = 0.3 + 0.22 * Math.sin(ca * 1.7 + ci);
+      ctx.fillStyle = grad('wvCau', function () {
+        var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+        gg.addColorStop(0, 'rgba(240,252,255,0.85)');
+        gg.addColorStop(1, 'rgba(240,252,255,0)');
+        return gg;
+      });
+      ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
-    // 小鱼剪影：在水层里慢游、自动往复调头（不同球错相），一尾生命感点缀
-    var fa = time * 0.22 + wk;
-    var fx = Math.sin(fa) * r * 0.46;
-    var fy = lv + r * 0.36 + Math.sin(time * 0.8 + wk) * r * 0.035;
-    var fdir = Math.cos(fa) >= 0 ? 1 : -1;
-    var fs = r * 0.15;
-    ctx.save();
-    ctx.translate(fx, fy);
-    ctx.scale(fdir, 1);
-    ctx.fillStyle = 'rgba(226,246,255,0.38)';
-    ctx.beginPath();
-    ctx.moveTo(fs, 0);
-    ctx.quadraticCurveTo(0, -fs * 0.52, -fs * 0.7, 0);
-    ctx.quadraticCurveTo(0, fs * 0.52, fs, 0);
-    ctx.closePath(); ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(-fs * 0.58, 0); ctx.lineTo(-fs * 1.02, -fs * 0.3); ctx.lineTo(-fs * 1.02, fs * 0.3);
-    ctx.closePath(); ctx.fill();
-    ctx.restore();
-    // 上浮气泡（3 枚：从水底升起、到水面即没，圆圈描边=空气泡质感）
-    for (bi = 0; bi < 3; bi++) {
-      var ba2 = time * (0.35 + bi * 0.11) + bi * 2.7;
-      var prog2 = (ba2 % 1.4) / 1.4;
-      var bxx = Math.sin(ba2 * 2.1 + bi * 1.9) * r * 0.2 + (bi - 1) * r * 0.22;
-      var topY = yw(bxx) + r * 0.03;
-      var byy = r * 0.85 - prog2 * (r * 0.85 - topY);
-      var br2 = r * (0.028 + 0.012 * (bi % 3));
-      ctx.strokeStyle = 'rgba(255,255,255,0.42)';
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(bxx, byy, br2, 0, Math.PI * 2); ctx.stroke();
+    // ⑤ 柔边气泡：3 枚径向渐变气泡从底部升到水面渐没（抵达光带处淡出，无描边）
+    for (var bi = 0; bi < 3; bi++) {
+      var ba2 = time * (0.3 + bi * 0.1) + bi * 2.6;
+      var prog2 = (ba2 % 1.5) / 1.5;
+      var bxx = Math.sin(ba2 * 1.8 + bi * 2.1) * r * 0.18 + (bi - 1) * r * 0.24;
+      var topY = lv + r * 0.05;
+      var byy = r * 0.8 - prog2 * (r * 0.8 - topY);
+      var br2 = r * (0.035 + 0.012 * (bi % 3));
+      var bfade = prog2 < 0.82 ? 1 : 1 - (prog2 - 0.82) / 0.18;
+      ctx.save();
+      ctx.translate(bxx, byy);
+      ctx.scale(br2, br2);
+      ctx.globalAlpha = 0.5 * bfade;
+      ctx.fillStyle = grad('wvBub', function () {
+        var gg = ctx.createRadialGradient(-0.3, -0.3, 0, 0, 0, 1);
+        gg.addColorStop(0, 'rgba(255,255,255,0.9)');
+        gg.addColorStop(0.35, 'rgba(255,255,255,0.28)');
+        gg.addColorStop(1, 'rgba(255,255,255,0)');
+        return gg;
+      });
+      ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
     }
-    ctx.lineCap = 'butt';
+    // ⑥ 内壁晕影：贴球壁一圈由内向外轻微加深，让所有内部内容在壁边自然消隐，
+    //    同时收拢球体体积感（内部各元素的"边缘过渡"由它统一兜底）
+    ctx.fillStyle = grad('wvVin' + wk, function () {
+      var gg = ctx.createRadialGradient(0, 0, r * 0.52, 0, 0, r * 0.94);
+      gg.addColorStop(0, 'rgba(4,16,44,0)');
+      gg.addColorStop(0.72, 'rgba(4,16,44,0.09)');
+      gg.addColorStop(1, 'rgba(4,16,44,0.26)');
+      return gg;
+    });
+    ctx.fillRect(-r, -r, r * 2, r * 2);
     ctx.restore();
   }
 
