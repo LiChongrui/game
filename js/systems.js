@@ -1792,7 +1792,7 @@
   var bookBtn = { cx: 46, cy: 688, r: 20, pressT: 0 };
   var trophyBtn = { cx: 24, cy: 36, r: 14, pressT: 0 }; // 成就页入口（奖杯，左上角，与右上静音钮对称）
   var restartBtn = { cx: C.W - 24, cy: 688, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
-  var ngBtn = { cx: 349, cy: 688, r: 16, pressT: 0 }; // 二周目「深渊回响」入口（解锁后显示）
+  var ngBtn = { cx: 258, cy: 76, r: 12, pressT: 0 }; // 二周目「深渊回响」入口（顶栏中段：任务条与潮汐胶囊之间的空档）
   var SKILL_BTNS = [
     { key: 'swap',   cx: 116, cy: 688, r: 20, pressT: 0 },
     { key: 'ripple', cx: 178, cy: 688, r: 20, pressT: 0 },
@@ -2054,7 +2054,7 @@
     if (!ng.unlocked && totalScore() >= C.ng.unlockScore) {
       ng.unlocked = true;
       saveFlag('mg_ng', 1);
-      addPopup(C.W / 2, 260, '解锁「深渊回响」：右下角入口开启二周目', true, 0);
+      addPopup(C.W / 2, 260, '解锁「深渊回响」：顶栏「渊」钮开启二周目', true, 0);
       audio.quest();
     }
     // 海域演进：累计分跨过里程碑 → 世界换色 + 弹报

@@ -42,7 +42,7 @@
     var cy = VH - 36;
     if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {
       bookBtn.cy = cy; restartBtn.cy = cy;
-      if (typeof ngBtn !== 'undefined') ngBtn.cy = cy; // 深渊回响入口同样贴底（未解锁灰钮也显示）
+      // ngBtn 固定在左上角（奖杯正下方），不参与贴底
       // trophyBtn 固定在左上角（与右上静音钮对称），不参与贴底
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
     }

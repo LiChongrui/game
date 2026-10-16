@@ -1590,22 +1590,22 @@
       ctx.fillText(cfg.name, btn.cx, btn.cy + btn.r + 12);
     }
 
-    // 二周目「深渊回响」入口：解锁后紫色圆钮+渊字；未解锁灰色锁钮+解锁提示（不再完全隐藏）
+    // 二周目「深渊回响」入口：顶栏中段空档；解锁后紫色渊字钮，未解锁灰色锁钮+解锁提示
     if (state === 'play') {
       if (ng.unlocked) {
         drawCircleBtn(ngBtn, '#6B5AA8', 0.95, false, 0);
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 13px system-ui, sans-serif';
-        ctx.fillText('渊', ngBtn.cx, ngBtn.cy + 5);
+        ctx.font = 'bold 11px system-ui, sans-serif';
+        ctx.fillText('渊', ngBtn.cx, ngBtn.cy + 4);
       } else {
         drawCircleBtn(ngBtn, '#6E7B88', 0.62, false, 0);
-        ctx.strokeStyle = 'rgba(255,255,255,0.92)'; ctx.lineWidth = 1.6;
-        ctx.beginPath(); ctx.arc(ngBtn.cx, ngBtn.cy - 3.5, 3.2, Math.PI, 0); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.92)'; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.arc(ngBtn.cx, ngBtn.cy - 2.5, 2.6, Math.PI, 0); ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.92)';
-        roundRect(ngBtn.cx - 4.5, ngBtn.cy - 3.5, 9, 7.5, 2); ctx.fill();
+        roundRect(ngBtn.cx - 3.8, ngBtn.cy - 2.5, 7.6, 6.4, 1.8); ctx.fill();
         ctx.fillStyle = 'rgba(240,250,252,0.85)';
         ctx.font = '7.5px system-ui, sans-serif';
-        ctx.fillText('累计5万解锁', ngBtn.cx, ngBtn.cy + 25);
+        ctx.fillText('5万解锁', ngBtn.cx, ngBtn.cy + 22);
       }
     }
   }
@@ -1851,7 +1851,7 @@
           }
           ctx.fillStyle = found2 ? '#155A8A' : '#4E6E86';
           ctx.font = '8.5px system-ui, sans-serif';
-          ctx.fillText(found2 ? (isChest2 ? '深海宝箱' : spDef2.name) : '？？？', slotR.x + 27, cy2 + 3);
+          ctx.fillText(found2 ? (isChest2 ? '深海宝箱' : spDef2.name) : '？？？', slotR.x + 33, cy2 + 3);
         }
       }
       ctx.textAlign = 'center';
