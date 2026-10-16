@@ -1,0 +1,100 @@
+// 水滴合成深海 - 微信小游戏环境垫片
+// 在 bundle.js 之前加载：把 wx API 桥接成游戏源码依赖的最小 DOM 环境，
+// 游戏八个模块（platform/config/physics/core/systems/panels/render/main）零改动。
+// 依赖面（自源码 grep 全量核对）：
+//   window / window.MG / innerWidth/Height / devicePixelRatio / addEventListener(resize|pointerup|keydown)
+//   document.getElementById('game') / createElement('canvas') / documentElement / body
+//   canvas.style / canvas.addEventListener(pointerdown|move|up|cancel) / toDataURL（仅调试导出用）
+//   localStorage（platform.js 存储层）/ navigator.clipboard / navigator.vibrate
+//   AudioContext（合成音效，全链路 try/catch，桥失败仅静音）/ performance.now / requestAnimationFrame
+(function () {
+  var G = GameGlobal;
+  var sys = wx.getSystemInfoSync();
+
+  // 主画布：wx.createCanvas 首次调用返回主屏画布，之后调用返回离屏画布
+  var mainCanvas = wx.createCanvas();
+  mainCanvas.style = {}; // core.js fit() 会写 style.width/height，微信无 style，给空对象接住
+
+  // window → GameGlobal（游戏里 window.MG / window.AudioContext 等全部落在这里）
+  G.window = G;
+  G.innerWidth = sys.windowWidth;
+  G.innerHeight = sys.windowHeight;
+  G.devicePixelRatio = Math.min(sys.pixelRatio || 2, 2);
+  if (!G.performance) G.performance = { now: function () { return Date.now(); } };
+  if (!G.requestAnimationFrame) {
+    G.requestAnimationFrame = function (fn) { return setTimeout(function () { fn(Date.now()); }, 16); };
+  }
+
+  // localStorage → 微信同步存储（platform.js 的 get/set 直接用 localStorage）
+  G.localStorage = {
+    getItem: function (k) {
+      try { var v = wx.getStorageSync(String(k)); return (v === '' || v == null) ? null : String(v); }
+      catch (e) { return null; }
+    },
+    setItem: function (k, v) { try { wx.setStorageSync(String(k), String(v)); } catch (e) {} },
+    removeItem: function (k) { try { wx.removeStorageSync(String(k)); } catch (e) {} }
+  };
+
+  // navigator：剪贴板接 wx.setClipboardData（分享文案复制直接成功）；振动接短振动
+  G.navigator = {
+    clipboard: {
+      writeText: function (t) {
+        try { wx.setClipboardData({ data: String(t) }); } catch (e) {}
+        return Promise.resolve();
+      }
+    },
+    vibrate: function () { try { wx.vibrateShort({ type: 'light' }); } catch (e) {} }
+  };
+
+  // document：主画布 getElementById('game')；离屏 canvas createElement('canvas')（iconData 调试用）
+  G.document = {
+    getElementById: function () { return mainCanvas; },
+    createElement: function (tag) {
+      if (tag === 'canvas') { var c = wx.createCanvas(); c.style = {}; return c; }
+      return {};
+    },
+    documentElement: mainCanvas,
+    body: { appendChild: function () {}, removeChild: function () {} }
+  };
+
+  // AudioContext 桥：微信基础库 2.19+ 的 WebAudioContext。游戏音效全链路
+  // try/catch + 空值守卫（core.js audio 段），桥不兼容时只静音不崩。
+  G.AudioContext = function () { return wx.createWebAudioContext(); };
+
+  // ---------- 事件桥：pointer* → wx.onTouch* ----------
+  // canvas 与 window 各留一张 handler 表；touchend 同时喂 pointerup（canvas 的 tryDrop 与
+  // window 的 audio.ensure 各取所需），多点触控取 changedTouches[0]。
+  var handlers = { canvas: {}, window: {} };
+  function emit(list, ev) {
+    for (var i = 0; i < list.length; i++) {
+      try { list[i](ev); } catch (e) { console.error('shim handler error', e); }
+    }
+  }
+  function touchEvent(e) {
+    var t = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]) || {};
+    return {
+      clientX: t.clientX || 0, clientY: t.clientY || 0,
+      pointerId: t.identifier || 0,
+      preventDefault: function () {}
+    };
+  }
+  function bindWxTouch(wxOn, pointerType) {
+    wxOn(function (e) {
+      var ev = touchEvent(e);
+      emit(handlers.canvas[pointerType] || [], ev);
+      emit(handlers.window[pointerType] || [], ev);
+    });
+  }
+  mainCanvas.addEventListener = function (type, fn) {
+    (handlers.canvas[type] = handlers.canvas[type] || []).push(fn);
+  };
+  G.addEventListener = function (type, fn) {
+    if (type === 'resize' || type === 'orientationchange') return; // 竖屏固定，不响应
+    (handlers.window[type] = handlers.window[type] || []).push(fn);
+  };
+  bindWxTouch(wx.onTouchStart, 'pointerdown');
+  bindWxTouch(wx.onTouchMove, 'pointermove');
+  bindWxTouch(wx.onTouchEnd, 'pointerup');
+  bindWxTouch(wx.onTouchCancel, 'pointercancel');
+  // keydown（audio.ensure 兜底）在触屏上不存在，挂空表即可（无触发方，无害）
+})();
