@@ -36,7 +36,8 @@
     C.floorY = FLOORY;                     // 同步给物理引擎（每帧读取，水滴落到新地板）
     C.containerTop = 145;
     C.dangerY = 209;
-    C.spawnY = FLOORY - 526;               // 147：★出生点距容器底恒定 526px（646-120=526 同源）
+    // 坠落高度：最大可投放水滴（tiers 前 5 档中的溪流 r45）底部接触警戒线时的球心位置
+    C.spawnY = C.dangerY - C.tiers[4].r;   // 209 - 45 = 164
     canvas.width = Math.round(w * dpr);    // 画布铺满整个窗口（背景全程由游戏自绘）
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';

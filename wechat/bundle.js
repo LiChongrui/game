@@ -78,8 +78,8 @@ MG.config = {
   dangerY: 209,        // 危险线 y（堆积超过此线且静止即失败；堆叠空间 209~673 = 464px）
 
   // 投放
-  spawnY: 147,         // 出生点 y（★距容器底恒定 673-147=526px，与 720 时代 646-120=526 完全一致；
-                       // 相对几何同原版：开口下 2px、警戒线上 62px、r45 虚影底距警戒线 17px）
+  // 投放：坠落高度 = 最大可投放水滴底部接触警戒线时的球心位置（dangerY209 - 溪流 r45 = 164）
+  spawnY: 164,
   dropCooldown: 0.55,  // 两次投放最小间隔（秒）
 
   // 物理
@@ -432,7 +432,8 @@ MG.config = {
     C.floorY = FLOORY;                     // 同步给物理引擎（每帧读取，水滴落到新地板）
     C.containerTop = 145;
     C.dangerY = 209;
-    C.spawnY = FLOORY - 526;               // 147：★出生点距容器底恒定 526px（646-120=526 同源）
+    // 坠落高度：最大可投放水滴（tiers 前 5 档中的溪流 r45）底部接触警戒线时的球心位置
+    C.spawnY = C.dangerY - C.tiers[4].r;   // 209 - 45 = 164
     canvas.width = Math.round(w * dpr);    // 画布铺满整个窗口（背景全程由游戏自绘）
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';
