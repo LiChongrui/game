@@ -42,6 +42,7 @@
     var cy = VH - 36;
     if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {
       bookBtn.cy = cy; restartBtn.cy = cy;
+      if (typeof trophyBtn !== 'undefined') trophyBtn.cy = cy;
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
     }
   }

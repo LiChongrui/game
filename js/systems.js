@@ -63,6 +63,7 @@
   var evapMode = false;
   var rainHint = 0;
   var dexOpen = false;
+  var achOpen = false; // 成就页（成就/每日/榜单）——与图鉴拆分为两个独立入口
   var lastPointer = { x: -100, y: -100 };
 
   var quest = null, questDepth = 0;
@@ -537,6 +538,7 @@
     if (scoreBump > 0) scoreBump -= dt;
     // 按钮按压反馈计时
     if (bookBtn.pressT > 0) bookBtn.pressT -= dt;
+    if (trophyBtn.pressT > 0) trophyBtn.pressT -= dt;
     if (MUTE.pressT > 0) MUTE.pressT -= dt;
     if (restartBtn.pressT > 0) restartBtn.pressT -= dt;
     for (i = 0; i < SKILL_BTNS.length; i++) if (SKILL_BTNS[i].pressT > 0) SKILL_BTNS[i].pressT -= dt;
@@ -1770,6 +1772,7 @@
   // ---------- 命中区域（圆形按钮） ----------
   var MUTE = { cx: C.W - 24, cy: 36, r: 13, pressT: 0 };
   var bookBtn = { cx: 46, cy: 688, r: 20, pressT: 0 };
+  var trophyBtn = { cx: 90, cy: 688, r: 16, pressT: 0 }; // 成就页入口（奖杯）
   var restartBtn = { cx: C.W - 24, cy: 688, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
   var ngBtn = { cx: 349, cy: 688, r: 16, pressT: 0 }; // 二周目「深渊回响」入口（解锁后显示）
   var SKILL_BTNS = [
@@ -1780,11 +1783,12 @@
   ];
   fit(); // 首次适配（按钮已定义，底部元素可同步贴底）
   var DEX_PANEL = { x: 20, y: 64, w: 380, h: 560 };
-  var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 60, y: DEX_PANEL.y + 10, w: 50, h: 26 };
-  var tabDexBtn = { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 10, w: 66, h: 26 };
-  var tabAchBtn = { x: DEX_PANEL.x + 86, y: DEX_PANEL.y + 10, w: 66, h: 26 };
-  var tabDailyBtn = { x: DEX_PANEL.x + 158, y: DEX_PANEL.y + 10, w: 66, h: 26 };
-  var tabRankBtn = { x: DEX_PANEL.x + 230, y: DEX_PANEL.y + 10, w: 66, h: 26 };
+  var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 42, y: DEX_PANEL.y + 12, w: 28, h: 28 }; // 右上 × 关闭
+  // 成就页分段页签：成就 / 每日 / 榜单（与图鉴分节同款分段控件样式）
+  function achTabRect(i) {
+    var segW = Math.floor((DEX_PANEL.w - 30) / 3);
+    return { x: DEX_PANEL.x + 15 + i * segW, y: DEX_PANEL.y + 44, w: segW, h: 24 };
+  }
   var shareCopyBtn = { x: 0, y: 0, w: 150, h: 42 }; // 分享卡片：复制文案按钮（打开时定位）
   function spRowRect(i) {
     // 特殊·宝箱分节：按海域分组行（每行 = 一片海域 + 它的 2 种特殊滴）
@@ -1796,9 +1800,9 @@
     return { x: r.x + 124 + s * 106, y: r.y + 4, w: 102, h: 32 };
   }
   function spVisibleStages() {
-    // 只显示已抵达海域 + 下一海域（更深的特殊滴不剧透）
-    var arr = [], m = Math.min(seaStage() + 1, C.seaStages.length - 1);
-    for (var i = 0; i <= m; i++) arr.push(i);
+    // 全部海域都列出（未解锁的以"？？？"占位，不隐藏结构）
+    var arr = [], i;
+    for (i = 0; i < C.seaStages.length; i++) arr.push(i);
     return arr;
   }
   function tierCellRect(t) {
@@ -1909,18 +1913,13 @@
     }
     if (dexOpen) {
       if (inRect(p, dexCloseBtn) || !inRect(p, DEX_PANEL)) { dexOpen = false; return; }
-      if (inRect(p, tabDexBtn)) { dexTab = 0; return; }
-      if (inRect(p, tabAchBtn)) { dexTab = 1; return; }
-      if (inRect(p, tabDailyBtn)) { dexTab = 2; return; }
-      if (inRect(p, tabRankBtn)) { dexTab = 3; return; }
-      if (dexTab === 0) {
-        // 分节切换
-        for (var sc = 0; sc < 3; sc++) {
-          if (inRect(p, dexSecRect(sc))) {
-            dexSec = sc; dexSelTier = -1; dexSelStage = -1;
-            audio.blip(520 + sc * 80, 0.08, 'sine', 0.06, 0.3); return;
-          }
+      // 分节切换
+      for (var sc = 0; sc < 3; sc++) {
+        if (inRect(p, dexSecRect(sc))) {
+          dexSec = sc; dexSelTier = -1; dexSelStage = -1;
+          audio.blip(520 + sc * 80, 0.08, 'sine', 0.06, 0.3); return;
         }
+      }
         if (dexSec === 0) {
           for (var ti2 = 0; ti2 < T.length; ti2++) {
             if (inRect(p, tierCellRect(ti2))) { dexSelTier = ti2; dexSelStage = -1; audio.blip(620, 0.08, 'sine', 0.06, 0.3); return; }
@@ -1943,11 +1942,18 @@
             }
           }
         }
+      return;
+    }
+    if (achOpen) {
+      if (inRect(p, dexCloseBtn) || !inRect(p, DEX_PANEL)) { achOpen = false; return; }
+      for (var at = 0; at < 3; at++) {
+        if (inRect(p, achTabRect(at))) { dexTab = at; audio.blip(520 + at * 80, 0.08, 'sine', 0.06, 0.3); return; }
       }
       return;
     }
     if (inMute(p)) { MUTE.pressT = 0.16; audio.muted = !audio.muted; saveFlag('mg_mute', audio.muted); if (audio.muted) audio.bgm.stop(); else audio.bgm.start(); return; }
-    if (inCircle(p, bookBtn)) { bookBtn.pressT = 0.16; dexOpen = true; return; }
+    if (inCircle(p, bookBtn)) { bookBtn.pressT = 0.16; dexOpen = true; achOpen = false; return; }
+    if (inCircle(p, trophyBtn)) { trophyBtn.pressT = 0.16; achOpen = true; dexOpen = false; dexTab = 0; return; }
     // 二周目「深渊回响」：词缀三选一弹窗（点卡片开跑，点外关闭）
     if (ngOpen) {
       for (var ni = 0; ni < ngPickRects.length; ni++) {
@@ -2017,7 +2023,7 @@
       updateFx(dt);
       return;
     }
-    if (dexOpen) { updateFx(dt); return; }
+    if (dexOpen || achOpen) { updateFx(dt); return; }
     if (state !== 'play') { updateFx(dt); return; }
 
     time += dt;
