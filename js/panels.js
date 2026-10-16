@@ -568,7 +568,7 @@
     ctx.fillStyle = 'rgba(200,225,245,0.55)';
     ctx.font = '11px system-ui, sans-serif';
     ctx.fillText('开始游戏后自动入账', C.W / 2, y + 57);
-    ctx.textAlign = 'left';
+    ctx.textAlign = 'center'; // 恢复菜单流的 center——曾误设 left 泄漏给开始按钮，导致小程序文字右移溢出
   }
 
   function drawDchalCard() {

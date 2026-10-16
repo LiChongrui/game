@@ -3654,7 +3654,7 @@ MG.config = {
     ctx.fillStyle = 'rgba(200,225,245,0.55)';
     ctx.font = '11px system-ui, sans-serif';
     ctx.fillText('开始游戏后自动入账', C.W / 2, y + 57);
-    ctx.textAlign = 'left';
+    ctx.textAlign = 'center'; // 恢复菜单流的 center——曾误设 left 泄漏给开始按钮，导致小程序文字右移溢出
   }
 
   function drawDchalCard() {
@@ -5980,6 +5980,7 @@ MG.config = {
     roundRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1, 14); ctx.stroke();
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 22px system-ui, sans-serif';
+    ctx.textAlign = 'center'; // 显式声明：离线卡等前置绘制不得改变菜单按钮文字对齐
     ctx.textBaseline = 'middle';
     ctx.fillText('开 始 游 戏', C.W / 2, b.y + b.h / 2 + 1);
     ctx.textBaseline = 'alphabetic';
