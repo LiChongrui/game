@@ -1698,6 +1698,18 @@
     drawSeaProgress();
     ctx.restore();
   }
+  // 差额分精简：≥1万 缩写为「X万」（省字符，条内不挤）
+  function fmtDiff(n) {
+    if (n < 10000) return String(n);
+    var w = n / 10000;
+    return (w >= 10 ? Math.round(w) : Math.round(w * 10) / 10) + '万';
+  }
+  // 海域色作文字色：压暗 20% 保证 13px 小字在浅色条底上的对比度（浅色海域尤其需要）
+  function seaTextColor(hex) {
+    var n = parseInt(hex.slice(1), 16);
+    var r = Math.round(((n >> 16) & 255) * 0.8), g = Math.round(((n >> 8) & 255) * 0.8), b = Math.round((n & 255) * 0.8);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
   // 海域进度条：满宽细条（y100~116，位于当前得分下方、任务条之上的宽松段；容器开口 190）
   // 出生点 147 在条下方 25px，条不压坠落区），显示累计分距下一海域的进度
   // 配色：填充=当前海域深水色（与背景同族），右端小圆点=下一海域徽章色（目的地），左端骑线徽章=当前位置
@@ -1724,12 +1736,34 @@
     ctx.lineJoin = 'round';
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    var label = maxed ? '已达最深海域 · ' + C.seaStages[last].name
-      : '距「' + C.seaStages[cur + 1].name + '」还差 ' + (C.seaStages[cur + 1].at - ts) + ' 分';
-    var cx = sx + sw / 2;
-    ctx.strokeText(label, cx, sy + 15);
-    ctx.fillStyle = '#2C5A78';
-    ctx.fillText(label, cx, sy + 15);
+    // 条内文字（精简）：「当前海域 → 下一海域 差额分」，海域名用各自海域色、连接语与数字统一深蓝
+    var segs = maxed
+      ? [[C.seaStages[last].name, seaTextColor(SEA_BADGES[last].c)], [' · 已达最深', '#2C5A78']]
+      : [[C.seaStages[cur].name, seaTextColor(SEA_BADGES[cur].c)], [' → ', '#2C5A78'],
+         [C.seaStages[cur + 1].name, seaTextColor(SEA_BADGES[cur + 1].c)],
+         [' ' + fmtDiff(C.seaStages[cur + 1].at - ts) + ' 分', '#2C5A78']];
+    var segsW = function () {
+      var w = 0;
+      for (var i = 0; i < segs.length; i++) w += ctx.measureText(segs[i][0]).width;
+      return w;
+    };
+    // 超长自适应缩字号（后期海域名 + 大分数叠加，两端徽章之间不被文字挤占）
+    var lf = 13;
+    while (lf > 10 && segsW() > sw - 84) {
+      lf--;
+      ctx.font = 'bold ' + lf + 'px system-ui, sans-serif';
+    }
+    // 分段绘制（整体居中；描边保证在填充色上仍可读）
+    ctx.save();
+    ctx.textAlign = 'left';
+    var x0 = sx + sw / 2 - segsW() / 2;
+    for (var si = 0; si < segs.length; si++) {
+      ctx.strokeText(segs[si][0], x0, sy + 15);
+      ctx.fillStyle = segs[si][1];
+      ctx.fillText(segs[si][0], x0, sy + 15);
+      x0 += ctx.measureText(segs[si][0]).width;
+    }
+    ctx.restore();
     if (!maxed) {
       // 右端终点标记骑在条右端点上（不透明底遮挡条端），与左端当前位置徽章呼应
       drawSeaBadge(cur + 1, sx + sw, sy + sh / 2, false, true);
