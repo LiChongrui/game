@@ -143,7 +143,7 @@ const html = `<!DOCTYPE html>
 <section>
   <h2>📖 图鉴 · 成就 · 每日 · 榜单</h2>
   <div class="shots">
-    <figure><img src="${img('sys_ach')}" alt="成就·每日·榜单"><figcaption>成就页：三档难度成就 / 每日任务 / 好友榜单</figcaption></figure>
+    <figure><img src="${img('sys_board')}" alt="排行榜"><figcaption>排行榜：好友深海榜 · 比比谁潜得更深</figcaption></figure>
   </div>
   <ul>
     <li><b>图鉴</b>（左下书本钮）：合成链 9 档 + 海域演进 8 行，点选条目查看说明；未抵达的海域以 ??? 保持悬念。</li>
