@@ -1,7 +1,7 @@
-// 水滴成海 - systems：游戏状态 / 输入 / 合成 / 技能 / 潮汐 / 海域事件 / 图鉴数据 / 主更新
+// 滴水成海 - systems：游戏状态 / 输入 / 合成 / 技能 / 潮汐 / 海域事件 / 图鉴数据 / 主更新
 // 模块加载顺序 2/4（依赖 core.js：canvas、audio、存储助手）。顶层 var 初始化
 // （rollTier 等）调用的函数与本文件同域提升，或来自已加载的 core.js。
-// 水滴成海 - 游戏主逻辑
+// 滴水成海 - 游戏主逻辑
 // 输入 / 合成 / 技能 / 图鉴 / 海域 / 特殊水滴(漩涡·雨云·冰晶) / 潮汐 / 任务链 / 渲染 / 音效 / 广告占位
 // 全部 UI 画在 canvas 内（含按钮命中判定），便于后续原样移植到微信小游戏（无 DOM 环境）
   // ---------- 状态 ----------
@@ -270,7 +270,7 @@
   // ---------- 战报分享（卡片式预览；上线后在此接 wx.shareAppMessage） ----------
   var shareOpen = false, shareText = '';
   function buildShareText() {
-    return '【水滴成海】我在' + C.seaStages[seaStage()].name + '拿下 ' + score + ' 分！' +
+    return '【滴水成海】我在' + C.seaStages[seaStage()].name + '拿下 ' + score + ' 分！' +
       (maxCombo > 1 ? '最高 ' + maxCombo + ' 连击，' : '') +
       (seaCount > 0 ? '沧海汇入海域 ×' + seaCount + '，' : '') +
       '最佳 ' + best + '。来和我比比谁潜得更深！';
