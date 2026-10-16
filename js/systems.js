@@ -137,10 +137,19 @@
 
   // 海域演进：累计分跨过里程碑改变世界（背景色调随阶段加深 + 称号）
   var stageSeen = -1; // 已提示过的阶段（会话内）
+  var seaFade = null; // 海域换色渐变 { from, to, t, dur }：跨里程碑时背景平滑过渡而非跳变
   function seaStage() {
     var s = 0, ts = totalScore();
     for (var i = C.seaStages.length - 1; i >= 0; i--) { if (ts >= C.seaStages[i].at) { s = i; break; } }
     return s;
+  }
+  // 渲染层查询当前换色进度：进行中返回 { from, to, k }（k 为缓动后的插值系数），静止返回 null
+  function seaBlend() {
+    if (!seaFade) return null;
+    var p = seaFade.t / seaFade.dur;
+    if (p >= 1) return null;
+    p = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; // easeInOutQuad
+    return { from: seaFade.from, to: seaFade.to, k: p };
   }
 
   // ---------- 每日任务（按日期种子生成，跨局累计；全完成涨连续天数） ----------
@@ -2030,6 +2039,8 @@
 
   // ---------- 更新 ----------
   function update(dt) {
+    // 海域换色渐变计时：任何状态都推进（面板/结算打开时背景过渡不冻结）
+    if (seaFade) { seaFade.t += dt; if (seaFade.t >= seaFade.dur) seaFade = null; }
     if (adOverlay) {
       adOverlay.t -= dt;
       if (adOverlay.t <= 0) { var cb = adOverlay.cb; adOverlay = null; if (cb) cb(); }
@@ -2059,10 +2070,11 @@
       addPopup(C.W / 2, 260, '解锁「深渊潜航」：本局结束后可在结算页开启', true, 0);
       audio.quest();
     }
-    // 海域演进：累计分跨过里程碑 → 世界换色 + 弹报
+    // 海域演进：累计分跨过里程碑 → 世界换色（1.8s 渐变过渡）+ 弹报
     var stg = seaStage();
     if (stageSeen < 0) stageSeen = stg;
     else if (stg > stageSeen) {
+      seaFade = { from: stageSeen, to: stg, t: 0, dur: 1.8 };
       stageSeen = stg;
       addPopup(C.W / 2, 285, '海域演进 · 潜入「' + C.seaStages[stg].name + '」', true, 0);
       parts.push({ type: 'ring', x: C.W / 2, y: 285, r: 40, life: 0.9, max: 0.9, color: '#7FD4FF' });

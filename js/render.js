@@ -32,6 +32,27 @@
     b = Math.round(Math.min(255, Math.max(0, b)));
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   }
+  // 颜色插值（海域换色渐变用）：支持 '#RRGGBB' 与 'rgb/rgba(...)' 两种写法
+  function parseCol(c) {
+    if (c.charAt(0) === '#') {
+      var n = parseInt(c.slice(1), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 1];
+    }
+    var m = c.match(/rgba?\(([^)]+)\)/);
+    if (m) {
+      var p = m[1].split(',');
+      return [parseFloat(p[0]), parseFloat(p[1]), parseFloat(p[2]), p.length > 3 ? parseFloat(p[3]) : 1];
+    }
+    return [0, 0, 0, 1];
+  }
+  function mixCol(a, b, k) {
+    var A = parseCol(a), B = parseCol(b);
+    var r = Math.round(A[0] + (B[0] - A[0]) * k),
+        g = Math.round(A[1] + (B[1] - A[1]) * k),
+        bl = Math.round(A[2] + (B[2] - A[2]) * k),
+        al = +(A[3] + (B[3] - A[3]) * k).toFixed(3);
+    return 'rgba(' + r + ',' + g + ',' + bl + ',' + al + ')';
+  }
 
   // ---------- 背景：深海渐变（全窗口宽） + 顶部柔光 + 波光 + 气泡 ----------
   // ---------- 渐变缓存（性能：每帧 create 渐变产生对象 churn + GC 压力，按 key 复用） ----------
@@ -48,10 +69,22 @@
   }
 
   function drawBackground() {
-    // 深海渐变（铺满整个窗口，两侧即延伸海水）；色调随海域里程碑逐级加深
-    var st = C.seaStages[seaStage()];
+    // 深海渐变（铺满整个窗口，两侧即延伸海水）；色调随海域里程碑逐级加深，
+    // 跨里程碑时在 1.8s 内从旧海域色平滑插值到新海域色（seaBlend 提供进度）
+    var stg = seaStage();
+    var sb = seaBlend();
+    var st;
+    if (sb) {
+      var sA = C.seaStages[sb.from], sB = C.seaStages[sb.to], k = sb.k;
+      st = {
+        bg: [mixCol(sA.bg[0], sB.bg[0], k), mixCol(sA.bg[1], sB.bg[1], k), mixCol(sA.bg[2], sB.bg[2], k), mixCol(sA.bg[3], sB.bg[3], k)],
+        shade: mixCol(sA.shade, sB.shade, k)
+      };
+    } else st = C.seaStages[stg];
+    // 渐变缓存 key：过渡期按 1/24 步长量化（视觉无级差，缓存不爆炸）
+    var sk = sb ? 'F' + sb.from + '_' + sb.to + '_' + Math.round(sb.k * 24) : '' + stg;
     var vk = Math.round(VH), lk = Math.round(LW);
-    var bg = grad('bg' + seaStage() + '_' + vk, function () {
+    var bg = grad('bg' + sk + '_' + vk, function () {
       var gg = ctx.createLinearGradient(0, 0, 0, VH);
       gg.addColorStop(0, st.bg[0]);
       gg.addColorStop(0.4, st.bg[1]);
@@ -89,14 +122,14 @@
     if (BX > 0) {
       var edge = BX + 26; // 仅轻微溢入游戏区，避免在缸体内形成可见的明暗台阶
       var ek = Math.round(edge);
-      ctx.fillStyle = grad('shadeL' + lk + '_' + ek + '_' + seaStage(), function () {
+      ctx.fillStyle = grad('shadeL' + lk + '_' + ek + '_' + sk, function () {
         var gg = ctx.createLinearGradient(0, 0, edge, 0);
         gg.addColorStop(0, st.shade);
         gg.addColorStop(1, 'rgba(16,56,96,0)');
         return gg;
       });
       ctx.fillRect(0, 0, edge, VH);
-      ctx.fillStyle = grad('shadeR' + lk + '_' + ek + '_' + seaStage(), function () {
+      ctx.fillStyle = grad('shadeR' + lk + '_' + ek + '_' + sk, function () {
         var gg = ctx.createLinearGradient(LW, 0, LW - edge, 0);
         gg.addColorStop(0, st.shade);
         gg.addColorStop(1, 'rgba(16,56,96,0)');
