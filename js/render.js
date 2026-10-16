@@ -1326,9 +1326,9 @@
     ctx.beginPath(); ctx.arc(0, 0, c.r, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
-  // 潮汐信息胶囊（独立放在右上"下一个"预览正下方，不与任务条同排）
+  // 潮汐信息胶囊（右侧，与任务条同行同高，左右对称）
   function drawTidePill() {
-    var tx = C.W - 122, tw = 92, ty = 66, th = 20; // 中心与预览（W-76）对齐；与任务条同一水平带
+    var tx = C.W - 122, tw = 92, ty = 66, th = 34; // 与任务条(qy66/qh34)同高同排
     var active = tide.phase === 'active';
     var warn = !active && tide.timer <= C.tide.warnTime;
     var pulse = 0.5 + 0.5 * Math.sin(time * 6);
@@ -1337,10 +1337,10 @@
     ctx.font = 'bold 15px system-ui, sans-serif';
     if (active) {
       ctx.fillStyle = 'rgba(25,105,185,' + (0.75 + pulse * 0.25) + ')';
-      ctx.fillText('涨潮 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 14);
+      ctx.fillText('涨潮 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 22);
     } else {
       ctx.fillStyle = warn ? 'rgba(200,90,40,' + (0.7 + pulse * 0.3) + ')' : '#4A7FA0';
-      ctx.fillText('潮汐 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 14);
+      ctx.fillText('潮汐 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 22);
     }
   }
   // 涨潮横幅
@@ -1412,7 +1412,7 @@
     ctx.fillText('重新开始', confirmYes.x + confirmYes.w / 2, confirmYes.y + 27);
   }
 
-  // ---------- 任务条 + 潮汐胶囊 ----------
+  // ---------- 任务条 + 潮汐胶囊 + 海域进度条 ----------
   function drawQuest() {
     if (!quest) return;
     ctx.save();
@@ -1428,13 +1428,44 @@
     }
     ctx.fillStyle = '#7A5B10';
     ctx.font = 'bold 15px system-ui, sans-serif';
-    ctx.fillText(quest.text + ' ' + quest.have + '/' + quest.need, qx + qw / 2, qy + 14);
+    ctx.fillText(quest.text + ' ' + quest.have + '/' + quest.need, qx + qw / 2, qy + 15);
     ctx.fillStyle = '#B8860B';
     ctx.font = '13px system-ui, sans-serif';
     var stars = '★★★'.slice(0, quest.stars || 1);
-    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 28);
+    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 29);
     drawTidePill();
+    drawSeaProgress();
     ctx.restore();
+  }
+  // 海域进度条：满宽细条，显示累计分距下一海域的进度（颜色=下一海域徽章色）
+  function drawSeaProgress() {
+    var cur = seaStage(), ts = totalScore();
+    var last = C.seaStages.length - 1;
+    var maxed = cur >= last;
+    var sx = 12, sy = 106, sw = C.W - 24, sh = 16;
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    roundRect(sx, sy, sw, sh, 8); ctx.fill();
+    var frac = 1;
+    if (!maxed) {
+      var lo = C.seaStages[cur].at, hi = C.seaStages[cur + 1].at;
+      frac = Math.min(1, Math.max(0.02, (ts - lo) / (hi - lo)));
+    }
+    if (frac > 0) {
+      ctx.fillStyle = maxed ? SEA_BADGES[last].c : SEA_BADGES[cur + 1].c;
+      ctx.globalAlpha = 0.8;
+      roundRect(sx + 2, sy + 2, Math.max(10, (sw - 4) * frac), sh - 4, 6); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.font = 'bold 13px system-ui, sans-serif';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    var label = maxed ? '已达最深海域 · ' + C.seaStages[last].name
+      : '距「' + C.seaStages[cur + 1].name + '」还差 ' + (C.seaStages[cur + 1].at - ts) + ' 分';
+    var cx = sx + sw / 2;
+    ctx.strokeText(label, cx, sy + 13);
+    ctx.fillStyle = '#2C5A78';
+    ctx.fillText(label, cx, sy + 13);
   }
 
   // ---------- 技能栏 ----------
