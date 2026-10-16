@@ -1884,7 +1884,6 @@
     }
     if (nextIron && ironCount() < C.iron.maxActive) {
       createIron(clampAim(aimX), C.spawnY);
-      addPopup(C.W / 2, 210, '礁石来袭！', true, 0); // 居中净空带，避开顶部 HUD
       addShake(2, 0.15);
     } else {
       nb = phys.create(clampAim(aimX), C.spawnY, useTier, 0, 0);

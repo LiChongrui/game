@@ -649,10 +649,10 @@
 
     var w = b.r * 1.6, h = b.r * 1.3;
     var seamY = -h * 0.06; // 盖/身分界
-    // 盖（弧顶木盖）
+    // 盖（弧顶木盖）——深海蓝绿木色，与整体冷调协调，金饰点睛
     ctx.fillStyle = grad('chestLid', function () {
       var gg = ctx.createLinearGradient(0, -h * 0.62, 0, seamY);
-      gg.addColorStop(0, '#C08A48'); gg.addColorStop(1, '#8F5E2C');
+      gg.addColorStop(0, '#4E88A2'); gg.addColorStop(1, '#2F6078');
       return gg;
     });
     ctx.beginPath();
@@ -662,18 +662,18 @@
     // 身（直壁木箱，底部圆角）
     ctx.fillStyle = grad('chestBody', function () {
       var gg = ctx.createLinearGradient(0, seamY, 0, h * 0.56);
-      gg.addColorStop(0, '#96622D'); gg.addColorStop(1, '#64401A');
+      gg.addColorStop(0, '#3A7492'); gg.addColorStop(1, '#224E66');
       return gg;
     });
     roundRect(-w / 2, seamY, w, h * 0.62, 3); ctx.fill();
     // 木板竖缝
-    ctx.strokeStyle = 'rgba(60,36,12,0.35)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(14,44,64,0.4)'; ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(-w * 0.17, seamY + 3); ctx.lineTo(-w * 0.17, h * 0.52);
     ctx.moveTo(w * 0.17, seamY + 3); ctx.lineTo(w * 0.17, h * 0.52);
     ctx.stroke();
-    // 铜箍 ×2（贯穿盖与身）
-    ctx.fillStyle = '#6B5539';
+    // 铜箍 ×2（贯穿盖与身）——深蓝底金铆钉
+    ctx.fillStyle = '#1E4258';
     roundRect(-w * 0.42, -h * 0.36, 4.5, h * 0.9, 2); ctx.fill();
     roundRect(w * 0.42 - 4.5, -h * 0.36, 4.5, h * 0.9, 2); ctx.fill();
     // 铆钉
@@ -691,7 +691,7 @@
     // 金锁 + 锁孔
     ctx.fillStyle = '#F2C14E';
     roundRect(-4.5, seamY - 3, 9, 10, 2.5); ctx.fill();
-    ctx.fillStyle = '#8A5A18';
+    ctx.fillStyle = '#1E4258';
     ctx.beginPath(); ctx.arc(0, seamY + 1.2, 1.6, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath();
     ctx.moveTo(-0.9, seamY + 2.2); ctx.lineTo(0.9, seamY + 2.2);
@@ -1694,12 +1694,14 @@
   }
 
   // ---------- 图鉴（页签：图鉴 / 成就） ----------
-  // 通用页头：左侧标题 + 右上 × 关闭（图鉴/成就共用）
+  // 通用页头：左侧标题 + 右上 × 关闭（图鉴/成就共用；标题为空则不画，避免与页签重名）
   function drawPanelHeader(title) {
     ctx.textAlign = 'left';
-    ctx.fillStyle = '#155A8A';
-    ctx.font = 'bold 19px system-ui, sans-serif';
-    ctx.fillText(title, DEX_PANEL.x + 18, DEX_PANEL.y + 30);
+    if (title) {
+      ctx.fillStyle = '#155A8A';
+      ctx.font = 'bold 19px system-ui, sans-serif';
+      ctx.fillText(title, DEX_PANEL.x + 18, DEX_PANEL.y + 30);
+    }
     ctx.fillStyle = 'rgba(46,134,180,0.12)';
     ctx.beginPath(); ctx.arc(dexCloseBtn.x + dexCloseBtn.w / 2, dexCloseBtn.y + dexCloseBtn.h / 2, 13, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#4A7FA0'; ctx.lineWidth = 2; ctx.lineCap = 'round';
@@ -1936,7 +1938,7 @@
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
     ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
-    drawPanelHeader('成就');
+    drawPanelHeader(''); // 成就殿堂：页签已含"成就"，页头不再重复标题
     var dailyDot = !(daily.done[0] && daily.done[1] && daily.done[2]) ? 1 : -1;
     drawSegTabs([achTabRect(0), achTabRect(1), achTabRect(2)], ['成就', '每日', '榜单'], dexTab, dailyDot, 'achtabs');
     if (dexTab === 1) drawDailyTab();
@@ -1955,11 +1957,11 @@
     gg.addColorStop(1, 'rgba(255,208,96,0)');
     ctx.fillStyle = gg;
     ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#A96F35'; // 弧顶木盖
+    ctx.fillStyle = '#3E7E98'; // 弧顶木盖（深海蓝绿，与游戏内宝箱一致）
     ctx.beginPath(); ctx.moveTo(-15, -2); ctx.quadraticCurveTo(0, -16, 15, -2); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#8A5A2B'; // 箱身
+    ctx.fillStyle = '#2A5E78'; // 箱身
     roundRect(-15, -2, 30, 13, 2); ctx.fill();
-    ctx.fillStyle = '#6B5539'; // 铜箍 ×2
+    ctx.fillStyle = '#1E4258'; // 铜箍 ×2
     ctx.fillRect(-10, -2, 3, 13);
     ctx.fillRect(7, -2, 3, 13);
     ctx.fillStyle = '#F2C14E'; // 金锁
@@ -2058,6 +2060,9 @@
       var d = a.diff || 1;
       ctx.fillStyle = done ? 'rgba(245,197,66,0.14)' : (d === 3 ? 'rgba(150,110,220,0.08)' : 'rgba(46,134,180,0.07)');
       roundRect(cx0, ry, cw, ch, 8); ctx.fill();
+      // 难度色左饰条（达成转金）
+      ctx.fillStyle = done ? '#F5C542' : (d === 3 ? '#9B7FD0' : (d === 2 ? '#C99B3F' : '#8FB4CC'));
+      roundRect(cx0, ry + 10, 3, ch - 20, 1.5); ctx.fill();
       ctx.textAlign = 'left';
       // 名称 + 难度星（达成金色，未达成灰蓝）
       ctx.fillStyle = done ? '#B8860B' : (d === 3 ? '#6B5AA8' : '#155A8A');
@@ -2097,41 +2102,32 @@
     }
   }
 
-  // 每日页签：3 个按日期生成的任务 + 连续天数
+  // 每日页签：3 个按日期生成的任务（独立说明行已删，卡片上移放大）
   function drawDailyTab() {
-    ctx.textAlign = 'center';
-    ctx.font = '15px system-ui, sans-serif';
-    ctx.fillStyle = '#4A7FA0';
-    var allDone = daily.done[0] && daily.done[1] && daily.done[2];
-    ctx.fillText(daily.date + (allDone ? ' · 今日全勤 ✓' : ' · 完成全部任务涨连续天数'), C.W / 2, DEX_PANEL.y + 82);
-    // 连续天数火焰
-    var fy = DEX_PANEL.y + 110;
-    ctx.font = 'bold 19px system-ui, sans-serif';
-    ctx.fillStyle = daily.streak > 0 ? '#E2705E' : '#8AA5B8';
-    var flame = ''; for (var fi = 0; fi < Math.min(daily.streak, 7); fi++) flame += '🔥';
-    ctx.fillText(flame + (daily.streak > 7 ? ' ×' + daily.streak : (daily.streak > 0 ? ' 连续 ' + daily.streak + ' 天' : ' 尚无连续记录')), C.W / 2, fy);
     for (var i = 0; i < daily.tasks.length; i++) {
       var t = daily.tasks[i], done = daily.done[i];
-      var ry = DEX_PANEL.y + 134 + i * 86;
+      var ry = DEX_PANEL.y + 92 + i * 106;
       ctx.fillStyle = done ? 'rgba(245,197,66,0.14)' : 'rgba(46,134,180,0.07)';
-      roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 74, 8); ctx.fill();
+      roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 84, 10); ctx.fill();
+      // 达成金饰条
+      if (done) { ctx.fillStyle = '#F5C542'; roundRect(DEX_PANEL.x + 14, ry + 10, 3, 64, 1.5); ctx.fill(); }
       ctx.textAlign = 'left';
       ctx.fillStyle = done ? '#B8860B' : '#155A8A';
       ctx.font = 'bold 16px system-ui, sans-serif';
-      ctx.fillText((done ? '✓ ' : '') + t.text, DEX_PANEL.x + 26, ry + 22);
+      ctx.fillText((done ? '✓ ' : '') + t.text, DEX_PANEL.x + 26, ry + 26);
       // 难度星级（右侧）+ 分级奖励
       ctx.textAlign = 'right';
       ctx.fillStyle = (t.stars || 1) === 3 ? '#9B7FD0' : ((t.stars || 1) === 2 ? '#C99B3F' : '#9AB4C4');
       ctx.font = '13px system-ui, sans-serif';
       var dstar = '';
       for (var ds = 0; ds < (t.stars || 1); ds++) dstar += '★';
-      ctx.fillText(dstar, DEX_PANEL.x + DEX_PANEL.w - 26, ry + 20);
+      ctx.fillText(dstar, DEX_PANEL.x + DEX_PANEL.w - 26, ry + 24);
       ctx.textAlign = 'left';
       ctx.fillStyle = '#4A7FA0';
       ctx.font = '14px system-ui, sans-serif';
-      ctx.fillText('奖励 +' + Math.round(C.daily.rewardScore * (1 + ((t.stars || 1) - 1) * 0.5)) + ' 分', DEX_PANEL.x + 26, ry + 46);
+      ctx.fillText('奖励 +' + Math.round(C.daily.rewardScore * (1 + ((t.stars || 1) - 1) * 0.5)) + ' 分', DEX_PANEL.x + 26, ry + 50);
       // 进度条
-      var barX = DEX_PANEL.x + 26, barW = DEX_PANEL.w - 120, barY = ry + 58;
+      var barX = DEX_PANEL.x + 26, barW = DEX_PANEL.w - 120, barY = ry + 62;
       ctx.fillStyle = 'rgba(46,134,180,0.15)';
       roundRect(barX, barY, barW, 9, 4.5); ctx.fill();
       if (daily.prog[i] > 0) {
@@ -2144,45 +2140,34 @@
       ctx.fillText(done ? '已完成' : (daily.prog[i] + '/' + t.need), barX + barW + 34, barY + 9);
       ctx.textAlign = 'left';
     }
-    ctx.textAlign = 'center';
-    ctx.font = '14px system-ui, sans-serif';
-    ctx.fillStyle = '#4A7FA0';
-    ctx.fillText('全勤奖励：+' + (C.daily.streakBase + (daily.streak + 1) * C.daily.streakStep) + ' 分 · 随机技能充能 +2', C.W / 2, DEX_PANEL.y + 424);
   }
 
-  // 榜单页签：本地好友榜（预留微信排行榜接口位）+ 晒成绩
+  // 榜单页签：本地好友榜（预留微信排行榜接口位）
   function drawRankTab() {
     var rows = friendBoard();
-    ctx.textAlign = 'center';
-    ctx.font = '15px system-ui, sans-serif';
-    ctx.fillStyle = '#4A7FA0';
-    ctx.fillText('好友深海榜 · 比比谁潜得更深', C.W / 2, DEX_PANEL.y + 82);
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
-      var ry = DEX_PANEL.y + 100 + i * 46;
+      var ry = DEX_PANEL.y + 86 + i * 50;
       ctx.fillStyle = r.me ? 'rgba(245,197,66,0.16)' : (i % 2 ? 'rgba(46,134,180,0.05)' : 'rgba(46,134,180,0.09)');
-      roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 38, 8); ctx.fill();
-      // 名次徽章
+      roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 42, 9); ctx.fill();
+      // 名次徽章（序号必须显式居中：上一轮循环末尾的 textAlign 会污染到这里）
       var badge = ['#F5C542', '#B9C4CC', '#D2955B'][i] || 'rgba(46,134,180,0.35)';
       ctx.fillStyle = badge;
-      ctx.beginPath(); ctx.arc(DEX_PANEL.x + 38, ry + 19, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(DEX_PANEL.x + 38, ry + 21, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.textAlign = 'center';
       ctx.fillStyle = i < 3 ? '#FFFFFF' : '#3E6E90';
       ctx.font = 'bold 14px system-ui, sans-serif';
-      ctx.fillText(String(i + 1), DEX_PANEL.x + 38, ry + 23);
+      ctx.fillText(String(i + 1), DEX_PANEL.x + 38, ry + 26);
       ctx.textAlign = 'left';
       ctx.fillStyle = r.me ? '#B8860B' : '#155A8A';
       ctx.font = (r.me ? 'bold ' : '') + '16px system-ui, sans-serif';
-      ctx.fillText(r.me ? r.name + '（你）' : r.name, DEX_PANEL.x + 58, ry + 24);
+      ctx.fillText(r.me ? r.name + '（你）' : r.name, DEX_PANEL.x + 60, ry + 26);
       ctx.textAlign = 'right';
       ctx.fillStyle = r.me ? '#B8860B' : '#3E6E90';
       ctx.font = 'bold 16px system-ui, sans-serif';
-      ctx.fillText(String(r.score), DEX_PANEL.x + DEX_PANEL.w - 26, ry + 24);
+      ctx.fillText(String(r.score), DEX_PANEL.x + DEX_PANEL.w - 26, ry + 26);
       ctx.textAlign = 'left';
     }
-    ctx.textAlign = 'center';
-    ctx.font = '14px system-ui, sans-serif';
-    ctx.fillStyle = '#8AA5B8';
-    ctx.fillText('上线后接入微信好友排行（wx.setUserCloudStorage）', C.W / 2, DEX_PANEL.y + 436);
   }
 
   // 战报分享卡片（结算页"分享战报"打开；上线后接 wx.shareAppMessage）
