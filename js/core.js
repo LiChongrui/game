@@ -46,8 +46,9 @@
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // 按钮贴屏底（块内坐标 = VH-oy-46，渲染时 +oy 恰好落在屏幕底上方 46）：图鉴/道具/重开
-    var cy = VH - oy - 46;
+    // 按钮恒落在块内底部带（容器底 673 ~ 块底 747，共 74）：图鉴/道具/重开在该带内近似垂直居中。
+    // 块贴顶后按钮随块整体上移，屏底多出的空间由海床/技能栏渐变自然延伸填充（不挪按钮）
+    var cy = C.H - 46;
     // 注意：模块化后 bookBtn 等声明在 systems.js（后加载），早期触发时用 typeof 守卫
     if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {
       bookBtn.cy = cy; restartBtn.cy = cy;

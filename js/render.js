@@ -1817,16 +1817,17 @@
   }
 
   function drawSkillBar() {
-    // 道具带：海底基色的柔和延续（同色系微加深），块内贴屏底延伸（byBand=VH-renderOy 渲染后恰为屏幕底），无接缝
-    var byBand = VH - renderOy;
+    // 道具带：海底基色的柔和延续（同色系微加深），块内 691 起、向下延伸到屏底（块贴顶后屏底
+    // 多出的空间）。按钮仍在块内底部带（cy=701），只是深色渐变顺延到屏底，避免出现明暗接缝。
+    var bandEnd = VH - renderOy;
     var g = grad('skbar' + Math.round(VH) + '_' + Math.round(renderOy), function () {
-      var gg = ctx.createLinearGradient(0, byBand - 56, 0, byBand);
+      var gg = ctx.createLinearGradient(0, C.H - 56, 0, bandEnd);
       gg.addColorStop(0, 'rgba(56,102,130,0)');
       gg.addColorStop(1, 'rgba(36,78,106,0.3)');
       return gg;
     });
     ctx.fillStyle = g;
-    ctx.fillRect(0, byBand - 56, C.W, 56);
+    ctx.fillRect(0, C.H - 56, C.W, bandEnd - (C.H - 56));
 
     var readyPulse = 0.5 + 0.5 * Math.sin(time * 5);
 
