@@ -5333,14 +5333,11 @@ MG.config = {
     ctx.fillStyle = '#12517E';
     ctx.fillText(txt, 0, 0);
     ctx.restore();
-    // 第二行信息：最佳 + 海域进度（并入一行省出独立进度条的高度）+ 海域加成 + 词缀
+    // 第二行信息：最佳 + 当前海域 + 海域加成 + 词缀（距下一海域的进度由进度条可视化，不再重复文字）
     ctx.font = '14px system-ui, sans-serif';
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-    var cur = seaStage(), ts = totalScore(), last = C.seaStages.length - 1;
-    var seaTxt = cur >= last ? '已达「' + C.seaStages[last].name + '」'
-      : '距「' + C.seaStages[cur + 1].name + '」还差 ' + (C.seaStages[cur + 1].at - ts) + ' 分';
-    var sub = '最佳 ' + best + ' · ' + seaTxt + (seaCount > 0 ? ' · 海域 ×' + seaCount : '') +
+    var sub = '最佳 ' + best + ' · ' + C.seaStages[seaStage()].name + (seaCount > 0 ? ' · 海域 ×' + seaCount : '') +
       (ng.active ? ' · 「' + ng.active.name + '」×' + ng.active.mult : '');
     // 信息行超长时自适应缩字号（后期最佳分/海域名/词缀叠加，保右端不溢出屏幕）
     var subFont = 14;
