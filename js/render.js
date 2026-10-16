@@ -2210,7 +2210,6 @@
     ctx.font = '12px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(220,240,255,0.5)';
     ctx.fillText('投放水滴 · 同级相融合成 · 小心警戒线', C.W / 2, VH - 56);
-    drawMuteBtn(); // 初始界面右上角：静音入口（与局内同一位置，未开局即可静音）
   }
 
   // ---------- 主渲染 ----------
