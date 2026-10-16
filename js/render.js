@@ -2634,3 +2634,47 @@
 
     ctx.restore();
   }
+
+  // ---------- 文档图标渲染钩子（游戏说明配图用） ----------
+  // 配合 MG.debug.headless=true 冻结渲染循环后调用：把游戏内图形原样画到主画布指定位置，
+  // 再由测试脚本截图裁剪导出 PNG——保证文档图标与游戏内实际观感完全一致。
+  MG.debug.icon = function (kind, id, cx, cy) {
+    ctx.save();
+    ctx.clearRect(cx - 48, cy - 48, 96, 96);
+    ctx.translate(cx, cy);
+    if (kind === 'tier') {
+      // 合成链水滴：标准球体 + 表情/波纹
+      drawBall({ x: 0, y: 0, r: 30, tier: id, vx: 0, vy: 0 }, 1);
+    } else if (kind === 'sp') {
+      // 特殊滴：与图鉴 drawSpForm 同构（礁石/符文/冰晶特殊处理）
+      var r = 26;
+      if (id === 'iron') drawIronBall({ x: 0, y: 0, r: r, vx: 0, vy: 0 }, 1);
+      else if (id === 'rune') drawBall({ x: 0, y: 0, r: r, tier: 1, vx: 0, vy: 0, rune: 'ripple' }, 1);
+      else drawBall({ x: 0, y: 0, r: r, tier: 1, vx: 0, vy: 0, special: id, frozen: id === 'ice' ? 1 : 0 }, 1);
+    } else if (kind === 'sea') {
+      // 海域徽章：放大 2.4 倍
+      ctx.scale(2.4, 2.4);
+      drawSeaBadge(id, 0, 0, true);
+    } else if (kind === 'skill') {
+      // 技能图标：用技能条同款配色
+      var col = id === 'swap' ? '#8E6FC0' : (id === 'ripple' ? '#2FA8A0' : (id === 'evap' ? '#E2705E' : '#3FA8B8'));
+      ctx.scale(2.2, 2.2);
+      drawSkillIcon(id, 0, 0, col);
+    } else if (kind === 'chest') {
+      // 深海宝箱
+      ctx.scale(1.7, 1.7);
+      drawChestIcon(0, 0, 1);
+    } else if (kind === 'ng') {
+      // 深渊潜航：紫罗兰渐变胶囊（与结算页按钮同风格）
+      var ngg = ctx.createLinearGradient(0, -18, 0, 18);
+      ngg.addColorStop(0, '#8A67BE'); ngg.addColorStop(1, '#5A3FA2');
+      ctx.fillStyle = ngg;
+      roundRect(-46, -19, 92, 38, 19); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 15px system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('深渊潜航', 0, 1);
+    }
+    ctx.restore();
+  };
