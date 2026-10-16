@@ -42,6 +42,9 @@
   var dexSpecial = dexLoaded.sp;   // 特殊水滴发现记录 { vortex:1, iron:1, ... }
   var dexTab = 0;                  // 图鉴页签：0=图鉴 1=成就 2=每日 3=榜单
   var dexSelSp = 0;                // 图鉴页当前选中的特殊滴说明
+  var dexSec = 0;                  // 图鉴主页分节：0=合成链 1=海域演进 2=特殊·宝箱
+  var dexSelTier = -1;             // 选中的合成链档位（-1 未选）
+  var dexSelStage = -1;            // 选中的海域阶段（-1 未选）
   // 跨局终身统计（成就进度用）：宝箱/涨潮/礁石对/彩虹合成/任务/连击/单局最高分
   var lifeStats = (function () {
     var d = { chest: 0, tide: 0, ironPair: 0, rainbow: 0, quest: 0, combo: 0, best: 0 };
@@ -1603,8 +1606,20 @@
   var tabRankBtn = { x: DEX_PANEL.x + 230, y: DEX_PANEL.y + 10, w: 66, h: 26 };
   var shareCopyBtn = { x: 0, y: 0, w: 150, h: 42 }; // 分享卡片：复制文案按钮（打开时定位）
   function spCellRect(i) {
-    // 9 格（8 种特殊滴 + 深海宝箱），实际形态绘制
-    return { x: DEX_PANEL.x + 12 + i * 38.4, y: DEX_PANEL.y + 362, w: 36, h: 80 };
+    // 特殊·宝箱分节：5 列 × 2 行（8 种特殊滴 + 深海宝箱）
+    return { x: DEX_PANEL.x + 14 + (i % 5) * 72, y: DEX_PANEL.y + 76 + Math.floor(i / 5) * 118, w: 64, h: 110 };
+  }
+  function tierCellRect(t) {
+    // 合成链分节：3 列 × 3 行（9 档）
+    return { x: DEX_PANEL.x + 14 + (t % 3) * 118, y: DEX_PANEL.y + 76 + Math.floor(t / 3) * 120, w: 108, h: 112 };
+  }
+  function stageRowRect(g) {
+    // 海域演进分节：8 行纵向列表（由浅入深）
+    return { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 76 + g * 44, w: DEX_PANEL.w - 28, h: 40 };
+  }
+  function dexSecRect(i) {
+    // 分节切换胶囊：合成链 / 海域演进 / 特殊·宝箱
+    return { x: DEX_PANEL.x + 14 + i * 120, y: DEX_PANEL.y + 44, w: 112, h: 24 };
   }
 
   // 重开确认弹窗
@@ -1706,8 +1721,25 @@
       if (inRect(p, tabDailyBtn)) { dexTab = 2; return; }
       if (inRect(p, tabRankBtn)) { dexTab = 3; return; }
       if (dexTab === 0) {
-        for (var si = 0; si <= SP_DEFS.length; si++) { // 末位是深海宝箱格
-          if (inRect(p, spCellRect(si))) { dexSelSp = si; audio.blip(620, 0.08, 'sine', 0.06, 0.3); return; }
+        // 分节切换
+        for (var sc = 0; sc < 3; sc++) {
+          if (inRect(p, dexSecRect(sc))) {
+            dexSec = sc; dexSelTier = -1; dexSelStage = -1;
+            audio.blip(520 + sc * 80, 0.08, 'sine', 0.06, 0.3); return;
+          }
+        }
+        if (dexSec === 0) {
+          for (var ti2 = 0; ti2 < T.length; ti2++) {
+            if (inRect(p, tierCellRect(ti2))) { dexSelTier = ti2; dexSelStage = -1; audio.blip(620, 0.08, 'sine', 0.06, 0.3); return; }
+          }
+        } else if (dexSec === 1) {
+          for (var st = 0; st < C.seaStages.length; st++) {
+            if (inRect(p, stageRowRect(st))) { dexSelStage = st; dexSelTier = -1; audio.blip(620, 0.08, 'sine', 0.06, 0.3); return; }
+          }
+        } else {
+          for (var si = 0; si <= SP_DEFS.length; si++) { // 末位是深海宝箱格
+            if (inRect(p, spCellRect(si))) { dexSelSp = si; dexSelTier = -1; dexSelStage = -1; audio.blip(620, 0.08, 'sine', 0.06, 0.3); return; }
+          }
         }
       }
       return;
