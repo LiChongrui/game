@@ -310,6 +310,7 @@
   var cooldown = 0;
   var combo = 0, comboTimer = 0, maxCombo = 0;
   var reviveCount = 0, doubled = false; // 每局复活上限 2 次（看广告）
+  var runBuffered = false; // 每局一次「深流缓冲」是否已用
   var popups = [], parts = [];
   var rippleQueue = []; // 待发的涟漪次波 { t, x, y }
   var time = 0;
@@ -1495,7 +1496,14 @@
       if (above && sup[i] && sp < C.dangerSpeed * 2) {
         // 越线 + 有支撑 + 基本静止（阈值放宽一倍：堆顶微颤不算"在动"）
         b.dangerT += dt;
-        if (b.dangerT > C.dangerTime) { gameOver(); return; }
+        if (b.dangerT > C.dangerTime) {
+          // 每局一次「深流缓冲」：首次判负改为全局 6 秒宽限，缓解前期暴毙挫败感
+          if (!runBuffered) {
+            runBuffered = true;
+            for (var j = 0; j < bs.length; j++) { bs[j].dangerT = 0; bs[j].grace = 6; }
+            addPopup(C.W / 2, C.dangerY + 66, '深流缓冲 · 宽限 6 秒', true, 0);
+          } else { gameOver(); return; }
+        }
       } else if (above) {
         // 越线但悬空/被明显扰动：计时缓慢消退而非清零，避免永远攒不满
         b.dangerT = Math.max(0, b.dangerT - dt * 2);
@@ -1794,6 +1802,7 @@
     score = 0; displayScore = 0; scoreBump = 0;
     combo = 0; comboTimer = 0; cooldown = 0; maxCombo = 0;
     reviveCount = 0; doubled = false;
+    runBuffered = false; // 新局重置深流缓冲
     skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
     seaCount = 0; scoreMult = 1;
     evapMode = false; rippleMode = false; flowMode = false; flowPick = null; rainHint = 0;
@@ -3507,12 +3516,12 @@
         // 锁图标（小挂锁）
         ctx.strokeStyle = 'rgba(255,255,255,0.9)';
         ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(btn.cx, btn.cy - 8, 4.5, Math.PI, 0); ctx.stroke();
+        ctx.beginPath(); ctx.arc(btn.cx, btn.cy - 9, 4.5, Math.PI, 0); ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.9)';
-        roundRect(btn.cx - 6.5, btn.cy - 8, 13, 10, 2); ctx.fill();
+        roundRect(btn.cx - 6.5, btn.cy - 9, 13, 10, 2); ctx.fill();
         ctx.fillStyle = 'rgba(230,242,248,0.75)';
         ctx.font = '9px system-ui, sans-serif';
-        ctx.fillText('累计 ' + C.skillUnlock[cfg.key] + ' 分', btn.cx, btn.cy + 13);
+        ctx.fillText('累计 ' + C.skillUnlock[cfg.key] + ' 分', btn.cx, btn.cy + 12);
       } else if (!ready) {
         ctx.strokeStyle = 'rgba(255,255,255,0.85)';
         ctx.lineWidth = 3;
@@ -3532,10 +3541,10 @@
         ctx.strokeStyle = '#E24B4A'; ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(btn.cx, btn.cy, btn.r + 3, 0, Math.PI * 2); ctx.stroke();
       }
-      // 名称标签：浅色文字，在变深的道具带上保持可读（底边留 6px 余量）
+      // 名称标签：浅色文字，在变深的道具带上保持可读（锁定态下移一行避开门槛提示）
       ctx.fillStyle = 'rgba(240,250,252,0.95)';
       ctx.font = '10px system-ui, sans-serif';
-      ctx.fillText(cfg.name, btn.cx, btn.cy + btn.r + 6);
+      ctx.fillText(cfg.name, btn.cx, btn.cy + btn.r + (unl ? 6 : 12));
     }
 
     // 二周目「深渊回响」入口（解锁后显示）：紫色圆钮 + 渊字
@@ -3729,7 +3738,7 @@
     ctx.textAlign = 'center';
     for (var stg = 0; stg < C.seaStages.length; stg++) {
       var ss = C.seaStages[stg];
-      var sw = 82, sx0 = DEX_PANEL.x + 14 + stg * (sw + 8), sy0 = DEX_PANEL.y + 442;
+      var sw = 53, sx0 = DEX_PANEL.x + 14 + stg * (sw + 6), sy0 = DEX_PANEL.y + 442;
       var isCur = stg === curStage, reached = tsNow >= ss.at;
       ctx.fillStyle = isCur ? '#2E86B4' : (reached ? 'rgba(46,134,180,0.14)' : 'rgba(120,145,165,0.14)');
       roundRect(sx0, sy0, sw, 40, 7); ctx.fill();
@@ -3738,11 +3747,12 @@
         roundRect(sx0 + 0.5, sy0 + 0.5, sw - 1, 39, 7); ctx.stroke();
       }
       ctx.fillStyle = isCur ? '#FFFFFF' : (reached ? '#155A8A' : '#8AA5B8');
-      ctx.font = 'bold 12px system-ui, sans-serif';
+      ctx.font = 'bold 11px system-ui, sans-serif';
       ctx.fillText(ss.name, sx0 + sw / 2, sy0 + 17);
       ctx.font = '9px system-ui, sans-serif';
       ctx.fillStyle = isCur ? 'rgba(255,255,255,0.85)' : (reached ? '#1E7A6F' : '#B0584A');
-      ctx.fillText(stg === 0 ? '起点' : (reached ? '已抵达' : (ss.at + ' 分解锁')), sx0 + sw / 2, sy0 + 32);
+      var gateTxt = stg === 0 ? '起点' : (reached ? '已抵达' : (ss.at >= 10000 ? (ss.at / 10000) + '万解锁' : ss.at + '分解锁'));
+      ctx.fillText(gateTxt, sx0 + sw / 2, sy0 + 32);
     }
 
     // 特殊水滴条（发现即点亮，点选查看说明）
