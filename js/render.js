@@ -1602,20 +1602,22 @@
   function drawNgPick() {
     ctx.fillStyle = 'rgba(10,40,70,0.66)';
     ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
-    var pw = 330, ph = 320, px = (C.W - pw) / 2, py = (VH - ph) / 2;
+    var pw = 330, ph = 348, px = (C.W - pw) / 2, py = (VH - ph) / 2;
     panel(px, py, pw, ph, 14, 0.97);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#5B4A94';
     ctx.font = 'bold 20px system-ui, sans-serif';
-    ctx.fillText('深渊回响', C.W / 2, py + 38);
+    ctx.fillText('深渊回响', C.W / 2, py + 36);
     ctx.font = '11px system-ui, sans-serif';
     ctx.fillStyle = '#4A7FA0';
-    ctx.fillText('选择一条海况词缀 · 高危高收益的无尽局', C.W / 2, py + 60);
+    ctx.fillText('选一条海况词缀，立即重开一局无尽模式', C.W / 2, py + 58);
+    ctx.fillStyle = '#B0584A';
+    ctx.fillText(ng.active ? ('当前词缀「' + ng.active.name + '」，重新选择将替换') : '⚠ 当前局面不保留 · 词缀难度更高、得分更高', C.W / 2, py + 76);
 
     ngPickRects = [];
     for (var i = 0; i < ngPicks.length; i++) {
       var af = ngPicks[i];
-      var ry = py + 80 + i * 74, rh = 64;
+      var ry = py + 92 + i * 74, rh = 64;
       var rect = { x: px + 20, y: ry, w: pw - 40, h: rh };
       ngPickRects.push(rect);
       ctx.fillStyle = 'rgba(107,90,168,0.12)';
@@ -1763,7 +1765,7 @@
         var isNext = stg === curStage + 1, hiddenStg = !isCur && !reached && !isNext;
         var rowCy = sRow.y + sRow.h / 2;
         if (isCur) {
-          ctx.fillStyle = '#2E86B4';
+          ctx.fillStyle = (SEA_BADGES[stg] || SEA_BADGES[0]).c; // 当前海域行铺该海域主题色
         } else if (reached) { // 已抵达：铺该海域专属色的浅底
           ctx.globalAlpha = 0.13;
           ctx.fillStyle = (SEA_BADGES[stg] || SEA_BADGES[0]).c;
