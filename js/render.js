@@ -1482,14 +1482,45 @@
 
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
   function drawHUD() {
-    // 计分（左上角悬浮；左端让位给奖杯按钮，从 x48 起）
     ctx.textAlign = 'left';
-    var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
     ctx.lineJoin = 'round';
+    // 第一组（左上）：成就奖杯图标 + 最高分 · 最远海域（历史信息退居角落，实时信息居中）
+    var farIdx = 0;
+    for (var fi = C.seaStages.length - 1; fi >= 0; fi--) {
+      if (careerPeak >= C.seaStages[fi].at) { farIdx = fi; break; }
+    }
+    ctx.font = 'bold 13px system-ui, sans-serif';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    var top1 = '最高 ' + best + ' · 最远 ' + C.seaStages[farIdx].name;
+    var t1Font = 13;
+    while (t1Font > 10 && ctx.measureText(top1).width > 268) { // 右端到下一滴预览左侧(329)为止，防溢出
+      t1Font--;
+      ctx.font = 'bold ' + t1Font + 'px system-ui, sans-serif';
+    }
+    ctx.strokeText(top1, 48, 30);
+    ctx.fillStyle = '#3E6E90';
+    ctx.fillText(top1, 48, 30);
+    // 第一组第二行（更弱的信息）：海域加成 / 词缀；每日挑战局显示目标进度
+    var chal = dchalHud();
+    var top2 = (chal ? '每日挑战 ' + Math.min(score, chal.goal) + '/' + chal.goal + (chal.done ? ' ✓' : '') : '') +
+      (seaCount > 0 ? (chal ? ' · ' : '') + '海域 ×' + seaCount : '') +
+      (ng.active ? ' · 「' + ng.active.name + '」×' + ng.active.mult : '');
+    if (top2) {
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.lineWidth = 2.5;
+      ctx.strokeText(top2, 48, 46);
+      ctx.fillStyle = chal && !chal.done ? '#7B6FD0' : (ng.active ? '#6B5AA8' : '#4A7FA0');
+      ctx.fillText(top2, 48, 46);
+    }
+
+    // 第二组（中轴）：当前得分居中 + 正下方海域进度条（分数涨→进度前进，垂直联动）
+    var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
     ctx.save();
-    ctx.translate(48, 38);
+    ctx.textAlign = 'center';
+    ctx.translate(C.W / 2, 64);
     ctx.scale(bump, bump);
-    ctx.font = 'bold 34px system-ui, sans-serif';
+    ctx.font = 'bold 30px system-ui, sans-serif';
     ctx.lineWidth = 4;
     ctx.strokeStyle = 'rgba(255,255,255,0.85)';
     var txt = String(Math.round(displayScore));
@@ -1497,21 +1528,7 @@
     ctx.fillStyle = '#12517E';
     ctx.fillText(txt, 0, 0);
     ctx.restore();
-    // 第二行信息：最佳 + 当前海域 + 海域加成 + 词缀（距下一海域的进度由进度条可视化，不再重复文字）
-    ctx.font = '14px system-ui, sans-serif';
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-    var sub = '最佳 ' + best + ' · ' + C.seaStages[seaStage()].name + (seaCount > 0 ? ' · 海域 ×' + seaCount : '') +
-      (ng.active ? ' · 「' + ng.active.name + '」×' + ng.active.mult : '');
-    // 信息行超长时自适应缩字号（后期最佳分/海域名/词缀叠加，保右端不溢出屏幕）
-    var subFont = 14;
-    while (subFont > 11 && ctx.measureText(sub).width > C.W - 62) {
-      subFont--;
-      ctx.font = subFont + 'px system-ui, sans-serif';
-    }
-    ctx.strokeText(sub, 48, 58);
-    ctx.fillStyle = ng.active ? '#6B5AA8' : '#3E6E90';
-    ctx.fillText(sub, 48, 58);
+    ctx.textAlign = 'left';
 
     // 右上角：下一滴预览 + 静音按钮（主流布局，随 HUD 上移）
     ctx.textAlign = 'center';
@@ -1570,7 +1587,7 @@
   }
   // 潮汐信息胶囊（右侧，与任务条同行同高，左右对称）
   function drawTidePill() {
-    var tx = C.W - 122, tw = 92, ty = 66, th = 34; // 与任务条(qy66/qh34)同高同排
+    var tx = C.W - 122, tw = 92, ty = 94, th = 32; // 第三组：与任务条(qy94/qh32)同高同排，整体上移后贴空隙带
     var active = tide.phase === 'active';
     var warn = !active && tide.timer <= C.tide.warnTime;
     var pulse = 0.5 + 0.5 * Math.sin(time * 6);
@@ -1632,28 +1649,8 @@
     }
   }
 
-  function drawLevelHud() {
-    var em = Math.floor(levelElapsed / 60), es = Math.floor(levelElapsed % 60);
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.lineJoin = 'round';
-    ctx.font = 'bold 12px system-ui, sans-serif';
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-    var etxt = '已进行 ' + em + ':' + (es < 10 ? '0' + es : es);
-    ctx.strokeText(etxt, C.W / 2, 20);
-    ctx.fillStyle = '#2E7DA8';
-    ctx.fillText(etxt, C.W / 2, 20);
-    // 每日挑战局：计时下方目标进度（systems 的 dchalHud，挑战局外返回 null）
-    var chal = dchalHud();
-    if (chal) {
-      var ctxt = '每日挑战 ' + Math.min(score, chal.goal) + '/' + chal.goal + (chal.done ? ' ✓' : '');
-      ctx.strokeText(ctxt, C.W / 2, 40);
-      ctx.fillStyle = chal.done ? '#C9920E' : '#7B6FD0';
-      ctx.fillText(ctxt, C.W / 2, 40);
-    }
-    ctx.restore();
-  }
+  // 顶部计时已移除（休闲合成局内无时间压力，信息价值低于得分/进度）；
+  // 每日挑战局的目标进度并入 HUD 第一组第二行（左上角，与最高分同组）
 
   // ---------- 重开确认弹窗 ----------
   function drawConfirm() {
@@ -1690,8 +1687,8 @@
     if (!quest) return;
     ctx.save();
     ctx.textAlign = 'center';
-    // 任务条：第三行左侧（两行：进度 + 星级/奖励，与任务难度匹配）
-    var qw = 206, qx = 12, qy = 66, qh = 34;
+    // 任务条：第三组左侧（两行：进度 + 星级/奖励，与任务难度匹配）
+    var qw = 206, qx = 12, qy = 94, qh = 32;
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     roundRect(qx, qy, qw, qh, 10); ctx.fill();
     var prog = Math.min(1, quest.have / quest.need);
@@ -1701,11 +1698,11 @@
     }
     ctx.fillStyle = '#7A5B10';
     ctx.font = 'bold 15px system-ui, sans-serif';
-    ctx.fillText(quest.text + ' ' + quest.have + '/' + quest.need, qx + qw / 2, qy + 14);
+    ctx.fillText(quest.text + ' ' + quest.have + '/' + quest.need, qx + qw / 2, qy + 13);
     ctx.fillStyle = '#B8860B';
     ctx.font = '13px system-ui, sans-serif';
     var stars = '★★★'.slice(0, quest.stars || 1);
-    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 30);
+    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 28);
     drawTidePill();
     drawSeaProgress();
     ctx.restore();
@@ -1717,7 +1714,7 @@
     var cur = seaStage(), ts = totalScore();
     var last = C.seaStages.length - 1;
     var maxed = cur >= last;
-    var sx = 12, sy = 106, sw = C.W - 24, sh = 16;
+    var sx = 12, sy = 72, sw = C.W - 24, sh = 16;
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     roundRect(sx, sy, sw, sh, 8); ctx.fill();
     var frac = 1;
@@ -2330,7 +2327,6 @@
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
 
     drawHUD();
-    drawLevelHud();
     drawQuest();
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
     drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）
