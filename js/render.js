@@ -1537,7 +1537,11 @@
     ctx.fillStyle = '#2E7DA8';
     ctx.fillText(etxt, C.W - 78, 41);
 
-    // 静音按钮（右上角，小号）
+    // 静音按钮（右上角，小号）：局内与初始界面共用同一入口
+    drawMuteBtn();
+  }
+  // 静音按钮（局内 HUD 与初始界面共用；坐标 MUTE.cx/cy 恒定，菜单态铺满时为同一屏幕位置）
+  function drawMuteBtn() {
     drawMiniBtn(MUTE);
     ctx.save();
     ctx.translate(MUTE.cx, MUTE.cy);
@@ -2170,6 +2174,7 @@
     ctx.font = '12px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(220,240,255,0.5)';
     ctx.fillText('投放水滴 · 同级相融合成 · 小心警戒线', C.W / 2, VH - 56);
+    drawMuteBtn(); // 初始界面右上角：静音入口（与局内同一位置，未开局即可静音）
   }
 
   // ---------- 主渲染 ----------
@@ -2192,10 +2197,15 @@
 
     if (state === 'menu') {
       drawMenu();
-      drawTrophyBtn(menuTrophy);   // 成就殿堂/每日挑战入口（菜单态固定位，systems 菜单分支处理）
+      // 成就/音量按钮与局内同一屏幕位置：菜单态铺满（renderOy=0）需补 oy 与局内对齐
+      ctx.save();
+      ctx.translate(0, oy);
+      drawTrophyBtn(menuTrophy);   // 成就殿堂/每日挑战入口（systems 菜单分支处理，命中区同步 +oy）
+      drawMuteBtn();               // 初始界面右上角静音入口
+      ctx.restore();
       if (achOpen) drawAchPanel(); // 面板盖在菜单之上（点击已放行到 achOpen 分支）
       ctx.restore(); return;
-    } // 开始界面：背景之上画菜单 + 奖杯入口 + 成就殿堂面板
+    } // 开始界面：背景之上画菜单 + 奖杯入口 + 音量入口 + 成就殿堂面板
 
     drawContainer();
     drawDangerLine();

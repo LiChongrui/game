@@ -253,9 +253,9 @@
             roundRect(slotR.x + 0.5, slotR.y + 0.5, slotR.w - 1, slotR.h - 1, 8); ctx.stroke();
             ctx.setLineDash([]);
             ctx.fillStyle = '#A8BCCB';
-            ctx.font = '11px system-ui, sans-serif';
+            ctx.font = '13px system-ui, sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('？？？', slotR.x + slotR.w / 2, cy2 + 3);
+            ctx.fillText('？？？', slotR.x + slotR.w / 2, cy2 + 4);
             ctx.textAlign = 'left';
             ctx.restore();
             continue;
@@ -277,8 +277,8 @@
             ctx.textAlign = 'left';
           }
           ctx.fillStyle = found2 ? '#155A8A' : '#4E6E86';
-          ctx.font = '11px system-ui, sans-serif';
-          ctx.fillText(found2 ? (isChest2 ? '宝箱' : spDef2.name) : '？？？', slotR.x + 33, cy2 + 3);
+          ctx.font = '13px system-ui, sans-serif';
+          ctx.fillText(found2 ? (isChest2 ? '宝箱' : spDef2.name) : '？？？', slotR.x + 33, cy2 + 4);
         }
       }
       ctx.textAlign = 'center';
