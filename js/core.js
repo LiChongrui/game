@@ -11,11 +11,15 @@
   var canvas = document.getElementById('game');
   var ctx = canvas.getContext('2d');
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
-  var VH = C.H;           // 当前逻辑高度
+  var VH = C.H;           // 当前逻辑高度（全屏：h/view.s，≥720）
   var LW = C.W;           // 当前逻辑宽度（≥ C.W，宽窗口下两侧为延伸海水）
   var BX = 0;             // 游戏区（420 逻辑宽）水平居中偏移
-  var FLOORY = C.floorY;  // 容器底 y（底部锚定：VH - 74）
+  var FLOORY = C.floorY;  // 容器底 y（游戏块内恒定：646）
   var view = { s: 1 };
+  // 游戏块 = 420×720 固定逻辑区（HUD 118 + 容器 528 + 底部 74），长宽比恒定，所有设备一致；
+  // 高屏多出的高度上下均分给背景延伸（oy 为块在屏幕中的垂直居中偏移，菜单态铺满时为 0）
+  var oy = 0;             // 游戏块垂直居中偏移（逻辑 px，≥0）
+  var renderOy = 0;       // 渲染/点击实际使用的偏移：菜单态 0（铺满），其余态 oy
 
   function fit() {
     var w = window.innerWidth, h = window.innerHeight;
@@ -24,10 +28,11 @@
     VH = h / view.s;
     LW = w / view.s;                       // 逻辑宽度（≥420）
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
-    FLOORY = VH - 74;                      // 容器底贴住窗口底部（720-646=74）
+    oy = Math.max(0, (VH - C.H) / 2);      // 游戏块垂直居中：高屏多出的高度上下均分
+    // 游戏块内全部恒定（=config 初始值）：容器底/容器顶/警戒线/出生点不随设备变化，
+    // 容器长宽比恒定 420:528——不同设备游戏区大小比例完全一致
+    FLOORY = C.H - 74;                     // 646
     C.floorY = FLOORY;                     // 同步给物理引擎（每帧读取，水滴落到新地板）
-    // 顶部 HUD 区固定 118 逻辑 px：容器顶/警戒线/出生点全部恒定（=config 初始值，不再随 FLOORY 推算），
-    // 高屏多出来的高度全部给容器长高——HUD 与容器之间不再出现大片空白
     C.containerTop = 118;
     C.dangerY = 182;
     C.spawnY = 120;
@@ -35,15 +40,15 @@
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // 底部按钮/图鉴角标同步贴底：道具按钮上移，在容器底~屏底带内近似垂直居中（含名称标签空间）
-    var cy = VH - 46;
+    // 按钮全部落在游戏块内恒定位（块内坐标）：道具按钮在容器底~块底带内近似垂直居中
+    var cy = C.H - 46;
     // 注意：模块化后 bookBtn 等声明在 systems.js（后加载），早期触发时用 typeof 守卫
     if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {
       bookBtn.cy = cy; restartBtn.cy = cy;
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
     }
     if (typeof trophyBtn !== 'undefined' && typeof MUTE !== 'undefined') {
-      trophyBtn.cy = 36; MUTE.cy = 36;     // 奖杯/静音回到正常左上/右上角落（与分数行同排）
+      trophyBtn.cy = 36; MUTE.cy = 36;     // 奖杯/静音：块内左上/右上角落（与分数行同排）
     }
   }
   window.addEventListener('resize', fit);

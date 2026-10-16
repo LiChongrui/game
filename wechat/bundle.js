@@ -405,11 +405,15 @@ MG.config = {
   var canvas = document.getElementById('game');
   var ctx = canvas.getContext('2d');
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
-  var VH = C.H;           // 当前逻辑高度
+  var VH = C.H;           // 当前逻辑高度（全屏：h/view.s，≥720）
   var LW = C.W;           // 当前逻辑宽度（≥ C.W，宽窗口下两侧为延伸海水）
   var BX = 0;             // 游戏区（420 逻辑宽）水平居中偏移
-  var FLOORY = C.floorY;  // 容器底 y（底部锚定：VH - 74）
+  var FLOORY = C.floorY;  // 容器底 y（游戏块内恒定：646）
   var view = { s: 1 };
+  // 游戏块 = 420×720 固定逻辑区（HUD 118 + 容器 528 + 底部 74），长宽比恒定，所有设备一致；
+  // 高屏多出的高度上下均分给背景延伸（oy 为块在屏幕中的垂直居中偏移，菜单态铺满时为 0）
+  var oy = 0;             // 游戏块垂直居中偏移（逻辑 px，≥0）
+  var renderOy = 0;       // 渲染/点击实际使用的偏移：菜单态 0（铺满），其余态 oy
 
   function fit() {
     var w = window.innerWidth, h = window.innerHeight;
@@ -418,10 +422,11 @@ MG.config = {
     VH = h / view.s;
     LW = w / view.s;                       // 逻辑宽度（≥420）
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
-    FLOORY = VH - 74;                      // 容器底贴住窗口底部（720-646=74）
+    oy = Math.max(0, (VH - C.H) / 2);      // 游戏块垂直居中：高屏多出的高度上下均分
+    // 游戏块内全部恒定（=config 初始值）：容器底/容器顶/警戒线/出生点不随设备变化，
+    // 容器长宽比恒定 420:528——不同设备游戏区大小比例完全一致
+    FLOORY = C.H - 74;                     // 646
     C.floorY = FLOORY;                     // 同步给物理引擎（每帧读取，水滴落到新地板）
-    // 顶部 HUD 区固定 118 逻辑 px：容器顶/警戒线/出生点全部恒定（=config 初始值，不再随 FLOORY 推算），
-    // 高屏多出来的高度全部给容器长高——HUD 与容器之间不再出现大片空白
     C.containerTop = 118;
     C.dangerY = 182;
     C.spawnY = 120;
@@ -429,15 +434,15 @@ MG.config = {
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // 底部按钮/图鉴角标同步贴底：道具按钮上移，在容器底~屏底带内近似垂直居中（含名称标签空间）
-    var cy = VH - 46;
+    // 按钮全部落在游戏块内恒定位（块内坐标）：道具按钮在容器底~块底带内近似垂直居中
+    var cy = C.H - 46;
     // 注意：模块化后 bookBtn 等声明在 systems.js（后加载），早期触发时用 typeof 守卫
     if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {
       bookBtn.cy = cy; restartBtn.cy = cy;
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
     }
     if (typeof trophyBtn !== 'undefined' && typeof MUTE !== 'undefined') {
-      trophyBtn.cy = 36; MUTE.cy = 36;     // 奖杯/静音回到正常左上/右上角落（与分数行同排）
+      trophyBtn.cy = 36; MUTE.cy = 36;     // 奖杯/静音：块内左上/右上角落（与分数行同排）
     }
   }
   window.addEventListener('resize', fit);
@@ -2371,6 +2376,7 @@ MG.config = {
       stage: seaStage(), daily: { done: daily.done.slice(), streak: daily.streak }, best: best,
       jellies: jellies.map(function (j) { return { x: Math.round(j.x), y: Math.round(j.y), s: Math.round(j.s) }; }),
       col: colProgress, chestTimer: Math.round(chestTimer * 10) / 10,
+      oy: oy, renderOy: renderOy, VH: VH, floorY: C.floorY, containerTop: C.containerTop,
       offline: offlineGain ? { mins: offlineGain.mins, gain: offlineGain.gain } : null
     };
   };
@@ -2753,9 +2759,10 @@ MG.config = {
   function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - MUTE.cy; return dx * dx + dy * dy <= 18 * 18; } // 命中区略大于视觉（小按钮易点空）
   function toLocal(e) {
     var rect = canvas.getBoundingClientRect();
+    // 内容层游戏块垂直居中偏移 renderOy（菜单态 0），触摸 y 同量补偿还原块内坐标
     return {
       x: (e.clientX - rect.left) / view.s - BX,
-      y: (e.clientY - rect.top) / view.s
+      y: (e.clientY - rect.top) / view.s - renderOy
     };
   }
   function hitButton(p) {
@@ -3084,10 +3091,11 @@ MG.config = {
   // ---------- 面板几何（渲染与点击热区共用，一处定义） ----------
   var DEX_PANEL = { x: 20, y: 64, w: 380, h: 560 };
   var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 42, y: DEX_PANEL.y + 8, w: 28, h: 28 }; // 右上 × 关闭（中心 +22px，与页头标题文字对齐）
-  // 面板垂直居中：菜单态 VH 已被 render 换为整屏逻辑高（铺满），局内为安全视口高——
-  // 每帧在绘制前重算 y，弹出的页签始终处于屏幕中央（此前固定 y=64 偏上）
+  // 面板垂直居中：菜单态（铺满）以整屏 VH 为基准；局内游戏块为固定 720 逻辑（居中块=屏幕中心，
+  // 块内 (C.H-h)/2 + 偏移 renderOy 恰好落在屏幕中央）——每帧绘制前重算，页签始终处于屏幕中央
   function layoutDexPanel() {
-    DEX_PANEL.y = Math.max(10, Math.round((VH - DEX_PANEL.h) / 2));
+    var base = state === 'menu' ? VH : C.H;
+    DEX_PANEL.y = Math.max(10, Math.round((base - DEX_PANEL.h) / 2));
     dexCloseBtn.y = DEX_PANEL.y + 8;
   }
   // 成就页分段页签：成就 / 每日 / 榜单（与图鉴分节同款分段控件样式）
@@ -3216,7 +3224,7 @@ MG.config = {
   function drawDex() {
     layoutDexPanel();
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
     drawPanelHeader('图鉴');
     drawColBadge();
@@ -3400,7 +3408,7 @@ MG.config = {
   function drawAchPanel() {
     layoutDexPanel();
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
     drawPanelHeader('成就殿堂'); // 固定页头标题，不随页签变化
     var dailyDot = !(daily.done[0] && daily.done[1] && daily.done[2]) ? 1 : -1;
@@ -3748,7 +3756,7 @@ MG.config = {
   function drawShare() {
     if (!shareOpen) return;
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
     var pw = 300, ph = 420, px = (C.W - pw) / 2, py = 160;
     panel(px, py, pw, ph, 16, 0.97);
     // 卡片头：深海渐变 + 标题
@@ -5046,9 +5054,10 @@ MG.config = {
   // ---------- 容器：玻璃质感 + 底部焦散 ----------
   function drawContainer() {
     var floorY = FLOORY, FH = 12;
-    // 海底基色：从床面到画布底一条连续渐变（泡沫白 → 青 → 深海青），先铺满
-    var bed = grad('bed' + Math.round(VH), function () {
-      var gg = ctx.createLinearGradient(0, floorY, 0, VH);
+    // 海底基色：从床面到屏幕底一条连续渐变（泡沫白 → 青 → 深海青）——块底以下（手势区）
+    // 由同一条渐变自然延伸，无接缝；块内坐标到屏底 = VH - renderOy
+    var bed = grad('bed' + Math.round(VH) + '_' + Math.round(renderOy), function () {
+      var gg = ctx.createLinearGradient(0, floorY, 0, VH - renderOy);
       gg.addColorStop(0, 'rgba(216,236,232,0.95)');
       gg.addColorStop(0.3, 'rgba(170,208,204,0.95)');
       gg.addColorStop(0.62, 'rgba(112,158,174,0.95)');
@@ -5056,7 +5065,7 @@ MG.config = {
       return gg;
     });
     ctx.fillStyle = bed;
-    ctx.fillRect(0, floorY + 4, C.W, VH - floorY - 4);
+    ctx.fillRect(0, floorY + 4, C.W, VH - renderOy - floorY - 4);
     // 床面：圆角横条（半透明玻璃质感，透出海底基色，不再有硬边界）
     var fg = grad('fg' + Math.round(VH), function () {
       var gg = ctx.createLinearGradient(0, floorY, 0, floorY + FH + 6);
@@ -5105,9 +5114,9 @@ MG.config = {
     ctx.beginPath(); ctx.ellipse(C.W * 0.74, sy0 + 14, 115, 15, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = 'rgba(228,240,234,0.55)';
     ctx.beginPath(); ctx.ellipse(C.W * 0.47, sy0 + 18, 85, 11, 0, 0, Math.PI * 2); ctx.fill();
-    // 卵石（y 相对底部：VH-720 偏移）
+    // 卵石（块内坐标，贴容器底；块底以下的屏底延伸由海底基色渐变覆盖）
     ctx.fillStyle = 'rgba(110,150,168,0.4)';
-    var yoff = VH - C.H;
+    var yoff = 0;
     var peb = [[24, 688, 3], [66, 700, 2], [112, 686, 2.5], [172, 702, 2], [246, 690, 2.5], [306, 700, 2], [352, 686, 2.5], [404, 696, 2.2]];
     for (var pi = 0; pi < peb.length; pi++) {
       ctx.beginPath(); ctx.arc(peb[pi][0], peb[pi][1] + yoff, peb[pi][2], 0, Math.PI * 2); ctx.fill();
@@ -5475,7 +5484,7 @@ MG.config = {
   function drawConfirm() {
     if (!confirmOpen) return;
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
     var px = 60, py = 300, pw = C.W - 120, ph = 170;
     panel(px, py, pw, ph, 14, 0.97);
     ctx.textAlign = 'center';
@@ -5606,15 +5615,15 @@ MG.config = {
   }
 
   function drawSkillBar() {
-    // 道具带：海底基色的柔和延续（同色系微加深，方向与渐变一致，不割裂）
-    var g = grad('skbar' + Math.round(VH), function () {
-      var gg = ctx.createLinearGradient(0, VH - 56, 0, VH);
+    // 道具带：海底基色的柔和延续（同色系微加深），块内 664 起延伸到屏幕底（手势区），无接缝
+    var g = grad('skbar' + Math.round(VH) + '_' + Math.round(renderOy), function () {
+      var gg = ctx.createLinearGradient(0, C.H - 56, 0, C.H + renderOy);
       gg.addColorStop(0, 'rgba(56,102,130,0)');
       gg.addColorStop(1, 'rgba(36,78,106,0.3)');
       return gg;
     });
     ctx.fillStyle = g;
-    ctx.fillRect(0, VH - 56, C.W, 56);
+    ctx.fillRect(0, C.H - 56, C.W, 56 + renderOy);
 
     var readyPulse = 0.5 + 0.5 * Math.sin(time * 5);
 
@@ -5689,8 +5698,8 @@ MG.config = {
   // 二周目词缀三选一弹窗
   function drawNgPick() {
     ctx.fillStyle = 'rgba(10,40,70,0.66)';
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
-    var pw = 330, ph = 348, px = (C.W - pw) / 2, py = (VH - ph) / 2;
+    ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
+    var pw = 330, ph = 348, px = (C.W - pw) / 2, py = (C.H - ph) / 2;
     panel(px, py, pw, ph, 14, 0.97);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#5B4A94';
@@ -5819,7 +5828,7 @@ MG.config = {
     dim.addColorStop(0, 'rgba(6,30,56,0.82)');
     dim.addColorStop(1, 'rgba(4,18,36,0.88)');
     ctx.fillStyle = dim;
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
     ctx.strokeStyle = 'rgba(160,220,255,0.25)';
     ctx.lineWidth = 1.2;
     for (var i = 0; i < 8; i++) {
@@ -5829,7 +5838,7 @@ MG.config = {
     }
     // 漂流瓶（随水流轻摆）
     ctx.save();
-    ctx.translate(C.W / 2, VH / 2 - 64);
+    ctx.translate(C.W / 2, C.H / 2 - 64);
     ctx.rotate(Math.sin(time * 1.4) * 0.12);
     ctx.fillStyle = 'rgba(150,220,200,0.9)';
     roundRect(-13, -10, 26, 34, 8); ctx.fill();
@@ -5843,18 +5852,18 @@ MG.config = {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 25px system-ui, sans-serif';
-    ctx.fillText('深海漂流瓶 · 激励视频', C.W / 2, VH / 2 + 26);
+    ctx.fillText('深海漂流瓶 · 激励视频', C.W / 2, C.H / 2 + 26);
     ctx.font = '18px system-ui, sans-serif';
-    ctx.fillText(adOverlay.label + ' · ' + adOverlay.t.toFixed(1) + 's 后发放奖励', C.W / 2, VH / 2 + 52);
+    ctx.fillText(adOverlay.label + ' · ' + adOverlay.t.toFixed(1) + 's 后发放奖励', C.W / 2, C.H / 2 + 52);
     ctx.font = '14px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.fillText('（演示占位：上线微信时替换为 wx.createRewardedVideoAd）', C.W / 2, VH / 2 + 78);
+    ctx.fillText('（演示占位：上线微信时替换为 wx.createRewardedVideoAd）', C.W / 2, C.H / 2 + 78);
   }
 
   function drawOver() {
     buildOverButtons();
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
 
     var pw = 320, ph = 436, px = (C.W - pw) / 2, py = 150;
     panel(px, py, pw, ph, 16, 0.97);
@@ -5952,7 +5961,7 @@ MG.config = {
 
     ctx.fillStyle = 'rgba(6,28,52,0.42)';
     // 菜单态 VH 已换为整屏逻辑高，遮罩直接盖满全屏（无接缝）
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
 
     ctx.textAlign = 'center';
     var pulse = 0.5 + 0.5 * Math.sin(time * 2.4);
@@ -6009,10 +6018,13 @@ MG.config = {
 
   // ---------- 主渲染 ----------
   function render() {
-    // 全屏铺满：刘海/手势条按正常区域对待，不做安全区偏移，单一变换贯穿整帧
+    // 背景：无偏移全屏变换铺满（刘海/手势条区域为海色延伸，正常区域对待）
     ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, 0);
     drawBackground();
 
+    // 内容层：游戏块（420×720 恒定比例）垂直居中——菜单态铺满不偏移
+    renderOy = state === 'menu' ? 0 : oy;
+    ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, dpr * renderOy);
     if (shakeT > 0) {
       var s = shakeAmp * (shakeT / 0.4);
       ctx.translate((Math.random() - 0.5) * 2 * s, (Math.random() - 0.5) * 2 * s);
@@ -6063,7 +6075,7 @@ MG.config = {
 
     if (evapMode) {
       ctx.fillStyle = 'rgba(10,40,70,0.18)';
-      ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+      ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
       var hb = ballAt(lastPointer);
       if (hb) {
         ctx.save();
@@ -6084,7 +6096,7 @@ MG.config = {
     // 涟漪选位模式：显示波纹中心指示
     if (rippleMode) {
       ctx.fillStyle = 'rgba(10,40,70,0.12)';
-      ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+      ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
       var rx = Math.max(12, Math.min(C.W - 12, lastPointer.x < 0 ? C.W / 2 : lastPointer.x));
       var ry = Math.max(C.containerTop + 30, Math.min(FLOORY - 16, lastPointer.y < 0 ? (C.containerTop + FLOORY) / 2 : lastPointer.y));
       ctx.save();
@@ -6113,7 +6125,7 @@ MG.config = {
     // 水流模式：已选水滴高亮 + 操作提示
     if (flowMode) {
       ctx.fillStyle = 'rgba(10,40,70,0.14)';
-      ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+      ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
       if (flowPick) {
         ctx.save();
         ctx.strokeStyle = '#7FE8F5';
@@ -6141,7 +6153,7 @@ MG.config = {
       return gg;
     });
     ctx.fillStyle = vg;
-    ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
+    ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
 
     drawHUD();
     drawLevelHud();

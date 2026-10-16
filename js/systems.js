@@ -1657,6 +1657,7 @@
       stage: seaStage(), daily: { done: daily.done.slice(), streak: daily.streak }, best: best,
       jellies: jellies.map(function (j) { return { x: Math.round(j.x), y: Math.round(j.y), s: Math.round(j.s) }; }),
       col: colProgress, chestTimer: Math.round(chestTimer * 10) / 10,
+      oy: oy, renderOy: renderOy, VH: VH, floorY: C.floorY, containerTop: C.containerTop,
       offline: offlineGain ? { mins: offlineGain.mins, gain: offlineGain.gain } : null
     };
   };
@@ -2039,9 +2040,10 @@
   function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - MUTE.cy; return dx * dx + dy * dy <= 18 * 18; } // 命中区略大于视觉（小按钮易点空）
   function toLocal(e) {
     var rect = canvas.getBoundingClientRect();
+    // 内容层游戏块垂直居中偏移 renderOy（菜单态 0），触摸 y 同量补偿还原块内坐标
     return {
       x: (e.clientX - rect.left) / view.s - BX,
-      y: (e.clientY - rect.top) / view.s
+      y: (e.clientY - rect.top) / view.s - renderOy
     };
   }
   function hitButton(p) {

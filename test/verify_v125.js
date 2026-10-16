@@ -63,6 +63,7 @@ setTimeout(() => {
     out.hasMG = !!globalThis.MG;
     out.hasConfig = !!(globalThis.MG && MG.config);
     out.noSafeInset = globalThis.__safeInset == null; // 安全区机制已移除
+    out.geo = MG.probe().oy != null ? { oy: MG.probe().oy, VH: MG.probe().VH, floorY: MG.probe().floorY, ct: MG.probe().containerTop } : null;
     out.state0 = MG.probe().state;                 // 期望 menu
     // 点「开始游戏」按钮：全屏铺满，view.s = min(420/420, 780/720) = 1，无偏移
     var vs = Math.min(420 / 420, SCREEN_H / 720);
