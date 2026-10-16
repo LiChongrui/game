@@ -67,7 +67,16 @@
   // try/catch + 空值守卫（core.js audio 段），桥不兼容时只静音不崩。
   G.AudioContext = function () { return wx.createWebAudioContext(); };
 
-  // 安全区不做任何处理：刘海/挖孔与手势条按正常区域对待（用户定版），全屏铺满
+  // 顶部保留区：状态栏/手势条仍按正常区域对待（用户定版），但胶囊（···◎）由微信
+  // 强制悬浮在右上角，HUD 右上角的静音按钮必须让位。取胶囊下缘 + 8px 供 core.fit()
+  // 把游戏块贴到其正下方（oy 顶贴）；Web 无胶囊 → __safeTop=0 → 块直接贴屏顶。
+  var safeTop = 0;
+  try {
+    var mb = wx.getMenuButtonBoundingClientRect ? wx.getMenuButtonBoundingClientRect() : null;
+    if (mb && mb.bottom > 0) safeTop = mb.bottom + 8;
+    else if (sys.statusBarHeight) safeTop = sys.statusBarHeight + 44;
+  } catch (e) {}
+  G.__safeTop = safeTop;
 
   // ---------- 事件桥：pointer* → wx.onTouch* ----------
   // canvas 与 window 各留一张 handler 表；touchend 同时喂 pointerup（canvas 的 tryDrop 与

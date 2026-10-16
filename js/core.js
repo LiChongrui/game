@@ -18,8 +18,9 @@
   var view = { s: 1 };
   // 游戏块 = 420×747 固定逻辑区（9:16；顶部 HUD 0~164 + 出生空隙带 26 + 容器 483 + 底部 74），
   // 长宽比恒定，所有设备一致；坠落高度 = 最大可投放滴底触警戒线时的球心（dangerY - 45）；
-  // 高屏多出的高度上下均分给背景延伸（oy 为块居中偏移，菜单态铺满时为 0）
-  var oy = 0;             // 游戏块垂直居中偏移（逻辑 px，≥0）
+  // 高屏多余高度全部向下延伸（海底/技能栏贴屏底）；oy 为块顶部偏移：
+  // Web 贴屏顶（0），微信端贴在胶囊区下方（HUD 不被胶囊遮挡）
+  var oy = 0;             // 游戏块顶部偏移（逻辑 px，≥0）
   var renderOy = 0;       // 渲染/点击实际使用的偏移：菜单态 0（铺满），其余态 oy
 
   function fit() {
@@ -29,7 +30,9 @@
     VH = h / view.s;
     LW = w / view.s;                       // 逻辑宽度（≥420）
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
-    oy = Math.max(0, (VH - C.H) / 2);      // 游戏块垂直居中：高屏多出的高度上下均分
+    // 块贴顶：HUD 首行（cy36/r16 → 顶缘 20）落在胶囊区下缘正下方；Web 无胶囊则 oy=0 贴屏顶
+    // （__safeTop 由 wx-shim 用 getMenuButtonBoundingClientRect 计算，单位=窗口 CSS px）
+    oy = Math.max(0, Math.min((window.__safeTop || 0) / view.s - 20, VH - C.H));
     // 游戏块内全部恒定（=config 初始值）：容器底/容器顶/警戒线/出生点不随设备变化，
     // 容器 420:483 恒定——不同设备游戏区大小比例完全一致；底部带 74 不变
     FLOORY = C.H - 74;                     // 673
@@ -43,8 +46,8 @@
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // 按钮全部落在游戏块内恒定位（块内坐标）：道具按钮在容器底~块底带内近似垂直居中
-    var cy = C.H - 46;
+    // 按钮贴屏底（块内坐标 = VH-oy-46，渲染时 +oy 恰好落在屏幕底上方 46）：图鉴/道具/重开
+    var cy = VH - oy - 46;
     // 注意：模块化后 bookBtn 等声明在 systems.js（后加载），早期触发时用 typeof 守卫
     if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {
       bookBtn.cy = cy; restartBtn.cy = cy;
