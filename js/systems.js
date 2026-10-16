@@ -1822,12 +1822,12 @@
     return { x: r.x + r.w - 196 + s * 98, y: r.y + 4, w: 92, h: 32 };
   }
   function tierCellRect(t) {
-    // 合成链分节：3 列 × 3 行（9 档）
-    return { x: DEX_PANEL.x + 14 + (t % 3) * 118, y: DEX_PANEL.y + 76 + Math.floor(t / 3) * 120, w: 108, h: 112 };
+    // 合成链分节：3 列 × 3 行（9 档），格高 122 填满说明区以上空间
+    return { x: DEX_PANEL.x + 14 + (t % 3) * 118, y: DEX_PANEL.y + 76 + Math.floor(t / 3) * 130, w: 108, h: 122 };
   }
   function stageRowRect(g) {
-    // 海域演进分节：8 行纵向列表（由浅入深）
-    return { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 76 + g * 44, w: DEX_PANEL.w - 28, h: 40 };
+    // 海域演进分节：8 行纵向列表（由浅入深），行距 48 填满说明区以上空间
+    return { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 80 + g * 48, w: DEX_PANEL.w - 28, h: 40 };
   }
   function dexSecRect(i) {
     // 分节切换：通栏分段控件（合成链 / 海域演进——特殊滴已并入海域行），样式与顶部页签区分

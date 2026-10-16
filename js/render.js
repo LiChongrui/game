@@ -1730,7 +1730,7 @@
           ctx.strokeStyle = '#2E86B4'; ctx.lineWidth = 1.5;
           roundRect(tRect.x + 0.5, tRect.y + 0.5, tRect.w - 1, tRect.h - 1, 10); ctx.stroke();
         }
-        var bx = tRect.x + tRect.w / 2, by = tRect.y + 40;
+        var bx = tRect.x + tRect.w / 2, by = tRect.y + 44;
         if (unlocked) {
           drawBall({ x: bx, y: by, r: 24, tier: t, vx: 0, vy: 0 }, 1);
         } else {
@@ -1742,10 +1742,10 @@
         }
         ctx.fillStyle = unlocked ? '#155A8A' : '#8AA5B8';
         ctx.font = 'bold 13px system-ui, sans-serif';
-        ctx.fillText(unlocked ? T[t].name : '？？？', bx, tRect.y + 84);
+        ctx.fillText(unlocked ? T[t].name : '？？？', bx, tRect.y + 88);
         ctx.font = '10px system-ui, sans-serif';
         ctx.fillStyle = '#4A7FA0';
-        ctx.fillText(unlocked ? ('分值 ' + T[t].score + ' · ×' + (dexCounts[t] || 0)) : '未解锁', bx, tRect.y + 102);
+        ctx.fillText(unlocked ? ('分值 ' + T[t].score + ' · ×' + (dexCounts[t] || 0)) : '未解锁', bx, tRect.y + 108);
       }
     } else if (dexSec === 1) {
 
@@ -1863,17 +1863,18 @@
       sub = known ? (isChestSel ? '深海随机事件' : '已发现') : '未发现';
       body = known ? dsc.desc : '在海域中发现它即可点亮说明。';
     }
+    // 说明区：贴面板底部（消除底部大片空白）
     ctx.fillStyle = 'rgba(46,134,180,0.10)';
-    roundRect(DEX_PANEL.x + 12, DEX_PANEL.y + 452, DEX_PANEL.w - 24, 70, 8); ctx.fill();
+    roundRect(DEX_PANEL.x + 12, DEX_PANEL.y + 478, DEX_PANEL.w - 24, 68, 8); ctx.fill();
     ctx.textAlign = 'left';
     ctx.fillStyle = known ? '#155A8A' : '#8AA5B8';
     ctx.font = 'bold 13px system-ui, sans-serif';
-    ctx.fillText(title, DEX_PANEL.x + 24, DEX_PANEL.y + 472);
+    ctx.fillText(title, DEX_PANEL.x + 24, DEX_PANEL.y + 498);
     ctx.font = '10px system-ui, sans-serif';
     ctx.fillStyle = known ? '#1E7A6F' : '#B0584A';
-    ctx.fillText(sub, DEX_PANEL.x + 24, DEX_PANEL.y + 490);
+    ctx.fillText(sub, DEX_PANEL.x + 24, DEX_PANEL.y + 516);
     ctx.fillStyle = '#4A7FA0';
-    ctx.fillText(body, DEX_PANEL.x + 24, DEX_PANEL.y + 510);
+    ctx.fillText(body, DEX_PANEL.x + 24, DEX_PANEL.y + 536);
     ctx.textAlign = 'center';
   }
 
