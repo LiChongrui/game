@@ -36,11 +36,12 @@ const path = require('path');
   await page.waitForTimeout(300);
   await shot('play');
 
-  // ③ 特殊水滴：铁滴 / 符文滴 / 漩涡滴 / 冰晶滴 落在堆上
-  await drop(2, 90, { iron: true });      await page.waitForTimeout(650);
-  await drop(1, 330, { rune: 'ripple' }); await page.waitForTimeout(650);
-  await drop(2, 150, { special: 'vortex' }); await page.waitForTimeout(650);
-  await drop(1, 290, { special: 'ice' }); await page.waitForTimeout(650);
+  // ③ 特殊水滴：铁滴 / 彩虹滴 / 云滴 / 磁力滴 / 冰晶滴（都留在场上带可见标记）
+  await drop(2, 90, { iron: true });        await page.waitForTimeout(650);
+  await drop(1, 200, { special: 'rainbow' }); await page.waitForTimeout(650);
+  await drop(1, 330, { special: 'cloud' }); await page.waitForTimeout(650);
+  await drop(2, 150, { special: 'magnet' }); await page.waitForTimeout(650);
+  await drop(1, 290, { special: 'ice' });   await page.waitForTimeout(650);
   await page.waitForTimeout(1800);
   await shot('special');
 
@@ -49,8 +50,8 @@ const path = require('path');
   await page.waitForTimeout(1500);
   await shot('skill');
 
-  // ⑤ 海域演进：珊瑚浅海主题色 + 进度条指向蔚蓝深海
-  await page.evaluate(() => { MG.debug.setLife(6500); });
+  // ⑤ 海域演进：珊瑚浅海主题色 + 进度条指向蔚蓝深海（先钉住潮汐不触发）
+  await page.evaluate(() => { const t = MG.probe().tideRef; t.phase = 'idle'; t.timer = 99; t.progress = 0; MG.debug.setLife(6500); });
   await page.waitForTimeout(2800); // 等海域渐变走完
   await shot('sea');
 
