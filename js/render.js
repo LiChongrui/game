@@ -1754,7 +1754,7 @@
     } else if (dexSec === 1) {
 
       // 海域演进纵向列表（由浅入深）：每行 = 徽章 + 海域名/状态 + 该海域 2 个特殊滴槽位
-      // 已抵达：发现的显实际形态，未发现的显"？"；下一海域：灰度形态+真名预告；更深海域："？？？"虚位占格（不隐藏结构）
+      // 已抵达：发现的显实际形态，未发现的显"？"；下一海域只显海域名+解锁积分；更深的特殊滴一律"？？？"不剧透
       ctx.textAlign = 'left';
       for (var stg = 0; stg < C.seaStages.length; stg++) {
         var ss = C.seaStages[stg];
@@ -1806,7 +1806,7 @@
             roundRect(slotR.x + 0.5, slotR.y + 0.5, slotR.w - 1, slotR.h - 1, 8); ctx.stroke();
           }
           var cx2 = slotR.x + 14, cy2 = rowCy;
-          if (hiddenStg) { // 更深海域：虚线空位 + "？？？"（结构可见，内容不剧透）
+          if (hiddenStg || isNext) { // 更深海域 + 下一海域：虚线空位 + "？？？"（特殊滴内容不剧透，海域名/解锁积分仍可见）
             ctx.save();
             ctx.setLineDash([3, 3]);
             ctx.strokeStyle = '#A8BCCB'; ctx.lineWidth = 1;
@@ -1820,13 +1820,9 @@
             ctx.restore();
             continue;
           }
-          ctx.save();
-          if (isNext) ctx.filter = 'grayscale(1) opacity(0.75)'; // 下一海域：灰色预告
-          if (found2 || isNext) {
+          if (found2) {
             drawSpForm(spIdx2, cx2, cy2);
-            ctx.filter = 'none';
           } else {
-            ctx.filter = 'none';
             ctx.fillStyle = 'rgba(120,145,165,0.22)';
             ctx.beginPath(); ctx.arc(cx2, cy2, 9, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#8AA5B8';
@@ -1835,10 +1831,9 @@
             ctx.fillText('?', cx2, cy2 + 3.5);
             ctx.textAlign = 'left';
           }
-          ctx.restore();
-          ctx.fillStyle = (found2 || isNext) ? (reached ? '#155A8A' : '#8AA5B8') : '#8AA5B8';
+          ctx.fillStyle = found2 ? '#155A8A' : '#8AA5B8';
           ctx.font = '8.5px system-ui, sans-serif';
-          ctx.fillText((found2 || isNext) ? (isChest2 ? '深海宝箱' : spDef2.name) : '？？？', slotR.x + 27, cy2 + 3);
+          ctx.fillText(found2 ? (isChest2 ? '深海宝箱' : spDef2.name) : '？？？', slotR.x + 27, cy2 + 3);
         }
       }
       ctx.textAlign = 'center';
