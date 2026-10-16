@@ -6,7 +6,8 @@
 // 全部 UI 画在 canvas 内（含按钮命中判定），便于后续原样移植到微信小游戏（无 DOM 环境）
   // ---------- 状态 ----------
   var phys = new MG.Physics();
-  var state = 'play';
+  var state = 'menu'; // 开机先停在开始界面（主流小游戏设计：标题 + 开始按钮）
+  var menuStartBtn = { x: C.W / 2 - 110, y: 396, w: 220, h: 60 }; // 「开始游戏」主按钮
   var score = 0, displayScore = 0, scoreBump = 0;
   var best = 0; // 刷新页面即重新计，不跨刷新保留
   var nextTier = rollTier();
@@ -1542,7 +1543,10 @@
       if (af) ngStartRun(af);
       return af ? af.name : null;
     },
-    over: function () { buildOverButtons(); gameOver(); } // 直达结算页（UI 测试用）
+    over: function () { buildOverButtons(); gameOver(); }, // 直达结算页（UI 测试用）
+    menuBtn: function () { return menuStartBtn; }, // 开始界面按钮几何（UI 测试用）
+    openDex: function () { dexOpen = true; achOpen = false; },
+    closeDex: function () { dexOpen = false; achOpen = false; }
   };
 
   // 第 1 关通过：弹出提示进入无尽模式，不清场、不重置，继续当前局面
@@ -1949,6 +1953,15 @@
       shareOpen = false;
       return;
     }
+    // 开始界面：只响应「开始游戏」
+    if (state === 'menu') {
+      if (inRect(p, menuStartBtn)) {
+        menuStartBtn.pressT = 0.2;
+        audio.blip(660, 0.12, 'sine', 0.1, 0.4);
+        restart();
+      }
+      return;
+    }
     if (dexOpen) {
       if (inRect(p, dexCloseBtn) || !inRect(p, DEX_PANEL)) { dexOpen = false; return; }
       // 分节切换
@@ -2054,6 +2067,7 @@
   function update(dt) {
     // 海域换色渐变计时：任何状态都推进（面板/结算打开时背景过渡不冻结）
     if (seaFade) { seaFade.t += dt; if (seaFade.t >= seaFade.dur) seaFade = null; }
+    if (state === 'menu') { time += dt; updateFx(dt); return; } // 开始界面：只跑视觉动画
     if (adOverlay) {
       adOverlay.t -= dt;
       if (adOverlay.t <= 0) { var cb = adOverlay.cb; adOverlay = null; if (cb) cb(); }
