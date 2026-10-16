@@ -430,6 +430,7 @@
     return 1.15 - 0.15 * (0.6 - t) / 0.6;
   }
 
+  // 礁石压顶不做压扁/形变：物理层已让礁石与普通滴严格分离（零容差全量修正），保持各自圆形
   function drawBall(b, alpha) {
     if (b.iron) { if (b.chest) drawChest(b, alpha); else drawIronBall(b, alpha); return; }
     var t = T[b.tier];
@@ -1729,11 +1730,11 @@
     ctx.fillStyle = '#2C5A78';
     ctx.fillText(label, cx, sy + 15);
     if (!maxed) {
-      // 右端终点标记：下一海域徽章图标（未抵达灰化态，与左端当前位置彩色徽章呼应）
-      drawSeaBadge(cur + 1, sx + sw - 16, sy + sh / 2, false);
+      // 右端终点标记骑在条右端点上（不透明底遮挡条端），与左端当前位置徽章呼应
+      drawSeaBadge(cur + 1, sx + sw, sy + sh / 2, false, true);
     }
-    // 左端骑线放当前海域徽章——直观标注"当前位置"（与图鉴徽章语言一致）
-    drawSeaBadge(cur, sx + 16, sy + sh / 2, true);
+    // 左端徽章骑在条左端点上——直观标注"当前位置"，并遮住条端
+    drawSeaBadge(cur, sx, sy + sh / 2, true);
   }
 
   // ---------- 技能栏 ----------

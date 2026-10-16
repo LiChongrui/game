@@ -357,15 +357,18 @@ MG.config = {
           if (dist < 0.0001) { nx = 0; ny = -1; dist = 0.0001; }
           else { nx = dx / dist; ny = dy / dist; }
 
-          var overlap = minD - dist - C.slop;
+          // 礁石（iron）参与的接触：零容差 + 全量位置修正——礁石与普通滴严格分离，
+          // 既不重叠（视觉穿模）也不压扁水滴（水滴-水滴仍保留 slop 让堆叠柔软自然）
+          var ironPair = !!(a.iron || o.iron);
+          var overlap = minD - dist - (ironPair ? 0 : C.slop);
           if (overlap <= 0) continue;
 
           // 质量 ∝ 面积（b.m 为自定义质量，铁块等障碍用）
           var ma = a.m || a.r * a.r, mo = o.m || o.r * o.r;
           var invA = 1 / ma, invO = 1 / mo, invSum = invA + invO;
 
-          // 位置修正（按反质量分配）
-          var corr = overlap / invSum * 0.8;
+          // 位置修正（按反质量分配）；礁石对全量修正，杜绝残余重叠
+          var corr = overlap / invSum * (ironPair ? 1.0 : 0.8);
           a.x -= nx * corr * invA; a.y -= ny * corr * invA;
           o.x += nx * corr * invO; o.y += ny * corr * invO;
 
@@ -3514,7 +3517,7 @@ MG.config = {
     { c: '#B85C3A', g: 'vent' },    // 热泉裂谷：热泉火苗（暗锈橙=热泉褐岩色）
     { c: '#8A5FB4', g: 'crown' }    // 深渊王座：王冠
   ];
-  function drawSeaBadge(stg, x, y, reached) {
+  function drawSeaBadge(stg, x, y, reached, opaque) {
     var ic = SEA_BADGES[stg] || SEA_BADGES[0];
     ctx.save();
     ctx.translate(x, y);
@@ -3523,7 +3526,8 @@ MG.config = {
       ctx.fillStyle = ic.c; ctx.fill();
       ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1; ctx.stroke();
     } else {
-      ctx.fillStyle = 'rgba(120,145,165,0.16)'; ctx.fill();
+      // opaque：不透明浅底（用于骑在进度条端点上遮挡条身，否则半透明底会透出进度条）
+      ctx.fillStyle = opaque ? '#EFF5FA' : 'rgba(120,145,165,0.16)'; ctx.fill();
       ctx.strokeStyle = '#8AA5B8'; ctx.lineWidth = 1; ctx.stroke();
     }
     var fg = reached ? '#FFFFFF' : '#8AA5B8';
@@ -4272,6 +4276,7 @@ MG.config = {
     return 1.15 - 0.15 * (0.6 - t) / 0.6;
   }
 
+  // 礁石压顶不做压扁/形变：物理层已让礁石与普通滴严格分离（零容差全量修正），保持各自圆形
   function drawBall(b, alpha) {
     if (b.iron) { if (b.chest) drawChest(b, alpha); else drawIronBall(b, alpha); return; }
     var t = T[b.tier];
@@ -5571,11 +5576,11 @@ MG.config = {
     ctx.fillStyle = '#2C5A78';
     ctx.fillText(label, cx, sy + 15);
     if (!maxed) {
-      // 右端终点标记：下一海域徽章图标（未抵达灰化态，与左端当前位置彩色徽章呼应）
-      drawSeaBadge(cur + 1, sx + sw - 16, sy + sh / 2, false);
+      // 右端终点标记骑在条右端点上（不透明底遮挡条端），与左端当前位置徽章呼应
+      drawSeaBadge(cur + 1, sx + sw, sy + sh / 2, false, true);
     }
-    // 左端骑线放当前海域徽章——直观标注"当前位置"（与图鉴徽章语言一致）
-    drawSeaBadge(cur, sx + 16, sy + sh / 2, true);
+    // 左端徽章骑在条左端点上——直观标注"当前位置"，并遮住条端
+    drawSeaBadge(cur, sx, sy + sh / 2, true);
   }
 
   // ---------- 技能栏 ----------

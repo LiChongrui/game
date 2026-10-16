@@ -422,7 +422,7 @@
     { c: '#B85C3A', g: 'vent' },    // 热泉裂谷：热泉火苗（暗锈橙=热泉褐岩色）
     { c: '#8A5FB4', g: 'crown' }    // 深渊王座：王冠
   ];
-  function drawSeaBadge(stg, x, y, reached) {
+  function drawSeaBadge(stg, x, y, reached, opaque) {
     var ic = SEA_BADGES[stg] || SEA_BADGES[0];
     ctx.save();
     ctx.translate(x, y);
@@ -431,7 +431,8 @@
       ctx.fillStyle = ic.c; ctx.fill();
       ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1; ctx.stroke();
     } else {
-      ctx.fillStyle = 'rgba(120,145,165,0.16)'; ctx.fill();
+      // opaque：不透明浅底（用于骑在进度条端点上遮挡条身，否则半透明底会透出进度条）
+      ctx.fillStyle = opaque ? '#EFF5FA' : 'rgba(120,145,165,0.16)'; ctx.fill();
       ctx.strokeStyle = '#8AA5B8'; ctx.lineWidth = 1; ctx.stroke();
     }
     var fg = reached ? '#FFFFFF' : '#8AA5B8';
