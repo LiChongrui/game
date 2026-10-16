@@ -1527,13 +1527,14 @@
     // 与左侧统计行同排、与静音按钮(cy36)垂直居中对齐
     ctx.textAlign = 'center';
     ctx.lineJoin = 'round';
-    ctx.font = 'bold 12px system-ui, sans-serif';
-    ctx.lineWidth = 2.5;
+    // 样式与左侧「统计最佳结果」完全一致（同字号/同描边/同色），同排同 baseline 对称
+    ctx.font = '14px system-ui, sans-serif';
+    ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     var em = Math.floor(levelElapsed / 60), es = Math.floor(levelElapsed % 60);
     var etxt = '已进行 ' + em + ':' + (es < 10 ? '0' + es : es);
     ctx.strokeText(etxt, C.W - 78, 41);
-    ctx.fillStyle = '#2E7DA8';
+    ctx.fillStyle = '#3E6E90';
     ctx.fillText(etxt, C.W - 78, 41);
 
     // 静音按钮（右上角，小号）
