@@ -1110,7 +1110,8 @@
       var a0 = arm * Math.PI * 2 / 3;
       var endA = a0 + Math.PI * 1.9;
       (function (a0, endA, arm) {
-        var gx0 = Math.cos(a0) * r * 0.14, gy0 = Math.sin(a0) * r * 0.14;
+        // 渐变与臂均从核心内部（0.05r）起：中心与旋臂连成一体，不再分离
+        var gx0 = Math.cos(a0) * r * 0.05, gy0 = Math.sin(a0) * r * 0.05;
         var gx1 = Math.cos(endA) * r * 0.66, gy1 = Math.sin(endA) * r * 0.66;
         ctx.strokeStyle = grad('vtxArm' + arm, function () {
           var gg = ctx.createLinearGradient(gx0, gy0, gx1, gy1);
@@ -1124,15 +1125,15 @@
       for (var i2 = 0; i2 <= 40; i2++) {
         var tt = i2 / 40;
         var aa = a0 + tt * Math.PI * 1.9;
-        var rr2 = r * (0.14 + 0.52 * tt);
+        var rr2 = r * (0.05 + 0.61 * tt);              // 从核心内部起旋，臂与中心相接
         var x2 = Math.cos(aa) * rr2, y2 = Math.sin(aa) * rr2;
         if (i2 === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
       }
       ctx.stroke();
     }
-    // 中心亮核（被吸入的光）
+    // 中心亮核（被吸入的光）——核略放大并被旋臂根部穿过，与臂连成一体
     ctx.fillStyle = 'rgba(222,228,255,0.92)';
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.09, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.11, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
   function drawCloudMark(r) {
@@ -1704,7 +1705,7 @@
     var cur = seaStage(), ts = totalScore();
     var last = C.seaStages.length - 1;
     var maxed = cur >= last;
-    var sx = 12, sy = 100, sw = C.W - 24, sh = 20;
+    var sx = 24, sy = 100, sw = C.W - 48, sh = 20; // 两侧各留 24：端点徽章(r10)不顶屏幕边界
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     roundRect(sx, sy, sw, sh, 8); ctx.fill();
     var frac = 1;

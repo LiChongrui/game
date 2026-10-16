@@ -1879,7 +1879,8 @@
         var a0 = k * Math.PI * 2 / 3;
         var endA = a0 + Math.PI * 1.9;
         (function (a0, endA, k) {
-          var gx0 = Math.cos(a0) * 16, gy0 = Math.sin(a0) * 16;
+          // 渐变与臂均从核心内部（4px）起：中心与旋臂连成一体，不再分离
+          var gx0 = Math.cos(a0) * 4, gy0 = Math.sin(a0) * 4;
           var gx1 = Math.cos(endA) * 104, gy1 = Math.sin(endA) * 104;
           ctx.strokeStyle = grad('stormArm' + k, function () {
             var gg = ctx.createLinearGradient(gx0, gy0, gx1, gy1);
@@ -1893,15 +1894,15 @@
         for (var i2 = 0; i2 <= 40; i2++) {
           var tt = i2 / 40;
           var aa = a0 + tt * Math.PI * 1.9;
-          var rr = 16 + 88 * tt;
+          var rr = 4 + 100 * tt;                       // 从核心内部起旋，臂与中心相接
           var x2 = Math.cos(aa) * rr, y2 = Math.sin(aa) * rr;
           if (i2 === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
         }
         ctx.stroke();
       }
-      // 中心亮核（被吸入的光，轻微呼吸）
+      // 中心亮核（被吸入的光，轻微呼吸）——核略放大并被旋臂根部穿过，与臂连成一体
       ctx.fillStyle = 'rgba(222,228,255,' + (0.55 + 0.2 * Math.sin(time * 4)).toFixed(2) + ')';
-      ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     } else if (seaEvent.type === 'surge') {
       var g = grad('surge' + Math.round(FLOORY), function () {
