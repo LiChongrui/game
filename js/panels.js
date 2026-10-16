@@ -92,12 +92,48 @@
     }
     ctx.textBaseline = 'alphabetic';
   }
+  // 图鉴页头收集度徽条：进度条 + 四个里程碑刻度（25/50/75/100%），已达成的点亮金色圆点
+  // 纯展示无交互；数据来自 systems 的 colProgress/COL_MILESTONES（运行期全局解析）
+  function drawColBadge() {
+    var cp = colProgress();
+    var pct = cp.n / cp.total;
+    var full = pct >= 1;
+    var bx = DEX_PANEL.x + 112, bw = 162, by = DEX_PANEL.y + 19, bh = 8;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#4A7FA0';
+    ctx.font = '12px system-ui, sans-serif';
+    ctx.fillText('收集度', DEX_PANEL.x + 66, DEX_PANEL.y + 28);
+    ctx.fillStyle = 'rgba(21,90,138,0.12)';
+    roundRect(bx, by, bw, bh, bh / 2); ctx.fill();
+    if (pct > 0) {
+      ctx.fillStyle = full ? '#D9A93F' : '#2E86B4';
+      roundRect(bx, by, Math.max(bh, bw * pct), bh, bh / 2); ctx.fill();
+    }
+    for (var i = 0; i < COL_MILESTONES.length; i++) {
+      var m = COL_MILESTONES[i];
+      var mx = bx + bw * m.pct;
+      if (colClaimed[m.id]) {
+        ctx.fillStyle = '#F5C542';
+        ctx.beginPath(); ctx.arc(mx, by + bh / 2, 3.2, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1; ctx.stroke();
+      } else {
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.fillRect(mx - 1, by + 1.5, 2, bh - 3);
+      }
+    }
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#155A8A';
+    ctx.font = 'bold 13px system-ui, sans-serif';
+    ctx.fillText(cp.n + '/' + cp.total, DEX_PANEL.x + DEX_PANEL.w - 56, DEX_PANEL.y + 29);
+    ctx.textAlign = 'center';
+  }
 
   function drawDex() {
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
     ctx.fillRect(-BX, 0, C.W + BX * 2, VH);
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
     drawPanelHeader('图鉴');
+    drawColBadge();
 
     // —— 分节切换：通栏分段控件（特殊滴槽位已并入海域演进，不再单列）——
     var secNames = ['合成链', '海域演进'];

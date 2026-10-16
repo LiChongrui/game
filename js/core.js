@@ -56,10 +56,10 @@
   function saveFlag(key, v) { MG.platform.set(key, v ? '1' : '0'); }
   function loadDex() {
     var v = MG.platform.getJSON('mg_dex', {}) || {};
-    return { u: v.u || {}, c: v.c || {}, sp: v.sp || {}, stats: v.stats || {}, ach: v.ach || {} };
+    return { u: v.u || {}, c: v.c || {}, sp: v.sp || {}, stats: v.stats || {}, ach: v.ach || {}, col: v.col || {} };
   }
   function saveDex() {
-    MG.platform.setJSON('mg_dex', { u: dexUnlocked, c: dexCounts, sp: dexSpecial, stats: lifeStats, ach: achDone });
+    MG.platform.setJSON('mg_dex', { u: dexUnlocked, c: dexCounts, sp: dexSpecial, stats: lifeStats, ach: achDone, col: colClaimed });
   }
 
   // ---------- 存档版本（迁移机制） ----------

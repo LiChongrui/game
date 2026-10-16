@@ -58,6 +58,7 @@
     return d;
   })();
   var achDone = dexLoaded.ach;     // 已达成成就 { id: 1 }
+  var colClaimed = dexLoaded.col;  // 图鉴收集里程碑领取记录 { m25:1, m50:1, ... }
   function bumpStat(k, n) {
     lifeStats[k] = (lifeStats[k] || 0) + (n || 1);
     saveDex();
@@ -596,6 +597,7 @@
         '图鉴解锁 · ' + T[t].name + ' +' + bonus, true, 0);
     }
     saveDex();
+    checkCollection();
   }
   // 累计得分跨过门槛时补解锁（如先合出了高级、后攒够积分）
   function checkDexGates() {
@@ -682,6 +684,57 @@
     saveDex();
     var i = spIndexByKey(sp);
     addPopup(C.W / 2, 240, '图鉴新发现 · ' + (i >= 0 ? SP_DEFS[i].name : '宝箱'), true, 0);
+    checkCollection();
+  }
+
+  // ---------- 图鉴收集度（长线收集闭环：水滴 9 档 + 特殊形态 15 种 + 宝箱 = 25 格） ----------
+  // 达成率跨过里程碑即自动发放奖励（对齐成就奖励体系：积分 + 技能充能 + 宝箱贺礼）；
+  // 领取记录持久化（mg_dex.col），老存档的既有收集会在下一局开始后 1 秒内自动补发
+  var COL_MILESTONES = [
+    { id: 'm25',  pct: 0.25, score: 500,  charge: 1, name: '收集 25%' },
+    { id: 'm50',  pct: 0.5,  score: 1200, charge: 2, name: '收集 50%', chest: true },
+    { id: 'm75',  pct: 0.75, score: 2500, charge: 3, name: '收集 75%', chest: true },
+    { id: 'm100', pct: 1,    score: 6000, charge: 0, name: '集齐图鉴', allCharge: 2 }
+  ];
+  function colProgress() {
+    var n = 0, t, k;
+    for (t = 0; t < T.length; t++) if (dexUnlocked[t]) n++;
+    for (k in dexSpecial) if (dexSpecial[k]) n++;
+    return { n: n, total: T.length + SP_DEFS.length + 1 };
+  }
+  function checkCollection() {
+    var cp = colProgress(), i;
+    for (i = 0; i < COL_MILESTONES.length; i++) {
+      var m = COL_MILESTONES[i];
+      if (colClaimed[m.id]) continue;
+      if (cp.n / cp.total < m.pct) continue;
+      colClaimed[m.id] = 1;
+      var gain = Math.round(m.score * cm(scoreMult));
+      score += gain;
+      scoreBump = 0.4;
+      if (score > best) { best = score; saveNum('mg_best', best); }
+      var sub = null, s;
+      if (m.charge) {
+        var keys = [];
+        for (s = 0; s < C.skills.length; s++) if (skillUnlocked(C.skills[s].key)) keys.push(C.skills[s]);
+        if (keys.length) {
+          var pick = keys[(Math.random() * keys.length) | 0];
+          skillCharge[pick.key] += m.charge;
+          sub = '「' + pick.name + '」充能 +' + m.charge;
+        }
+      }
+      if (m.allCharge) {
+        for (s = 0; s < C.skills.length; s++) skillCharge[C.skills[s].key] += m.allCharge;
+        sub = '全技能充能 +' + m.allCharge;
+      }
+      addPopup(C.W / 2, 240, '图鉴收集达成 · ' + m.name + ' +' + gain, true, 0);
+      if (sub) addPopup(C.W / 2, 266, sub, false, 0);
+      if (m.id === 'm100') addPopup(C.W / 2, 292, '成就称号 · 深海博物学家', false, 0);
+      if (m.chest && !chest && state === 'play') chestTimer = Math.min(chestTimer, 4); // 稍后沉一只宝箱贺礼
+      parts.push({ type: 'ring', x: C.W / 2, y: 150, r: 26, life: 0.6, max: 0.6, color: '#F5C542' });
+      audio.quest();
+      saveDex();
+    }
   }
 
   // ---------- 任务链 ----------
@@ -1521,7 +1574,8 @@
       bodies: bs, ui: ui, stats: lifeStats, ach: achDone, dexSp: dexSpecial,
       modes: { evap: evapMode, ripple: rippleMode, flow: flowMode },
       stage: seaStage(), daily: { done: daily.done.slice(), streak: daily.streak }, best: best,
-      jellies: jellies.map(function (j) { return { x: Math.round(j.x), y: Math.round(j.y), s: Math.round(j.s) }; })
+      jellies: jellies.map(function (j) { return { x: Math.round(j.x), y: Math.round(j.y), s: Math.round(j.s) }; }),
+      col: colProgress, chestTimer: Math.round(chestTimer * 10) / 10
     };
   };
   // 测试钩子（仅自动化测试用）：充能 / 成就 / 局面构造 / 加压进度
@@ -2131,7 +2185,7 @@
       audio.big();
     }
     achTick -= dt;
-    if (achTick <= 0) { achTick = 1; checkAchievements(); }
+    if (achTick <= 0) { achTick = 1; checkAchievements(); checkCollection(); }
 
     updateTide(dt);
     phys.step(dt);
