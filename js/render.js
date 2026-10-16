@@ -1601,6 +1601,28 @@
   }
 
   // ---------- 顶部中央计时：本局已进行时长 ----------
+  // 成就殿堂入口按钮（🏆 奖杯，每日未全勤显红点）——游玩态技能栏与菜单态共用
+  function drawTrophyBtn() {
+    drawCircleBtn(trophyBtn, '#B8912F', 0.9, false, 0);
+    var tx = trophyBtn.cx, ty = trophyBtn.cy;
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(tx - 6, ty - 8); ctx.lineTo(tx + 6, ty - 8); ctx.lineTo(tx + 5, ty - 1);
+    ctx.quadraticCurveTo(tx, ty + 4, tx - 5, ty - 1);
+    ctx.closePath(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(tx - 6, ty - 6); ctx.quadraticCurveTo(tx - 10, ty - 6, tx - 8, ty - 1);
+    ctx.moveTo(tx + 6, ty - 6); ctx.quadraticCurveTo(tx + 10, ty - 6, tx + 8, ty - 1);
+    ctx.moveTo(tx, ty + 3); ctx.lineTo(tx, ty + 6);
+    ctx.moveTo(tx - 4, ty + 7); ctx.lineTo(tx + 4, ty + 7);
+    ctx.stroke();
+    ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+    if (!(daily.done[0] && daily.done[1] && daily.done[2])) {
+      ctx.fillStyle = '#E2705E';
+      ctx.beginPath(); ctx.arc(tx + trophyBtn.r - 3, ty - trophyBtn.r + 3, 3.2, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
   function drawLevelHud() {
     var em = Math.floor(levelElapsed / 60), es = Math.floor(levelElapsed % 60);
     ctx.save();
@@ -1613,6 +1635,14 @@
     ctx.strokeText(etxt, C.W / 2, 20);
     ctx.fillStyle = '#2E7DA8';
     ctx.fillText(etxt, C.W / 2, 20);
+    // 每日挑战局：计时下方目标进度（systems 的 dchalHud，挑战局外返回 null）
+    var chal = dchalHud();
+    if (chal) {
+      var ctxt = '每日挑战 ' + Math.min(score, chal.goal) + '/' + chal.goal + (chal.done ? ' ✓' : '');
+      ctx.strokeText(ctxt, C.W / 2, 40);
+      ctx.fillStyle = chal.done ? '#C9920E' : '#7B6FD0';
+      ctx.fillText(ctxt, C.W / 2, 40);
+    }
     ctx.restore();
   }
 
@@ -1770,24 +1800,7 @@
     ctx.beginPath(); ctx.moveTo(bx, by - 6); ctx.lineTo(bx, by + 6); ctx.stroke();
 
     // 成就页入口（🏆 奖杯，图鉴旁；每日未全勤显红点）
-    drawCircleBtn(trophyBtn, '#B8912F', 0.9, false, 0);
-    var tx = trophyBtn.cx, ty = trophyBtn.cy;
-    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(tx - 6, ty - 8); ctx.lineTo(tx + 6, ty - 8); ctx.lineTo(tx + 5, ty - 1);
-    ctx.quadraticCurveTo(tx, ty + 4, tx - 5, ty - 1);
-    ctx.closePath(); ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(tx - 6, ty - 6); ctx.quadraticCurveTo(tx - 10, ty - 6, tx - 8, ty - 1);
-    ctx.moveTo(tx + 6, ty - 6); ctx.quadraticCurveTo(tx + 10, ty - 6, tx + 8, ty - 1);
-    ctx.moveTo(tx, ty + 3); ctx.lineTo(tx, ty + 6);
-    ctx.moveTo(tx - 4, ty + 7); ctx.lineTo(tx + 4, ty + 7);
-    ctx.stroke();
-    ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
-    if (!(daily.done[0] && daily.done[1] && daily.done[2])) {
-      ctx.fillStyle = '#E2705E';
-      ctx.beginPath(); ctx.arc(tx + trophyBtn.r - 3, ty - trophyBtn.r + 3, 3.2, 0, Math.PI * 2); ctx.fill();
-    }
+    drawTrophyBtn();
 
     // 重开按钮（↻ 循环箭头，点击弹确认）
     drawCircleBtn(restartBtn, '#5E90B4', 0.85, false, 0);
@@ -2181,7 +2194,12 @@
     ctx.save();
     ctx.translate(BX, 0);
 
-    if (state === 'menu') { drawMenu(); ctx.restore(); return; } // 开始界面：背景之上只画菜单
+    if (state === 'menu') {
+      drawMenu();
+      drawTrophyBtn();             // 成就殿堂/每日挑战入口（菜单态可点，systems 菜单分支处理）
+      if (achOpen) drawAchPanel(); // 面板盖在菜单之上（点击已放行到 achOpen 分支）
+      ctx.restore(); return;
+    } // 开始界面：背景之上画菜单 + 奖杯入口 + 成就殿堂面板
 
     drawContainer();
     drawDangerLine();

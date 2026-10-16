@@ -33,6 +33,10 @@
     var segW = Math.floor((DEX_PANEL.w - 30) / 2);
     return { x: DEX_PANEL.x + 15 + i * segW, y: DEX_PANEL.y + 40, w: segW, h: 28 };
   }
+  function dchalBtnRect() {
+    // 每日页签挑战卡右侧「开始挑战」按钮（systems 点击判定与绘制共用）
+    return { x: DEX_PANEL.x + DEX_PANEL.w - 118, y: DEX_PANEL.y + 74 + 26, w: 96, h: 34 };
+  }
 
   // ---------- 面板绘制 ----------
   // 通用页头：左侧标题 + 右上 × 关闭（图鉴/成就共用；标题为空则不画，避免与页签重名）
@@ -532,10 +536,43 @@
   }
 
   // 每日页签：3 个按日期生成的任务（独立说明行已删，卡片上移放大）
+  // 每日挑战卡（每日页签顶部）：今日海况词缀 + 目标分 + 开始按钮（热区 dchalBtnRect，systems 处理点击）
+  function drawDchalCard() {
+    var ci = dchalInfo();
+    var cx = DEX_PANEL.x + 14, cy = DEX_PANEL.y + 74, cw = DEX_PANEL.w - 28, chh = 96;
+    ctx.fillStyle = ci.done ? 'rgba(245,197,66,0.14)' : 'rgba(123,111,208,0.10)';
+    roundRect(cx, cy, cw, chh, 10); ctx.fill();
+    if (ci.done) { ctx.fillStyle = '#F5C542'; roundRect(cx, cy + 10, 3, chh - 20, 1.5); ctx.fill(); }
+    ctx.textAlign = 'left';
+    ctx.fillStyle = ci.done ? '#B8860B' : '#6A5AB8';
+    ctx.font = 'bold 16px system-ui, sans-serif';
+    ctx.fillText((ci.done ? '✓ ' : '') + '今日挑战 · ' + ci.name, cx + 12, cy + 24);
+    ctx.fillStyle = '#4A7FA0';
+    ctx.font = '13px system-ui, sans-serif';
+    ctx.fillText(ci.desc, cx + 12, cy + 46);
+    ctx.fillText('目标 ' + ci.goal + ' 分 · 连续 ' + ci.streak + ' 天', cx + 12, cy + 68);
+    ctx.fillText('首通奖励最高 +' + C.dailyChal.rewardMax + ' 分 & 随机充能 +2', cx + 12, cy + 88);
+    var br = dchalBtnRect();
+    var bg = ctx.createLinearGradient(0, br.y, 0, br.y + br.h);
+    if (!ci.canStart) { bg.addColorStop(0, '#B9C9D4'); bg.addColorStop(1, '#9DB2C0'); }
+    else if (ci.done) { bg.addColorStop(0, '#F5C542'); bg.addColorStop(1, '#D9A93F'); }
+    else { bg.addColorStop(0, '#8B7FD0'); bg.addColorStop(1, '#6A5AB8'); }
+    ctx.fillStyle = bg;
+    roundRect(br.x, br.y, br.w, br.h, br.h / 2); ctx.fill();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 14px system-ui, sans-serif';
+    ctx.fillText(ci.done ? '再玩一局' : '开始挑战', br.x + br.w / 2, br.y + 22);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#8AA5B8';
+    ctx.font = '12px system-ui, sans-serif';
+    if (!ci.canStart) ctx.fillText('对局中不可发起', br.x - 6, br.y + 52);
+  }
   function drawDailyTab() {
+    drawDchalCard();
     for (var i = 0; i < daily.tasks.length; i++) {
       var t = daily.tasks[i], done = daily.done[i];
-      var ry = DEX_PANEL.y + 92 + i * 106;
+      var ry = DEX_PANEL.y + 184 + i * 106;
       ctx.fillStyle = done ? 'rgba(245,197,66,0.14)' : 'rgba(46,134,180,0.07)';
       roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 84, 10); ctx.fill();
       // 达成金饰条

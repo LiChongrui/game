@@ -114,18 +114,21 @@
   var ngOpen = false, ngPicks = [];   // 词缀三选一弹窗
   var ngPickRects = [];               // 三张词缀卡的命中区（draw 时填充）
   var GRAV0 = C.gravity;              // 基准重力（词缀局按倍率改写，重开恢复）
-  function ngStartRun(affix) {
+  function ngStartRun(affix, fromDaily) {
     ng.active = affix;
+    ng.fromDaily = !!fromDaily;
     C.gravity = GRAV0 * (affix.grav || 1);
     restart();
     ng.active = affix;                 // restart 会清 active，重设
+    ng.fromDaily = !!fromDaily;
     C.gravity = GRAV0 * (affix.grav || 1);
-    addPopup(C.W / 2, 300, '深渊潜航 ·「' + affix.name + '」×' + affix.mult, true, 0);
+    addPopup(C.W / 2, 300, (fromDaily ? '每日挑战 ·「' : '深渊潜航 ·「') + affix.name + '」' + (fromDaily ? '' : '×' + affix.mult), true, 0);
     ngOpen = false;
   }
   function ngEndRun() {
     if (!ng.active) return;
     ng.active = null;
+    ng.fromDaily = false;
     C.gravity = GRAV0;
   }
   // 词缀三选一：从词缀池随机抽 3 张
@@ -242,6 +245,69 @@
       audio.quest();
     }
     saveDaily();
+  }
+
+  // ---------- 每日挑战（每天一局全服同规则的词缀挑战局：达到目标分即完成） ----------
+  // 复用「深渊潜航」词缀管线（重力/潮汐/暗礁/冰冻/倍率全部已实现），另配两条更凶的每日专属词缀；
+  // 完成状态持久化（mg_dchal），连续完成天数递增奖励；进行中的挑战局不持久化（刷新即丢，可重试）
+  var DCHAL_AFFIXES = [
+    { id: 'heavy',   name: '重压之海', desc: '重力 +25%',              grav: 1.25, mult: 1.5 },
+    { id: 'storm',   name: '疾风骤雨', desc: '潮汐间隔 -40%',          tideInt: 0.6, mult: 1.6 },
+    { id: 'reef',    name: '暗礁密布', desc: '礁石概率 ×2',            ironX: 2, mult: 1.5 },
+    { id: 'frost',   name: '冰封之海', desc: '水滴 15% 落水即冻',      ice: 0.15, mult: 1.4 },
+    { id: 'abyss',   name: '深渊试炼', desc: '重力 +25% 且潮汐 -40%',  grav: 1.25, tideInt: 0.6, mult: 1.9 },
+    { id: 'icereef', name: '冰礁之海', desc: '暗礁 ×2 且 15% 落水即冻', ironX: 2, ice: 0.15, mult: 1.9 }
+  ];
+  var dchal = (function () {
+    var d = MG.platform.getJSON('mg_dchal', null) || {};
+    if (d.date !== todayStr()) d = { date: todayStr(), done: false, streak: d.streak || 0, lastDate: d.lastDate || null };
+    return d;
+  })();
+  function saveChal() { MG.platform.setJSON('mg_dchal', dchal); }
+  var dchalRun = null; // 本局挑战参数 { goal }（仅运行期）
+  function dchalRoll() {
+    var rnd = mulberry(dateSeed('chal-' + todayStr()));
+    var affix = DCHAL_AFFIXES[Math.floor(rnd() * DCHAL_AFFIXES.length)];
+    var goal = Math.max(C.dailyChal.goalMin, Math.ceil((lifeStats.best || 3000) * C.dailyChal.goalBestRatio / 100) * 100);
+    return { affix: affix, goal: goal };
+  }
+  function dchalStart() {
+    if (state !== 'menu' && state !== 'over') return; // 对局中不可发起（防误触清空当前局面）
+    var roll = dchalRoll();
+    dchalRun = { goal: roll.goal };
+    ngStartRun(roll.affix, true);
+    achOpen = false;
+  }
+  // 面板/HUD 读取的挑战态（panels/render 经全局解析调用）
+  function dchalInfo() {
+    var roll = dchalRoll();
+    return {
+      name: roll.affix.name, desc: roll.affix.desc, goal: roll.goal,
+      done: dchal.done, streak: dchal.streak || 0,
+      canStart: state === 'menu' || state === 'over',
+      running: !!(ng.active && ng.fromDaily && dchalRun)
+    };
+  }
+  function dchalHud() { return (ng.active && ng.fromDaily && dchalRun) ? { goal: dchalRun.goal, done: dchal.done } : null; }
+  function checkDailyChallenge() {
+    if (!ng.active || !ng.fromDaily || !dchalRun) return;
+    if (dchal.date !== todayStr()) { dchal.date = todayStr(); dchal.done = false; saveChal(); } // 跨天兜底（长时间挂机）
+    if (dchal.done) return; // 今日已完成：可继续玩但不重复发奖
+    if (score < dchalRun.goal) return;
+    dchal.done = true;
+    dchal.streak = (dchal.lastDate === yesterdayStr()) ? (dchal.streak || 0) + 1 : 1;
+    dchal.lastDate = todayStr();
+    var gain = Math.round(Math.min(C.dailyChal.rewardMax, C.dailyChal.rewardBase + (dchal.streak - 1) * C.dailyChal.rewardStep) * cm(scoreMult));
+    score += gain;
+    scoreBump = 0.5;
+    if (score > best) { best = score; saveNum('mg_best', best); }
+    var pk = C.skills[(Math.random() * C.skills.length) | 0];
+    skillCharge[pk.key] += C.dailyChal.charge;
+    addPopup(C.W / 2, 205, '每日挑战达成！+' + gain, true, 0);
+    addPopup(C.W / 2, 232, '连续 ' + dchal.streak + ' 天 ·「' + pk.name + '」充能 +' + C.dailyChal.charge, false, 0);
+    parts.push({ type: 'ring', x: C.W / 2, y: 205, r: 30, life: 0.7, max: 0.7, color: '#F5C542' });
+    audio.quest();
+    saveChal();
   }
 
   // ---------- 好友榜（本地模拟榜：预留微信 wx 接口位，上线后替换数据源） ----------
@@ -1627,6 +1693,7 @@
     menuBtn: function () { return menuStartBtn; }, // 开始界面按钮几何（UI 测试用）
     openDex: function () { dexOpen = true; achOpen = false; },
     forceEvent: function (type) { startSeaEvent(type); }, // 直接触发深海事件（UI 测试用：surge/bless/storm）
+    addScore: function (n) { score += n; }, // 测试用直接加分（每日挑战达标验证等）
     dexSecTab: function (i) { return dexSecRect(i); }, // 图鉴分节控件几何（UI 测试用）
     closeDex: function () { dexOpen = false; achOpen = false; }
   };
@@ -2023,8 +2090,10 @@
       shareOpen = false;
       return;
     }
-    // 开始界面：只响应「开始游戏」
-    if (state === 'menu') {
+    // 开始界面：响应「开始游戏」与奖杯（每日挑战从菜单发起，成就殿堂随时可看）；
+    // 面板打开时放行到下方 dexOpen/achOpen 分支，否则面板内点击会被这里提前吞掉
+    if (state === 'menu' && !achOpen && !dexOpen) {
+      if (inCircle(p, trophyBtn)) { trophyBtn.pressT = 0.16; achOpen = true; dexOpen = false; dexTab = 1; return; }
       if (inRect(p, menuStartBtn)) {
         menuStartBtn.pressT = 0.2;
         audio.blip(660, 0.12, 'sine', 0.1, 0.4);
@@ -2070,6 +2139,7 @@
       for (var at = 0; at < 3; at++) {
         if (inRect(p, achTabRect(at))) { dexTab = at; audio.blip(520 + at * 80, 0.08, 'sine', 0.06, 0.3); return; }
       }
+      if (dexTab === 1 && inRect(p, dchalBtnRect())) { audio.blip(660, 0.1, 'triangle', 0.1, 1.4); dchalStart(); return; }
       return;
     }
     if (inMute(p)) { MUTE.pressT = 0.16; audio.muted = !audio.muted; saveFlag('mg_mute', audio.muted); if (audio.muted) audio.bgm.stop(); else audio.bgm.start(); return; }
@@ -2185,7 +2255,7 @@
       audio.big();
     }
     achTick -= dt;
-    if (achTick <= 0) { achTick = 1; checkAchievements(); checkCollection(); }
+    if (achTick <= 0) { achTick = 1; checkAchievements(); checkCollection(); checkDailyChallenge(); }
 
     updateTide(dt);
     phys.step(dt);
