@@ -125,7 +125,7 @@ const html = `<!DOCTYPE html>
     <tr><td><img class="ic" src="${ico('sp_void')}" alt="">虚空滴</td><td>深渊王座</td><td>吞噬场上最低档水滴（至多 5 颗），折算高分</td></tr>
     <tr><td><img class="ic" src="${ico('sp_aurora')}" alt="">极光滴</td><td>深渊王座</td><td>极光庇护：下一次合成得分 ×3</td></tr>
   </table>
-  <p style="margin-top:8px"><img class="ic" src="${ico('chest')}" alt=""><b>深海宝箱</b>：对局中偶有宝箱浮出，限时 14 秒点击开启可得随机奖励；涨潮间隙还有<b>随机深海事件</b>（漩涡风暴 / 涌泉）不期而至。</p>
+  <p style="margin-top:8px"><img class="ic" src="${ico('chest')}" alt=""><b>宝箱</b>：对局中偶有宝箱浮出，限时 14 秒点击开启可得随机奖励；涨潮间隙还有<b>随机深海事件</b>（漩涡风暴 / 涌泉）不期而至。</p>
 </section>
 
 <section>

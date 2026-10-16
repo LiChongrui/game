@@ -29,7 +29,7 @@
   var dangerAlert = 0; // 越线判定进度 0..1（checkDanger 每帧写入，警戒线渲染读取）
 
   var skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
-  // 深海宝箱（无尽模式）：定期沉入一只，限时点击开启随机奖励
+  // 宝箱（无尽模式）：定期沉入一只，限时点击开启随机奖励
   var chest = null;
   var chestTimer = 26 + Math.random() * 20;
   var questStaleT = 4; // 滞留任务检查计时
@@ -188,7 +188,7 @@
     var t2 = { type: 'combo', need: mn(3 + Math.floor(rnd() * 3)), stars: stars };
     t2.text = '达成 ' + t2.need + ' 连击';
     var extras = [
-      { type: 'chest', need: Math.min(3, mn(1)), text: '开启深海宝箱' },
+      { type: 'chest', need: Math.min(3, mn(1)), text: '开启宝箱' },
       { type: 'tide',  need: mn(2), text: '经历涨潮' },
       { type: 'iron',  need: Math.min(3, mn(1)), text: '消除礁石' }
     ];
@@ -609,7 +609,7 @@
   var ACH_DEFS = [
     { id: 'score2k',  name: '深海富豪', desc: '单局得分达到 30000',        target: 30000, diff: 1, perk: '永续 · 开局充能 +2', cur: function () { return Math.max(score, best, lifeStats.best || 0); } },
     { id: 'combo6',   name: '连浪六叠', desc: '达成 6 连击',               target: 6,     diff: 1, perk: '永续 · 连击窗 +0.3s', cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
-    { id: 'chest5',   name: '寻宝猎人', desc: '累计开启 10 只深海宝箱',    target: 10,    diff: 1, perk: '永续 · 宝箱奖励 +50%', cur: function () { return lifeStats.chest || 0; } },
+    { id: 'chest5',   name: '寻宝猎人', desc: '累计开启 10 只宝箱',    target: 10,    diff: 1, perk: '永续 · 宝箱奖励 +50%', cur: function () { return lifeStats.chest || 0; } },
     { id: 'tide12',   name: '弄潮儿',   desc: '经历 25 次涨潮',            target: 25,    diff: 2, perk: '永续 · 潮期得分 +10%', cur: function () { return lifeStats.tide || 0; } },
     { id: 'iron5',    name: '礁石克星', desc: '累计消除 12 对礁石',        target: 12,    diff: 2, perk: '永续 · 礁石相消 ×2', cur: function () { return lifeStats.ironPair || 0; } },
     { id: 'rainbow5', name: '虹光使者', desc: '触发 12 次彩虹合成',        target: 12,    diff: 2, perk: '永续 · 彩虹得分 +50%', cur: function () { return lifeStats.rainbow || 0; } },
@@ -643,7 +643,7 @@
   }
 
   // ---------- 特殊水滴图鉴（发现即点亮；与海域绑定：stage=解锁海域） ----------
-  // 每片海域相对上一片恰好新增 2 种（潮汐池=礁石+深海宝箱，宝箱在图鉴中单列）
+  // 每片海域相对上一片恰好新增 2 种（潮汐池=礁石+宝箱，宝箱在图鉴中单列）
   var SP_DEFS = [
     { key: 'vortex',  stage: 1, name: '漩涡滴', color: '#7B6FD0', desc: '吸附周围水滴后消散，聚拢散滴。' },
     { key: 'cloud',   stage: 1, name: '雨云滴', color: '#8FA8BC', desc: '分裂成两颗雾泡，补充低级滴。' },
@@ -665,7 +665,7 @@
     for (var i = 0; i < SP_DEFS.length; i++) if (SP_DEFS[i].key === key) return i;
     return -1;
   }
-  // 海域 → 图鉴两个槽位的 dexSelSp 索引（潮汐池槽 2 = 深海宝箱虚拟位 SP_DEFS.length）
+  // 海域 → 图鉴两个槽位的 dexSelSp 索引（潮汐池槽 2 = 宝箱虚拟位 SP_DEFS.length）
   var STAGE_SP_SLOTS = {};
   (function () {
     var per = {}, i;
@@ -681,7 +681,7 @@
     dexSpecial[sp] = 1;
     saveDex();
     var i = spIndexByKey(sp);
-    addPopup(C.W / 2, 240, '图鉴新发现 · ' + (i >= 0 ? SP_DEFS[i].name : '深海宝箱'), true, 0);
+    addPopup(C.W / 2, 240, '图鉴新发现 · ' + (i >= 0 ? SP_DEFS[i].name : '宝箱'), true, 0);
   }
 
   // ---------- 任务链 ----------
@@ -1575,7 +1575,7 @@
     closeDex: function () { dexOpen = false; achOpen = false; }
   };
 
-  // ---------- 深海宝箱（探索要素） ----------
+  // ---------- 宝箱（探索要素） ----------
   function spawnChest() {
     discoverSpecial('chest');
     var b = createIron(C.W * (0.2 + Math.random() * 0.6), C.dangerY + 52); // 警戒线下方开阔水域生成，不压坠落区虚影
@@ -2035,7 +2035,7 @@
       for (var i = 0; i < SKILL_BTNS.length; i++) {
         if (inCircle(p, SKILL_BTNS[i])) { SKILL_BTNS[i].pressT = 0.16; useSkill(SKILL_BTNS[i].key); return; }
       }
-      // 深海宝箱：点击开启（点击范围放宽 14px，手机上好点）
+      // 宝箱：点击开启（点击范围放宽 14px，手机上好点）
       if (chest) {
         var cdx = p.x - chest.b.x, cdy = p.y - chest.b.y;
         if (cdx * cdx + cdy * cdy <= (chest.b.r + 14) * (chest.b.r + 14)) { openChest(); return; }
