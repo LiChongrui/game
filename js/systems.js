@@ -456,6 +456,15 @@
     }
   }
   function addPopup(x, y, text, isBig, mult) {
+    // 公告带（居中 + 设计稿 y 180~320）改为底部锚定：跟随警戒线，不随窗口高度漂移
+    if (x === C.W / 2 && y >= 180 && y <= 320) y = C.dangerY + (y - 182);
+    // 防重叠：与仍在显示中的弹字同带（横向接近）时向下顺移一行，多条同时弹出不再叠字
+    for (var i = 0; i < popups.length; i++) {
+      var op = popups[i];
+      if (op.life > 0.35 && Math.abs(op.x - x) < 220) {
+        while (Math.abs(op.y - y) < 24) y += 26;
+      }
+    }
     popups.push({ x: x, y: y, text: text, life: 1.0, max: 1.0, big: !!isBig, mult: mult || 0, scale: 0.4 });
   }
   function addShake(amp, dur) {
@@ -622,6 +631,7 @@
       q.text = '合成出「' + T[q.tier].name + '」';
     }
     q.rewardScore = C.questScoreBase + depth * C.questScoreStep;
+    q.stars = Math.min(3, 1 + Math.floor(depth / 2)); // 难度星级随任务深度递进 1~3
     quest = q;
   }
   function questProgress(nt, comboN) {
@@ -1226,7 +1236,7 @@
           if (!runBuffered) {
             runBuffered = true;
             for (var j = 0; j < bs.length; j++) { bs[j].dangerT = 0; bs[j].grace = 3; }
-            addPopup(C.W / 2, C.dangerY + 66, '深流缓冲 · 宽限 3 秒', true, 0);
+            addPopup(C.W / 2, 248, '深流缓冲 · 宽限 3 秒', true, 0);
           } else { dangerAlert = 0; gameOver(); return; }
         }
       } else {
@@ -1509,7 +1519,7 @@
         phys.bodies[i].dangerT = 0;
         phys.bodies[i].grace = 0.8; // 短宽限，稳定局面
       }
-      if (removed > 0) addPopup(C.W / 2, C.dangerY - 24, '越线水滴被冲走 ×' + removed, false, 0);
+      if (removed > 0) addPopup(C.W / 2, 158, '越线水滴被冲走 ×' + removed, false, 0);
       state = 'play';
     });
   }
@@ -1593,7 +1603,8 @@
   var tabRankBtn = { x: DEX_PANEL.x + 230, y: DEX_PANEL.y + 10, w: 66, h: 26 };
   var shareCopyBtn = { x: 0, y: 0, w: 150, h: 42 }; // 分享卡片：复制文案按钮（打开时定位）
   function spCellRect(i) {
-    return { x: DEX_PANEL.x + 12 + i * 46, y: DEX_PANEL.y + 346, w: 44, h: 76 };
+    // 9 格（8 种特殊滴 + 深海宝箱），实际形态绘制
+    return { x: DEX_PANEL.x + 12 + i * 38.4, y: DEX_PANEL.y + 362, w: 36, h: 80 };
   }
 
   // 重开确认弹窗
@@ -1695,7 +1706,7 @@
       if (inRect(p, tabDailyBtn)) { dexTab = 2; return; }
       if (inRect(p, tabRankBtn)) { dexTab = 3; return; }
       if (dexTab === 0) {
-        for (var si = 0; si < SP_DEFS.length; si++) {
+        for (var si = 0; si <= SP_DEFS.length; si++) { // 末位是深海宝箱格
           if (inRect(p, spCellRect(si))) { dexSelSp = si; audio.blip(620, 0.08, 'sine', 0.06, 0.3); return; }
         }
       }

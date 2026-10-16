@@ -1300,18 +1300,22 @@
     if (!quest) return;
     ctx.save();
     ctx.textAlign = 'center';
-    // 任务条：第三行左侧（第二行是最佳/海域副信息；与潮汐胶囊同一水平带）
-    var qw = 206, qx = 12, qy = 66;
+    // 任务条：第三行左侧（两行：进度 + 星级/奖励，与任务难度匹配）
+    var qw = 206, qx = 12, qy = 66, qh = 34;
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    roundRect(qx, qy, qw, 20, 10); ctx.fill();
+    roundRect(qx, qy, qw, qh, 10); ctx.fill();
     var prog = Math.min(1, quest.have / quest.need);
     if (prog > 0) {
       ctx.fillStyle = 'rgba(245,197,66,0.35)';
-      roundRect(qx + 2, qy + 2, Math.max(10, (qw - 4) * prog), 16, 8); ctx.fill();
+      roundRect(qx + 2, qy + 2, Math.max(10, (qw - 4) * prog), qh - 4, 8); ctx.fill();
     }
     ctx.fillStyle = '#7A5B10';
     ctx.font = 'bold 12px system-ui, sans-serif';
-    ctx.fillText('任务：' + quest.text + ' ' + quest.have + '/' + quest.need, qx + qw / 2, qy + 14);
+    ctx.fillText(quest.text + ' ' + quest.have + '/' + quest.need, qx + qw / 2, qy + 14);
+    ctx.fillStyle = '#B8860B';
+    ctx.font = '10px system-ui, sans-serif';
+    var stars = '★★★'.slice(0, quest.stars || 1);
+    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 28);
     drawTidePill();
     ctx.restore();
   }
@@ -1371,10 +1375,6 @@
     ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.8;
     ctx.strokeRect(bx - 8, by - 6, 16, 12);
     ctx.beginPath(); ctx.moveTo(bx, by - 6); ctx.lineTo(bx, by + 6); ctx.stroke();
-    ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(240,250,252,0.95)';
-    ctx.font = '10px system-ui, sans-serif';
-    ctx.fillText('图鉴', bx, by + bookBtn.r + 6);
 
     // 重开按钮（↻ 循环箭头，点击弹确认）
     drawCircleBtn(restartBtn, '#5E90B4', 0.85, false, 0);
@@ -1389,9 +1389,6 @@
     ctx.lineTo(rx0 + ax - 4, ry0 + ay - 3);
     ctx.lineTo(rx0 + ax + 1, ry0 + ay + 6);
     ctx.closePath(); ctx.fill();
-    ctx.fillStyle = 'rgba(240,250,252,0.95)';
-    ctx.font = '10px system-ui, sans-serif';
-    ctx.fillText('重开', rx0, ry0 + restartBtn.r + 6);
 
     ctx.textAlign = 'center';
     for (var i = 0; i < SKILL_BTNS.length; i++) {
@@ -1428,21 +1425,18 @@
         ctx.strokeStyle = '#E24B4A'; ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(btn.cx, btn.cy, btn.r + 3, 0, Math.PI * 2); ctx.stroke();
       }
-      // 名称标签：浅色文字，在变深的道具带上保持可读（锁定态下移一行避开门槛提示）
+      // 名称标签：下移到圆钮外（文字顶不再压到道具圆钮）
       ctx.fillStyle = 'rgba(240,250,252,0.95)';
       ctx.font = '10px system-ui, sans-serif';
-      ctx.fillText(cfg.name, btn.cx, btn.cy + btn.r + (unl ? 6 : 12));
+      ctx.fillText(cfg.name, btn.cx, btn.cy + btn.r + 12);
     }
 
-    // 二周目「深渊回响」入口（解锁后显示）：紫色圆钮 + 渊字 + 用途标注
+    // 二周目「深渊回响」入口（解锁后显示）：紫色圆钮 + 渊字
     if (ng.unlocked && state === 'play') {
       drawCircleBtn(ngBtn, '#6B5AA8', 0.95, false, 0);
       ctx.fillStyle = '#FFFFFF';
       ctx.font = 'bold 13px system-ui, sans-serif';
       ctx.fillText('渊', ngBtn.cx, ngBtn.cy + 5);
-      ctx.fillStyle = 'rgba(240,250,252,0.95)';
-      ctx.font = '10px system-ui, sans-serif';
-      ctx.fillText('回响', ngBtn.cx, ngBtn.cy + ngBtn.r + 6);
     }
   }
   // 二周目词缀三选一弹窗
@@ -1554,15 +1548,20 @@
 
     ctx.textAlign = 'center';
 
-    // 合成链 5×2 紧凑网格（10 档水滴；未解锁只显示剪影，不提示门槛数值）
+    // —— 合成链 ——（5×2 网格；未解锁只显示剪影，不提示门槛数值）
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.fillStyle = '#2E86B4';
+    ctx.fillText('合成链', DEX_PANEL.x + 14, DEX_PANEL.y + 56);
+    ctx.textAlign = 'center';
     for (var t = 0; t < T.length; t++) {
       var col = t % 5, row = Math.floor(t / 5);
       var cx0 = DEX_PANEL.x + 14 + col * 70;
-      var cy0 = DEX_PANEL.y + 64 + row * 108;
+      var cy0 = DEX_PANEL.y + 64 + row * 112;
       ctx.fillStyle = 'rgba(46,134,180,0.08)';
-      roundRect(cx0, cy0, 66, 100, 8); ctx.fill();
+      roundRect(cx0, cy0, 66, 104, 8); ctx.fill();
       var unlocked = !!dexUnlocked[t];
-      var bx = cx0 + 33, by = cy0 + 36;
+      var bx = cx0 + 33, by = cy0 + 38;
       if (unlocked) {
         drawBall({ x: bx, y: by, r: 18, tier: t, vx: 0, vy: 0 }, 1);
       } else {
@@ -1574,23 +1573,22 @@
       }
       ctx.fillStyle = unlocked ? '#155A8A' : '#8AA5B8';
       ctx.font = 'bold 11px system-ui, sans-serif';
-      ctx.fillText(unlocked ? T[t].name : '？？？', bx, cy0 + 70);
+      ctx.fillText(unlocked ? T[t].name : '？？？', bx, cy0 + 74);
       ctx.font = '9px system-ui, sans-serif';
       ctx.fillStyle = '#4A7FA0';
-      ctx.fillText(unlocked ? ('分值 ' + T[t].score + ' · ×' + (dexCounts[t] || 0)) : '未解锁', bx, cy0 + 88);
+      ctx.fillText(unlocked ? ('分值 ' + T[t].score + ' · ×' + (dexCounts[t] || 0)) : '未解锁', bx, cy0 + 92);
     }
 
-    // 海域演进全景：当前高亮 / 已达成点亮 / 未达成显示门槛
-    ctx.textAlign = 'center';
+    // —— 海域演进 ——（当前高亮 / 已达成点亮 / 未达成显示门槛）
     var curStage = seaStage(), tsNow = totalScore();
-    ctx.font = '10px system-ui, sans-serif';
-    ctx.fillStyle = '#4A7FA0';
     ctx.textAlign = 'left';
-    ctx.fillText('海域演进', DEX_PANEL.x + 14, DEX_PANEL.y + 288);
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.fillStyle = '#2E86B4';
+    ctx.fillText('海域演进', DEX_PANEL.x + 14, DEX_PANEL.y + 296);
     ctx.textAlign = 'center';
     for (var stg = 0; stg < C.seaStages.length; stg++) {
       var ss = C.seaStages[stg];
-      var sw = 40, sx0 = DEX_PANEL.x + 14 + stg * (sw + 4), sy0 = DEX_PANEL.y + 294;
+      var sw = 40, sx0 = DEX_PANEL.x + 14 + stg * (sw + 4), sy0 = DEX_PANEL.y + 302;
       var isCur = stg === curStage, reached = tsNow >= ss.at;
       ctx.fillStyle = isCur ? '#2E86B4' : (reached ? 'rgba(46,134,180,0.14)' : 'rgba(120,145,165,0.14)');
       roundRect(sx0, sy0, sw, 40, 7); ctx.fill();
@@ -1608,11 +1606,16 @@
       ctx.fillText(gateTxt, sx0 + sw / 2, sy0 + 32);
     }
 
-    // 特殊水滴条（发现即点亮，点选查看说明）
+    // —— 特殊水滴与宝箱 ——（实际形态绘制：水滴本体 + 专属标记 / 木箱金锁；点选查看说明）
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.fillStyle = '#2E86B4';
+    ctx.fillText('特殊水滴与宝箱', DEX_PANEL.x + 14, DEX_PANEL.y + 356);
     ctx.textAlign = 'center';
-    for (var s = 0; s < SP_DEFS.length; s++) {
-      var sp = SP_DEFS[s], rect = spCellRect(s);
-      var found = !!dexSpecial[sp.key];
+    for (var s = 0; s <= SP_DEFS.length; s++) { // 末位是深海宝箱
+      var isChest = s === SP_DEFS.length;
+      var sp = isChest ? null : SP_DEFS[s], rect = spCellRect(s);
+      var found = isChest ? true : !!dexSpecial[sp.key];
       var sel = dexSelSp === s;
       ctx.fillStyle = sel ? 'rgba(46,134,180,0.18)' : 'rgba(46,134,180,0.06)';
       roundRect(rect.x, rect.y, rect.w, rect.h, 8); ctx.fill();
@@ -1620,12 +1623,12 @@
         ctx.strokeStyle = '#2E86B4'; ctx.lineWidth = 1.5;
         roundRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1, 8); ctx.stroke();
       }
-      var sx = rect.x + rect.w / 2, sy = rect.y + 24;
-      if (found) {
-        ctx.fillStyle = sp.color;
-        ctx.beginPath(); ctx.arc(sx, sy, 13, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,0.9)';
-        ctx.beginPath(); ctx.arc(sx - 4, sy - 4, 4, 0, Math.PI * 2); ctx.fill();
+      var sx = rect.x + rect.w / 2, sy = rect.y + 26;
+      if (isChest) {
+        drawChestIcon(sx, sy);
+      } else if (found) {
+        // 与场上一致的实际形态：水滴本体 + 专属标记（冰晶滴带冻结外壳）
+        drawBall({ x: sx, y: sy, r: 13, tier: 1, vx: 0, vy: 0, special: isChest ? null : sp.key, frozen: sp.key === 'ice' ? 1 : 0 }, 1);
       } else {
         ctx.fillStyle = '#C3D2DC';
         ctx.beginPath(); ctx.arc(sx, sy, 13, 0, Math.PI * 2); ctx.fill();
@@ -1635,24 +1638,47 @@
       }
       ctx.fillStyle = found ? '#155A8A' : '#8AA5B8';
       ctx.font = '9px system-ui, sans-serif';
-      ctx.fillText(found ? sp.name : '？？？', sx, rect.y + 54);
+      ctx.fillText(isChest ? '深海宝箱' : (found ? sp.name : '？？？'), sx, rect.y + 58);
       ctx.fillStyle = found ? '#1E7A6F' : '#B0584A';
-      ctx.fillText(found ? '已发现' : '未发现', sx, rect.y + 68);
+      ctx.fillText(found ? '已发现' : '未发现', sx, rect.y + 72);
     }
 
-    // 说明框：选中特殊滴的玩法说明
-    var dsc = SP_DEFS[dexSelSp] || SP_DEFS[0];
-    var known = !!dexSpecial[dsc.key];
+    // 说明框：选中条目的玩法说明（含深海宝箱）
+    var CHEST_INFO = { key: 'chest', name: '深海宝箱', desc: '沉入海底的木箱，在沉走前点击开启：得分 / 符文充能 / 甘霖预告。' };
+    var dsc = dexSelSp === SP_DEFS.length ? CHEST_INFO : (SP_DEFS[dexSelSp] || SP_DEFS[0]);
+    var known = dexSelSp === SP_DEFS.length ? true : !!dexSpecial[dsc.key];
     ctx.fillStyle = 'rgba(46,134,180,0.10)';
-    roundRect(DEX_PANEL.x + 12, DEX_PANEL.y + 434, DEX_PANEL.w - 24, 44, 8); ctx.fill();
+    roundRect(DEX_PANEL.x + 12, DEX_PANEL.y + 454, DEX_PANEL.w - 24, 58, 8); ctx.fill();
     ctx.fillStyle = known ? '#155A8A' : '#8AA5B8';
     ctx.font = 'bold 12px system-ui, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(known ? dsc.name : '？？？', DEX_PANEL.x + 24, DEX_PANEL.y + 451);
+    ctx.fillText(known ? dsc.name : '？？？', DEX_PANEL.x + 24, DEX_PANEL.y + 473);
     ctx.font = '10px system-ui, sans-serif';
     ctx.fillStyle = '#4A7FA0';
-    ctx.fillText(known ? dsc.desc : '在海域中发现它即可点亮说明', DEX_PANEL.x + 24, DEX_PANEL.y + 468);
+    ctx.fillText(known ? dsc.desc : '在海域中发现它即可点亮说明', DEX_PANEL.x + 24, DEX_PANEL.y + 494);
     ctx.textAlign = 'center';
+  }
+
+  // 图鉴用迷你宝箱图标（木箱 + 铜箍 + 金锁 + 呼吸金晕，与场上宝箱同款观感）
+  function drawChestIcon(cx, cy) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    var glow = 0.3 + 0.15 * Math.sin(time * 3);
+    var gg = ctx.createRadialGradient(0, 0, 2, 0, 0, 22);
+    gg.addColorStop(0, 'rgba(255,208,96,' + glow + ')');
+    gg.addColorStop(1, 'rgba(255,208,96,0)');
+    ctx.fillStyle = gg;
+    ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#A96F35'; // 弧顶木盖
+    ctx.beginPath(); ctx.moveTo(-15, -2); ctx.quadraticCurveTo(0, -16, 15, -2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#8A5A2B'; // 箱身
+    roundRect(-15, -2, 30, 13, 2); ctx.fill();
+    ctx.fillStyle = '#6B5539'; // 铜箍 ×2
+    ctx.fillRect(-10, -2, 3, 13);
+    ctx.fillRect(7, -2, 3, 13);
+    ctx.fillStyle = '#F2C14E'; // 金锁
+    roundRect(-3.5, -4, 7, 8, 2); ctx.fill();
+    ctx.restore();
   }
 
   // 成就页签：常驻目标列表（跨局累计，达成给分与充能奖励）
