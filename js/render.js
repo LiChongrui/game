@@ -1705,27 +1705,32 @@
     ctx.stroke();
     ctx.lineCap = 'butt';
   }
-  // 通用分段控件：segRects=[{x,w}...]，活动段白色内嵌芯片
+  // 通用分段控件：segRects=[{x,w}...]，活动段浅蓝渐变胶囊芯片（描边+垂直居中文字）
   function drawSegTabs(rects, labels, active, dotIdx) {
-    ctx.textAlign = 'center';
+    var r0 = rects[0], rl = rects[rects.length - 1];
     ctx.fillStyle = 'rgba(21,90,138,0.10)';
-    roundRect(rects[0].x, rects[0].y, rects[rects.length - 1].x + rects[rects.length - 1].w - rects[0].x, rects[0].h, 12); ctx.fill();
+    roundRect(r0.x, r0.y, rl.x + rl.w - r0.x, r0.h, r0.h / 2); ctx.fill();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (var i = 0; i < rects.length; i++) {
       var sr = rects[i];
       if (i === active) {
-        ctx.fillStyle = '#FFFFFF';
-        roundRect(sr.x + 2, sr.y + 2, sr.w - 4, sr.h - 4, 9); ctx.fill();
+        var tg = ctx.createLinearGradient(0, sr.y + 2, 0, sr.y + sr.h - 2);
+        tg.addColorStop(0, '#FFFFFF'); tg.addColorStop(1, '#CFE7F6');
+        ctx.fillStyle = tg;
+        roundRect(sr.x + 2, sr.y + 2, sr.w - 4, sr.h - 4, (sr.h - 4) / 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(46,134,180,0.5)'; ctx.lineWidth = 1; ctx.stroke();
         ctx.fillStyle = '#155A8A';
       } else {
         ctx.fillStyle = '#5B7E96';
       }
       ctx.font = 'bold 15px system-ui, sans-serif';
-      ctx.fillText(labels[i], sr.x + sr.w / 2, sr.y + 16);
+      ctx.fillText(labels[i], sr.x + sr.w / 2, sr.y + sr.h / 2 + 1);
       if (i === dotIdx && i !== active) { // 未全勤提醒小红点
         ctx.fillStyle = '#E2705E';
-        ctx.beginPath(); ctx.arc(sr.x + sr.w - 9, sr.y + 5, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(sr.x + sr.w - 11, sr.y + 7, 3, 0, Math.PI * 2); ctx.fill();
       }
     }
+    ctx.textBaseline = 'alphabetic';
   }
 
   function drawDex() {
@@ -2062,16 +2067,16 @@
       while (ctx.measureText(perk).width > cw - 20 && perk.length > 4) perk = perk.slice(0, -2);
       if (perk !== a.perk) perk += '…';
       ctx.fillText(perk, cx0 + 10, ry + 43);
-      // 进度条
-      var barX = cx0 + 10, barW = cw - 20, barY = ry + 51;
+      // 进度条（左）+ 状态文字（右，同一行垂直居中，不再压在条上）
+      var barX = cx0 + 10, barW = cw - 64, barY = ry + 52;
       ctx.fillStyle = 'rgba(46,134,180,0.15)';
-      roundRect(barX, barY, barW, 8, 4); ctx.fill();
+      roundRect(barX, barY, barW, 9, 4.5); ctx.fill();
       ctx.fillStyle = done ? '#F5C542' : '#2E86B4';
-      if (cur > 0) { roundRect(barX, barY, Math.max(6, barW * cur / a.target), 8, 4); ctx.fill(); }
+      if (cur > 0) { roundRect(barX, barY, Math.max(9, barW * cur / a.target), 9, 4.5); ctx.fill(); }
       ctx.textAlign = 'right';
       ctx.fillStyle = done ? '#B8860B' : '#4A7FA0';
-      ctx.font = '10px system-ui, sans-serif';
-      ctx.fillText(done ? '已达成' : (cur + '/' + a.target), cx0 + cw - 10, barY + 13);
+      ctx.font = 'bold 11px system-ui, sans-serif';
+      ctx.fillText(done ? '已达成' : (cur + '/' + a.target), cx0 + cw - 10, barY + 8);
     }
   }
 

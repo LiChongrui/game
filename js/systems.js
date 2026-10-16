@@ -1824,7 +1824,7 @@
   // 成就页分段页签：成就 / 每日 / 榜单（与图鉴分节同款分段控件样式）
   function achTabRect(i) {
     var segW = Math.floor((DEX_PANEL.w - 30) / 3);
-    return { x: DEX_PANEL.x + 15 + i * segW, y: DEX_PANEL.y + 44, w: segW, h: 24 };
+    return { x: DEX_PANEL.x + 15 + i * segW, y: DEX_PANEL.y + 40, w: segW, h: 28 };
   }
   var shareCopyBtn = { x: 0, y: 0, w: 150, h: 42 }; // 分享卡片：复制文案按钮（打开时定位）
   function spSlotRect(stg, s) {
@@ -1843,7 +1843,7 @@
   function dexSecRect(i) {
     // 分节切换：通栏分段控件（合成链 / 海域演进——特殊滴已并入海域行），样式与顶部页签区分
     var segW = Math.floor((DEX_PANEL.w - 30) / 2);
-    return { x: DEX_PANEL.x + 15 + i * segW, y: DEX_PANEL.y + 44, w: segW, h: 24 };
+    return { x: DEX_PANEL.x + 15 + i * segW, y: DEX_PANEL.y + 40, w: segW, h: 28 };
   }
 
   // 重开确认弹窗

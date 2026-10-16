@@ -185,16 +185,16 @@ MG.config = {
   // 随机出生池（只出前 5 级，权重）
   spawnWeights: [30, 26, 22, 14, 8],
 
-  // 合成链（色相从浅青向深海靛蓝递进，拉开等级辨识度）
+  // 合成链（每档一个可辨识色相：雾白→青→青绿→天蓝→宝蓝→靛蓝→紫→海军蓝→深渊墨蓝，明度同步递进）
   tiers: [
-    { name: '雾泡', r: 15, color: '#D9F2FB', dark: '#9CCDE3', score: 1 },
-    { name: '水滴', r: 21, color: '#AEE0F4', dark: '#6FB3D6', score: 3 },
-    { name: '露珠', r: 28, color: '#7FD6E8', dark: '#3F9DBE', score: 6 },
-    { name: '浪花', r: 36, color: '#54BCE2', dark: '#2783B2', score: 10 },
-    { name: '溪流', r: 45, color: '#3B9FD9', dark: '#1C669C', score: 15 },
-    { name: '湖泊', r: 55, color: '#3480C8', dark: '#17497E', score: 21 },
-    { name: '江河', r: 66, color: '#2C62B0', dark: '#143868', score: 29 },
-    { name: '大海', r: 78, color: '#22499A', dark: '#0E2557', score: 38 },
-    { name: '沧海', r: 92, color: '#1B2F6E', dark: '#0A1538', score: 50 }
+    { name: '雾泡', r: 15, color: '#E8F5FC', dark: '#A8CFE2', score: 1 },
+    { name: '水滴', r: 21, color: '#8FDCE9', dark: '#3E9FBC', score: 3 },
+    { name: '露珠', r: 28, color: '#56CDB4', dark: '#1E8A76', score: 6 },
+    { name: '浪花', r: 36, color: '#4EA8E6', dark: '#1C68A6', score: 10 },
+    { name: '溪流', r: 45, color: '#3E7BD6', dark: '#19468F', score: 15 },
+    { name: '湖泊', r: 55, color: '#5B62C8', dark: '#2A3186', score: 21 },
+    { name: '江河', r: 66, color: '#7A55BE', dark: '#3B2A6E', score: 29 },
+    { name: '大海', r: 78, color: '#27479C', dark: '#101F56', score: 38 },
+    { name: '沧海', r: 92, color: '#122A5E', dark: '#060F2E', score: 50 }
   ]
 };
