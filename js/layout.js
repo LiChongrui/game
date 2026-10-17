@@ -12,9 +12,10 @@
 //
 // ★★ 比例承接地（v177 用户定版，覆盖 v175 的"底部带吸收"方案）：
 //   块高多出的全部高度垫在「HUD 三组行位」与「坠落高度」之间的间距里。
-//   HUD 钉块顶（0~164）不动；容器/警戒线/坠落高度/底部带/面板/菜单
+//   HUD 钉块顶（0~164）不动；容器/底部带/面板/菜单
 //   = 9:16 基准值 + EXTRA 整体下移；底部带高度恒 74。
 //   EXTRA = C.H - 747（9:16 基准块高）：9:18(840) → +93；8:18(945) → +198；H=747 → 0（逐像素等于 v171 定版）。
+//   ★ v178 附加：警戒线/坠落高度 = 基准 + EXTRA + DANGER_SHIFT(20)（用户："警戒线和坠落区高度增加20"）。
 //   约束：H ≥ floorY + 74 = 673 + EXTRA + 74 ⇒ H ≥ 747。
 // 适配策略（view.s / oy / renderOy / hudInset）由 core.fit() 每帧重算，见其注释。
 //
@@ -31,13 +32,16 @@ MG.layout = {
     // ★ 比例承接地：HUD(0~164) 钉块顶；其余全部 = 9:16 基准值 + EXTRA 整体下移。
     // EXTRA = 块高 - 9:16 基准块高 747（9:18=840 → +93；8:18=945 → +198；H=747 → 0）
     var EXTRA = H - 747;
+    // ★ v178 用户要求：警戒线与坠落高度在基准上再下移 20px（绝对调整量，与比例无关；
+    //   堆叠空间相应 419→399，容器/底部带不动）
+    var DANGER_SHIFT = 20;
     this.extra = EXTRA;
     // 同步真源给物理引擎（每帧读 C.*）：容器/警戒线/容器底随 EXTRA 下移，容器高恒 483
     C.containerTop = 190 + EXTRA;      // 容器开口（+EXTRA 下移）
-    C.dangerY = 254 + EXTRA;           // 警戒线（+EXTRA 下移）
+    C.dangerY = 254 + EXTRA + DANGER_SHIFT; // 警戒线（+EXTRA+DANGER_SHIFT 下移）
     C.floorY = 673 + EXTRA;            // 容器底（+EXTRA 下移）
     // 坠落高度 = 最大可投放水滴（tiers 前 5 档中的溪流 r45）底部接触警戒线时的球心位置（公式派生，禁写死）
-    C.spawnY = C.dangerY - C.tiers[4].r; // (254+EXTRA) - 45 = 209+EXTRA
+    C.spawnY = C.dangerY - C.tiers[4].r; // (254+EXTRA+20) - 45 = 209+EXTRA+20
 
     // ---- ① 顶部 HUD 区（v149/v161 定版行位；钉块顶，块高变化时本区不动）----
     this.hud = {
@@ -52,12 +56,12 @@ MG.layout = {
       hudBottom: 164           // HUD 区底沿（任务条底；与容器开口之间为 26+EXTRA px 空隙带）
     };
 
-    // ---- ② 容器区（核心游戏几何：用户定版；随 EXTRA 整体下移，容器 483 高不变）----
+    // ---- ② 容器区（核心游戏几何：用户定版；随 EXTRA+DANGER_SHIFT 整体下移，容器 483 高不变）----
     this.body = {
       containerTop: C.containerTop,     // 190+EXTRA 容器开口
-      dangerY: C.dangerY,               // 254+EXTRA 警戒线
+      dangerY: C.dangerY,               // 254+EXTRA+20 警戒线（v178 下移 20）
       floorY: C.floorY,                 // 673+EXTRA 容器底
-      spawnY: C.spawnY,                 // 209+EXTRA 坠落高度（公式派生，禁写死）
+      spawnY: C.spawnY,                 // 209+EXTRA+20 坠落高度（公式派生，禁写死）
       tutY: 480 + EXTRA                 // 首局引导胶囊锚点（容器中部，随容器下移）
     };
 

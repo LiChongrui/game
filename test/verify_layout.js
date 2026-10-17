@@ -22,8 +22,9 @@ function eq(name, got, want) {
   fail++; console.log('FAIL', name, 'got', JSON.stringify(got), 'want', JSON.stringify(want));
 }
 
-// ===== ① H=747（EXTRA=0）：全部派生值必须等于 v171 硬编码值（像素级不变）=====
+// ===== ① H=747（EXTRA=0）：9:16 基线 + v178 DANGER_SHIFT(20) =====
 // 显式设基线，与 config 当前交付值解耦（config 改比例后本段仍回归 9:16）
+// 注：v178 起警戒线/坠落高度含 +20 绝对调整（用户要求），其余同 v171 定版
 C.H = 747; L.build();
 eq('hud.row1Y', L.hud.row1Y, 41);
 eq('hud.trophyCy', L.hud.trophyCy, 36);
@@ -38,9 +39,9 @@ eq('hud.tidePill.ty', L.hud.tidePill.ty, 130);
 eq('hud.tidePill.tx', L.hud.tidePill.tx, 298);
 eq('hud.tideBannerY', L.hud.tideBannerY, 250);
 eq('body.containerTop', L.body.containerTop, 190);
-eq('body.dangerY', L.body.dangerY, 254);
+eq('body.dangerY', L.body.dangerY, 254 + 20);   // v178：+20
 eq('body.floorY', L.body.floorY, 673);
-eq('body.spawnY', L.body.spawnY, 209);
+eq('body.spawnY', L.body.spawnY, 209 + 20);     // v178：+20（公式 dangerY-45 自动跟随）
 eq('body.tutY', L.body.tutY, 480);
 eq('band.h', L.band.h, 74);
 eq('band.btnCy', L.band.btnCy, 701);
@@ -67,26 +68,28 @@ eq('menu.offlineY', L.menu.offlineY, 316);
 eq('menu.startY', L.menu.startY, 396);
 eq('menu.footDy', L.menu.footDy, 56);
 eq('extra(747)', L.extra, 0);
-console.log('① 9:16 像素不变断言: ' + pass + ' pass, ' + fail + ' fail');
+console.log('① 9:16 基线断言(含v178 +20): ' + pass + ' pass, ' + fail + ' fail');
 
 // ===== ② 改比例自动重排：HUD 钉顶不动，其余 = 基准 + EXTRA 整体下移，底部带恒 74 =====
+// ★ v178：警戒线/坠落高度 = 基准 + EXTRA + DANGER_SHIFT(20)
 function checkRatio(H, label) {
   pass = 0; fail = 0;
   var X = H - 747; // EXTRA
+  var DS = 20;     // DANGER_SHIFT（v178）
   C.H = H; L.build();
   eq('extra(' + label + ')', L.extra, X);
   // HUD 钉块顶：三组行位完全不动
   eq('hud 不动(' + label + ')', L.hud.row1Y + '/' + L.hud.scoreY + '/' + L.hud.seaBar.sy + '/' + L.hud.quest.qy + '/' + L.hud.trophyCy, '41/88/100/130/36');
-  // 容器/警戒线/坠落高度：+EXTRA 下移（容器高恒 483）
+  // 容器/警戒线/坠落高度：+EXTRA(+DANGER_SHIFT) 下移（容器高恒 483）
   eq('containerTop(' + label + ')', L.body.containerTop, 190 + X);
-  eq('dangerY(' + label + ')', L.body.dangerY, 254 + X);
+  eq('dangerY(' + label + ')', L.body.dangerY, 254 + X + DS);
   eq('floorY(' + label + ')', L.body.floorY, 673 + X);
-  eq('spawnY(' + label + ')', L.body.spawnY, 209 + X);
+  eq('spawnY(' + label + ')', L.body.spawnY, 209 + X + DS);
   eq('容器高(' + label + ')', L.body.floorY - L.body.containerTop, 483);
-  eq('堆叠空间(' + label + ')', L.body.floorY - L.body.dangerY, 419);
+  eq('堆叠空间(' + label + ')', L.body.floorY - L.body.dangerY, 419 - DS);
   eq('tutY(' + label + ')', L.body.tutY, 480 + X);
   // ★ 多出的区域垫在 HUD 与坠落高度之间：164 → spawnY
-  eq('HUD→坠落间距(' + label + ')', L.body.spawnY - L.hud.hudBottom, 45 + X);
+  eq('HUD→坠落间距(' + label + ')', L.body.spawnY - L.hud.hudBottom, 45 + X + DS);
   // 底部带：高度恒 74，内部布局 +EXTRA 平移（不打散）
   eq('band.h(' + label + ')', L.band.h, 74);
   eq('btnCy(' + label + ')', L.band.btnCy, 701 + X);          // = floorY+28
@@ -112,8 +115,8 @@ function checkRatio(H, label) {
      (218 + X) + '/' + (252 + X) + '/' + (316 + X) + '/' + (396 + X));
   // 回写 config 真源（物理引擎读 C.*）
   eq('C.floorY回写(' + label + ')', C.floorY, 673 + X);
-  eq('C.spawnY回写(' + label + ')', C.spawnY, 209 + X);
-  eq('C.dangerY回写(' + label + ')', C.dangerY, 254 + X);
+  eq('C.spawnY回写(' + label + ')', C.spawnY, 209 + X + DS);
+  eq('C.dangerY回写(' + label + ')', C.dangerY, 254 + X + DS);
   eq('C.containerTop回写(' + label + ')', C.containerTop, 190 + X);
   console.log('② ' + label + ' 自动重排断言: ' + pass + ' pass, ' + fail + ' fail');
   return fail;
@@ -126,13 +129,15 @@ f2 += checkRatio(800, 'H=800');  // 任意比例抽查：EXTRA=+53
 // ===== ③ 交付比例回归：config 当前 H =====
 pass = 0; fail = 0;
 var initialH = CONFIG_H0;         // config 交付值（各段不得污染，从加载瞬间记录）
+var IX = initialH - 747;          // 交付 EXTRA
 eq('config.H(交付比例)', initialH, 840);
 C.H = initialH; L.build();        // 以 config 交付值为准重建
 eq('交付 band.h', L.band.h, 74);
-eq('交付 btnCy', L.band.btnCy, 701 + (initialH - 747));
-eq('交付 floorY', L.body.floorY, 673 + (initialH - 747));
-eq('交付 spawnY', L.body.spawnY, 209 + (initialH - 747));
-eq('交付 HUD→坠落间距', L.body.spawnY - L.hud.hudBottom, 45 + (initialH - 747));
+eq('交付 btnCy', L.band.btnCy, 701 + IX);
+eq('交付 floorY', L.body.floorY, 673 + IX);
+eq('交付 dangerY', L.body.dangerY, 254 + IX + 20);   // v178：+20
+eq('交付 spawnY', L.body.spawnY, 209 + IX + 20);     // v178：+20
+eq('交付 HUD→坠落间距', L.body.spawnY - L.hud.hudBottom, 45 + IX + 20);
 console.log('③ 交付比例回归断言: ' + pass + ' pass, ' + fail + ' fail');
 
 process.exit((fail + f2) ? 1 : 0);
