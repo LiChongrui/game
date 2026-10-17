@@ -1608,7 +1608,7 @@
     ctx.save();
     ctx.globalAlpha = a;
     ctx.textAlign = 'center';
-    ctx.translate(C.W / 2, MG.layout.body.stackCy); // v188：涨潮横幅锚堆叠空间中心
+    ctx.translate(C.W / 2, MG.layout.body.mirrorCy); // v190：涨潮横幅锚堆叠区镜像位（出生区相对警戒线的镜像）
     ctx.scale(scale, scale);
     ctx.font = 'bold 43px system-ui, sans-serif';
     ctx.strokeStyle = 'rgba(255,255,255,0.9)';

@@ -7,8 +7,10 @@
 // ★★ v184：容器顶不设置（用户："容器到HUD顶部，直接到窗口最大位置即可，相当于不设置容器顶；
 //   堆叠空间没必要，堆叠区从堆叠底部开始，高度上限不需要设置"）：containerTop = 0，
 //   容器从块顶开始长；dangerY 直接钉绝对基准，"堆叠空间"退为派生量自动守恒，不再是反推参数。
-// ★★★ v187/v188：警戒线与出生点联动调整后，dangerY 绝对基准 = 317+dy（v188 单独下移 10）；
-//   弹出提示（公告弹字 + 涨潮横幅）锚堆叠空间中心 stackCy=(dangerY+floorY)/2（v188）。
+// ★★★ v188/v190：警戒线绝对基准 = 317+dy（v188 单独下移 10）；出生点 spawnY = 262+dy
+//   独立基准（v190 起与警戒线解耦——"单独移警戒线"语义：警戒线动、出生点不动、间距必变）；
+//   弹出提示（公告弹字 + 涨潮横幅）锚 mirrorCy = dangerY + (dangerY - spawnY) = 372+dy
+//   （出生区相对警戒线在堆叠区中的镜像对称位置，v190）。
 //   dy = C.H - 840（9:18 定版基准块高）：H=840 → 0（= 当前交付逐像素一致）。
 // 运行：node test/verify_layout.js
 const fs = require('fs');
@@ -44,13 +46,14 @@ eq('hud.quest.qy', L.hud.quest.qy, 130);
 eq('hud.quest.qh', L.hud.quest.qh, 34);
 eq('hud.tidePill.ty', L.hud.tidePill.ty, 130);
 eq('hud.tidePill.tx', L.hud.tidePill.tx, 298);
-eq('body.stackCy', L.body.stackCy, 541.5);            // v188 堆叠空间中心（弹出提示默认锚点）=(317+766)/2
+eq('body.mirrorCy', L.body.mirrorCy, 372);             // v190 镜像锚 = 317+(317-262)
 eq('hud.hudBottom', L.hud.hudBottom, 164);
 // ---- 容器区：底部锚定链（floorY = H-74）；容器顶不设置 = 0（v184）----
 eq('body.containerTop', L.body.containerTop, 0);    // v184：容器顶不设置，容器从块顶开始长
 eq('body.dangerY', L.body.dangerY, 317);            // 失败线绝对基准（v188：单独下移 10）
 eq('body.floorY', L.body.floorY, 766);              // 840-74（底部带恒 74）
-eq('body.spawnY', L.body.spawnY, 272);              // 317-45（公式派生；随警戒线+10联动）
+eq('body.spawnY', L.body.spawnY, 262);              // 出生点独立基准（v190 起与警戒线解耦）
+eq('body.spawnGap', L.body.spawnGap, 55);           // 出生通道 = dangerY - spawnY（"单独移"显式体现）
 eq('body.tutY', L.body.tutY, 573);
 eq('容器高(派生)', L.body.floorY - L.body.containerTop, 766);  // 堆叠空间退为派生量，不再设置
 // ---- 底部带：恒 74 贴块底，内部钉 floorY 相对位 ----
@@ -96,16 +99,16 @@ function checkRatio(H, label) {
   eq('containerTop(' + label + ')', L.body.containerTop, 0);
   eq('dangerY(' + label + ')', L.body.dangerY, 317 + D);
   eq('floorY(' + label + ')', L.body.floorY, 766 + D);
-  eq('spawnY(' + label + ')', L.body.spawnY, 272 + D);
+  eq('spawnY(' + label + ')', L.body.spawnY, 262 + D);   // v190：独立基准，不随警戒线
   eq('容器高(派生)(' + label + ')', L.body.floorY - L.body.containerTop, 766 + D);
   eq('堆叠空间(派生)(' + label + ')', L.body.floorY - L.body.dangerY, 449);
-  // 出生通道 = dangerY - spawnY = 45（公式本意，禁写死）
-  eq('出生通道(派生)(' + label + ')', L.body.dangerY - L.body.spawnY, 45);
+  // 出生通道 = dangerY - spawnY = 55（v190 解耦后；v188 曾联动为 45）
+  eq('出生通道(派生)(' + label + ')', L.body.dangerY - L.body.spawnY, 55);
   eq('tutY(' + label + ')', L.body.tutY, 573 + D);
-  // ★ v188：弹出提示（公告弹字 + 涨潮横幅）锚堆叠空间中心 = (dangerY+floorY)/2
-  eq('弹出提示锚=堆叠中心(' + label + ')', L.body.stackCy, (317 + 766) / 2 + D);
+  // ★ v190：弹出提示锚 = 出生区相对警戒线的镜像位 = dangerY + 出生通道
+  eq('弹出提示锚=镜像位(' + label + ')', L.body.mirrorCy, 372 + D);
   // ★ 弹性残余不再有"容器顶空隙"：容器从块顶(0)开始长，HUD 浮在容器上（v184）
-  eq('HUD→坠落间距(' + label + ')', L.body.spawnY - L.hud.hudBottom, 108 + D);
+  eq('HUD→坠落间距(' + label + ')', L.body.spawnY - L.hud.hudBottom, 98 + D);
   // 底部带：高度恒 74，内部布局 +dy 平移（不打散）
   eq('band.h(' + label + ')', L.band.h, 74);
   eq('btnCy(' + label + ')', L.band.btnCy, 794 + D);          // = floorY+28
@@ -131,7 +134,7 @@ function checkRatio(H, label) {
      (311 + D) + '/' + (345 + D) + '/' + (409 + D) + '/' + (489 + D));
   // 回写 config 真源（物理引擎读 C.*）
   eq('C.floorY回写(' + label + ')', C.floorY, 766 + D);
-  eq('C.spawnY回写(' + label + ')', C.spawnY, 272 + D);
+  eq('C.spawnY回写(' + label + ')', C.spawnY, 262 + D);
   eq('C.dangerY回写(' + label + ')', C.dangerY, 317 + D);
   eq('C.containerTop回写(' + label + ')', C.containerTop, 0);
   console.log('② ' + label + ' 自动重排断言: ' + pass + ' pass, ' + fail + ' fail');
@@ -155,11 +158,11 @@ eq('交付 btnCy', L.band.btnCy, 794);
 eq('交付 floorY', L.body.floorY, 766);
 eq('交付 containerTop', L.body.containerTop, 0);   // v184：容器顶不设置
 eq('交付 dangerY', L.body.dangerY, 317);
-eq('交付 spawnY', L.body.spawnY, 272);
-eq('交付 stackCy', L.body.stackCy, 541.5);          // v188 堆叠空间中心（弹出提示锚点）
+eq('交付 spawnY', L.body.spawnY, 262);
+eq('交付 mirrorCy', L.body.mirrorCy, 372);          // v190 镜像锚 = 317+(317-262)
 eq('交付 containerTop', L.body.containerTop, 0);   // v184：容器顶不设置
 eq('交付 堆叠空间(派生)', L.body.floorY - L.body.dangerY, 449);
-eq('交付 HUD→坠落间距', L.body.spawnY - L.hud.hudBottom, 108);
+eq('交付 HUD→坠落间距', L.body.spawnY - L.hud.hudBottom, 98);
 console.log('③ 交付比例回归断言: ' + pass + ' pass, ' + fail + ' fail');
 
 process.exit((fail + f2) ? 1 : 0);

@@ -333,8 +333,11 @@ MG.layout = {
     C.floorY = H - 74;                 // 766（9:18）：容器底 = 块底 - 底部带 74
     C.containerTop = 0;                // 容器顶不设置（v184）：容器从块顶（窗口最大位置）开始长
     C.dangerY = 317 + dy;              // 317（9:18）：失败线绝对基准（v187 的 307 下移 10，v188）
-    // 坠落高度 = 最大可投放水滴（tiers 前 5 档中的溪流 r45）底部接触警戒线时的球心位置（公式派生，禁写死）
-    C.spawnY = C.dangerY - C.tiers[4].r; // 317-45 = 272（9:18；公式自动跟随警戒线的+10）
+    // 坠落高度 = 出生点绝对基准（262+dy，v186/v187 定版）。
+    // ★ v190 起与警戒线解耦：v188 曾按"公式跟随"让 spawnY 随警戒线 +10 联动，用户反馈
+    //   "单独给警戒线往下移10 好像没有生效，因为警戒线和出生区的间距没有变化"——
+    //   "单独移"语义 = 警戒线动、出生点不动，间距（出生通道）必须跟着变。
+    C.spawnY = 262 + dy;               // 262（9:18）：出生点独立基准，不随警戒线漂移
 
     // ---- ① 顶部 HUD 区（v149/v161 定版行位；★ 钉块顶，块高变化时本区不动）----
     this.hud = {
@@ -353,8 +356,12 @@ MG.layout = {
       containerTop: C.containerTop,     // 0：容器顶不设置（容器从块顶开始长，v184 用户定版）
       dangerY: C.dangerY,               // 317+dy 警戒线（绝对基准，v188 下移 10）
       floorY: C.floorY,                 // 766+dy 容器底
-      spawnY: C.spawnY,                 // 272+dy 坠落高度（公式派生，禁写死；随警戒线联动）
-      stackCy: (C.dangerY + C.floorY) / 2, // 541.5+dy 堆叠空间中心（v188：弹出提示默认锚点）
+      spawnY: C.spawnY,                 // 262+dy 出生点（独立基准，v190 起与警戒线解耦）
+      // 出生通道（坠落区）高度 = dangerY - spawnY = 55（9:18）——"单独移警戒线"的显式体现
+      spawnGap: C.dangerY - C.spawnY,
+      // ★ v190 弹出提示（公告弹字 + 涨潮横幅）默认锚点：出生区相对警戒线在堆叠区中的
+      //   镜像对称位置 = dangerY + spawnGap = 372+dy（出生通道 55 镜像到警戒线下方）
+      mirrorCy: C.dangerY + (C.dangerY - C.spawnY),
       tutY: 573 + dy                    // 首局引导胶囊锚点（容器中部，随底部锚定链平移）
     };
 
@@ -1464,10 +1471,11 @@ MG.layout.build();
     }
   }
   function addPopup(x, y, text, isBig, mult) {
-    // 公告带（居中 + 设计稿 y 180~320）锚定堆叠空间中心（v188 用户："弹出提示（如涨潮等），
-    // 要默认出现在堆叠空间的中心"）：基准 = layout.body.stackCy = (dangerY+floorY)/2，
-    // 保留设计稿相对 209 的偏移让多条弹字错开；警戒线调整不再波及弹字锚（无需剥离）
-    if (x === C.W / 2 && y >= 180 && y <= 320) y = MG.layout.body.stackCy + (y - 209);
+    // 公告带（居中 + 设计稿 y 180~320）锚定堆叠区镜像位（v190 用户："弹出提示（如涨潮等），
+    // 要默认出现在出生区相对于警戒线在堆叠区中的镜像对称位置"）：基准 =
+    // layout.body.mirrorCy = dangerY + 出生通道（出生区相对警戒线镜像到警戒线下方），
+    // 保留设计稿相对 209 的偏移让多条弹字错开
+    if (x === C.W / 2 && y >= 180 && y <= 320) y = MG.layout.body.mirrorCy + (y - 209);
     // 防重叠：与仍在显示中的弹字同带（横向接近）时向下顺移一行，多条同时弹出不再叠字
     for (var i = 0; i < popups.length; i++) {
       var op = popups[i];
@@ -5626,7 +5634,7 @@ MG.layout.build();
     ctx.save();
     ctx.globalAlpha = a;
     ctx.textAlign = 'center';
-    ctx.translate(C.W / 2, MG.layout.body.stackCy); // v188：涨潮横幅锚堆叠空间中心
+    ctx.translate(C.W / 2, MG.layout.body.mirrorCy); // v190：涨潮横幅锚堆叠区镜像位（出生区相对警戒线的镜像）
     ctx.scale(scale, scale);
     ctx.font = 'bold 43px system-ui, sans-serif';
     ctx.strokeStyle = 'rgba(255,255,255,0.9)';

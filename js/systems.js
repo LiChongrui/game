@@ -576,10 +576,11 @@
     }
   }
   function addPopup(x, y, text, isBig, mult) {
-    // 公告带（居中 + 设计稿 y 180~320）锚定堆叠空间中心（v188 用户："弹出提示（如涨潮等），
-    // 要默认出现在堆叠空间的中心"）：基准 = layout.body.stackCy = (dangerY+floorY)/2，
-    // 保留设计稿相对 209 的偏移让多条弹字错开；警戒线调整不再波及弹字锚（无需剥离）
-    if (x === C.W / 2 && y >= 180 && y <= 320) y = MG.layout.body.stackCy + (y - 209);
+    // 公告带（居中 + 设计稿 y 180~320）锚定堆叠区镜像位（v190 用户："弹出提示（如涨潮等），
+    // 要默认出现在出生区相对于警戒线在堆叠区中的镜像对称位置"）：基准 =
+    // layout.body.mirrorCy = dangerY + 出生通道（出生区相对警戒线镜像到警戒线下方），
+    // 保留设计稿相对 209 的偏移让多条弹字错开
+    if (x === C.W / 2 && y >= 180 && y <= 320) y = MG.layout.body.mirrorCy + (y - 209);
     // 防重叠：与仍在显示中的弹字同带（横向接近）时向下顺移一行，多条同时弹出不再叠字
     for (var i = 0; i < popups.length; i++) {
       var op = popups[i];
