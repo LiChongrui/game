@@ -1545,29 +1545,30 @@
     // 设置按钮（左上角，v197：替代原成就奖杯位；右上角音量钮已移除）——局内与初始界面共用
     drawSetBtn();
   }
-  // 设置按钮（v197：用户"游戏内这个地方改成设置按钮，用来弹出设置音效、音乐和震动"）：
-  // 白底圆 + 蓝灰环 + 齿轮图标（沿用 v196 drawRowBtn 统一样式，与旧音量钮同 accent）
+  // 设置按钮（v197 新增；v199 重设计图标）：彩底白齿轮（与底部道具钮同一绘制语言）
   function drawSetBtn() {
-    drawRowBtn(setBtn, '#3E6E90');
+    drawRowBtn(setBtn, '#2E7DA8');
     ctx.save();
     ctx.translate(setBtn.cx, setBtn.cy);
-    var gs = setBtn.r / 13;       // 图标随按钮半径等比缩放（与奖杯/喇叭同系数）
+    var gs = setBtn.r / 13;       // 图标随按钮半径等比缩放（与底部道具钮同系数）
     ctx.scale(gs, gs);
-    ctx.strokeStyle = '#3E6E90';
-    ctx.lineWidth = 1.6;
-    // 八齿
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 2.5;
+    // 八齿（v199：加长加粗——齿根抵齿圈外缘，圈齿一体；旧为 -10~-6.5 细短线，脱节发虚）
     for (var gi = 0; gi < 8; gi++) {
       ctx.save();
       ctx.rotate(gi * Math.PI / 4);
       ctx.beginPath();
-      ctx.moveTo(0, -10); ctx.lineTo(0, -6.5);
+      ctx.moveTo(0, -12.5); ctx.lineTo(0, -8.5);
       ctx.stroke();
       ctx.restore();
     }
-    // 齿圈 + 中心孔
-    ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(0, 0, 2.4, 0, Math.PI * 2); ctx.stroke();
+    // 齿圈 + 中心孔（与齿同粗，白图标压彩底）
+    ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
+    ctx.lineCap = 'butt';
   }
   // 设置弹窗（v197：音效/音乐/震动三开关；几何走 layout.setRect/setRowRect/setCloseRect）
   // 用户要求底部不放说明文本，故面板 300×260：标题 + ✕ + 三行开关排满仅余 12
@@ -1616,18 +1617,19 @@
       ctx.beginPath(); ctx.arc(on ? sx + 52 - 15 : sx + 15, sy + 15, 11, 0, Math.PI * 2); ctx.fill();
     }
   }
-  // 第一排圆钮统一样式（v196）：白底圆 + 主题色 2px 环 + 按压动画
-  // （旧：奖杯 = 金实心球+白线框、音量 = 白底小圆+蓝灰细边——两钮风格尺寸都不一致；
-  //   用户："优化一下成就殿堂的图标样式、图标大小；音量按钮同成就殿堂图标一样优化"）
+  // 第一排圆钮统一样式（v196 建；★ v199 改：accent 实底 + 白细内环 + 白图标）
+  // 用户："设置的图标太难看了，也不协调"——旧为白 0.85 底 + accent 2px 环，细彩线图标
+  //   压白底，在 HUD 一众粗元素里发虚；现改"彩底 + 白图标"，与底部道具钮（drawCircleBtn
+  //   彩底白图标）同一绘制语言。v197 起唯一调用方 = drawSetBtn（奖杯/音量钮已移除）
   function drawRowBtn(c, accent) {
     var s = c.pressT > 0 ? 1 - 0.1 * (c.pressT / 0.16) : 1;
     ctx.save();
     ctx.translate(c.cx, c.cy);
     ctx.scale(s, s);
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillStyle = accent;
     ctx.beginPath(); ctx.arc(0, 0, c.r, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = accent; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(0, 0, c.r - 1, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0, 0, c.r - 1.5, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
   // 潮汐卡（v195）：与任务卡同高同款白底（左右边距各 15、卡间 10）；

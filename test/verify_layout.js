@@ -1,4 +1,4 @@
-// 布局几何验证（v197）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗静态核查
+// 布局几何验证（v199）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗静态核查
 // 纯 node 计算（vm 加载 config + layout，无浏览器/无 canvas）。
 // ★ v183 新定位语义（覆盖 v175~v182 的 EXTRA 分配方案；用户：
 //   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少！"）：
@@ -325,7 +325,7 @@ eq('音乐存mg_music', /saveFlag\('mg_music', audio\.musicOn\)/.test(SRC), true
 eq('震动存mg_vib', /saveFlag\('mg_vib', audio\.vibOn\)/.test(SRC), true);
 eq('restart关闭setOpen', /confirmOpen = false;\n    setOpen = false;/.test(SRC), true);
 eq('drawSetBtn定义', /function drawSetBtn\(\) \{/.test(RSRC), true);
-eq('设置钮引drawRowBtn蓝灰', /drawRowBtn\(setBtn, '#3E6E90'\);/.test(RSRC), true);
+eq('设置钮引drawRowBtn蓝', /drawRowBtn\(setBtn, '#2E7DA8'\);/.test(RSRC), true); // v199：accent 改 #2E7DA8（与 HUD 计时文字同色）
 eq('齿轮图标八齿', /for \(var gi = 0; gi < 8; gi\+\+\)/.test(RSRC), true);
 eq('drawSettings定义', /function drawSettings\(\) \{/.test(RSRC), true);
 eq('设置弹窗调用', /drawSettings\(\);/.test(RSRC), true);
@@ -355,7 +355,22 @@ eq('震动旧歧义说明已改', /合成与事件震动反馈/.test(RSRC), fals
 var WSHIM = fs.readFileSync(path.join(__dirname, '..', 'wechat', 'wx-shim.js'), 'utf8');
 eq('垫片vibrate桥wx长短震', /vibrate: function \(ms\) \{[\s\S]*?wx\.vibrateLong\(\);[\s\S]*?wx\.vibrateShort/.test(WSHIM), true);
 eq('垫片vibrate按ms映射强度', /ms >= 20 \? 'medium' : 'light'/.test(WSHIM), true);
-console.log('⑥ v195六钮真源+HUD卡度量+v196第一排+v197设置断言: ' + pass + ' pass, ' + fail + ' fail');
+// ---- v199 设置图标重设计（用户："设置的图标太难看了，也不协调"；三样例筛选后选 B）----
+// B = 彩底白齿轮：drawRowBtn 从"白0.85底+彩环"改"accent实底+白细内环"，与底部道具钮
+// （drawCircleBtn 彩底白图标）同一绘制语言；齿轮白色加粗（齿 -12.5~-8.5 线宽2.5、
+// 齿圈 r8、孔 r3，圈齿一体，外径占钮径 47%——旧细短线脱节发虚）
+eq('drawRowBtn实底', /ctx\.fillStyle = accent;\n    ctx\.beginPath\(\); ctx\.arc\(0, 0, c\.r, 0, Math\.PI \* 2\); ctx\.fill\(\);/.test(RSRC), true);
+eq('drawRowBtn白细内环', /ctx\.strokeStyle = 'rgba\(255,255,255,0\.35\)'; ctx\.lineWidth = 1\.5;/.test(RSRC), true);
+eq('旧白0.85底已移除', /ctx\.fillStyle = 'rgba\(255,255,255,0\.85\)';/.test(RSRC), false);
+eq('旧彩环2px已移除', /ctx\.strokeStyle = accent; ctx\.lineWidth = 2;/.test(RSRC), false);
+eq('齿轮白色描边', /ctx\.strokeStyle = '#FFFFFF';\n    ctx\.lineCap = 'round';/.test(RSRC), true);
+eq('齿轮线宽2.5', /ctx\.lineWidth = 2\.5;/.test(RSRC), true);
+eq('齿加长-12.5~-8.5', /ctx\.moveTo\(0, -12\.5\); ctx\.lineTo\(0, -8\.5\);/.test(RSRC), true);
+eq('齿圈r8+孔r3同粗', /ctx\.arc\(0, 0, 8, 0, Math\.PI \* 2\); ctx\.stroke\(\);\n    ctx\.beginPath\(\); ctx\.arc\(0, 0, 3, 0, Math\.PI \* 2\); ctx\.stroke\(\);/.test(RSRC), true);
+eq('旧细短线齿已移除', /ctx\.moveTo\(0, -10\); ctx\.lineTo\(0, -6\.5\);/.test(RSRC), false);
+eq('旧齿圈r6.5已移除', /ctx\.arc\(0, 0, 6\.5, 0, Math\.PI \* 2\); ctx\.stroke\(\);/.test(RSRC), false);
+eq('齿轮旧蓝灰色已移除', /ctx\.strokeStyle = '#3E6E90';\n    ctx\.lineWidth = 1\.6;/.test(RSRC), false);
+console.log('⑥ v195六钮真源+HUD卡度量+v196第一排+v197设置+v199设置图标断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
 process.exit(f2 ? 1 : 0);
