@@ -3,6 +3,21 @@
 // 函数与状态互相可见；加载顺序只约束"顶层初始化语句"的执行先后。
   var C = MG.config;
   var T = C.tiers;
+  // 跨模块工具：微信 Canvas 对 hsl/hsla 支持不稳定，提供 rgba 兜底
+  MG.util = MG.util || {};
+  MG.util.hslToRgba = function (h, s, l, a) {
+    h = ((h % 360) + 360) % 360 / 360; s = Math.max(0, Math.min(1, s / 100)); l = Math.max(0, Math.min(1, l / 100));
+    var c = s * (1 - Math.abs(2 * l - 1));
+    var x = c * (1 - Math.abs((h * 6) % 2 - 1));
+    var m = l - c / 2, r, g, b;
+    if (h < 1 / 6) { r = c; g = x; b = 0; }
+    else if (h < 2 / 6) { r = x; g = c; b = 0; }
+    else if (h < 3 / 6) { r = 0; g = c; b = x; }
+    else if (h < 4 / 6) { r = 0; g = x; b = c; }
+    else if (h < 5 / 6) { r = x; g = 0; b = c; }
+    else { r = c; g = 0; b = x; }
+    return 'rgba(' + Math.round((r + m) * 255) + ',' + Math.round((g + m) * 255) + ',' + Math.round((b + m) * 255) + ',' + (a == null ? 1 : a) + ')';
+  };
 
   // ---------- 画布 ----------
   // 逻辑高度动态（VH ≥ 747）：顶部元素（HUD/出生区/警戒线）按顶部坐标绘制，
@@ -22,6 +37,7 @@
   // Web 贴屏顶（0），微信端贴在胶囊区下方（HUD 不被胶囊遮挡）
   var oy = 0;             // 游戏块顶部偏移（逻辑 px，≥0）
   var renderOy = 0;       // 渲染/点击实际使用的偏移：菜单态 0（铺满），其余态 oy
+  var hudInset = 0;       // HUD 顶行避让胶囊的实际下挪量（菜单=oy；游戏态限幅 min(oy,24) 防止任务面板侵入容器）
 
   function fit() {
     var w = window.innerWidth, h = window.innerHeight;

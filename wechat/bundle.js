@@ -402,6 +402,21 @@ MG.config = {
 // 函数与状态互相可见；加载顺序只约束"顶层初始化语句"的执行先后。
   var C = MG.config;
   var T = C.tiers;
+  // 跨模块工具：微信 Canvas 对 hsl/hsla 支持不稳定，提供 rgba 兜底
+  MG.util = MG.util || {};
+  MG.util.hslToRgba = function (h, s, l, a) {
+    h = ((h % 360) + 360) % 360 / 360; s = Math.max(0, Math.min(1, s / 100)); l = Math.max(0, Math.min(1, l / 100));
+    var c = s * (1 - Math.abs(2 * l - 1));
+    var x = c * (1 - Math.abs((h * 6) % 2 - 1));
+    var m = l - c / 2, r, g, b;
+    if (h < 1 / 6) { r = c; g = x; b = 0; }
+    else if (h < 2 / 6) { r = x; g = c; b = 0; }
+    else if (h < 3 / 6) { r = 0; g = c; b = x; }
+    else if (h < 4 / 6) { r = 0; g = x; b = c; }
+    else if (h < 5 / 6) { r = x; g = 0; b = c; }
+    else { r = c; g = 0; b = x; }
+    return 'rgba(' + Math.round((r + m) * 255) + ',' + Math.round((g + m) * 255) + ',' + Math.round((b + m) * 255) + ',' + (a == null ? 1 : a) + ')';
+  };
 
   // ---------- 画布 ----------
   // 逻辑高度动态（VH ≥ 747）：顶部元素（HUD/出生区/警戒线）按顶部坐标绘制，
@@ -421,6 +436,7 @@ MG.config = {
   // Web 贴屏顶（0），微信端贴在胶囊区下方（HUD 不被胶囊遮挡）
   var oy = 0;             // 游戏块顶部偏移（逻辑 px，≥0）
   var renderOy = 0;       // 渲染/点击实际使用的偏移：菜单态 0（铺满），其余态 oy
+  var hudInset = 0;       // HUD 顶行避让胶囊的实际下挪量（菜单=oy；游戏态限幅 min(oy,24) 防止任务面板侵入容器）
 
   function fit() {
     var w = window.innerWidth, h = window.innerHeight;
@@ -1704,7 +1720,7 @@ MG.config = {
       var ang = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 160;
       parts.push({ type: 'dot', x: mx, y: my, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 40,
         r: 1.5 + Math.random() * 2.5, life: 0.6, max: 0.6,
-        color: 'hsl(' + Math.floor(Math.random() * 360) + ',80%,65%)' });
+        color: MG.util.hslToRgba(Math.floor(Math.random() * 360), 80, 65, 1) });
     }
     parts.push({ type: 'ring', x: mx, y: my, r: 18, life: 0.5, max: 0.5, color: '#C084FC' });
     addShake(3, 0.2);
@@ -2375,7 +2391,7 @@ MG.config = {
     var bs = [], i;
     for (i = 0; i < phys.bodies.length; i++) {
       b = phys.bodies[i];
-      bs.push({ x: Math.round(b.x), y: Math.round(b.y), r: Math.round(b.r), tier: b.tier, iron: !!b.iron, chest: !!b.chest });
+      bs.push({ x: Math.round(b.x), y: Math.round(b.y), r: Math.round(b.r), tier: b.tier, iron: !!b.iron, chest: !!b.chest, special: b.special || null });
     }
     var ui = { book: { cx: bookBtn.cx, cy: bookBtn.cy }, restart: { cx: restartBtn.cx, cy: restartBtn.cy }, skills: [] };
     for (i = 0; i < SKILL_BTNS.length; i++) ui.skills.push({ key: SKILL_BTNS[i].key, cx: SKILL_BTNS[i].cx, cy: SKILL_BTNS[i].cy });
@@ -2391,7 +2407,7 @@ MG.config = {
       stage: seaStage(), daily: { done: daily.done.slice(), streak: daily.streak }, best: best,
       jellies: jellies.map(function (j) { return { x: Math.round(j.x), y: Math.round(j.y), s: Math.round(j.s) }; }),
       col: colProgress, chestTimer: Math.round(chestTimer * 10) / 10,
-      oy: oy, renderOy: renderOy, VH: VH, floorY: C.floorY, containerTop: C.containerTop,
+      oy: oy, renderOy: renderOy, VH: VH, floorY: C.floorY, containerTop: C.containerTop, time: time,
       dangerY: C.dangerY, spawnY: C.spawnY,
       offline: offlineGain ? { mins: offlineGain.mins, gain: offlineGain.gain } : null
     };
@@ -2773,7 +2789,7 @@ MG.config = {
     var dx = p.x - c.cx, dy = p.y - c.cy;
     return dx * dx + dy * dy <= (c.r + 6) * (c.r + 6);
   }
-  function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - (MUTE.cy + oy); return dx * dx + dy * dy <= (MUTE.r + 6) * (MUTE.r + 6); } // 命中区随按钮半径（与其他圆钮同为 r+6）；+oy 与 drawHUD 平移一致
+  function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - (MUTE.cy + hudInset); return dx * dx + dy * dy <= (MUTE.r + 6) * (MUTE.r + 6); } // 命中区随按钮半径（与其他圆钮同为 r+6）；+hudInset 与 HUD 平移一致（菜单=oy，游戏态=min(oy,24)）
   function toLocal(e) {
     var rect = canvas.getBoundingClientRect();
     // 内容层游戏块垂直居中偏移 renderOy（菜单态 0），触摸 y 同量补偿还原块内坐标
@@ -2857,8 +2873,8 @@ MG.config = {
     // 面板打开时放行到下方 dexOpen/achOpen 分支，否则面板内点击会被这里提前吞掉
     if (state === 'menu' && !achOpen && !dexOpen) {
       // 初始界面静音入口（未开局即可静音，复用局内同一逻辑与存档键）；命中区与绘制一致 +oy
-      if (inCircle(p, { cx: MUTE.cx, cy: MUTE.cy + oy, r: MUTE.r })) { MUTE.pressT = 0.16; audio.muted = !audio.muted; saveFlag('mg_mute', audio.muted); if (audio.muted) audio.bgm.stop(); else audio.bgm.start(); return; }
-      if (inCircle(p, { cx: menuTrophy.cx, cy: menuTrophy.cy + oy, r: menuTrophy.r })) { menuTrophy.pressT = 0.16; achOpen = true; dexOpen = false; dexTab = 1; return; }
+      if (inCircle(p, { cx: MUTE.cx, cy: MUTE.cy + hudInset, r: MUTE.r })) { MUTE.pressT = 0.16; audio.muted = !audio.muted; saveFlag('mg_mute', audio.muted); if (audio.muted) audio.bgm.stop(); else audio.bgm.start(); return; }
+      if (inCircle(p, { cx: menuTrophy.cx, cy: menuTrophy.cy + hudInset, r: menuTrophy.r })) { menuTrophy.pressT = 0.16; achOpen = true; dexOpen = false; dexTab = 1; return; }
       if (inRect(p, menuStartBtn)) {
         menuStartBtn.pressT = 0.2;
         audio.blip(660, 0.12, 'sine', 0.1, 0.4);
@@ -4774,16 +4790,17 @@ MG.config = {
     ctx.lineCap = 'butt';
     ctx.restore();
   }
-  // 彩虹滴徽记：旋转的五彩弧 + 游动星光
+  // 彩虹滴徽记：旋转流动的五彩弧 + 游动星光（保留动态效果）。
+  // 颜色走 hslToRgba（微信 Canvas 对 hsla 支持不稳定，直接用 hsla 会导致描边偶发失效→视觉「闪烁」）。
   function drawRainbowMark(r) {
-    var hue0 = (time * 120) % 360;
+    var hue0 = (time * 40) % 360;
     ctx.save();
     ctx.lineWidth = Math.max(2, r * 0.16);
     ctx.lineCap = 'round';
     for (var k = 0; k < 5; k++) {
-      ctx.strokeStyle = 'hsla(' + ((hue0 + k * 72) % 360) + ',85%,62%,0.9)';
+      ctx.strokeStyle = MG.util.hslToRgba((hue0 + k * 72) % 360, 85, 62, 0.9);
       ctx.beginPath();
-      ctx.arc(0, 0, r * 0.72, time * 2 + k * Math.PI * 0.4, time * 2 + k * Math.PI * 0.4 + Math.PI * 0.28);
+      ctx.arc(0, 0, r * 0.72, time * 0.8 + k * Math.PI * 0.4, time * 0.8 + k * Math.PI * 0.4 + Math.PI * 0.28);
       ctx.stroke();
     }
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
@@ -6094,6 +6111,7 @@ MG.config = {
     ctx.translate(BX, 0);
 
     if (state === 'menu') {
+      hudInset = oy;   // 菜单态整组下移 oy（用户确认此布局正确），同步给命中区
       drawMenu();
       // 成就/音量按钮与局内同一屏幕位置：菜单态铺满（renderOy=0）需补 oy 与局内对齐
       ctx.save();
@@ -6219,15 +6237,19 @@ MG.config = {
     ctx.fillStyle = vg;
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
 
-    // HUD 整体随胶囊避让下挪 oy：游戏态内容层 renderOy=0（块顶铺满），故 HUD 需单独 +oy 平移，
-    // 使其与改动前（整层下移 oy）屏幕坐标完全一致、且不被胶囊遮挡；其余 overlay 随块内坐标上移贴顶。
-    if (state === 'play') { ctx.save(); ctx.translate(0, oy); }
+    // HUD 整体随胶囊避让下挪 hudInset：游戏态内容层 renderOy=0（块顶铺满，消灭顶部留白），
+    // 故 HUD（分数/进度/任务/潮汐/涨潮横幅）统一 +hudInset 平移避让胶囊；
+    // hudInset=min(oy,24) 确保任务面板底边(164)不侵入容器顶(190)，且典型机型(oy≈23)可完整避让胶囊；
+    // 顶部奖杯按钮走 drawSkillBar 非平移路径，其 cy 同步设为 36+hudInset 与静音同高对齐。
+    hudInset = (state === 'menu') ? oy : (state === 'play' ? Math.min(oy, 24) : 0);
+    trophyBtn.cy = 36 + hudInset;   // 与静音(36+hudInset)同高（奖杯不参与本平移，故直接烤进坐标）
+    if (hudInset > 0) { ctx.save(); ctx.translate(0, hudInset); }
     drawHUD();
-    if (state === 'play') ctx.restore();
     drawQuest();
+    drawTideBanner();
+    if (hudInset > 0) ctx.restore();
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
     drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）
-    drawTideBanner();
     drawSkillBar();
     drawConfirm();
     if (adOverlay) drawAdOverlay();

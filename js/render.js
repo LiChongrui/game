@@ -922,16 +922,17 @@
     ctx.lineCap = 'butt';
     ctx.restore();
   }
-  // 彩虹滴徽记：旋转的五彩弧 + 游动星光
+  // 彩虹滴徽记：旋转流动的五彩弧 + 游动星光（保留动态效果）。
+  // 颜色走 hslToRgba（微信 Canvas 对 hsla 支持不稳定，直接用 hsla 会导致描边偶发失效→视觉「闪烁」）。
   function drawRainbowMark(r) {
-    var hue0 = (time * 120) % 360;
+    var hue0 = (time * 40) % 360;
     ctx.save();
     ctx.lineWidth = Math.max(2, r * 0.16);
     ctx.lineCap = 'round';
     for (var k = 0; k < 5; k++) {
-      ctx.strokeStyle = 'hsla(' + ((hue0 + k * 72) % 360) + ',85%,62%,0.9)';
+      ctx.strokeStyle = MG.util.hslToRgba((hue0 + k * 72) % 360, 85, 62, 0.9);
       ctx.beginPath();
-      ctx.arc(0, 0, r * 0.72, time * 2 + k * Math.PI * 0.4, time * 2 + k * Math.PI * 0.4 + Math.PI * 0.28);
+      ctx.arc(0, 0, r * 0.72, time * 0.8 + k * Math.PI * 0.4, time * 0.8 + k * Math.PI * 0.4 + Math.PI * 0.28);
       ctx.stroke();
     }
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
@@ -2242,6 +2243,7 @@
     ctx.translate(BX, 0);
 
     if (state === 'menu') {
+      hudInset = oy;   // 菜单态整组下移 oy（用户确认此布局正确），同步给命中区
       drawMenu();
       // 成就/音量按钮与局内同一屏幕位置：菜单态铺满（renderOy=0）需补 oy 与局内对齐
       ctx.save();
@@ -2367,15 +2369,19 @@
     ctx.fillStyle = vg;
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
 
-    // HUD 整体随胶囊避让下挪 oy：游戏态内容层 renderOy=0（块顶铺满），故 HUD 需单独 +oy 平移，
-    // 使其与改动前（整层下移 oy）屏幕坐标完全一致、且不被胶囊遮挡；其余 overlay 随块内坐标上移贴顶。
-    if (state === 'play') { ctx.save(); ctx.translate(0, oy); }
+    // HUD 整体随胶囊避让下挪 hudInset：游戏态内容层 renderOy=0（块顶铺满，消灭顶部留白），
+    // 故 HUD（分数/进度/任务/潮汐/涨潮横幅）统一 +hudInset 平移避让胶囊；
+    // hudInset=min(oy,24) 确保任务面板底边(164)不侵入容器顶(190)，且典型机型(oy≈23)可完整避让胶囊；
+    // 顶部奖杯按钮走 drawSkillBar 非平移路径，其 cy 同步设为 36+hudInset 与静音同高对齐。
+    hudInset = (state === 'menu') ? oy : (state === 'play' ? Math.min(oy, 24) : 0);
+    trophyBtn.cy = 36 + hudInset;   // 与静音(36+hudInset)同高（奖杯不参与本平移，故直接烤进坐标）
+    if (hudInset > 0) { ctx.save(); ctx.translate(0, hudInset); }
     drawHUD();
-    if (state === 'play') ctx.restore();
     drawQuest();
+    drawTideBanner();
+    if (hudInset > 0) ctx.restore();
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
     drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）
-    drawTideBanner();
     drawSkillBar();
     drawConfirm();
     if (adOverlay) drawAdOverlay();

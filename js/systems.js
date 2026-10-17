@@ -971,7 +971,7 @@
       var ang = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 160;
       parts.push({ type: 'dot', x: mx, y: my, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 40,
         r: 1.5 + Math.random() * 2.5, life: 0.6, max: 0.6,
-        color: 'hsl(' + Math.floor(Math.random() * 360) + ',80%,65%)' });
+        color: MG.util.hslToRgba(Math.floor(Math.random() * 360), 80, 65, 1) });
     }
     parts.push({ type: 'ring', x: mx, y: my, r: 18, life: 0.5, max: 0.5, color: '#C084FC' });
     addShake(3, 0.2);
@@ -1642,7 +1642,7 @@
     var bs = [], i;
     for (i = 0; i < phys.bodies.length; i++) {
       b = phys.bodies[i];
-      bs.push({ x: Math.round(b.x), y: Math.round(b.y), r: Math.round(b.r), tier: b.tier, iron: !!b.iron, chest: !!b.chest });
+      bs.push({ x: Math.round(b.x), y: Math.round(b.y), r: Math.round(b.r), tier: b.tier, iron: !!b.iron, chest: !!b.chest, special: b.special || null });
     }
     var ui = { book: { cx: bookBtn.cx, cy: bookBtn.cy }, restart: { cx: restartBtn.cx, cy: restartBtn.cy }, skills: [] };
     for (i = 0; i < SKILL_BTNS.length; i++) ui.skills.push({ key: SKILL_BTNS[i].key, cx: SKILL_BTNS[i].cx, cy: SKILL_BTNS[i].cy });
@@ -1658,7 +1658,7 @@
       stage: seaStage(), daily: { done: daily.done.slice(), streak: daily.streak }, best: best,
       jellies: jellies.map(function (j) { return { x: Math.round(j.x), y: Math.round(j.y), s: Math.round(j.s) }; }),
       col: colProgress, chestTimer: Math.round(chestTimer * 10) / 10,
-      oy: oy, renderOy: renderOy, VH: VH, floorY: C.floorY, containerTop: C.containerTop,
+      oy: oy, renderOy: renderOy, VH: VH, floorY: C.floorY, containerTop: C.containerTop, time: time,
       dangerY: C.dangerY, spawnY: C.spawnY,
       offline: offlineGain ? { mins: offlineGain.mins, gain: offlineGain.gain } : null
     };
@@ -2040,7 +2040,7 @@
     var dx = p.x - c.cx, dy = p.y - c.cy;
     return dx * dx + dy * dy <= (c.r + 6) * (c.r + 6);
   }
-  function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - (MUTE.cy + oy); return dx * dx + dy * dy <= (MUTE.r + 6) * (MUTE.r + 6); } // 命中区随按钮半径（与其他圆钮同为 r+6）；+oy 与 drawHUD 平移一致
+  function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - (MUTE.cy + hudInset); return dx * dx + dy * dy <= (MUTE.r + 6) * (MUTE.r + 6); } // 命中区随按钮半径（与其他圆钮同为 r+6）；+hudInset 与 HUD 平移一致（菜单=oy，游戏态=min(oy,24)）
   function toLocal(e) {
     var rect = canvas.getBoundingClientRect();
     // 内容层游戏块垂直居中偏移 renderOy（菜单态 0），触摸 y 同量补偿还原块内坐标
@@ -2124,8 +2124,8 @@
     // 面板打开时放行到下方 dexOpen/achOpen 分支，否则面板内点击会被这里提前吞掉
     if (state === 'menu' && !achOpen && !dexOpen) {
       // 初始界面静音入口（未开局即可静音，复用局内同一逻辑与存档键）；命中区与绘制一致 +oy
-      if (inCircle(p, { cx: MUTE.cx, cy: MUTE.cy + oy, r: MUTE.r })) { MUTE.pressT = 0.16; audio.muted = !audio.muted; saveFlag('mg_mute', audio.muted); if (audio.muted) audio.bgm.stop(); else audio.bgm.start(); return; }
-      if (inCircle(p, { cx: menuTrophy.cx, cy: menuTrophy.cy + oy, r: menuTrophy.r })) { menuTrophy.pressT = 0.16; achOpen = true; dexOpen = false; dexTab = 1; return; }
+      if (inCircle(p, { cx: MUTE.cx, cy: MUTE.cy + hudInset, r: MUTE.r })) { MUTE.pressT = 0.16; audio.muted = !audio.muted; saveFlag('mg_mute', audio.muted); if (audio.muted) audio.bgm.stop(); else audio.bgm.start(); return; }
+      if (inCircle(p, { cx: menuTrophy.cx, cy: menuTrophy.cy + hudInset, r: menuTrophy.r })) { menuTrophy.pressT = 0.16; achOpen = true; dexOpen = false; dexTab = 1; return; }
       if (inRect(p, menuStartBtn)) {
         menuStartBtn.pressT = 0.2;
         audio.blip(660, 0.12, 'sine', 0.1, 0.4);
