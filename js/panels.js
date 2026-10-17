@@ -8,14 +8,8 @@
 
   // ---------- 面板几何（渲染与点击热区共用，一处定义） ----------
   var DEX_PANEL = { x: 20, y: 64, w: 380, h: 560 };
-  // 结算海报（over 态）：面板按游戏块高垂直居中（块高 747→945 改版后写死的 py=134 会偏上，
-  // 收敛为几何常量 + 每帧重算，与 DEX_PANEL 同法——渲染 drawOver 与命中 buildOverButtons 共用）
-  var OVER_PANEL = { w: 320, h: 472 };
-  function overPanelRect() {
-    return { x: (C.W - OVER_PANEL.w) / 2, y: Math.round((C.H - OVER_PANEL.h) / 2), w: OVER_PANEL.w, h: OVER_PANEL.h };
-  }
   var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 42, y: DEX_PANEL.y + 8, w: 28, h: 28 }; // 右上 × 关闭（中心 +22px，与页头标题文字对齐）
-  // 面板垂直居中：菜单态（铺满）以整屏 VH 为基准；局内游戏块为固定 945 逻辑（8:18，居中块=屏幕中心，
+  // 面板垂直居中：菜单态（铺满）以整屏 VH 为基准；局内游戏块为固定 747 逻辑（9:16，居中块=屏幕中心，
   // 块内 (C.H-h)/2 + 偏移 renderOy 恰好落在屏幕中央）——每帧绘制前重算，页签始终处于屏幕中央
   function layoutDexPanel() {
     var base = state === 'menu' ? VH : C.H;
@@ -682,7 +676,7 @@
     if (!shareOpen) return;
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
-    var pw = 300, ph = 420, px = (C.W - pw) / 2, py = Math.round((C.H - ph) / 2); // 按块高垂直居中（747→945 改版）
+    var pw = 300, ph = 420, px = (C.W - pw) / 2, py = 160;
     panel(px, py, pw, ph, 16, 0.97);
     // 卡片头：深海渐变 + 标题
     var head = ctx.createLinearGradient(0, py, 0, py + 96);

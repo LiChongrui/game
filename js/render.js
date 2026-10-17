@@ -331,7 +331,7 @@
     var nk = Math.max(2, Math.min(3, Math.floor(w / 50)));
     for (k = 0; k < nk; k++) {
       var px = x0 + (k + 0.5) * w / nk + Math.sin(seed * 1.7 + k * 5.3) * w * 0.15;
-      var h = 95 + ((k * 53 + seed * 17) % 60) + (VH - C.H) * 0.16;
+      var h = 95 + ((k * 53 + seed * 17) % 60) + (VH - 747) * 0.16;
       h = Math.min(h, VH * 0.36);
       var bend = Math.sin(time * (0.45 + (k % 3) * 0.15) + seed + k * 2.2); // -1..1 摆幅
       var tone = k % 2 ? '15,64,94' : '22,84,110';
@@ -1267,8 +1267,7 @@
     ctx.fillStyle = dep;
     ctx.fillRect(0, floorY - 30, C.W, 30);
 
-    // 底部装饰（无海床基色，直接坐在背景水色上）：沙丘起伏 + 卵石 + 海星 + 扇贝。
-    // 8:18 改版后底部带为 673~945（272px），装饰沿带铺开（避开按钮行 cy=899 的 879~919）
+    // 底部装饰（无海床基色，直接坐在背景水色上）：沙丘起伏 + 卵石 + 海星 + 扇贝
     var sy0 = floorY + FH + 6;
     // 沙丘（径向渐变柔边：中心实色 → 边缘全透明，消除硬边；scale 把椭圆映射到单位圆，
     // 保证渐变在椭圆各个方向均匀衰减，不会因径向渐变是圆形而被压扁）
@@ -1285,17 +1284,18 @@
       ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
-    dune(C.W * 0.2, sy0 + 39, 95, 13, 'rgba(238,246,240,0.7)', 'rgba(238,246,240,0)');
-    dune(C.W * 0.74, sy0 + 99, 115, 15, 'rgba(238,246,240,0.7)', 'rgba(238,246,240,0)');
-    dune(C.W * 0.47, sy0 + 69, 85, 11, 'rgba(228,240,234,0.55)', 'rgba(228,240,234,0)');
-    // 卵石（块内绝对坐标，贴容器底；沿底部带铺开）
+    dune(C.W * 0.2, sy0 + 12, 95, 13, 'rgba(238,246,240,0.7)', 'rgba(238,246,240,0)');
+    dune(C.W * 0.74, sy0 + 14, 115, 15, 'rgba(238,246,240,0.7)', 'rgba(238,246,240,0)');
+    dune(C.W * 0.47, sy0 + 18, 85, 11, 'rgba(228,240,234,0.55)', 'rgba(228,240,234,0)');
+    // 卵石（块内坐标，贴容器底；装饰 y 以 FLOORY=646 时代为基准，随床面整体下移）
     ctx.fillStyle = 'rgba(110,150,168,0.4)';
-    var peb = [[24, 700, 3], [66, 860, 2], [112, 730, 2.5], [172, 845, 2], [246, 712, 2.5], [306, 855, 2], [352, 745, 2.5], [404, 838, 2.2]];
+    var yoff = (floorY + FH + 6) - 664;
+    var peb = [[24, 688, 3], [66, 700, 2], [112, 686, 2.5], [172, 702, 2], [246, 690, 2.5], [306, 700, 2], [352, 686, 2.5], [404, 696, 2.2]];
     for (var pi = 0; pi < peb.length; pi++) {
-      ctx.beginPath(); ctx.arc(peb[pi][0], peb[pi][1], peb[pi][2], 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(peb[pi][0], peb[pi][1] + yoff, peb[pi][2], 0, Math.PI * 2); ctx.fill();
     }
-    drawStarfish(88, 855, 9);
-    drawShell(330, 858, 9);
+    drawStarfish(88, 700 + yoff, 9);
+    drawShell(330, 702 + yoff, 9);
   }
 
   // 海星：五条圆钝臂 + 中心盘 + 亮斑
@@ -2061,10 +2061,8 @@
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
 
-    // 结算海报：面板几何收敛 panels.js（OVER_PANEL/overPanelRect），按块高垂直居中；
-    // 统计区与按钮组均拉开呼吸感（v161 排版放松沿用）
-    var ovr = overPanelRect();
-    var px = ovr.x, py = ovr.y, pw = ovr.w, ph = ovr.h;
+    // 结算海报：面板加高放宽（436→472、上移至134），统计区与按钮组均拉开呼吸感
+    var pw = 320, ph = 472, px = (C.W - pw) / 2, py = 134;
     panel(px, py, pw, ph, 16, 0.97);
 
     ctx.textAlign = 'center';
@@ -2222,7 +2220,7 @@
     ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, 0);
     drawBackground();
 
-    // 内容层：游戏块（420×945 ≈ 8:18 恒定比例）垂直居中——所有态一致居中（oy=(VH-C.H)/2），
+    // 内容层：游戏块（420×747 ≈ 9:16 恒定比例）垂直居中——所有态一致居中（oy=(VH-C.H)/2），
     // 高屏多余高度上下均分，块顶上方/块底下方由全屏背景渐变自然延展填充（无留白）。
     // transform y 偏移用 dpr*view.s*renderOy（renderOy 为逻辑 px，与 toLocal 的 -renderOy 同量纲，
     // 修早期漏乘 view.s 导致 view.s≠1 真机上偏移算少、游戏区偏上的问题）。
