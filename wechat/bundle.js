@@ -323,14 +323,14 @@ MG.layout = {
     // EXTRA = 块高 - 9:16 基准块高 747（9:18=840 → +93；8:18=945 → +198；H=747 → 0）
     var EXTRA = H - 747;
     this.extra = EXTRA;
-    this.dangerShift = 20;   // 警戒线基准已含 +20（v178 用户："警戒线和坠落区高度增加20"）——
+    this.dangerShift = 40;   // 警戒线基准已含 +40（v178/v181 用户两次"加20"）——
     // 仅作标注，供锚在警戒线上、但位置不该被这次调整波及的组件（公告带）剥离，别无他用
     // 同步真源给物理引擎（每帧读 C.*）：容器/警戒线/容器底随 EXTRA 下移，容器高恒 483
     C.containerTop = 190 + EXTRA;      // 容器开口（+EXTRA 下移）
-    C.dangerY = 274 + EXTRA;           // 警戒线：基准 254→274（v178 +20），其余不动
+    C.dangerY = 294 + EXTRA;           // 警戒线：基准 254→274(v178)→294(v181 再加20)，其余不动
     C.floorY = 673 + EXTRA;            // 容器底（+EXTRA 下移）
     // 坠落高度 = 最大可投放水滴（tiers 前 5 档中的溪流 r45）底部接触警戒线时的球心位置（公式派生，禁写死）
-    C.spawnY = C.dangerY - C.tiers[4].r; // 274-45 = 229+EXTRA（公式自动跟随警戒线的+20）
+    C.spawnY = C.dangerY - C.tiers[4].r; // 294-45 = 249+EXTRA（公式自动跟随警戒线的两次+20）
 
     // ---- ① 顶部 HUD 区（v149/v161 定版行位；钉块顶，块高变化时本区不动）----
     this.hud = {
@@ -348,9 +348,9 @@ MG.layout = {
     // ---- ② 容器区（核心游戏几何：用户定版；随 EXTRA+DANGER_SHIFT 整体下移，容器 483 高不变）----
     this.body = {
       containerTop: C.containerTop,     // 190+EXTRA 容器开口
-      dangerY: C.dangerY,               // 254+EXTRA+20 警戒线（v178 下移 20）
+      dangerY: C.dangerY,               // 254+EXTRA+40 警戒线（v178/v181 两次 +20）
       floorY: C.floorY,                 // 673+EXTRA 容器底
-      spawnY: C.spawnY,                 // 209+EXTRA+20 坠落高度（公式派生，禁写死）
+      spawnY: C.spawnY,                 // 209+EXTRA+40 坠落高度（公式派生，禁写死）
       tutY: 480 + EXTRA                 // 首局引导胶囊锚点（容器中部，随容器下移）
     };
 

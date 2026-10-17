@@ -39,9 +39,9 @@ eq('hud.tidePill.ty', L.hud.tidePill.ty, 130);
 eq('hud.tidePill.tx', L.hud.tidePill.tx, 298);
 eq('hud.tideBannerY', L.hud.tideBannerY, 250);
 eq('body.containerTop', L.body.containerTop, 190);
-eq('body.dangerY', L.body.dangerY, 254 + 20);   // v178：+20
+eq('body.dangerY', L.body.dangerY, 254 + 40);   // v178+v181：两次+20
 eq('body.floorY', L.body.floorY, 673);
-eq('body.spawnY', L.body.spawnY, 209 + 20);     // v178：+20（公式 dangerY-45 自动跟随）
+eq('body.spawnY', L.body.spawnY, 209 + 40);     // v178+v181：两次+20（公式 dangerY-45 自动跟随）
 eq('body.tutY', L.body.tutY, 480);
 eq('band.h', L.band.h, 74);
 eq('band.btnCy', L.band.btnCy, 701);
@@ -75,7 +75,7 @@ console.log('① 9:16 基线断言(含v178 +20): ' + pass + ' pass, ' + fail + '
 function checkRatio(H, label) {
   pass = 0; fail = 0;
   var X = H - 747; // EXTRA
-  var DS = 20;     // DANGER_SHIFT（v178）
+  var DS = 40;     // 警戒线累计调整（v178+v181 两次+20）
   C.H = H; L.build();
   eq('extra(' + label + ')', L.extra, X);
   // HUD 钉块顶：三组行位完全不动
@@ -137,9 +137,9 @@ C.H = initialH; L.build();        // 以 config 交付值为准重建
 eq('交付 band.h', L.band.h, 74);
 eq('交付 btnCy', L.band.btnCy, 701 + IX);
 eq('交付 floorY', L.body.floorY, 673 + IX);
-eq('交付 dangerY', L.body.dangerY, 254 + IX + 20);   // v178：+20
-eq('交付 spawnY', L.body.spawnY, 209 + IX + 20);     // v178：+20
-eq('交付 HUD→坠落间距', L.body.spawnY - L.hud.hudBottom, 45 + IX + 20);
+eq('交付 dangerY', L.body.dangerY, 254 + IX + 40);   // v178+v181：两次+20
+eq('交付 spawnY', L.body.spawnY, 209 + IX + 40);     // v178+v181：两次+20
+eq('交付 HUD→坠落间距', L.body.spawnY - L.hud.hudBottom, 45 + IX + 40);
 console.log('③ 交付比例回归断言: ' + pass + ' pass, ' + fail + ' fail');
 
 process.exit((fail + f2) ? 1 : 0);
