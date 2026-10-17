@@ -1214,7 +1214,7 @@
     ctx.textAlign = 'center';
     ctx.font = 'bold 14px system-ui, sans-serif';
     var tw = ctx.measureText(label).width + 12;
-    var ly = Math.max(C.containerTop + 14, C.spawnY - r - 11); // 距球顶约5px间距；大档虚影时钳制在容器内，不越块顶
+    var ly = Math.max(C.containerTop + 15, C.spawnY - r - 10); // 距球顶5px间距；大档虚影时钳制在容器内，不越块顶
     ctx.fillStyle = 'rgba(255,255,255,0.88)';
     roundRect(aimX - tw / 2, ly - 12, tw, 17, 8); ctx.fill();
     ctx.fillStyle = nextIron ? '#6B6353' : (nextSpecial ? specialColor(nextSpecial) : runeColor(nextRune));
@@ -1287,7 +1287,7 @@
     }
     for (var di = 0; di < MG.layout.band.dunes.length; di++) {
       var du = MG.layout.band.dunes[di];
-      dune(C.W * du.xr, sy0 + du.dy, du.rx, du.ry, du.c, du.c0);
+      dune(du.x, sy0 + du.dy, du.rx, du.ry, du.c, du.c0);
     }
     // 卵石（块内坐标，贴容器底；装饰 y 以 FLOORY=646 时代为基准，随床面整体下移）
     ctx.fillStyle = 'rgba(110,150,168,0.4)';
@@ -1509,9 +1509,9 @@
       t1Font--;
       ctx.font = t1Font + 'px system-ui, sans-serif';
     }
-    ctx.strokeText(top1, 48, MG.layout.hud.row1Y);
+    ctx.strokeText(top1, 50, MG.layout.hud.row1Y);
     ctx.fillStyle = chal && !chal.done ? '#7B6FD0' : (ng.active ? '#6B5AA8' : '#3E6E90');
-    ctx.fillText(top1, 48, MG.layout.hud.row1Y);
+    ctx.fillText(top1, 50, MG.layout.hud.row1Y);
 
     // 第二组（中轴）：当前得分居中 + 正下方海域进度条（分数涨→进度前进，垂直联动）
     var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
@@ -1530,18 +1530,18 @@
     ctx.textAlign = 'left';
 
     // 右上角：计时（下一滴预览已移除——容器内虚影已直观展示下一滴，此处改回计时）
-    // 与左侧统计行同排、与静音按钮(cy36)垂直居中对齐
+    // 与左侧统计行同排、与静音按钮(cy35)垂直居中对齐
     ctx.textAlign = 'center';
     ctx.lineJoin = 'round';
-    // 计时沿用原样式（12px bold / #2E7DA8），与静音按钮(cy36)垂直居中对齐、与左侧统计行同排
+    // 计时沿用原样式（12px bold / #2E7DA8），与静音按钮(cy35)垂直居中对齐、与左侧统计行同排
     ctx.font = 'bold 12px system-ui, sans-serif';
     ctx.lineWidth = 2.5;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     var em = Math.floor(levelElapsed / 60), es = Math.floor(levelElapsed % 60);
     var etxt = '已进行 ' + em + ':' + (es < 10 ? '0' + es : es);
-    ctx.strokeText(etxt, C.W - 78, MG.layout.hud.row1Y);
+    ctx.strokeText(etxt, C.W - 80, MG.layout.hud.row1Y);
     ctx.fillStyle = '#2E7DA8';
-    ctx.fillText(etxt, C.W - 78, MG.layout.hud.row1Y);
+    ctx.fillText(etxt, C.W - 80, MG.layout.hud.row1Y);
 
     // 静音按钮（右上角，小号）：局内与初始界面共用同一入口
     drawMuteBtn();
@@ -1732,7 +1732,7 @@
     var last = C.seaStages.length - 1;
     var maxed = cur >= last;
     var sb = MG.layout.hud.seaBar;
-    var sx = sb.sx, sy = sb.sy, sw = sb.sw, sh = sb.sh; // 两侧各留 24：端点徽章(r10)不顶屏幕边界
+    var sx = sb.sx, sy = sb.sy, sw = sb.sw, sh = sb.sh; // 两侧各留 25：端点徽章(r10)不顶屏幕边界
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     roundRect(sx, sy, sw, sh, 8); ctx.fill();
     var frac = 1;
@@ -2041,7 +2041,7 @@
     }
     // 漂流瓶（随水流轻摆）
     ctx.save();
-    var bcy = MG.layout.panel.blockCy;
+    var bcy = MG.layout.panel.focusCy; // v191 修 bug：原引 panel.blockCy（v183 起重写 layout 后该字段已不存在，锚点 NaN 导致漂流瓶不绘制）
     ctx.translate(C.W / 2, bcy - 64);
     ctx.rotate(Math.sin(time * 1.4) * 0.12);
     ctx.fillStyle = 'rgba(150,220,200,0.9)';
@@ -2376,7 +2376,7 @@
     // 仍在胶囊下缘之上」的残余量（fit 里算好：高屏居中即避开胶囊→0，矮屏才给 ≤24）；
     // HUD（分数/进度/任务/潮汐胶囊）统一 +hudInset 平移；奖杯走 drawSkillBar 非平移路径，
     // 其 cy 同步设为 36+hudInset 与静音同高对齐。涨潮横幅 v188 起锚堆叠空间中心，不参与平移。
-    trophyBtn.cy = MG.layout.hud.trophyCy + hudInset;   // 与静音(36+hudInset)同高（奖杯不参与本平移，故直接烤进坐标）
+    trophyBtn.cy = MG.layout.hud.trophyCy + hudInset;   // 与静音(cy35+hudInset)同高（奖杯不参与本平移，故直接烤进坐标）
     if (hudInset > 0) { ctx.save(); ctx.translate(0, hudInset); }
     drawHUD();
     drawQuest();

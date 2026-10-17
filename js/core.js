@@ -56,13 +56,13 @@
     // 块顶上方/块底下方由全屏背景渐变（水色）自然延展填充，无留白、无接缝。
     // （__safeTop 由 wx-shim 用 getMenuButtonBoundingClientRect 计算，单位=窗口 CSS px）
     oy = Math.max(0, (VH - C.H) / 2);
-    // 胶囊残余避让：居中后 HUD 顶行（块内 cy36/r16 → 顶缘 20）若仍在胶囊下缘之上才需额外下挪；
-    // 高屏居中量已远大于胶囊高度 → hudInset=0（无需再避让）；矮屏(≈块高)才给 ≤24 的残余量。
-    var capBottom = window.__safeTop ? (window.__safeTop - 8) / view.s : 0;
-    hudInset = Math.max(0, Math.min(capBottom - oy - 20, 24));
+    // 胶囊残余避让：居中后 HUD 顶行（块内 trophyCy35/r16 → 顶缘 19）若仍在胶囊下缘之上才需额外下挪；
+    // 高屏居中量已远大于胶囊高度 → hudInset=0（无需再避让）；矮屏(≈块高)才给 ≤25 的残余量。
+    var capBottom = window.__safeTop ? (window.__safeTop - 10) / view.s : 0;
+    hudInset = Math.max(0, Math.min(capBottom - oy - (MG.layout.hud.trophyCy - 16), 25));
     // 容器区（layout.body 单一真源）：容器底/容器顶/警戒线/出生点按底部锚定
-    // （floorY = H-74，容器高 523/堆叠空间 379 定版，随块底整体平移）
-    FLOORY = MG.layout.body.floorY;        // 766+dy（9:18=766；dy=C.H-840）
+    // （floorY = H-75，随块底整体平移）
+    FLOORY = MG.layout.body.floorY;        // 765+dy（9:18=765；dy=C.H-840）
     canvas.width = Math.round(w * dpr);    // 画布铺满整个窗口（背景全程由游戏自绘）
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';

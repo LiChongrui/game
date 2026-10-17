@@ -8,8 +8,8 @@
 
   // ---------- 面板几何（渲染与点击热区共用，一处定义）----------
   // 尺寸/锚点走 MG.layout（改比例只改 config C.H，此处自动跟随）；y 为动态值：
-  var DEX_PANEL = { x: MG.layout.panel.dex.x, y: 64, w: MG.layout.panel.dex.w, h: MG.layout.panel.dex.h };
-  var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 42, y: DEX_PANEL.y + 8, w: 28, h: 28 }; // 右上 × 关闭（中心 +22px，与页头标题文字对齐）
+  var DEX_PANEL = { x: MG.layout.panel.dex.x, y: 65, w: MG.layout.panel.dex.w, h: MG.layout.panel.dex.h };
+  var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 40, y: DEX_PANEL.y + 10, w: 30, h: 30 }; // 右上 × 关闭（中心 +25px，与页头标题文字对齐）
   // 面板垂直居中：菜单态（铺满）以整屏 VH 为基准；局内游戏块高 C.H 为基准（比例旋钮，
   // 居中块=屏幕中心，块内 (C.H-h)/2 + 偏移 renderOy 恰好落在屏幕中央）——每帧绘制前重算
   function layoutDexPanel() {

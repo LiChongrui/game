@@ -70,20 +70,21 @@ MG.config = {
   W: 420,
   H: 840,              // 9:18（420×18/9=840；比例 2.0 < 常见手机≈2.16，view.s 按宽适配不变）
   // ★ 比例旋钮：改屏幕比例只改 H 这一处，其余元素位置由 js/layout.js 全部自动派生。
-  //   定位语义（v183 定版）：HUD 按顶部定位（钉块顶 0~164）；其余一切按底部定位
-  //   （= 9:18 定版基准 + dy，dy=H-840，随块底整体平移）；底部带恒 74 贴块底；
-  //   HUD 底与容器顶之间空隙 = 79+dy，有多少是多少、不显式分配。约束：H ≥ 761。
-  floorY: 673,         // 容器底 y 初始值（build() 回写为 H-74；9:18=766）
+  //   定位语义（v183 定版）：HUD 按顶部定位（钉块顶 0~165）；其余一切按底部定位
+  //   （= 9:18 定版基准 + dy，dy=H-840，随块底整体平移）；底部带恒 75 贴块底；
+  //   容器顶不设置（v184：容器从块顶长到容器底）；HUD 底与容器顶之间空隙 = 自然残余。
+  //   数值规范（v191）：layout 内全部基准值为 5 的倍数。约束：H ≥ 840。
+  floorY: 675,         // 容器底 y 初始值（build() 回写为 H-75；9:18=765）
 
-  // 容器（适度压缩给顶部宽松：开口 150、容器高 523、堆叠空间 379；顶部 HUD 区 0~164，
-  // 三组（统计/得分+进度条/任务+潮汐）行距舒适，开口上方空隙带供水滴出生/虚影悬停）
+  // 容器（顶部 HUD 区 0~165 三组（统计/得分+进度条/任务+潮汐）行距舒适；
+  // 容器顶不设置=0：容器从块顶长到容器底，堆叠空间只作派生量）
   wall: 0,             // 侧墙厚（0 = 无边框，水滴铺满画布全宽）
-  containerTop: 190,   // 容器顶部开口 y 初始值（build() 回写为 floorY-523；9:18=243）
-  dangerY: 254,        // 危险线 y 初始值（build() 回写为 floorY-379；9:18=387。堆积超过此线且静止即失败）
+  containerTop: 0,     // 容器顶部开口 y 初始值（build() 回写为 0：容器顶不设置，v184）
+  dangerY: 315,        // 危险线 y 初始值（build() 回写为 315+dy；9:18=315。堆积超过此线且静止即失败）
 
   // 投放
-  // 投放：坠落高度初始值（build() 公式回写为 dangerY-45；9:18=342）
-  spawnY: 209,
+  // 投放：坠落高度初始值（build() 回写为 260+dy 独立基准，与警戒线解耦，v190）
+  spawnY: 260,
   dropCooldown: 0.55,  // 两次投放最小间隔（秒）
 
   // 物理
@@ -297,21 +298,27 @@ MG.config = {
 // 一切坐标从「基础几何」经公式派生，分四层：
 //   ① hud   顶部信息区（0~hudBottom）：★ 按顶部定位——钉块顶，绝对定版，块高变化不动（v183）
 //   ② body  容器区（containerTop~floorY）：★ 按底部定位——= 9:18 定版基准 + dy（v183）
-//   ③ band  底部带（floorY~H）：高度恒 74 贴块底；内部（按钮/装饰）钉 floorY 相对位
+//   ③ band  底部带（floorY~H）：高度恒 75 贴块底；内部（按钮/装饰）钉 floorY 相对位
 //   ④ panel 全屏面板：同样按底部定位（= 9:18 定版基准 + dy），不漂流
-//   菜单（开始界面）：按底部定位（= 9:18 定版基准 + dy）
+// 菜单（开始界面）：按底部定位（= 9:18 定版基准 + dy）
 //
 // ★ 定位语义（v183 用户定版，覆盖 v175~v182 的 EXTRA 分配方案）：
 //   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少。"
-//   HUD 钉块顶（0~164）；其余一切 = 9:18 定版基准值 + dy，随块底整体平移；
-//   HUD 底与容器顶之间的空隙 = 79 + dy，自然伸缩，不再显式分配。
+//   HUD 钉块顶（0~hudBottom）；其余一切 = 9:18 定版基准值 + dy，随块底整体平移；
+//   HUD 底与容器顶之间的空隙 = 自然残余，不再显式分配。
 // ★★ 容器顶不设置（v184 用户定版："容器到HUD顶部，直接到窗口最大位置即可，
 //   相当于不设置容器顶；堆叠空间没必要，堆叠区从堆叠底部开始，高度上限不需要设置"）：
 //   containerTop = 0——容器从块顶开始长；失败线 dangerY 直接钉绝对基准
-//   （387+dy，含 v178/v181 两次+40），"堆叠空间"退为派生量（floorY-dangerY=379 自动守恒），
-//   不再是反推参数。dy = C.H - 840（9:18 定版基准块高）：H=840 → 0（= 当前交付逐像素一致）；
+//   （315+dy，含 v178/v181 两次+40 与 v188 单独下移 10），
+//   "堆叠空间"退为派生量（floorY-dangerY 自动守恒），不再是反推参数。
+// ★★★ 出生点独立基准（v190）：spawnY = 260+dy 与警戒线解耦（"单独移警戒线"语义：
+//   警戒线动、出生点不动、两者间距必变）；出生通道 = dangerY-spawnY = 55；
+//   弹出提示锚 mirrorCy = dangerY + 出生通道 = 370+dy（出生区相对警戒线的镜像对称位）。
+// ★ 数值规范（v191 用户要求"值要求是 0 或者 5 结尾"）：本文件所有基准值统一为
+//   5 的倍数（坐标/尺寸/偏移全部整齐，便于目测核对与微调）。
+//   dy = C.H - 840（9:18 定版基准块高）：H=840 → 0（= 当前交付逐像素一致）；
 //   改比例只改 C.H，HUD 不动、其余全部 +dy。
-//   约束：H ≥ 761（容器顶 243+dy 不侵入 HUD 底 164；当前 9:18=840 满足）。
+//   约束：H ≥ 765 + 75 = 840（当前交付比例即下限）。
 // 适配策略（view.s / oy / renderOy / hudInset）由 core.fit() 每帧重算，见其注释。
 //
 // ★ 使用规范：绘制与命中热区一律引用 MG.layout.xxx，禁止再写死坐标数字；
@@ -325,82 +332,80 @@ MG.layout = {
   build: function () {
     var C = MG.config, W = C.W, H = C.H;
     // ★★ 容器顶不设置（v184 用户定版）：containerTop = 0，容器从块顶开始长；
-    //   失败线 dangerY 直接钉绝对基准（317+dy，v188 用户"单独给警戒线往下移10"——
-    //   在 v187 的 307 基础上下移 10，其余不动），
-    //   "堆叠空间"不再作为反推参数——它只是派生量 floorY - dangerY = 449，自动守恒。
+    //   失败线 dangerY 直接钉绝对基准（315+dy，v191 数值规范：317→315），
+    //   "堆叠空间"不再作为反推参数——它只是派生量 floorY - dangerY，自动守恒。
     var dy = H - 840;                  // 9:18 定版基准块高 840；H=840 → 0
     this.dy = dy;
-    C.floorY = H - 74;                 // 766（9:18）：容器底 = 块底 - 底部带 74
+    C.floorY = H - 75;                 // 765（9:18）：容器底 = 块底 - 底部带 75
     C.containerTop = 0;                // 容器顶不设置（v184）：容器从块顶（窗口最大位置）开始长
-    C.dangerY = 317 + dy;              // 317（9:18）：失败线绝对基准（v187 的 307 下移 10，v188）
-    // 坠落高度 = 出生点绝对基准（262+dy，v186/v187 定版）。
-    // ★ v190 起与警戒线解耦：v188 曾按"公式跟随"让 spawnY 随警戒线 +10 联动，用户反馈
-    //   "单独给警戒线往下移10 好像没有生效，因为警戒线和出生区的间距没有变化"——
-    //   "单独移"语义 = 警戒线动、出生点不动，间距（出生通道）必须跟着变。
-    C.spawnY = 262 + dy;               // 262（9:18）：出生点独立基准，不随警戒线漂移
+    C.dangerY = 315 + dy;              // 315（9:18）：失败线绝对基准（254+两次+40-同步上移+单独下移10，v191 取整）
+    // 坠落高度 = 出生点绝对基准（260+dy，v190 定版，与警戒线解耦）。
+    // v188 曾按"公式跟随"让 spawnY 随警戒线联动，用户反馈"单独给警戒线往下移10 好像
+    // 没有生效，因为警戒线和出生区的间距没有变化"——"单独移"语义 = 警戒线动、出生点不动。
+    C.spawnY = 260 + dy;               // 260（9:18）：出生点独立基准，不随警戒线漂移
 
     // ---- ① 顶部 HUD 区（v149/v161 定版行位；★ 钉块顶，块高变化时本区不动）----
     this.hud = {
-      row1Y: 41,               // 统计最佳结果 / 计时 baseline（与奖杯·静音 cy36 垂直居中对齐同排）
-      trophyCy: 36,            // 奖杯 / 静音 / 菜单奖杯圆心（+hudInset 避让胶囊）
-      trophyCx: 24, muteCx: W - 24,
-      scoreY: 88,              // 当前得分 baseline（translate 锚点）
-      seaBar: { sx: 24, sy: 100, sw: W - 48, sh: 20 }, // 海域进度条（v151 定版 100~120）
-      quest: { qx: 12, qy: 130, qw: 206, qh: 34 },     // 任务条（v149 定版 130~164）
-      tidePill: { tx: W - 122, ty: 130, tw: 92, th: 34 }, // 潮汐胶囊（与任务条同高同排）
-      hudBottom: 164           // HUD 区底沿（任务条底）；容器顶=0（v184），HUD 直接浮在容器上
+      row1Y: 40,               // 统计最佳结果 / 计时 baseline（与奖杯·静音 cy35 垂直居中对齐同排）
+      trophyCy: 35,            // 奖杯 / 静音 / 菜单奖杯圆心（+hudInset 避让胶囊）
+      trophyCx: 25, muteCx: W - 25,
+      scoreY: 90,              // 当前得分 baseline（translate 锚点）
+      seaBar: { sx: 25, sy: 100, sw: W - 50, sh: 20 }, // 海域进度条（v151 定版 100~120）
+      quest: { qx: 10, qy: 130, qw: 205, qh: 35 },     // 任务条（v149 定版 130~165）
+      tidePill: { tx: W - 120, ty: 130, tw: 90, th: 35 }, // 潮汐胶囊（与任务条同高同排）
+      hudBottom: 165           // HUD 区底沿（任务条底）；容器顶=0（v184），HUD 直接浮在容器上
     };
 
     // ---- ② 容器区（核心游戏几何：底部锚定，随 dy 整体平移；容器顶不设置=0，v184）----
     this.body = {
       containerTop: C.containerTop,     // 0：容器顶不设置（容器从块顶开始长，v184 用户定版）
-      dangerY: C.dangerY,               // 317+dy 警戒线（绝对基准，v188 下移 10）
-      floorY: C.floorY,                 // 766+dy 容器底
-      spawnY: C.spawnY,                 // 262+dy 出生点（独立基准，v190 起与警戒线解耦）
+      dangerY: C.dangerY,               // 315+dy 警戒线（绝对基准，v191 取整）
+      floorY: C.floorY,                 // 765+dy 容器底
+      spawnY: C.spawnY,                 // 260+dy 出生点（独立基准，v190 起与警戒线解耦）
       // 出生通道（坠落区）高度 = dangerY - spawnY = 55（9:18）——"单独移警戒线"的显式体现
       spawnGap: C.dangerY - C.spawnY,
-      // ★ v190 弹出提示（公告弹字 + 涨潮横幅）默认锚点：出生区相对警戒线在堆叠区中的
-      //   镜像对称位置 = dangerY + spawnGap = 372+dy（出生通道 55 镜像到警戒线下方）
+      // ★ 弹出提示（公告弹字 + 涨潮横幅）默认锚点：出生区相对警戒线在堆叠区中的
+      //   镜像对称位置 = dangerY + spawnGap = 370+dy（出生通道 55 镜像到警戒线下方）
       mirrorCy: C.dangerY + (C.dangerY - C.spawnY),
-      tutY: 573 + dy                    // 首局引导胶囊锚点（容器中部，随底部锚定链平移）
+      tutY: 575 + dy                    // 首局引导胶囊锚点（容器中部，随底部锚定链平移）
     };
 
-    // ---- ③ 底部带（floorY~H：高度恒 74 贴块底，内部钉 floorY 相对位，绝不打散）----
+    // ---- ③ 底部带（floorY~H：高度恒 75 贴块底，内部钉 floorY 相对位，绝不打散）----
     this.band = {
       top: C.floorY,
-      h: H - C.floorY,                  // 恒 74（底部带固定不变，v177 用户定版）
-      btnCy: C.floorY + 28,             // 794+dy：底部一排按钮圆心（v163 铁律：与容器底恒距 28）
-      labelDy: 12,                      // 按钮名称标签：圆心 + r + 12
-      decorBase: C.floorY + 18,         // 784+dy：底部装饰基准线（床面玻璃横条底 FH12 + 6）
+      h: H - C.floorY,                  // 恒 75（底部带固定不变，v177 用户定版）
+      btnCy: C.floorY + 30,             // 795+dy：底部一排按钮圆心（v163 铁律：与容器底恒距 30）
+      labelDy: 10,                      // 按钮名称标签：圆心 + r + 10
+      decorBase: C.floorY + 20,         // 785+dy：底部装饰基准线（床面玻璃横条底 FH12 + 8）
       dunes: [                          // 三块沙丘（径向渐变柔边）：相对容器底固定，随 dy 平移不重排
-        { xr: 0.20, dy: 12, rx: 95,  ry: 13, c: 'rgba(238,246,240,0.7)', c0: 'rgba(238,246,240,0)' },
-        { xr: 0.74, dy: 14, rx: 115, ry: 15, c: 'rgba(238,246,240,0.7)', c0: 'rgba(238,246,240,0)' },
-        { xr: 0.47, dy: 18, rx: 85,  ry: 11, c: 'rgba(228,240,234,0.55)', c0: 'rgba(228,240,234,0)' }
+        { x: 85,  dy: 10, rx: 95,  ry: 15, c: 'rgba(238,246,240,0.7)', c0: 'rgba(238,246,240,0)' },
+        { x: 315, dy: 15, rx: 115, ry: 15, c: 'rgba(238,246,240,0.7)', c0: 'rgba(238,246,240,0)' },
+        { x: 195, dy: 20, rx: 85,  ry: 10, c: 'rgba(228,240,234,0.55)', c0: 'rgba(228,240,234,0)' }
       ],
-      pebbleYOff: (C.floorY + 18) - 664, // 卵石/海星/扇贝基准随 dy 平移（v136 时代 FLOORY=646 定版位）
-      pebbles: [[24, 688, 3], [66, 700, 2], [112, 686, 2.5], [172, 702, 2],
-                [246, 690, 2.5], [306, 700, 2], [352, 686, 2.5], [404, 696, 2.2]],
-      starfish: { x: 88, y: 700, s: 9 },
-      shell: { x: 330, y: 702, s: 9 }
+      pebbleYOff: (C.floorY + 20) - 665, // 卵石/海星/扇贝基准随 dy 平移（旧版 FLOORY=646 定版位）
+      pebbles: [[25, 685, 2.5], [65, 700, 2.5], [110, 685, 2.5], [170, 700, 2.5],
+                [245, 690, 2.5], [305, 700, 2.5], [350, 685, 2.5], [405, 695, 2.5]],
+      starfish: { x: 90, y: 700, s: 10 },
+      shell: { x: 330, y: 700, s: 10 }
     };
 
     // ---- ④ 全屏面板（底部锚定：= 9:18 定版基准 + dy，随块底平移不漂流）----
     this.panel = {
-      focusCy: 463 + dy,              // 游戏区焦点中心（9:18 定版 463：结算海报 py227/h472 与分享卡 py253/h420 的共同中心）
-      over: { w: 320, h: 472 },       // 结算海报（v161 排版放松定版；py = focusCy - 236 = 227+dy）
-      share: { w: 300, h: 420 },      // 战报分享卡（py = focusCy - 210 = 253+dy）
-      confirm: { w: W - 120, h: 170, dy: 393 + dy, btnDy: 102 }, // 重开确认（py393+dy；按钮 py+102）
-      ng: { w: 330, h: 348 },         // 深渊潜航词缀三选一（底部锚定，y = 246+dy）
+      focusCy: 465 + dy,              // 游戏区焦点中心（9:18 定版 465：结算海报 py230/h470 与分享卡 py255/h420 的共同中心）
+      over: { w: 320, h: 470 },       // 结算海报（v161 排版放松定版；py = focusCy - 235 = 230+dy）
+      share: { w: 300, h: 420 },      // 战报分享卡（py = focusCy - 210 = 255+dy）
+      confirm: { w: W - 120, h: 170, dy: 395 + dy, btnDy: 105 }, // 重开确认（py395+dy；按钮 py+105）
+      ng: { w: 330, h: 350 },         // 深渊潜航词缀三选一（底部锚定，y = 245+dy）
       dex: { x: 20, w: 380, h: 560 }, // 图鉴/成就（局内 y 由 dexY 派生；菜单态按全屏 VH 居中）
       dexY: 140 + dy                  // 图鉴局内 y（9:18 定版 140 = (840-560)/2，随底部锚定链平移）
     };
 
     // ---- 菜单（开始界面：底部锚定，= 9:18 定版基准 + dy）----
     this.menu = {
-      titleY: 311 + dy, titleShadowY: 313 + dy, subY: 345 + dy, bestY: 387 + dy,
-      offlineY: 409 + dy, offlineW: 300, offlineH: 62,
-      startY: 489 + dy, startW: 220, startH: 60,
-      footDy: 56                       // 底部玩法一句话：距块底（VH-56，随块底自动）
+      titleY: 310 + dy, titleShadowY: 315 + dy, subY: 345 + dy, bestY: 385 + dy,
+      offlineY: 410 + dy, offlineW: 300, offlineH: 60,
+      startY: 490 + dy, startW: 220, startH: 60,
+      footDy: 55                       // 底部玩法一句话：距块底（VH-55，随块底自动）
     };
   },
 
@@ -596,13 +601,13 @@ MG.layout.build();
     // 块顶上方/块底下方由全屏背景渐变（水色）自然延展填充，无留白、无接缝。
     // （__safeTop 由 wx-shim 用 getMenuButtonBoundingClientRect 计算，单位=窗口 CSS px）
     oy = Math.max(0, (VH - C.H) / 2);
-    // 胶囊残余避让：居中后 HUD 顶行（块内 cy36/r16 → 顶缘 20）若仍在胶囊下缘之上才需额外下挪；
-    // 高屏居中量已远大于胶囊高度 → hudInset=0（无需再避让）；矮屏(≈块高)才给 ≤24 的残余量。
-    var capBottom = window.__safeTop ? (window.__safeTop - 8) / view.s : 0;
-    hudInset = Math.max(0, Math.min(capBottom - oy - 20, 24));
+    // 胶囊残余避让：居中后 HUD 顶行（块内 trophyCy35/r16 → 顶缘 19）若仍在胶囊下缘之上才需额外下挪；
+    // 高屏居中量已远大于胶囊高度 → hudInset=0（无需再避让）；矮屏(≈块高)才给 ≤25 的残余量。
+    var capBottom = window.__safeTop ? (window.__safeTop - 10) / view.s : 0;
+    hudInset = Math.max(0, Math.min(capBottom - oy - (MG.layout.hud.trophyCy - 16), 25));
     // 容器区（layout.body 单一真源）：容器底/容器顶/警戒线/出生点按底部锚定
-    // （floorY = H-74，容器高 523/堆叠空间 379 定版，随块底整体平移）
-    FLOORY = MG.layout.body.floorY;        // 766+dy（9:18=766；dy=C.H-840）
+    // （floorY = H-75，随块底整体平移）
+    FLOORY = MG.layout.body.floorY;        // 765+dy（9:18=765；dy=C.H-840）
     canvas.width = Math.round(w * dpr);    // 画布铺满整个窗口（背景全程由游戏自绘）
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';
@@ -2449,7 +2454,7 @@ MG.layout.build();
     for (var i = bs.length - 1; i >= 0; i--) {
       var b = bs[i];
       var dx = p.x - b.x, dy = p.y - b.y;
-      var rr = b.r + 6;
+      var rr = b.r + 5;
       if (dx * dx + dy * dy <= rr * rr) return b;
     }
     return null;
@@ -2886,11 +2891,11 @@ MG.layout.build();
 
   function buildOverButtons() {
     overButtons = [];
-    var bw = 240, bh = 42, gap = 10, x = (C.W - bw) / 2;
+    var bw = 240, bh = 40, gap = 10, x = (C.W - bw) / 2;
     // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中
     // （面板几何走 MG.layout.overRect()，渲染 drawOver 与命中此处同源）
     var ovr = MG.layout.overRect();
-    var areaTop = ovr.y + 186, areaBottom = ovr.y + ovr.h - 22;
+    var areaTop = ovr.y + 185, areaBottom = ovr.y + ovr.h - 25;
     var n = 1 + (doubled ? 0 : 1) + 3; // 复活(无限)/双倍/分享/深渊潜航/重开
     var groupH = n * bh + (n - 1) * gap;
     var y = areaTop + (areaBottom - areaTop - groupH) / 2;
@@ -2915,34 +2920,34 @@ MG.layout.build();
   }
 
   // ---------- 命中区域（圆形按钮；坐标全部由 layout 派生，与绘制同源）----------
-  var MUTE = { cx: C.W - 24, cy: MG.layout.hud.trophyCy, r: 16, pressT: 0 };
-  var bookBtn = { cx: 46, cy: MG.layout.band.btnCy, r: 20, pressT: 0 };
-  var trophyBtn = { cx: 24, cy: MG.layout.hud.trophyCy, r: 16, pressT: 0 }; // 成就页入口（奖杯；局内由 fit()/render 挂到刘海行 +hudInset）——与重开按钮(r16)同径
-  var menuTrophy = { cx: 24, cy: MG.layout.hud.trophyCy, r: 16, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——与重开按钮同径
-  var restartBtn = { cx: C.W - 24, cy: MG.layout.band.btnCy, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
+  var MUTE = { cx: C.W - 25, cy: MG.layout.hud.trophyCy, r: 15, pressT: 0 };
+  var bookBtn = { cx: 45, cy: MG.layout.band.btnCy, r: 20, pressT: 0 };
+  var trophyBtn = { cx: 25, cy: MG.layout.hud.trophyCy, r: 15, pressT: 0 }; // 成就页入口（奖杯；局内由 fit()/render 挂到刘海行 +hudInset）——与重开按钮(r15)同径
+  var menuTrophy = { cx: 25, cy: MG.layout.hud.trophyCy, r: 15, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——与重开按钮同径
+  var restartBtn = { cx: C.W - 25, cy: MG.layout.band.btnCy, r: 15, pressT: 0 }; // 游戏内重开（带确认），右下角
   // 「深渊潜航」无局内悬浮钮：入口在结算页按钮组（主流 NG+ 模式选择设计）
-  // 底部一排共 6 个按钮（图鉴 + 4 道具 + 重开），中心等距 70px 均匀排列：46/116/186/256/326/396
+  // 底部一排共 6 个按钮（图鉴 + 4 道具 + 重开），中心等距 70px 均匀排列：45/115/185/255/325/395
   var SKILL_BTNS = [
-    { key: 'swap',   cx: 116, cy: MG.layout.band.btnCy, r: 20, pressT: 0 },
-    { key: 'ripple', cx: 186, cy: MG.layout.band.btnCy, r: 20, pressT: 0 },
-    { key: 'evap',   cx: 256, cy: MG.layout.band.btnCy, r: 20, pressT: 0 },
-    { key: 'flow',   cx: 326, cy: MG.layout.band.btnCy, r: 20, pressT: 0 }
+    { key: 'swap',   cx: 115, cy: MG.layout.band.btnCy, r: 20, pressT: 0 },
+    { key: 'ripple', cx: 185, cy: MG.layout.band.btnCy, r: 20, pressT: 0 },
+    { key: 'evap',   cx: 255, cy: MG.layout.band.btnCy, r: 20, pressT: 0 },
+    { key: 'flow',   cx: 325, cy: MG.layout.band.btnCy, r: 20, pressT: 0 }
   ];
   fit(); // 首次适配（按钮已定义，底部元素可同步贴底）
 
   // 重开确认弹窗（几何走 layout.confirmRect，渲染/命中共用）
   var confirmOpen = false;
-  var confirmYes = { x: C.W / 2 - 106, y: MG.layout.confirmRect().y + MG.layout.panel.confirm.btnDy, w: 94, h: 42 };
-  var confirmNo = { x: C.W / 2 + 12, y: MG.layout.confirmRect().y + MG.layout.panel.confirm.btnDy, w: 94, h: 42 };
+  var confirmYes = { x: C.W / 2 - 105, y: MG.layout.confirmRect().y + MG.layout.panel.confirm.btnDy, w: 95, h: 40 };
+  var confirmNo = { x: C.W / 2 + 15, y: MG.layout.confirmRect().y + MG.layout.panel.confirm.btnDy, w: 95, h: 40 };
 
   function inRect(p, r) {
     return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
   }
   function inCircle(p, c) {
     var dx = p.x - c.cx, dy = p.y - c.cy;
-    return dx * dx + dy * dy <= (c.r + 6) * (c.r + 6);
+    return dx * dx + dy * dy <= (c.r + 5) * (c.r + 5);
   }
-  function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - (MUTE.cy + hudInset); return dx * dx + dy * dy <= (MUTE.r + 6) * (MUTE.r + 6); } // 命中区随按钮半径（与其他圆钮同为 r+6）；+hudInset 与 HUD 平移一致（菜单=oy，游戏态=min(oy,24)）
+  function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - (MUTE.cy + hudInset); return dx * dx + dy * dy <= (MUTE.r + 5) * (MUTE.r + 5); } // 命中区随按钮半径（与其他圆钮同为 r+5）；+hudInset 与 HUD 平移一致（菜单=oy，游戏态=min(oy,25)）
   function toLocal(e) {
     var rect = canvas.getBoundingClientRect();
     // 内容层游戏块垂直居中偏移 renderOy（菜单态 0），触摸 y 同量补偿还原块内坐标
@@ -3278,8 +3283,8 @@ MG.layout.build();
 
   // ---------- 面板几何（渲染与点击热区共用，一处定义）----------
   // 尺寸/锚点走 MG.layout（改比例只改 config C.H，此处自动跟随）；y 为动态值：
-  var DEX_PANEL = { x: MG.layout.panel.dex.x, y: 64, w: MG.layout.panel.dex.w, h: MG.layout.panel.dex.h };
-  var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 42, y: DEX_PANEL.y + 8, w: 28, h: 28 }; // 右上 × 关闭（中心 +22px，与页头标题文字对齐）
+  var DEX_PANEL = { x: MG.layout.panel.dex.x, y: 65, w: MG.layout.panel.dex.w, h: MG.layout.panel.dex.h };
+  var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 40, y: DEX_PANEL.y + 10, w: 30, h: 30 }; // 右上 × 关闭（中心 +25px，与页头标题文字对齐）
   // 面板垂直居中：菜单态（铺满）以整屏 VH 为基准；局内游戏块高 C.H 为基准（比例旋钮，
   // 居中块=屏幕中心，块内 (C.H-h)/2 + 偏移 renderOy 恰好落在屏幕中央）——每帧绘制前重算
   function layoutDexPanel() {
@@ -5240,7 +5245,7 @@ MG.layout.build();
     ctx.textAlign = 'center';
     ctx.font = 'bold 14px system-ui, sans-serif';
     var tw = ctx.measureText(label).width + 12;
-    var ly = Math.max(C.containerTop + 14, C.spawnY - r - 11); // 距球顶约5px间距；大档虚影时钳制在容器内，不越块顶
+    var ly = Math.max(C.containerTop + 15, C.spawnY - r - 10); // 距球顶5px间距；大档虚影时钳制在容器内，不越块顶
     ctx.fillStyle = 'rgba(255,255,255,0.88)';
     roundRect(aimX - tw / 2, ly - 12, tw, 17, 8); ctx.fill();
     ctx.fillStyle = nextIron ? '#6B6353' : (nextSpecial ? specialColor(nextSpecial) : runeColor(nextRune));
@@ -5313,7 +5318,7 @@ MG.layout.build();
     }
     for (var di = 0; di < MG.layout.band.dunes.length; di++) {
       var du = MG.layout.band.dunes[di];
-      dune(C.W * du.xr, sy0 + du.dy, du.rx, du.ry, du.c, du.c0);
+      dune(du.x, sy0 + du.dy, du.rx, du.ry, du.c, du.c0);
     }
     // 卵石（块内坐标，贴容器底；装饰 y 以 FLOORY=646 时代为基准，随床面整体下移）
     ctx.fillStyle = 'rgba(110,150,168,0.4)';
@@ -5535,9 +5540,9 @@ MG.layout.build();
       t1Font--;
       ctx.font = t1Font + 'px system-ui, sans-serif';
     }
-    ctx.strokeText(top1, 48, MG.layout.hud.row1Y);
+    ctx.strokeText(top1, 50, MG.layout.hud.row1Y);
     ctx.fillStyle = chal && !chal.done ? '#7B6FD0' : (ng.active ? '#6B5AA8' : '#3E6E90');
-    ctx.fillText(top1, 48, MG.layout.hud.row1Y);
+    ctx.fillText(top1, 50, MG.layout.hud.row1Y);
 
     // 第二组（中轴）：当前得分居中 + 正下方海域进度条（分数涨→进度前进，垂直联动）
     var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
@@ -5556,18 +5561,18 @@ MG.layout.build();
     ctx.textAlign = 'left';
 
     // 右上角：计时（下一滴预览已移除——容器内虚影已直观展示下一滴，此处改回计时）
-    // 与左侧统计行同排、与静音按钮(cy36)垂直居中对齐
+    // 与左侧统计行同排、与静音按钮(cy35)垂直居中对齐
     ctx.textAlign = 'center';
     ctx.lineJoin = 'round';
-    // 计时沿用原样式（12px bold / #2E7DA8），与静音按钮(cy36)垂直居中对齐、与左侧统计行同排
+    // 计时沿用原样式（12px bold / #2E7DA8），与静音按钮(cy35)垂直居中对齐、与左侧统计行同排
     ctx.font = 'bold 12px system-ui, sans-serif';
     ctx.lineWidth = 2.5;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     var em = Math.floor(levelElapsed / 60), es = Math.floor(levelElapsed % 60);
     var etxt = '已进行 ' + em + ':' + (es < 10 ? '0' + es : es);
-    ctx.strokeText(etxt, C.W - 78, MG.layout.hud.row1Y);
+    ctx.strokeText(etxt, C.W - 80, MG.layout.hud.row1Y);
     ctx.fillStyle = '#2E7DA8';
-    ctx.fillText(etxt, C.W - 78, MG.layout.hud.row1Y);
+    ctx.fillText(etxt, C.W - 80, MG.layout.hud.row1Y);
 
     // 静音按钮（右上角，小号）：局内与初始界面共用同一入口
     drawMuteBtn();
@@ -5758,7 +5763,7 @@ MG.layout.build();
     var last = C.seaStages.length - 1;
     var maxed = cur >= last;
     var sb = MG.layout.hud.seaBar;
-    var sx = sb.sx, sy = sb.sy, sw = sb.sw, sh = sb.sh; // 两侧各留 24：端点徽章(r10)不顶屏幕边界
+    var sx = sb.sx, sy = sb.sy, sw = sb.sw, sh = sb.sh; // 两侧各留 25：端点徽章(r10)不顶屏幕边界
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     roundRect(sx, sy, sw, sh, 8); ctx.fill();
     var frac = 1;
@@ -6067,7 +6072,7 @@ MG.layout.build();
     }
     // 漂流瓶（随水流轻摆）
     ctx.save();
-    var bcy = MG.layout.panel.blockCy;
+    var bcy = MG.layout.panel.focusCy; // v191 修 bug：原引 panel.blockCy（v183 起重写 layout 后该字段已不存在，锚点 NaN 导致漂流瓶不绘制）
     ctx.translate(C.W / 2, bcy - 64);
     ctx.rotate(Math.sin(time * 1.4) * 0.12);
     ctx.fillStyle = 'rgba(150,220,200,0.9)';
@@ -6402,7 +6407,7 @@ MG.layout.build();
     // 仍在胶囊下缘之上」的残余量（fit 里算好：高屏居中即避开胶囊→0，矮屏才给 ≤24）；
     // HUD（分数/进度/任务/潮汐胶囊）统一 +hudInset 平移；奖杯走 drawSkillBar 非平移路径，
     // 其 cy 同步设为 36+hudInset 与静音同高对齐。涨潮横幅 v188 起锚堆叠空间中心，不参与平移。
-    trophyBtn.cy = MG.layout.hud.trophyCy + hudInset;   // 与静音(36+hudInset)同高（奖杯不参与本平移，故直接烤进坐标）
+    trophyBtn.cy = MG.layout.hud.trophyCy + hudInset;   // 与静音(cy35+hudInset)同高（奖杯不参与本平移，故直接烤进坐标）
     if (hudInset > 0) { ctx.save(); ctx.translate(0, hudInset); }
     drawHUD();
     drawQuest();
