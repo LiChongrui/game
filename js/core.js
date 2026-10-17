@@ -20,22 +20,24 @@
   };
 
   // ---------- 画布 ----------
-  // 逻辑高度动态（VH ≥ C.H）：顶部元素（HUD/出生区/警戒线）按块内绝对坐标绘制（layout.hud/body），
-  // 底部元素（按钮/装饰）钉在容器底相对位（layout.band），中间水域随窗口高度自适应；
-  // 画布 CSS 高度恒等于窗口高度，CSS 宽度=游戏区宽度（两侧为页面深海背景）
+  // 逻辑高度动态（VH ≥ C.H）：HUD 三组行位钉块顶（layout.hud，0~164），
+  // 容器/警戒线/坠落高度随 EXTRA 整体下移（layout.body），底部带恒 74 贴块底（layout.band），
+  // 中间水域随窗口高度自适应；画布 CSS 高度恒等于窗口高度，CSS 宽度=游戏区宽度（两侧为页面深海背景）
   var canvas = document.getElementById('game');
   var ctx = canvas.getContext('2d');
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
   var VH = C.H;           // 当前逻辑高度（全屏：h/view.s，≥C.H）
   var LW = C.W;           // 当前逻辑宽度（≥ C.W，宽窗口下两侧为延伸海水）
   var BX = 0;             // 游戏区（420 逻辑宽）水平居中偏移
-  var FLOORY = C.floorY;  // 容器底 y（= layout.body.floorY，游戏块内恒定）
+  var FLOORY = C.floorY;  // 容器底 y（= layout.body.floorY，随 EXTRA 下移）
   var view = { s: 1 };
-  // 游戏块 = 420×C.H 逻辑区（当前交付 9:18=840；顶部 HUD 0~164 + 出生空隙带 26 + 容器 483
-  // + 底部带 floorY~H 随比例伸缩）。坠落高度 = 最大可投放滴底触警戒线时的球心（dangerY - 45）；
-  // 高屏多余的高度上下均分（oy 为块居中偏移），块外由背景渐变延伸填充。
+  // 游戏块 = 420×C.H 逻辑区（当前交付 9:18=840）。★ 比例承接地（v177 用户定版）：
+  // 多出的块高全部垫在「HUD 三组行位(0~164)」与「坠落高度(spawnY)」之间——HUD 钉块顶，
+  // 容器/警戒线/坠落高度/底部带 = 9:16 基准 + EXTRA 整体下移，底部带恒 74 贴块底。
+  // 坠落高度 = 最大可投放滴底触警戒线时的球心（dangerY - 45）；高屏多余的高度上下均分
+  // （oy 为块居中偏移），块外由背景渐变延伸填充。
   // ★ 改比例只改 config 的 C.H 一处：layout.build() 自动重算全部游戏内坐标
-  //   （底部带 floorY~H 吸收高度变化，按钮/装饰钉 floorY 相对位）；本 fit() 只负责
+  //   （EXTRA=C.H-747 垫到 HUD 与坠落高度之间）；本 fit() 只负责
   //   「块 → 窗口」适配（view.s / oy / hudInset），不再写死任何游戏内坐标。
   var oy = 0;             // 游戏块顶部偏移（逻辑 px，≥0）
   var renderOy = 0;       // 渲染/点击实际使用的偏移（全态 = oy，垂直居中）
@@ -57,15 +59,15 @@
     // 高屏居中量已远大于胶囊高度 → hudInset=0（无需再避让）；矮屏(≈块高)才给 ≤24 的残余量。
     var capBottom = window.__safeTop ? (window.__safeTop - 8) / view.s : 0;
     hudInset = Math.max(0, Math.min(capBottom - oy - 20, 24));
-    // 游戏块内全部恒定（=config 初始值，layout.body 单一真源）：容器底/容器顶/警戒线/出生点
-    // 不随设备变化，容器 420:483 恒定——不同设备游戏区大小比例完全一致
-    FLOORY = MG.layout.body.floorY;        // 673（不再随 C.H 换算：底部带拉厚只加在 floorY~H 之间）
+    // 容器区（layout.body 单一真源）：容器底/容器顶/警戒线/出生点 = 9:16 基准 + EXTRA
+    // 整体下移（EXTRA=C.H-747），容器 420:483 恒定——不同设备游戏区大小比例完全一致
+    FLOORY = MG.layout.body.floorY;        // 673+EXTRA（9:16=673 / 9:18=766 / 8:18=871）
     canvas.width = Math.round(w * dpr);    // 画布铺满整个窗口（背景全程由游戏自绘）
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // 按钮恒贴在容器底下方（cy=FLOORY+28=701，与容器底恒距 28，v163 定版）——
-    // 块高/比例变化时底部带拉厚，按钮钉 floorY 相对位、不随块底下沉（v172 贴底事故的根治）
+    // 按钮恒贴在容器底下方（cy=layout.band.btnCy=FLOORY+28，与容器底恒距 28，v163 定版）——
+    // 块高/比例变化时容器整体下移，按钮随容器走（不钉屏幕、不贴块底，v172 贴底事故的根治）
     var cy = MG.layout.band.btnCy;
     // 注意：模块化后 bookBtn 等声明在 systems.js（后加载），早期触发时用 typeof 守卫
     if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {

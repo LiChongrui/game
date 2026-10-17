@@ -1,9 +1,9 @@
-// 布局几何验证（v175）：MG.layout 单一几何真源
-// 纯 node 计算（vm 加载 config + layout，无浏览器/无 canvas）：
-//   ① H=747：全部派生值必须等于 v171 硬编码值 → 重构像素级不变
-//   ② H=945：只改 C.H 一处 → 按钮/沙丘/卵石/海星/扇贝钉 floorY 相对位不动，
-//      HUD/容器/菜单/面板全部不漂流，底部带自动 74→272
-//   ③ 其他比例抽查 + 回 747 复原
+// 布局几何验证（v177）：MG.layout 单一几何真源
+// 纯 node 计算（vm 加载 config + layout，无浏览器/无 canvas）。
+// ★ v177 新语义（覆盖 v175"底部带吸收"方案，用户："底部带固定不变，多出的区域应当留在
+//   HUD 三组行位与坠落高度之间的间距"）：
+//   HUD(0~164) 钉块顶不动；容器/警戒线/坠落高度/底部带/面板/菜单 = 9:16 基准 + EXTRA 整体下移；
+//   底部带高度恒 74。EXTRA = C.H - 747。
 // 运行：node test/verify_layout.js
 const fs = require('fs');
 const path = require('path');
@@ -22,7 +22,7 @@ function eq(name, got, want) {
   fail++; console.log('FAIL', name, 'got', JSON.stringify(got), 'want', JSON.stringify(want));
 }
 
-// ===== ① H=747：全部派生值必须等于 v171 硬编码值（像素级不变）=====
+// ===== ① H=747（EXTRA=0）：全部派生值必须等于 v171 硬编码值（像素级不变）=====
 // 显式设基线，与 config 当前交付值解耦（config 改比例后本段仍回归 9:16）
 C.H = 747; L.build();
 eq('hud.row1Y', L.hud.row1Y, 41);
@@ -66,58 +66,73 @@ eq('menu.bestY', L.menu.bestY, 294);
 eq('menu.offlineY', L.menu.offlineY, 316);
 eq('menu.startY', L.menu.startY, 396);
 eq('menu.footDy', L.menu.footDy, 56);
+eq('extra(747)', L.extra, 0);
 console.log('① 9:16 像素不变断言: ' + pass + ' pass, ' + fail + ' fail');
 
-// ===== ② 改比例 H=945：只改 C.H 一处，验证自动重排 =====
-pass = 0; fail = 0;
-C.H = 945; L.build();
-eq('band.h(945)', L.band.h, 272);
-eq('band.btnCy(945)', L.band.btnCy, 701);              // 按钮钉 floorY+28 不动
-eq('dune0.abs(945)', L.band.decorBase + L.band.dunes[0].dy, 703); // 沙丘相对位不动
-eq('dune1.abs(945)', L.band.decorBase + L.band.dunes[1].dy, 705);
-eq('dune2.abs(945)', L.band.decorBase + L.band.dunes[2].dy, 709);
-eq('pebble0.abs(945)', L.band.pebbles[0][1] + L.band.pebbleYOff, 715);
-eq('starfish.abs(945)', L.band.starfish.y + L.band.pebbleYOff, 727);
-eq('shell.abs(945)', L.band.shell.y + L.band.pebbleYOff, 729);
-eq('hud(945) 不动', L.hud.row1Y + '/' + L.hud.scoreY + '/' + L.hud.quest.qy, '41/88/130');
-eq('body(945) 不动', L.body.floorY + '/' + L.body.spawnY + '/' + L.body.containerTop + '/' + L.body.dangerY, '673/209/190/254');
-eq('overRect.y(945)', L.overRect().y, 134);            // 面板锚定焦点不漂流
-eq('shareRect.y(945)', L.shareRect().y, 160);
-eq('confirmRect.y(945)', L.confirmRect().y, 300);
-eq('menu(945) 不动', L.menu.startY + '/' + L.menu.titleY + '/' + L.menu.offlineY, '396/218/316');
-eq('ngRect.y(945)', L.ngRect().y, 298.5);              // 全屏模态按块居中（随块高）
-eq('panel.blockCy(945)', L.panel.blockCy, 472.5);
-console.log('② 8:18 自动重排断言: ' + pass + ' pass, ' + fail + ' fail');
+// ===== ② 改比例自动重排：HUD 钉顶不动，其余 = 基准 + EXTRA 整体下移，底部带恒 74 =====
+function checkRatio(H, label) {
+  pass = 0; fail = 0;
+  var X = H - 747; // EXTRA
+  C.H = H; L.build();
+  eq('extra(' + label + ')', L.extra, X);
+  // HUD 钉块顶：三组行位完全不动
+  eq('hud 不动(' + label + ')', L.hud.row1Y + '/' + L.hud.scoreY + '/' + L.hud.seaBar.sy + '/' + L.hud.quest.qy + '/' + L.hud.trophyCy, '41/88/100/130/36');
+  // 容器/警戒线/坠落高度：+EXTRA 下移（容器高恒 483）
+  eq('containerTop(' + label + ')', L.body.containerTop, 190 + X);
+  eq('dangerY(' + label + ')', L.body.dangerY, 254 + X);
+  eq('floorY(' + label + ')', L.body.floorY, 673 + X);
+  eq('spawnY(' + label + ')', L.body.spawnY, 209 + X);
+  eq('容器高(' + label + ')', L.body.floorY - L.body.containerTop, 483);
+  eq('堆叠空间(' + label + ')', L.body.floorY - L.body.dangerY, 419);
+  eq('tutY(' + label + ')', L.body.tutY, 480 + X);
+  // ★ 多出的区域垫在 HUD 与坠落高度之间：164 → spawnY
+  eq('HUD→坠落间距(' + label + ')', L.body.spawnY - L.hud.hudBottom, 45 + X);
+  // 底部带：高度恒 74，内部布局 +EXTRA 平移（不打散）
+  eq('band.h(' + label + ')', L.band.h, 74);
+  eq('btnCy(' + label + ')', L.band.btnCy, 701 + X);          // = floorY+28
+  eq('decorBase(' + label + ')', L.band.decorBase, 691 + X);
+  eq('dune0.abs(' + label + ')', L.band.decorBase + L.band.dunes[0].dy, 703 + X);
+  eq('dune1.abs(' + label + ')', L.band.decorBase + L.band.dunes[1].dy, 705 + X);
+  eq('dune2.abs(' + label + ')', L.band.decorBase + L.band.dunes[2].dy, 709 + X);
+  eq('pebble0.abs(' + label + ')', L.band.pebbles[0][1] + L.band.pebbleYOff, 715 + X);
+  eq('pebble7.abs(' + label + ')', L.band.pebbles[7][1] + L.band.pebbleYOff, 723 + X);
+  eq('starfish.abs(' + label + ')', L.band.starfish.y + L.band.pebbleYOff, 727 + X);
+  eq('shell.abs(' + label + ')', L.band.shell.y + L.band.pebbleYOff, 729 + X);
+  eq('按钮-容器底恒距(' + label + ')', L.band.btnCy - L.body.floorY, 28);
+  // 面板：锚定游戏区焦点 +EXTRA 平移，不漂流
+  eq('overRect.y(' + label + ')', L.overRect().y, 134 + X);
+  eq('shareRect.y(' + label + ')', L.shareRect().y, 160 + X);
+  eq('confirmRect.y(' + label + ')', L.confirmRect().y, 300 + X);
+  eq('focusCy(' + label + ')', L.panel.focusCy, 370 + X);
+  // NG 弹窗：按块居中（随块高）
+  eq('ngRect.y(' + label + ')', L.ngRect().y, (H - 348) / 2);
+  eq('blockCy(' + label + ')', L.panel.blockCy, H / 2);
+  // 菜单：+EXTRA 平移（与容器相对关系不变）
+  eq('menu(' + label + ')', L.menu.titleY + '/' + L.menu.subY + '/' + L.menu.offlineY + '/' + L.menu.startY,
+     (218 + X) + '/' + (252 + X) + '/' + (316 + X) + '/' + (396 + X));
+  // 回写 config 真源（物理引擎读 C.*）
+  eq('C.floorY回写(' + label + ')', C.floorY, 673 + X);
+  eq('C.spawnY回写(' + label + ')', C.spawnY, 209 + X);
+  eq('C.dangerY回写(' + label + ')', C.dangerY, 254 + X);
+  eq('C.containerTop回写(' + label + ')', C.containerTop, 190 + X);
+  console.log('② ' + label + ' 自动重排断言: ' + pass + ' pass, ' + fail + ' fail');
+  return fail;
+}
+var f2 = 0;
+f2 += checkRatio(840, '9:18');   // 当前交付：EXTRA=+93
+f2 += checkRatio(945, '8:18');   // 历史场景回归：EXTRA=+198（曾因方案错误被否，现语义正确）
+f2 += checkRatio(800, 'H=800');  // 任意比例抽查：EXTRA=+53
 
-// ===== ③ 其他比例抽查 =====
+// ===== ③ 交付比例回归：config 当前 H =====
 pass = 0; fail = 0;
-C.H = 800; L.build();
-eq('H=800 band.h', L.band.h, 127);
-eq('H=800 btnCy', L.band.btnCy, 701);
-eq('H=800 overRect.y', L.overRect().y, 134);
-
-// ---- 交付比例回归：config 当前 H（9:18=840）----
 var initialH = CONFIG_H0;         // config 交付值（各段不得污染，从加载瞬间记录）
 eq('config.H(交付比例)', initialH, 840);
-C.H = initialH; L.build();       // 以 config 交付值为准重建
-eq('H=840 band.h', L.band.h, initialH - 673);          // 167：多出高度整段给底部带
-eq('H=840 btnCy', L.band.btnCy, 701);                  // 按钮钉 floorY+28 不动
-eq('H=840 decorBase', L.band.decorBase, 691);          // 装饰基准不动
-eq('H=840 dune0.abs', L.band.decorBase + L.band.dunes[0].dy, 703);
-eq('H=840 dune1.abs', L.band.decorBase + L.band.dunes[1].dy, 705);
-eq('H=840 dune2.abs', L.band.decorBase + L.band.dunes[2].dy, 709);
-eq('H=840 pebble0.abs', L.band.pebbles[0][1] + L.band.pebbleYOff, 715);
-eq('H=840 pebble7.abs', L.band.pebbles[7][1] + L.band.pebbleYOff, 723);
-eq('H=840 starfish.abs', L.band.starfish.y + L.band.pebbleYOff, 727);
-eq('H=840 shell.abs', L.band.shell.y + L.band.pebbleYOff, 729);
-eq('H=840 hud 不动', L.hud.row1Y + '/' + L.hud.scoreY + '/' + L.hud.quest.qy, '41/88/130');
-eq('H=840 body 不动', L.body.floorY + '/' + L.body.spawnY + '/' + L.body.containerTop + '/' + L.body.dangerY, '673/209/190/254');
-eq('H=840 overRect.y', L.overRect().y, 134);           // 面板锚定焦点不漂流
-eq('H=840 shareRect.y', L.shareRect().y, 160);
-eq('H=840 confirmRect.y', L.confirmRect().y, 300);
-eq('H=840 menu 不动', L.menu.startY + '/' + L.menu.titleY + '/' + L.menu.offlineY, '396/218/316');
-eq('H=840 ngRect.y', L.ngRect().y, (initialH - 348) / 2);  // NG 弹窗按块居中（246）
-eq('H=840 blockCy', L.panel.blockCy, initialH / 2);        // 420
-console.log('③ 多比例抽查: ' + pass + ' pass, ' + fail + ' fail');
+C.H = initialH; L.build();        // 以 config 交付值为准重建
+eq('交付 band.h', L.band.h, 74);
+eq('交付 btnCy', L.band.btnCy, 701 + (initialH - 747));
+eq('交付 floorY', L.body.floorY, 673 + (initialH - 747));
+eq('交付 spawnY', L.body.spawnY, 209 + (initialH - 747));
+eq('交付 HUD→坠落间距', L.body.spawnY - L.hud.hudBottom, 45 + (initialH - 747));
+console.log('③ 交付比例回归断言: ' + pass + ' pass, ' + fail + ' fail');
 
-process.exit(fail ? 1 : 0);
+process.exit((fail + f2) ? 1 : 0);
