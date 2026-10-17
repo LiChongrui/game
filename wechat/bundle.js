@@ -322,17 +322,15 @@ MG.layout = {
     // ★ 比例承接地：HUD(0~164) 钉块顶；其余全部 = 9:16 基准值 + EXTRA 整体下移。
     // EXTRA = 块高 - 9:16 基准块高 747（9:18=840 → +93；8:18=945 → +198；H=747 → 0）
     var EXTRA = H - 747;
-    // ★ v178 用户要求：警戒线与坠落高度在基准上再下移 20px（绝对调整量，与比例无关；
-    //   堆叠空间相应 419→399，容器/底部带不动）
-    var DANGER_SHIFT = 20;
     this.extra = EXTRA;
-    this.dangerShift = DANGER_SHIFT; // 暴露：供公告带等"锚警戒线但不随其调整漂移"的组件剥离
+    this.dangerShift = 20;   // 警戒线基准已含 +20（v178 用户："警戒线和坠落区高度增加20"）——
+    // 仅作标注，供锚在警戒线上、但位置不该被这次调整波及的组件（公告带）剥离，别无他用
     // 同步真源给物理引擎（每帧读 C.*）：容器/警戒线/容器底随 EXTRA 下移，容器高恒 483
     C.containerTop = 190 + EXTRA;      // 容器开口（+EXTRA 下移）
-    C.dangerY = 254 + EXTRA + DANGER_SHIFT; // 警戒线（+EXTRA+DANGER_SHIFT 下移）
+    C.dangerY = 274 + EXTRA;           // 警戒线：基准 254→274（v178 +20），其余不动
     C.floorY = 673 + EXTRA;            // 容器底（+EXTRA 下移）
     // 坠落高度 = 最大可投放水滴（tiers 前 5 档中的溪流 r45）底部接触警戒线时的球心位置（公式派生，禁写死）
-    C.spawnY = C.dangerY - C.tiers[4].r; // (254+EXTRA+20) - 45 = 209+EXTRA+20
+    C.spawnY = C.dangerY - C.tiers[4].r; // 274-45 = 229+EXTRA（公式自动跟随警戒线的+20）
 
     // ---- ① 顶部 HUD 区（v149/v161 定版行位；钉块顶，块高变化时本区不动）----
     this.hud = {
