@@ -1267,7 +1267,14 @@
     ctx.fillStyle = dep;
     ctx.fillRect(0, floorY - 30, C.W, 30);
 
-    // 底部点缀（无海床基色，直接坐在背景水色上）：卵石 + 海星 + 扇贝
+    // 底部装饰（无海床基色，直接坐在背景水色上）：沙丘起伏 + 卵石 + 海星 + 扇贝
+    var sy0 = floorY + FH + 6;
+    // 沙丘（三块浅色起伏，原样式原坐标）
+    ctx.fillStyle = 'rgba(238,246,240,0.7)';
+    ctx.beginPath(); ctx.ellipse(C.W * 0.2, sy0 + 12, 95, 13, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(C.W * 0.74, sy0 + 14, 115, 15, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(228,240,234,0.55)';
+    ctx.beginPath(); ctx.ellipse(C.W * 0.47, sy0 + 18, 85, 11, 0, 0, Math.PI * 2); ctx.fill();
     // 卵石（块内坐标，贴容器底；装饰 y 以 FLOORY=646 时代为基准，随床面整体下移）
     ctx.fillStyle = 'rgba(110,150,168,0.4)';
     var yoff = (floorY + FH + 6) - 664;
