@@ -13,8 +13,10 @@
   // 面板垂直居中：菜单态（铺满）以整屏 VH 为基准；局内游戏块高 C.H 为基准（比例旋钮，
   // 居中块=屏幕中心，块内 (C.H-h)/2 + 偏移 renderOy 恰好落在屏幕中央）——每帧绘制前重算
   function layoutDexPanel() {
-    var base = state === 'menu' ? VH : C.H;
-    DEX_PANEL.y = Math.max(10, Math.round((base - DEX_PANEL.h) / 2));
+    // 局内按底部锚定链（layout.panel.dexY = 140+dy，随块底平移）；菜单态铺满全屏按 VH 居中
+    DEX_PANEL.y = state === 'menu'
+      ? Math.max(10, Math.round((VH - DEX_PANEL.h) / 2))
+      : Math.max(10, Math.round(MG.layout.panel.dexY));
     dexCloseBtn.y = DEX_PANEL.y + 8;
   }
   // 成就页分段页签：成就 / 每日 / 榜单（与图鉴分节同款分段控件样式）

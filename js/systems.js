@@ -1662,7 +1662,7 @@
       col: colProgress, chestTimer: Math.round(chestTimer * 10) / 10,
       oy: oy, renderOy: renderOy, hudInset: hudInset, VH: VH, floorY: C.floorY, containerTop: C.containerTop, time: time,
       dangerY: C.dangerY, spawnY: C.spawnY,
-      layout: { H: C.H, extra: MG.layout.extra, bandH: MG.layout.band.h, btnCy: MG.layout.band.btnCy, decorBase: MG.layout.band.decorBase,
+      layout: { H: C.H, dy: MG.layout.dy, bandH: MG.layout.band.h, btnCy: MG.layout.band.btnCy, decorBase: MG.layout.band.decorBase,
                 overY: MG.layout.overRect().y, shareY: MG.layout.shareRect().y, confirmY: MG.layout.confirmRect().y,
                 focusCy: MG.layout.panel.focusCy, hudBottom: MG.layout.hud.hudBottom },
       offline: offlineGain ? { mins: offlineGain.mins, gain: offlineGain.gain } : null

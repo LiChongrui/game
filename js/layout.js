@@ -3,20 +3,20 @@
 // 本文件只依赖 MG.config；core/systems/panels/render 运行期经全局作用域解析引用。
 //
 // ★ 设计目标（v175）：改屏幕比例只改 config 的 C.H 一处，全游戏元素位置自动重排。
-// 一切坐标从「基础几何」经公式派生，分四层，层间锚点清晰：
-//   ① hud   顶部信息区（0~hudBottom）：手定版行位——★ 钉块顶，块高变化时本区不动（v177）
-//   ② body  容器区（containerTop~floorY）：核心游戏几何（用户定版），随 EXTRA 整体下移
-//   ③ band  底部带（floorY~H）：★ 高度恒 74 贴块底（v177 改）——内部布局（按钮/装饰）
-//            钉 floorY 相对位，随 EXTRA 整体平移，绝不打散重排
-//   ④ panel 全屏面板：锚定游戏区焦点（focusCy，随 EXTRA 平移）或块中心，不漂流
+// 一切坐标从「基础几何」经公式派生，分四层：
+//   ① hud   顶部信息区（0~hudBottom）：★ 按顶部定位——钉块顶，绝对定版，块高变化不动（v183）
+//   ② body  容器区（containerTop~floorY）：★ 按底部定位——= 9:18 定版基准 + dy（v183）
+//   ③ band  底部带（floorY~H）：高度恒 74 贴块底；内部（按钮/装饰）钉 floorY 相对位
+//   ④ panel 全屏面板：同样按底部定位（= 9:18 定版基准 + dy），不漂流
+//   菜单（开始界面）：按底部定位（= 9:18 定版基准 + dy）
 //
-// ★★ 比例承接地（v177 用户定版，覆盖 v175 的"底部带吸收"方案）：
-//   块高多出的全部高度垫在「HUD 三组行位」与「坠落高度」之间的间距里。
-//   HUD 钉块顶（0~164）不动；容器/底部带/面板/菜单
-//   = 9:16 基准值 + EXTRA 整体下移；底部带高度恒 74。
-//   EXTRA = C.H - 747（9:16 基准块高）：9:18(840) → +93；8:18(945) → +198；H=747 → 0（逐像素等于 v171 定版）。
-//   ★ v178 附加：警戒线/坠落高度 = 基准 + EXTRA + DANGER_SHIFT(20)（用户："警戒线和坠落区高度增加20"）。
-//   约束：H ≥ floorY + 74 = 673 + EXTRA + 74 ⇒ H ≥ 747。
+// ★★ 定位语义（v183 用户定版，覆盖 v175~v182 的 EXTRA 分配方案）：
+//   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少。"
+//   HUD 钉块顶（0~164）；其余一切 = 9:18 定版基准值 + dy，随块底整体平移；
+//   HUD 底与容器顶之间的空隙 = 79 + dy，自然伸缩，不再显式分配。
+//   dy = C.H - 840（9:18 定版基准块高）：H=840 → 0（= 当前交付逐像素一致）；
+//   改比例只改 C.H，HUD 不动、其余全部 +dy。
+//   约束：H ≥ 761（容器顶 243+dy 不侵入 HUD 底 164；当前 9:18=840 满足）。
 // 适配策略（view.s / oy / renderOy / hudInset）由 core.fit() 每帧重算，见其注释。
 //
 // ★ 使用规范：绘制与命中热区一律引用 MG.layout.xxx，禁止再写死坐标数字；
@@ -24,25 +24,24 @@
 window.MG = window.MG || {};
 MG.layout = {
   hud: null, body: null, band: null, panel: null, menu: null,
-  extra: 0,   // 当前比例的多余高度（= C.H - 747），供探针/调试输出
+  dy: 0,        // 当前块高相对 9:18 定版基准的底部平移量（= C.H - 840），供探针/调试输出
 
   // 由基础几何重建全部派生坐标（幂等；config 被外部改动后调用即可同步）
   build: function () {
     var C = MG.config, W = C.W, H = C.H;
-    // ★ 比例承接地：HUD(0~164) 钉块顶；其余全部 = 9:16 基准值 + EXTRA 整体下移。
-    // EXTRA = 块高 - 9:16 基准块高 747（9:18=840 → +93；8:18=945 → +198；H=747 → 0）
-    var EXTRA = H - 747;
-    this.extra = EXTRA;
-    this.dangerShift = 40;   // 警戒线基准已含 +40（v178/v181 用户两次"加20"）——
+    // ★ 底部锚定链：floorY 是唯一下移支点——容器底 = 块底 - 底部带 74（底部带恒 74 贴块底）。
+    // 容器高 523 / 堆叠空间 379 为 9:18 定版值（v182/v181 用户调整后现值），随块底整体平移。
+    var dy = H - 840;                  // 9:18 定版基准块高 840；H=840 → 0
+    this.dy = dy;
+    this.dangerShift = 40;             // 警戒线累计调整量（v178/v181 用户两次"+20"）——
     // 仅作标注，供锚在警戒线上、但位置不该被这次调整波及的组件（公告带）剥离，别无他用
-    // 同步真源给物理引擎（每帧读 C.*）：容器/警戒线/容器底随 EXTRA 下移，容器高恒 483
-    C.containerTop = 150 + EXTRA;      // 容器开口（150+EXTRA；v181：基准 190→150，压缩 HUD 与容器间弹性空白 40px，容器长高 40）
-    C.dangerY = 294 + EXTRA;           // 警戒线：基准 254→274(v178)→294(v181 再加20)，其余不动
-    C.floorY = 673 + EXTRA;            // 容器底（+EXTRA 下移）
+    C.floorY = H - 74;                 // 766（9:18）：容器底 = 块底 - 底部带 74
+    C.containerTop = C.floorY - 523;   // 243（9:18）：容器高 523 定版（v182：483+40），坐底部带上方
+    C.dangerY = C.floorY - 379;        // 387（9:18）：堆叠空间 379 定版（v181 两次+20 后现值）
     // 坠落高度 = 最大可投放水滴（tiers 前 5 档中的溪流 r45）底部接触警戒线时的球心位置（公式派生，禁写死）
-    C.spawnY = C.dangerY - C.tiers[4].r; // 294-45 = 249+EXTRA（公式自动跟随警戒线的两次+20）
+    C.spawnY = C.dangerY - C.tiers[4].r; // 387-45 = 342（9:18；公式自动跟随警戒线）
 
-    // ---- ① 顶部 HUD 区（v149/v161 定版行位；钉块顶，块高变化时本区不动）----
+    // ---- ① 顶部 HUD 区（v149/v161 定版行位；★ 钉块顶，块高变化时本区不动）----
     this.hud = {
       row1Y: 41,               // 统计最佳结果 / 计时 baseline（与奖杯·静音 cy36 垂直居中对齐同排）
       trophyCy: 36,            // 奖杯 / 静音 / 菜单奖杯圆心（+hudInset 避让胶囊）
@@ -52,53 +51,53 @@ MG.layout = {
       quest: { qx: 12, qy: 130, qw: 206, qh: 34 },     // 任务条（v149 定版 130~164）
       tidePill: { tx: W - 122, ty: 130, tw: 92, th: 34 }, // 潮汐胶囊（与任务条同高同排）
       tideBannerY: 250,        // 涨潮横幅锚点
-      hudBottom: 164           // HUD 区底沿（任务条底；与容器开口之间为 26+EXTRA px 空隙带）
+      hudBottom: 164           // HUD 区底沿（任务条底）；与容器开口之间 = 79+dy 空隙（有多少是多少）
     };
 
-    // ---- ② 容器区（核心游戏几何：用户定版；随 EXTRA+DANGER_SHIFT 整体下移，容器 483 高不变）----
+    // ---- ② 容器区（核心游戏几何：底部锚定，随 dy 整体平移，容器高 523 不变）----
     this.body = {
-      containerTop: C.containerTop,     // 150+EXTRA 容器开口（v181：-40 压缩弹性空白，容器 483→523）
-      dangerY: C.dangerY,               // 254+EXTRA+40 警戒线（v178/v181 两次 +20）
-      floorY: C.floorY,                 // 673+EXTRA 容器底
-      spawnY: C.spawnY,                 // 209+EXTRA+40 坠落高度（公式派生，禁写死）
-      tutY: 480 + EXTRA                 // 首局引导胶囊锚点（容器中部，随容器下移）
+      containerTop: C.containerTop,     // 243+dy 容器开口
+      dangerY: C.dangerY,               // 387+dy 警戒线
+      floorY: C.floorY,                 // 766+dy 容器底
+      spawnY: C.spawnY,                 // 342+dy 坠落高度（公式派生，禁写死）
+      tutY: 573 + dy                    // 首局引导胶囊锚点（容器中部，随底部锚定链平移）
     };
 
-    // ---- ③ 底部带（floorY~H：高度恒 74 贴块底，内部随 EXTRA 平移，绝不打散）----
+    // ---- ③ 底部带（floorY~H：高度恒 74 贴块底，内部钉 floorY 相对位，绝不打散）----
     this.band = {
       top: C.floorY,
-      h: H - C.floorY,                  // 恒 74（9:16/9:18/8:18 相同：底部带固定不变，v177）
-      btnCy: C.floorY + 28,             // 701+EXTRA：底部一排按钮圆心（v163 铁律：与容器底恒距 28）
+      h: H - C.floorY,                  // 恒 74（底部带固定不变，v177 用户定版）
+      btnCy: C.floorY + 28,             // 794+dy：底部一排按钮圆心（v163 铁律：与容器底恒距 28）
       labelDy: 12,                      // 按钮名称标签：圆心 + r + 12
-      decorBase: C.floorY + 18,         // 691+EXTRA：底部装饰基准线（床面玻璃横条底 FH12 + 6）
-      dunes: [                          // 三块沙丘（径向渐变柔边）：相对容器底固定，随 EXTRA 平移不重排
+      decorBase: C.floorY + 18,         // 784+dy：底部装饰基准线（床面玻璃横条底 FH12 + 6）
+      dunes: [                          // 三块沙丘（径向渐变柔边）：相对容器底固定，随 dy 平移不重排
         { xr: 0.20, dy: 12, rx: 95,  ry: 13, c: 'rgba(238,246,240,0.7)', c0: 'rgba(238,246,240,0)' },
         { xr: 0.74, dy: 14, rx: 115, ry: 15, c: 'rgba(238,246,240,0.7)', c0: 'rgba(238,246,240,0)' },
         { xr: 0.47, dy: 18, rx: 85,  ry: 11, c: 'rgba(228,240,234,0.55)', c0: 'rgba(228,240,234,0)' }
       ],
-      pebbleYOff: (C.floorY + 18) - 664, // 卵石/海星/扇贝基准随 EXTRA 平移（v136 时代 FLOORY=646 定版位）
+      pebbleYOff: (C.floorY + 18) - 664, // 卵石/海星/扇贝基准随 dy 平移（v136 时代 FLOORY=646 定版位）
       pebbles: [[24, 688, 3], [66, 700, 2], [112, 686, 2.5], [172, 702, 2],
                 [246, 690, 2.5], [306, 700, 2], [352, 686, 2.5], [404, 696, 2.2]],
       starfish: { x: 88, y: 700, s: 9 },
       shell: { x: 330, y: 702, s: 9 }
     };
 
-    // ---- ④ 全屏面板（锚定游戏区，随 EXTRA 平移不漂流）----
+    // ---- ④ 全屏面板（底部锚定：= 9:18 定版基准 + dy，随块底平移不漂流）----
     this.panel = {
-      blockCy: H / 2,                  // 块中心（全屏模态按块居中：NG 词缀/广告遮罩）
-      focusCy: 370 + EXTRA,            // 游戏区焦点中心（v161 定版：结算海报 py134/h472 与分享卡 py160/h420 的共同中心，随 EXTRA 平移）
-      over: { w: 320, h: 472 },        // 结算海报（v161 排版放松定版）
-      share: { w: 300, h: 420 },       // 战报分享卡
-      confirm: { w: W - 120, h: 170, dy: 300 + EXTRA, btnDy: 102 }, // 重开确认（py300+EXTRA；按钮 py+102）
-      ng: { w: 330, h: 348 },          // 深渊潜航词缀三选一（按块居中）
-      dex: { x: 20, w: 380, h: 560 }   // 图鉴/成就（layoutDexPanel 按态居中，y 动态）
+      focusCy: 463 + dy,              // 游戏区焦点中心（9:18 定版 463：结算海报 py227/h472 与分享卡 py253/h420 的共同中心）
+      over: { w: 320, h: 472 },       // 结算海报（v161 排版放松定版；py = focusCy - 236 = 227+dy）
+      share: { w: 300, h: 420 },      // 战报分享卡（py = focusCy - 210 = 253+dy）
+      confirm: { w: W - 120, h: 170, dy: 393 + dy, btnDy: 102 }, // 重开确认（py393+dy；按钮 py+102）
+      ng: { w: 330, h: 348 },         // 深渊潜航词缀三选一（底部锚定，y = 246+dy）
+      dex: { x: 20, w: 380, h: 560 }, // 图鉴/成就（局内 y 由 dexY 派生；菜单态按全屏 VH 居中）
+      dexY: 140 + dy                  // 图鉴局内 y（9:18 定版 140 = (840-560)/2，随底部锚定链平移）
     };
 
-    // ---- 菜单（开始界面：随 EXTRA 整体平移，与容器相对关系不变）----
+    // ---- 菜单（开始界面：底部锚定，= 9:18 定版基准 + dy）----
     this.menu = {
-      titleY: 218 + EXTRA, titleShadowY: 220 + EXTRA, subY: 252 + EXTRA, bestY: 294 + EXTRA,
-      offlineY: 316 + EXTRA, offlineW: 300, offlineH: 62,
-      startY: 396 + EXTRA, startW: 220, startH: 60,
+      titleY: 311 + dy, titleShadowY: 313 + dy, subY: 345 + dy, bestY: 387 + dy,
+      offlineY: 409 + dy, offlineW: 300, offlineH: 62,
+      startY: 489 + dy, startW: 220, startH: 60,
       footDy: 56                       // 底部玩法一句话：距块底（VH-56，随块底自动）
     };
   },
@@ -118,7 +117,7 @@ MG.layout = {
   },
   ngRect: function () {
     var p = this.panel.ng, W = MG.config.W;
-    return { x: (W - p.w) / 2, y: (MG.config.H - p.h) / 2, w: p.w, h: p.h };
+    return { x: (W - p.w) / 2, y: (840 - p.h) / 2 + this.dy, w: p.w, h: p.h };
   }
 };
 MG.layout.build();

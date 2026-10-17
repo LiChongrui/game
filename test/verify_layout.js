@@ -1,9 +1,11 @@
-// 布局几何验证（v177）：MG.layout 单一几何真源
+// 布局几何验证（v183）：MG.layout 单一几何真源
 // 纯 node 计算（vm 加载 config + layout，无浏览器/无 canvas）。
-// ★ v177 新语义（覆盖 v175"底部带吸收"方案，用户："底部带固定不变，多出的区域应当留在
-//   HUD 三组行位与坠落高度之间的间距"）：
-//   HUD(0~164) 钉块顶不动；容器/警戒线/坠落高度/底部带/面板/菜单 = 9:16 基准 + EXTRA 整体下移；
-//   底部带高度恒 74。EXTRA = C.H - 747。
+// ★ v183 新定位语义（覆盖 v175~v182 的 EXTRA 分配方案；用户：
+//   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少！"）：
+//   HUD(0~164) 钉块顶，绝对定版不动；其余一切 = 9:18 定版基准值 + dy，随块底整体平移；
+//   HUD 底与容器顶之间的空隙 = 79+dy，自然伸缩、不显式分配。
+//   dy = C.H - 840（9:18 定版基准块高）：H=840 → 0（= 当前交付逐像素一致）。
+//   约束：H ≥ 761（容器顶 243+dy 不侵入 HUD 底 164）。
 // 运行：node test/verify_layout.js
 const fs = require('fs');
 const path = require('path');
@@ -22,10 +24,11 @@ function eq(name, got, want) {
   fail++; console.log('FAIL', name, 'got', JSON.stringify(got), 'want', JSON.stringify(want));
 }
 
-// ===== ① H=747（EXTRA=0）：9:16 基线 + v178 DANGER_SHIFT(20) =====
-// 显式设基线，与 config 当前交付值解耦（config 改比例后本段仍回归 9:16）
-// 注：v178 起警戒线/坠落高度含 +20 绝对调整（用户要求），其余同 v171 定版
-C.H = 747; L.build();
+// ===== ① 9:18 定版基准（H=840, dy=0）：= 当前交付逐像素一致 =====
+// 显式设基准，与 config 当前交付值解耦；含 v178/v181 警戒线+40 与 v182 容器长高+40 成果
+C.H = 840; L.build();
+eq('dy(定版)', L.dy, 0);
+// ---- HUD：钉块顶，绝对定版 ----
 eq('hud.row1Y', L.hud.row1Y, 41);
 eq('hud.trophyCy', L.hud.trophyCy, 36);
 eq('hud.scoreY', L.hud.scoreY, 88);
@@ -38,108 +41,117 @@ eq('hud.quest.qh', L.hud.quest.qh, 34);
 eq('hud.tidePill.ty', L.hud.tidePill.ty, 130);
 eq('hud.tidePill.tx', L.hud.tidePill.tx, 298);
 eq('hud.tideBannerY', L.hud.tideBannerY, 250);
-eq('body.containerTop', L.body.containerTop, 150);   // v181：-40 压缩弹性空白
-eq('body.dangerY', L.body.dangerY, 254 + 40);   // v178+v181：两次+20
-eq('body.floorY', L.body.floorY, 673);
-eq('body.spawnY', L.body.spawnY, 209 + 40);     // v178+v181：两次+20（公式 dangerY-45 自动跟随）
-eq('body.tutY', L.body.tutY, 480);
+eq('hud.hudBottom', L.hud.hudBottom, 164);
+// ---- 容器区：底部锚定链（floorY = H-74）----
+eq('body.containerTop', L.body.containerTop, 243);   // 766-523（容器高 523 定版，v182 +40）
+eq('body.dangerY', L.body.dangerY, 387);             // 766-379（堆叠空间 379 定版，v178/v181 +40）
+eq('body.floorY', L.body.floorY, 766);               // 840-74（底部带恒 74）
+eq('body.spawnY', L.body.spawnY, 342);               // 387-45（公式派生）
+eq('body.tutY', L.body.tutY, 573);
+eq('HUD→容器顶空隙(定版)', L.body.containerTop - L.hud.hudBottom, 79); // 弹性残余：有多少是多少
+// ---- 底部带：恒 74 贴块底，内部钉 floorY 相对位 ----
 eq('band.h', L.band.h, 74);
-eq('band.btnCy', L.band.btnCy, 701);
-eq('band.decorBase', L.band.decorBase, 691);
-eq('band.pebbleYOff', L.band.pebbleYOff, 27);
-eq('dune0.abs', L.band.decorBase + L.band.dunes[0].dy, 703);
-eq('dune1.abs', L.band.decorBase + L.band.dunes[1].dy, 705);
-eq('dune2.abs', L.band.decorBase + L.band.dunes[2].dy, 709);
-eq('pebble0.abs', L.band.pebbles[0][1] + L.band.pebbleYOff, 715);
-eq('pebble7.abs', L.band.pebbles[7][1] + L.band.pebbleYOff, 723);
-eq('starfish.abs', L.band.starfish.y + L.band.pebbleYOff, 727);
-eq('shell.abs', L.band.shell.y + L.band.pebbleYOff, 729);
-eq('overRect.y', L.overRect().y, 134);
+eq('band.btnCy', L.band.btnCy, 794);                 // 766+28（v163 铁律）
+eq('band.decorBase', L.band.decorBase, 784);         // 766+18
+eq('band.pebbleYOff', L.band.pebbleYOff, 120);
+eq('dune0.abs', L.band.decorBase + L.band.dunes[0].dy, 796);
+eq('dune1.abs', L.band.decorBase + L.band.dunes[1].dy, 798);
+eq('dune2.abs', L.band.decorBase + L.band.dunes[2].dy, 802);
+eq('pebble0.abs', L.band.pebbles[0][1] + L.band.pebbleYOff, 808);
+eq('pebble7.abs', L.band.pebbles[7][1] + L.band.pebbleYOff, 816);
+eq('starfish.abs', L.band.starfish.y + L.band.pebbleYOff, 820);
+eq('shell.abs', L.band.shell.y + L.band.pebbleYOff, 822);
+eq('按钮-容器底恒距', L.band.btnCy - L.body.floorY, 28);
+// ---- 面板/菜单：底部锚定 ----
+eq('overRect.y', L.overRect().y, 227);               // focusCy463 - 236
 eq('overRect.x', L.overRect().x, 50);
-eq('shareRect.y', L.shareRect().y, 160);
-eq('confirmRect.y', L.confirmRect().y, 300);
+eq('shareRect.y', L.shareRect().y, 253);             // 463 - 210
+eq('confirmRect.y', L.confirmRect().y, 393);
 eq('confirmRect.x', L.confirmRect().x, 60);
-eq('ngRect.y', L.ngRect().y, 199.5);
+eq('ngRect.y', L.ngRect().y, 246);                   // (840-348)/2
+eq('panel.focusCy', L.panel.focusCy, 463);
+eq('panel.dexY', L.panel.dexY, 140);
 eq('panel.dex', L.panel.dex.x + '/' + L.panel.dex.w + '/' + L.panel.dex.h, '20/380/560');
-eq('menu.titleY', L.menu.titleY, 218);
-eq('menu.subY', L.menu.subY, 252);
-eq('menu.bestY', L.menu.bestY, 294);
-eq('menu.offlineY', L.menu.offlineY, 316);
-eq('menu.startY', L.menu.startY, 396);
+eq('menu.titleY', L.menu.titleY, 311);
+eq('menu.subY', L.menu.subY, 345);
+eq('menu.bestY', L.menu.bestY, 387);
+eq('menu.offlineY', L.menu.offlineY, 409);
+eq('menu.startY', L.menu.startY, 489);
 eq('menu.footDy', L.menu.footDy, 56);
-eq('extra(747)', L.extra, 0);
-console.log('① 9:16 基线断言(含v178 +20): ' + pass + ' pass, ' + fail + ' fail');
+console.log('① 9:18 定版基准断言: ' + pass + ' pass, ' + fail + ' fail');
 
-// ===== ② 改比例自动重排：HUD 钉顶不动，其余 = 基准 + EXTRA 整体下移，底部带恒 74 =====
-// ★ v178：警戒线/坠落高度 = 基准 + EXTRA + DANGER_SHIFT(20)
+// ===== ② 改比例自动重排：HUD 钉顶不动，其余 = 定版基准 + dy 整体平移，底部带恒 74 =====
 function checkRatio(H, label) {
   pass = 0; fail = 0;
-  var X = H - 747; // EXTRA
-  var DS = 40;     // 警戒线累计调整（v178+v181 两次+20）
+  var D = H - 840; // dy（底部平移量）
   C.H = H; L.build();
-  eq('extra(' + label + ')', L.extra, X);
+  eq('dy(' + label + ')', L.dy, D);
   // HUD 钉块顶：三组行位完全不动
   eq('hud 不动(' + label + ')', L.hud.row1Y + '/' + L.hud.scoreY + '/' + L.hud.seaBar.sy + '/' + L.hud.quest.qy + '/' + L.hud.trophyCy, '41/88/100/130/36');
-  // 容器/警戒线/坠落高度：+EXTRA(+DANGER_SHIFT) 下移（容器高 523 = 483+40，v181）
-  eq('containerTop(' + label + ')', L.body.containerTop, 150 + X);
-  eq('dangerY(' + label + ')', L.body.dangerY, 254 + X + DS);
-  eq('floorY(' + label + ')', L.body.floorY, 673 + X);
-  eq('spawnY(' + label + ')', L.body.spawnY, 209 + X + DS);
-  eq('容器高(' + label + ')', L.body.floorY - L.body.containerTop, 523);  // v181：483+40
-  eq('堆叠空间(' + label + ')', L.body.floorY - L.body.dangerY, 419 - DS);
-  eq('tutY(' + label + ')', L.body.tutY, 480 + X);
-  // ★ 多出的区域垫在 HUD 与坠落高度之间：164 → spawnY
-  eq('HUD→坠落间距(' + label + ')', L.body.spawnY - L.hud.hudBottom, 45 + X + DS);
-  // 底部带：高度恒 74，内部布局 +EXTRA 平移（不打散）
+  // 容器/警戒线/坠落高度：定版基准 + dy（容器高恒 523、堆叠空间恒 379）
+  eq('containerTop(' + label + ')', L.body.containerTop, 243 + D);
+  eq('dangerY(' + label + ')', L.body.dangerY, 387 + D);
+  eq('floorY(' + label + ')', L.body.floorY, 766 + D);
+  eq('spawnY(' + label + ')', L.body.spawnY, 342 + D);
+  eq('容器高(' + label + ')', L.body.floorY - L.body.containerTop, 523);
+  eq('堆叠空间(' + label + ')', L.body.floorY - L.body.dangerY, 379);
+  eq('tutY(' + label + ')', L.body.tutY, 573 + D);
+  // ★ 弹性残余：HUD 底与容器顶之间 = 79+dy，有多少是多少（不显式分配）
+  eq('HUD→容器顶空隙(' + label + ')', L.body.containerTop - L.hud.hudBottom, 79 + D);
+  eq('HUD→坠落间距(' + label + ')', L.body.spawnY - L.hud.hudBottom, 178 + D);
+  // 底部带：高度恒 74，内部布局 +dy 平移（不打散）
   eq('band.h(' + label + ')', L.band.h, 74);
-  eq('btnCy(' + label + ')', L.band.btnCy, 701 + X);          // = floorY+28
-  eq('decorBase(' + label + ')', L.band.decorBase, 691 + X);
-  eq('dune0.abs(' + label + ')', L.band.decorBase + L.band.dunes[0].dy, 703 + X);
-  eq('dune1.abs(' + label + ')', L.band.decorBase + L.band.dunes[1].dy, 705 + X);
-  eq('dune2.abs(' + label + ')', L.band.decorBase + L.band.dunes[2].dy, 709 + X);
-  eq('pebble0.abs(' + label + ')', L.band.pebbles[0][1] + L.band.pebbleYOff, 715 + X);
-  eq('pebble7.abs(' + label + ')', L.band.pebbles[7][1] + L.band.pebbleYOff, 723 + X);
-  eq('starfish.abs(' + label + ')', L.band.starfish.y + L.band.pebbleYOff, 727 + X);
-  eq('shell.abs(' + label + ')', L.band.shell.y + L.band.pebbleYOff, 729 + X);
+  eq('btnCy(' + label + ')', L.band.btnCy, 794 + D);          // = floorY+28
+  eq('decorBase(' + label + ')', L.band.decorBase, 784 + D);
+  eq('dune0.abs(' + label + ')', L.band.decorBase + L.band.dunes[0].dy, 796 + D);
+  eq('dune1.abs(' + label + ')', L.band.decorBase + L.band.dunes[1].dy, 798 + D);
+  eq('dune2.abs(' + label + ')', L.band.decorBase + L.band.dunes[2].dy, 802 + D);
+  eq('pebble0.abs(' + label + ')', L.band.pebbles[0][1] + L.band.pebbleYOff, 808 + D);
+  eq('pebble7.abs(' + label + ')', L.band.pebbles[7][1] + L.band.pebbleYOff, 816 + D);
+  eq('starfish.abs(' + label + ')', L.band.starfish.y + L.band.pebbleYOff, 820 + D);
+  eq('shell.abs(' + label + ')', L.band.shell.y + L.band.pebbleYOff, 822 + D);
   eq('按钮-容器底恒距(' + label + ')', L.band.btnCy - L.body.floorY, 28);
-  // 面板：锚定游戏区焦点 +EXTRA 平移，不漂流
-  eq('overRect.y(' + label + ')', L.overRect().y, 134 + X);
-  eq('shareRect.y(' + label + ')', L.shareRect().y, 160 + X);
-  eq('confirmRect.y(' + label + ')', L.confirmRect().y, 300 + X);
-  eq('focusCy(' + label + ')', L.panel.focusCy, 370 + X);
-  // NG 弹窗：按块居中（随块高）
-  eq('ngRect.y(' + label + ')', L.ngRect().y, (H - 348) / 2);
-  eq('blockCy(' + label + ')', L.panel.blockCy, H / 2);
-  // 菜单：+EXTRA 平移（与容器相对关系不变）
+  // 面板/菜单：定版基准 + dy 平移，不漂流
+  eq('overRect.y(' + label + ')', L.overRect().y, 227 + D);
+  eq('shareRect.y(' + label + ')', L.shareRect().y, 253 + D);
+  eq('confirmRect.y(' + label + ')', L.confirmRect().y, 393 + D);
+  eq('focusCy(' + label + ')', L.panel.focusCy, 463 + D);
+  eq('dexY(' + label + ')', L.panel.dexY, 140 + D);
+  // NG 弹窗：底部锚定（定版 246 + dy）
+  eq('ngRect.y(' + label + ')', L.ngRect().y, 246 + D);
+  // 菜单：定版基准 + dy 平移（与容器相对关系不变）
   eq('menu(' + label + ')', L.menu.titleY + '/' + L.menu.subY + '/' + L.menu.offlineY + '/' + L.menu.startY,
-     (218 + X) + '/' + (252 + X) + '/' + (316 + X) + '/' + (396 + X));
+     (311 + D) + '/' + (345 + D) + '/' + (409 + D) + '/' + (489 + D));
   // 回写 config 真源（物理引擎读 C.*）
-  eq('C.floorY回写(' + label + ')', C.floorY, 673 + X);
-  eq('C.spawnY回写(' + label + ')', C.spawnY, 209 + X + DS);
-  eq('C.dangerY回写(' + label + ')', C.dangerY, 254 + X + DS);
-  eq('C.containerTop回写(' + label + ')', C.containerTop, 150 + X);
-  // ★ v178：公告带锚 = dangerY - dangerShift（剥离 SHIFT，弹字位置不随警戒线调整漂移）
-  eq('公告带锚(' + label + ')', C.dangerY - L.dangerShift, 254 + X);
+  eq('C.floorY回写(' + label + ')', C.floorY, 766 + D);
+  eq('C.spawnY回写(' + label + ')', C.spawnY, 342 + D);
+  eq('C.dangerY回写(' + label + ')', C.dangerY, 387 + D);
+  eq('C.containerTop回写(' + label + ')', C.containerTop, 243 + D);
+  // 公告带锚 = dangerY - dangerShift(40)（剥离两次+20，弹字钉调整前警戒线，不随其漂移）
+  eq('公告带锚(' + label + ')', C.dangerY - L.dangerShift, 347 + D);
   console.log('② ' + label + ' 自动重排断言: ' + pass + ' pass, ' + fail + ' fail');
   return fail;
 }
 var f2 = 0;
-f2 += checkRatio(840, '9:18');   // 当前交付：EXTRA=+93
-f2 += checkRatio(945, '8:18');   // 历史场景回归：EXTRA=+198（曾因方案错误被否，现语义正确）
-f2 += checkRatio(800, 'H=800');  // 任意比例抽查：EXTRA=+53
+f2 += checkRatio(840, '9:18定版');  // 当前交付：dy=0
+f2 += checkRatio(880, 'H=880');     // 更高块高：dy=+40，其余全部上移 40、HUD 不动、空隙 119
+f2 += checkRatio(945, '8:18场景');  // 历史场景：dy=+105
+f2 += checkRatio(747, 'H=747');     // 9:16 数值回归：dy=-93；空隙 -14（<761 会侵入 HUD，非交付比例）
 
 // ===== ③ 交付比例回归：config 当前 H =====
 pass = 0; fail = 0;
 var initialH = CONFIG_H0;         // config 交付值（各段不得污染，从加载瞬间记录）
-var IX = initialH - 747;          // 交付 EXTRA
+var ID = initialH - 840;          // 交付 dy
 eq('config.H(交付比例)', initialH, 840);
 C.H = initialH; L.build();        // 以 config 交付值为准重建
+eq('交付 dy', L.dy, 0);
 eq('交付 band.h', L.band.h, 74);
-eq('交付 btnCy', L.band.btnCy, 701 + IX);
-eq('交付 floorY', L.body.floorY, 673 + IX);
-eq('交付 dangerY', L.body.dangerY, 254 + IX + 40);   // v178+v181：两次+20
-eq('交付 spawnY', L.body.spawnY, 209 + IX + 40);     // v178+v181：两次+20
-eq('交付 HUD→坠落间距', L.body.spawnY - L.hud.hudBottom, 45 + IX + 40);
+eq('交付 btnCy', L.band.btnCy, 794);
+eq('交付 floorY', L.body.floorY, 766);
+eq('交付 containerTop', L.body.containerTop, 243);
+eq('交付 dangerY', L.body.dangerY, 387);
+eq('交付 spawnY', L.body.spawnY, 342);
+eq('交付 HUD→容器顶空隙', L.body.containerTop - L.hud.hudBottom, 79);
 console.log('③ 交付比例回归断言: ' + pass + ' pass, ' + fail + ' fail');
 
 process.exit((fail + f2) ? 1 : 0);

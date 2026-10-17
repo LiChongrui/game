@@ -21,7 +21,7 @@
 
   // ---------- 画布 ----------
   // 逻辑高度动态（VH ≥ C.H）：HUD 三组行位钉块顶（layout.hud，0~164），
-  // 容器/警戒线/坠落高度随 EXTRA 整体下移（layout.body），底部带恒 74 贴块底（layout.band），
+  // 其余一切按底部定位（layout.body/band/panel/menu = 9:18 定版基准 + dy，随块底平移），
   // 中间水域随窗口高度自适应；画布 CSS 高度恒等于窗口高度，CSS 宽度=游戏区宽度（两侧为页面深海背景）
   var canvas = document.getElementById('game');
   var ctx = canvas.getContext('2d');
@@ -29,15 +29,16 @@
   var VH = C.H;           // 当前逻辑高度（全屏：h/view.s，≥C.H）
   var LW = C.W;           // 当前逻辑宽度（≥ C.W，宽窗口下两侧为延伸海水）
   var BX = 0;             // 游戏区（420 逻辑宽）水平居中偏移
-  var FLOORY = C.floorY;  // 容器底 y（= layout.body.floorY，随 EXTRA 下移）
+  var FLOORY = C.floorY;  // 容器底 y（= layout.body.floorY，随 dy 平移）
   var view = { s: 1 };
-  // 游戏块 = 420×C.H 逻辑区（当前交付 9:18=840）。★ 比例承接地（v177 用户定版）：
-  // 多出的块高全部垫在「HUD 三组行位(0~164)」与「坠落高度(spawnY)」之间——HUD 钉块顶，
-  // 容器/警戒线/坠落高度/底部带 = 9:16 基准 + EXTRA 整体下移，底部带恒 74 贴块底。
+  // 游戏块 = 420×C.H 逻辑区（当前交付 9:18=840）。★ 定位语义（v183 用户定版）：
+  // HUD 按顶部定位（钉块顶 0~164，绝对定版）；其余一切按底部定位
+  // （= 9:18 定版基准 + dy，dy=C.H-840，随块底整体平移）；底部带恒 74 贴块底；
+  // HUD 底与容器顶之间空隙 = 79+dy，有多少是多少、不显式分配。
   // 坠落高度 = 最大可投放滴底触警戒线时的球心（dangerY - 45）；高屏多余的高度上下均分
   // （oy 为块居中偏移），块外由背景渐变延伸填充。
   // ★ 改比例只改 config 的 C.H 一处：layout.build() 自动重算全部游戏内坐标
-  //   （EXTRA=C.H-747 垫到 HUD 与坠落高度之间）；本 fit() 只负责
+  //   （dy=C.H-840，HUD 不动、其余全部随块底平移）；本 fit() 只负责
   //   「块 → 窗口」适配（view.s / oy / hudInset），不再写死任何游戏内坐标。
   var oy = 0;             // 游戏块顶部偏移（逻辑 px，≥0）
   var renderOy = 0;       // 渲染/点击实际使用的偏移（全态 = oy，垂直居中）
@@ -59,9 +60,9 @@
     // 高屏居中量已远大于胶囊高度 → hudInset=0（无需再避让）；矮屏(≈块高)才给 ≤24 的残余量。
     var capBottom = window.__safeTop ? (window.__safeTop - 8) / view.s : 0;
     hudInset = Math.max(0, Math.min(capBottom - oy - 20, 24));
-    // 容器区（layout.body 单一真源）：容器底/容器顶/警戒线/出生点 = 9:16 基准 + EXTRA
-    // 整体下移（EXTRA=C.H-747），容器 420:483 恒定——不同设备游戏区大小比例完全一致
-    FLOORY = MG.layout.body.floorY;        // 673+EXTRA（9:16=673 / 9:18=766 / 8:18=871）
+    // 容器区（layout.body 单一真源）：容器底/容器顶/警戒线/出生点按底部锚定
+    // （floorY = H-74，容器高 523/堆叠空间 379 定版，随块底整体平移）
+    FLOORY = MG.layout.body.floorY;        // 766+dy（9:18=766；dy=C.H-840）
     canvas.width = Math.round(w * dpr);    // 画布铺满整个窗口（背景全程由游戏自绘）
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';
