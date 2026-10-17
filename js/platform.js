@@ -43,7 +43,11 @@ MG.platform = {
   // [wx] 替换为 wx.setUserCloudStorage + 开放数据域子域渲染
   submitScore: function (score) { /* Web 版为本地榜，见 main.js 好友榜 */ },
 
-  // ---------- 振动（可选反馈，平台不支持时静默） ----------
+  // ---------- 振动（★ 手机设备马达震动反馈，不是画面/窗口抖动） ----------
+  // v198 用户纠正："震动不是震动窗口，是手机设备的震动反馈！！！"——本接口只触发
+  // 硬件马达（navigator.vibrate；微信端由 wx-shim 桥到 wx.vibrateShort/vibrateLong）。
+  // 画面摇晃（systems.js addShake → render translate 微抖）是另一套独立视觉特效，
+  // 与设置里的"震动"开关无任何关联。iOS 微信/Safari 不支持振动 API，该开关静默无效。
   vibrate: function (ms) {
     if (navigator && navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) {} }
   }

@@ -54,7 +54,11 @@ MG.platform = {
   // [wx] 替换为 wx.setUserCloudStorage + 开放数据域子域渲染
   submitScore: function (score) { /* Web 版为本地榜，见 main.js 好友榜 */ },
 
-  // ---------- 振动（可选反馈，平台不支持时静默） ----------
+  // ---------- 振动（★ 手机设备马达震动反馈，不是画面/窗口抖动） ----------
+  // v198 用户纠正："震动不是震动窗口，是手机设备的震动反馈！！！"——本接口只触发
+  // 硬件马达（navigator.vibrate；微信端由 wx-shim 桥到 wx.vibrateShort/vibrateLong）。
+  // 画面摇晃（systems.js addShake → render translate 微抖）是另一套独立视觉特效，
+  // 与设置里的"震动"开关无任何关联。iOS 微信/Safari 不支持振动 API，该开关静默无效。
   vibrate: function (ms) {
     if (navigator && navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) {} }
   }
@@ -781,7 +785,11 @@ MG.layout.build();
     }
   };
 
-  // ---------- 震动反馈（v197：设置弹窗"震动"开关；平台不支持时静默） ----------
+  // ---------- 震动反馈（v197 设置弹窗"震动"开关；v198 用户纠正语义） ----------
+  // ★ v198 用户："震动不是震动窗口，是手机设备的震动反馈！！！"——本函数只走
+  //   MG.platform.vibrate（H5: navigator.vibrate；微信: wx-shim 桥 wx.vibrateShort/
+  //   vibrateLong），全程不碰画布变换；画面摇晃（addShake → render translate 微抖）
+  //   是另一套独立视觉特效，与震动开关无任何关联。
   // 音效/音乐/震动三开关相互独立：震动只认 vibOn，与静音状态无关。
   function hap(ms) { if (audio.vibOn) MG.platform.vibrate(ms || 20); }
 
@@ -5732,7 +5740,7 @@ MG.layout.build();
     ctx.lineCap = 'butt';
     // 三行开关（点整行即切换； systems.js toggleSet）
     var names = ['音效', '音乐', '震动'];
-    var descs = ['水滴合成与技能音效', '深海氛围背景音乐', '合成与事件震动反馈'];
+    var descs = ['水滴合成与技能音效', '深海氛围背景音乐', '设备震动反馈（马达）']; // v198：明确是手机设备马达，非画面抖动
     for (var si = 0; si < 3; si++) {
       var row = MG.layout.setRowRect(si);
       ctx.fillStyle = 'rgba(46,134,180,0.07)';

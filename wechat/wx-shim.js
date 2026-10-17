@@ -41,7 +41,10 @@
     removeItem: function (k) { try { wx.removeStorageSync(String(k)); } catch (e) {} }
   };
 
-  // navigator：剪贴板接 wx.setClipboardData（分享文案复制直接成功）；振动接短振动
+  // navigator：剪贴板接 wx.setClipboardData（分享文案复制直接成功）；
+  // 振动接【手机设备马达】（wx.vibrateShort/vibrateLong）——是硬件震动反馈，
+  // 不是画面/窗口抖动（画面摇晃是游戏内 addShake 的独立视觉特效，与此无关）；
+  // ms 映射强度（<20 light / <40 medium / ≥40 长震），与 core.js hap() 时长语义一致
   var nav = G.navigator = {
     clipboard: {
       writeText: function (t) {
@@ -49,7 +52,13 @@
         return Promise.resolve();
       }
     },
-    vibrate: function () { try { wx.vibrateShort({ type: 'light' }); } catch (e) {} }
+    vibrate: function (ms) {
+      try {
+        ms = ms || 20;
+        if (ms >= 40) wx.vibrateLong();
+        else wx.vibrateShort({ type: ms >= 20 ? 'medium' : 'light' });
+      } catch (e) {}
+    }
   };
 
   // document：主画布 getElementById('game')；离屏 canvas createElement('canvas')（iconData 调试用）

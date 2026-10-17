@@ -1593,7 +1593,7 @@
     ctx.lineCap = 'butt';
     // 三行开关（点整行即切换； systems.js toggleSet）
     var names = ['音效', '音乐', '震动'];
-    var descs = ['水滴合成与技能音效', '深海氛围背景音乐', '合成与事件震动反馈'];
+    var descs = ['水滴合成与技能音效', '深海氛围背景音乐', '设备震动反馈（马达）']; // v198：明确是手机设备马达，非画面抖动
     for (var si = 0; si < 3; si++) {
       var row = MG.layout.setRowRect(si);
       ctx.fillStyle = 'rgba(46,134,180,0.07)';

@@ -344,6 +344,17 @@ eq('vibOn默认开', /v == null \? true/.test(CSRC), true);
 eq('hap定义', /function hap\(ms\)/.test(CSRC), true);
 eq('hap接震动调用≥8', (CSRC.match(/hap\(\d+\)/g) || []).length >= 8, true);
 eq('fit无trophy/MUTE烤入', /trophyBtn\.cy = MG\.layout\.hud\.trophyCy/.test(CSRC), false);
+// ---- v198 震动语义纠正（用户："震动不是震动窗口，是手机设备的震动反馈！！！"）----
+// hap 只走 MG.platform.vibrate（navigator.vibrate / 微信 wx 桥）= 设备马达；
+// 画面摇晃（addShake → render translate 微抖）是独立视觉特效，与震动开关无关
+eq('hap只走platform.vibrate', /function hap\(ms\) \{ if \(audio\.vibOn\) MG\.platform\.vibrate\(ms \|\| 20\); \}/.test(CSRC), true);
+eq('platform.vibrate走navigator', /if \(navigator && navigator\.vibrate\)/.test(CSRC), true);
+eq('震动行说明明确设备马达', /'设备震动反馈（马达）'/.test(RSRC), true);
+eq('震动旧歧义说明已改', /合成与事件震动反馈/.test(RSRC), false);
+// 微信垫片：navigator.vibrate 桥 wx.vibrateShort/vibrateLong（ms→强度），是设备震动非画面抖动
+var WSHIM = fs.readFileSync(path.join(__dirname, '..', 'wechat', 'wx-shim.js'), 'utf8');
+eq('垫片vibrate桥wx长短震', /vibrate: function \(ms\) \{[\s\S]*?wx\.vibrateLong\(\);[\s\S]*?wx\.vibrateShort/.test(WSHIM), true);
+eq('垫片vibrate按ms映射强度', /ms >= 20 \? 'medium' : 'light'/.test(WSHIM), true);
 console.log('⑥ v195六钮真源+HUD卡度量+v196第一排+v197设置断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 

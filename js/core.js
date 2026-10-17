@@ -179,7 +179,11 @@
     }
   };
 
-  // ---------- 震动反馈（v197：设置弹窗"震动"开关；平台不支持时静默） ----------
+  // ---------- 震动反馈（v197 设置弹窗"震动"开关；v198 用户纠正语义） ----------
+  // ★ v198 用户："震动不是震动窗口，是手机设备的震动反馈！！！"——本函数只走
+  //   MG.platform.vibrate（H5: navigator.vibrate；微信: wx-shim 桥 wx.vibrateShort/
+  //   vibrateLong），全程不碰画布变换；画面摇晃（addShake → render translate 微抖）
+  //   是另一套独立视觉特效，与震动开关无任何关联。
   // 音效/音乐/震动三开关相互独立：震动只认 vibOn，与静音状态无关。
   function hap(ms) { if (audio.vibOn) MG.platform.vibrate(ms || 20); }
 
