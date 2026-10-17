@@ -68,6 +68,7 @@ MG.layout = {
       row1Y: 40,               // 统计最佳结果 / 计时 baseline（与奖杯·静音 cy35 垂直居中对齐同排）
       trophyCy: 35,            // 奖杯 / 静音 / 菜单奖杯圆心（+hudInset 避让胶囊）
       trophyCx: 25, muteCx: W - 25,
+      rowBtnR: 18,              // v196：第一排圆钮统一半径（奖杯/静音/菜单奖杯，15→18 变大）
       scoreY: 90,              // 当前得分 baseline（translate 锚点）
       seaBar: { sx: 25, sy: 100, sw: W - 50, sh: 20 }, // 海域进度条（v151 定版 100~120）
       // ★ v195 HUD 下探 + 任务元素重设计（用户："HUD信息区可以设置更大的范围（例如占用部分

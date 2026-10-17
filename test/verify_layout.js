@@ -1,4 +1,4 @@
-// 布局几何验证（v195）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮静态核查
+// 布局几何验证（v196）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮静态核查
 // 纯 node 计算（vm 加载 config + layout，无浏览器/无 canvas）。
 // ★ v183 新定位语义（覆盖 v175~v182 的 EXTRA 分配方案；用户：
 //   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少！"）：
@@ -39,6 +39,7 @@ eq('dy(定版)', L.dy, 0);
 // ---- HUD：钉块顶，绝对定版 ----
 eq('hud.row1Y', L.hud.row1Y, 40);
 eq('hud.trophyCy', L.hud.trophyCy, 35);
+eq('hud.rowBtnR', L.hud.rowBtnR, 18);                 // v196：第一排圆钮统一半径（奖杯/静音/菜单奖杯，15→18）
 eq('hud.scoreY', L.hud.scoreY, 90);
 eq('hud.seaBar.sy', L.hud.seaBar.sy, 100);
 eq('hud.seaBar.sh', L.hud.seaBar.sh, 20);
@@ -130,6 +131,7 @@ function checkRatio(H, label) {
   eq('btnCy(' + label + ')', L.band.btnCy, 795 + D);          // = floorY+30
   eq('btnCx(' + label + ')', L.band.btnCx.join('/'), '35/105/175/245/315/385'); // v195：由 W 派生，与比例无关
   eq('btnR(' + label + ')', L.band.btnR, 20);
+  eq('rowBtnR(' + label + ')', L.hud.rowBtnR, 18);      // v196：第一排圆钮半径由 W 派生前的常量真源，比例无关
   eq('decorBase(' + label + ')', L.band.decorBase, 785 + D);
   eq('dune0.abs(' + label + ')', L.band.decorBase + L.band.dunes[0].dy, 795 + D);
   eq('dune1.abs(' + label + ')', L.band.decorBase + L.band.dunes[1].dy, 800 + D);
@@ -183,6 +185,7 @@ eq('交付 堆叠空间(派生)', L.body.floorY - L.body.dangerY, 450);
 eq('交付 HUD→坠落间距', L.body.spawnY - L.hud.hudBottom, 70);  // v195：hudBottom 190
 eq('交付 btnCx', L.band.btnCx.join('/'), '35/105/175/245/315/385');
 eq('交付 btnR', L.band.btnR, 20);
+eq('交付 rowBtnR', L.hud.rowBtnR, 18);                 // v196：第一排圆钮统一半径
 console.log('③ 交付比例回归断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail; // 修复：③ 段失败此前被 ④ 段重置、不进退出码
 
@@ -244,10 +247,14 @@ eq('榜单行：高58', /DEX_PANEL\.w - 28, 58, 9/.test(PSRC), true);
 console.log('⑤ v194 图鉴/成就面板度量断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
-// ===== ⑥ v195 底部六钮真源 + HUD 任务/潮汐卡（systems.js/render.js 静态核查）=====
+// ===== ⑥ v195 底部六钮真源 + HUD 任务/潮汐卡 + v196 第一排圆钮/统计精简（systems.js/render.js 静态核查）=====
 // 底部六钮：坐标/半径一律引 layout.band 真源（旧 systems.js 写死 45/115/185/255/325/395
 // + restart r15：左缘距 25≠右缘距 10、重开偏小）。HUD 卡：任务条 205×35 → 任务卡 285×60
 // （靶心图标+标题+星级+金色进度条）；潮汐胶囊 90×35 → 潮汐卡 95×60（同高同款）。
+// ★ v196 第一排（用户："优化成就殿堂图标样式/大小；音量按钮同样优化；只统计最大得分和最远海"）：
+//   drawRowBtn(c, accent) 统一样式（白0.85圆底+主题色2px环+按压动画）替代旧双风格
+//   （奖杯金实心球+白线框 / 音量白底小圆+蓝灰细边）；半径引 layout.hud.rowBtnR=18；
+//   奖杯改实心金 #B8860B（缩放 r/13）；统计只留"最高/最远海域"，移除 海域×N/每日挑战/NG。
 pass = 0; fail = 0;
 var RSRC = fs.readFileSync(path.join(__dirname, '..', 'js', 'render.js'), 'utf8');
 eq('六钮引真源处数', (SRC.match(/cx: MG\.layout\.band\.btnCx\[\d\], cy: MG\.layout\.band\.btnCy, r: MG\.layout\.band\.btnR/g) || []).length, 6);
@@ -263,7 +270,28 @@ eq('潮汐卡卡体', /roundRect\(tx, ty, tw, th, 14\); ctx\.fill\(\);/.test(RSR
 eq('潮汐卡大倒计时', /ctx\.fillText\(Math\.ceil\(tide\.timer\) \+ 's', ccx, ty \+ 50\);/.test(RSRC), true);
 // 重开图标随钮放大（r15→20：弧半径 8→9）
 eq('重开图标半径9', /ctx\.arc\(rx0, ry0, 9, -Math\.PI \* 0\.35, Math\.PI \* 1\.25\); ctx\.stroke\(\);/.test(RSRC), true);
-console.log('⑥ v195 六钮真源+HUD卡度量断言: ' + pass + ' pass, ' + fail + ' fail');
+// ---- v196 第一排圆钮：统一样式 + 半径真源 + 统计精简 ----
+eq('三处半径引rowBtnR', (SRC.match(/r: MG\.layout\.hud\.rowBtnR/g) || []).length, 3); // MUTE/trophyBtn/menuTrophy
+eq('无写死row钮半径15', /cy: MG\.layout\.hud\.trophyCy, r: 15/.test(SRC), false);
+eq('rowBtnR真源定义', /rowBtnR: 18,/.test(fs.readFileSync(path.join(__dirname, '..', 'js', 'layout.js'), 'utf8')), true);
+eq('drawRowBtn定义', /function drawRowBtn\(c, accent\) \{/.test(RSRC), true);
+eq('成就殿堂引drawRowBtn金', /drawRowBtn\(btn, '#B8912F'\);/.test(RSRC), true);   // 奖杯：金 accent
+eq('音量引drawRowBtn蓝灰', /drawRowBtn\(MUTE, '#3E6E90'\);/.test(RSRC), true);   // 静音：蓝灰 accent（两钮成对）
+eq('旧drawMiniBtn已删除', /function drawMiniBtn/.test(RSRC), false);
+eq('奖杯改实心金', /ctx\.fillStyle = '#B8860B';/.test(RSRC), true);
+eq('奖杯杯体填充', /ctx\.moveTo\(-6, -8\); ctx\.lineTo\(6, -8\); ctx\.lineTo\(5, -1\);/.test(RSRC), true);
+eq('奖杯缩放r/13', /var ts = btn\.r \/ 13;/.test(RSRC), true);
+eq('喇叭图标放大r/13', /var ms = MUTE\.r \/ 13;/.test(RSRC), true);
+// 统计精简：只留"最高 X · 最远 海域名"（移除 海域×N / 每日挑战 X/Y / 「NG」×N）
+eq('统计限宽240', /measureText\(top1\)\.width > 240/.test(RSRC), true);
+eq('统计无海域×N', /海域 ×' \+ seaCount/.test(RSRC), false);
+eq('统计无每日挑战', /每日挑战 ' \+ Math\.min/.test(RSRC), false);
+eq('统计无NG', /「' \+ ng\.active\.name/.test(RSRC), false);
+eq('统计色固定', /ctx\.fillStyle = chal && !chal\.done/.test(RSRC), false); // 旧条件紫色已移除
+eq('统计无每日挑战紫', /'#7B6FD0'/.test(RSRC), false);
+eq('drawHUD无chal死代码', /var chal = dchalHud\(\);/.test(RSRC), false);
+eq('dchalHud定义已移除', /function dchalHud\(/.test(SRC), false);
+console.log('⑥ v195六钮真源+HUD卡度量+v196第一排断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
 process.exit(f2 ? 1 : 0);

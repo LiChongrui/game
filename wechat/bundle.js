@@ -360,6 +360,7 @@ MG.layout = {
       row1Y: 40,               // 统计最佳结果 / 计时 baseline（与奖杯·静音 cy35 垂直居中对齐同排）
       trophyCy: 35,            // 奖杯 / 静音 / 菜单奖杯圆心（+hudInset 避让胶囊）
       trophyCx: 25, muteCx: W - 25,
+      rowBtnR: 18,              // v196：第一排圆钮统一半径（奖杯/静音/菜单奖杯，15→18 变大）
       scoreY: 90,              // 当前得分 baseline（translate 锚点）
       seaBar: { sx: 25, sy: 100, sw: W - 50, sh: 20 }, // 海域进度条（v151 定版 100~120）
       // ★ v195 HUD 下探 + 任务元素重设计（用户："HUD信息区可以设置更大的范围（例如占用部分
@@ -1232,7 +1233,7 @@ MG.layout.build();
       running: !!(ng.active && ng.fromDaily && dchalRun)
     };
   }
-  function dchalHud() { return (ng.active && ng.fromDaily && dchalRun) ? { goal: dchalRun.goal, done: dchal.done } : null; }
+  // dchalHud() 已移除（v196）：HUD 统计精简为"最高/最远海域"后无调用方（原仅 drawHUD 用）
   function checkDailyChallenge() {
     if (!ng.active || !ng.fromDaily || !dchalRun) return;
     if (dchal.date !== todayStr()) { dchal.date = todayStr(); dchal.done = false; saveChal(); } // 跨天兜底（长时间挂机）
@@ -2962,12 +2963,12 @@ MG.layout.build();
   }
 
   // ---------- 命中区域（圆形按钮；坐标全部由 layout 派生，与绘制同源）----------
-  var MUTE = { cx: C.W - 25, cy: MG.layout.hud.trophyCy, r: 15, pressT: 0 };
+  var MUTE = { cx: C.W - 25, cy: MG.layout.hud.trophyCy, r: MG.layout.hud.rowBtnR, pressT: 0 }; // v196：引 rowBtnR 真源（15→18）
   // 底部六钮（v195）：圆心/半径一律引 layout.band 真源（btnCx=35+i×(W−70)/5 均匀派生、
   // btnR=20 统一半径）——旧写死 45/115/185/255/325/395 + restart r15：左缘距 25≠右缘距 10
   var bookBtn = { cx: MG.layout.band.btnCx[0], cy: MG.layout.band.btnCy, r: MG.layout.band.btnR, pressT: 0 };
-  var trophyBtn = { cx: 25, cy: MG.layout.hud.trophyCy, r: 15, pressT: 0 }; // 成就页入口（奖杯；局内由 fit()/render 挂到刘海行 +hudInset）——与静音按钮(r15)同径
-  var menuTrophy = { cx: 25, cy: MG.layout.hud.trophyCy, r: 15, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——与静音按钮同径
+  var trophyBtn = { cx: 25, cy: MG.layout.hud.trophyCy, r: MG.layout.hud.rowBtnR, pressT: 0 }; // 成就页入口（奖杯；局内由 fit()/render 挂到刘海行 +hudInset）——v196 引 rowBtnR 真源，与静音按钮同径
+  var menuTrophy = { cx: 25, cy: MG.layout.hud.trophyCy, r: MG.layout.hud.rowBtnR, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——v196 引 rowBtnR 真源，与静音按钮同径
   var restartBtn = { cx: MG.layout.band.btnCx[5], cy: MG.layout.band.btnCy, r: MG.layout.band.btnR, pressT: 0 }; // 游戏内重开（带确认），右下角
   // 「深渊潜航」无局内悬浮钮：入口在结算页按钮组（主流 NG+ 模式选择设计）
   // 底部一排共 6 个按钮（图鉴 + 4 道具 + 重开）：35/105/175/245/315/385 均匀分布、
@@ -5571,26 +5572,25 @@ MG.layout.build();
     ctx.textAlign = 'left';
     ctx.lineJoin = 'round';
     // 第一组（左上）：成就奖杯图标 + 最高分 · 最远海域（历史信息退居角落，实时信息居中）
+    // ★ v196：统计只保留"最高 / 最远海域"两项（用户："只统计最大得分和最远海就行了，
+    //   其他的统计就不要显示了"）——移除 海域×N / 每日挑战 X/Y / 「NG」×N 三项，
+    //   颜色随之固定 #3E6E90（原随每日挑战/NG 变紫的逻辑一并移除）
     var farIdx = 0;
     for (var fi = C.seaStages.length - 1; fi >= 0; fi--) {
       if (careerPeak >= C.seaStages[fi].at) { farIdx = fi; break; }
     }
-    var chal = dchalHud();
     // 统计最佳结果：沿用原样式（14px/原描边/原色/超宽自适应缩字号），与成就殿堂按钮垂直居中对齐（cy36 → baseline41）
     ctx.font = '14px system-ui, sans-serif';
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-    var top1 = '最高 ' + best + ' · 最远 ' + C.seaStages[farIdx].name +
-      (seaCount > 0 ? ' · 海域 ×' + seaCount : '') +
-      (chal ? ' · 每日挑战 ' + Math.min(score, chal.goal) + '/' + chal.goal + (chal.done ? ' ✓' : '') : '') +
-      (ng.active ? ' · 「' + ng.active.name + '」×' + ng.active.mult : '');
+    var top1 = '最高 ' + best + ' · 最远 ' + C.seaStages[farIdx].name;
     var t1Font = 14;
-    while (t1Font > 11 && ctx.measureText(top1).width > 272) { // 右端让位下一滴预览(x329 起)，不越界
+    while (t1Font > 11 && ctx.measureText(top1).width > 240) { // 右端让位计时文字(x340 起)，不越界
       t1Font--;
       ctx.font = t1Font + 'px system-ui, sans-serif';
     }
     ctx.strokeText(top1, 50, MG.layout.hud.row1Y);
-    ctx.fillStyle = chal && !chal.done ? '#7B6FD0' : (ng.active ? '#6B5AA8' : '#3E6E90');
+    ctx.fillStyle = '#3E6E90';
     ctx.fillText(top1, 50, MG.layout.hud.row1Y);
 
     // 第二组（中轴）：当前得分居中 + 正下方海域进度条（分数涨→进度前进，垂直联动）
@@ -5628,10 +5628,10 @@ MG.layout.build();
   }
   // 静音按钮（局内 HUD 与初始界面共用；坐标 MUTE.cx/cy 恒定，菜单态铺满时为同一屏幕位置）
   function drawMuteBtn() {
-    drawMiniBtn(MUTE);
+    drawRowBtn(MUTE, '#3E6E90'); // v196：与成就殿堂图标同款同大小（白底圆+主题色环）
     ctx.save();
     ctx.translate(MUTE.cx, MUTE.cy);
-    var ms = MUTE.r / 13 * 0.8;    // 图标随按钮半径等比缩放（按钮放大后图标同步放大）
+    var ms = MUTE.r / 13;        // 图标随按钮半径等比缩放（按钮放大后图标同步放大）
     ctx.scale(ms, ms);
     var mx = 0, my = 0;
     ctx.fillStyle = '#3E6E90';
@@ -5650,15 +5650,18 @@ MG.layout.build();
     }
     ctx.restore();
   }
-  function drawMiniBtn(c) {
+  // 第一排圆钮统一样式（v196）：白底圆 + 主题色 2px 环 + 按压动画
+  // （旧：奖杯 = 金实心球+白线框、音量 = 白底小圆+蓝灰细边——两钮风格尺寸都不一致；
+  //   用户："优化一下成就殿堂的图标样式、图标大小；音量按钮同成就殿堂图标一样优化"）
+  function drawRowBtn(c, accent) {
     var s = c.pressT > 0 ? 1 - 0.1 * (c.pressT / 0.16) : 1;
     ctx.save();
     ctx.translate(c.cx, c.cy);
     ctx.scale(s, s);
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.beginPath(); ctx.arc(0, 0, c.r, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(90,140,180,0.5)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(0, 0, c.r, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = accent; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, c.r - 1, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
   // 潮汐卡（v195）：与任务卡同高同款白底（左右边距各 15、卡间 10）；
@@ -5707,26 +5710,34 @@ MG.layout.build();
 
   // ---------- 顶部中央计时：本局已进行时长 ----------
   // 成就殿堂入口按钮（🏆 奖杯，每日未全勤显红点）——局内刘海行（trophyBtn）与菜单态（menuTrophy）共用
+  // ★ v196：白底圆 + 金环 + 实心金奖杯（旧为金实心球+白线框奖杯，像颗游戏棋子，与深海主题不搭；
+  //   实心奖杯在小尺寸下比线框清晰；缩放系数 r/14 → r/13，随 rowBtnR 15→18 等比放大）
   function drawTrophyBtn(btn) {
     btn = btn || trophyBtn;
-    drawCircleBtn(btn, '#B8912F', 0.9, false, 0);
+    drawRowBtn(btn, '#B8912F'); // 与静音按钮同款白底圆环（accent 金 vs 蓝灰，两钮成对）
     var tx = btn.cx, ty = btn.cy;
     // 图标随按钮半径等比缩放（按钮放大后图标同步放大，不留空壳感）
     ctx.save();
     ctx.translate(tx, ty);
-    var ts = btn.r / 14;
+    var ts = btn.r / 13;
     ctx.scale(ts, ts);
-    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.fillStyle = '#B8860B';
+    // 杯体（实心）：上宽下窄
     ctx.beginPath();
     ctx.moveTo(-6, -8); ctx.lineTo(6, -8); ctx.lineTo(5, -1);
     ctx.quadraticCurveTo(0, 4, -5, -1);
-    ctx.closePath(); ctx.stroke();
+    ctx.closePath(); ctx.fill();
+    // 双耳（描边）
+    ctx.strokeStyle = '#B8860B'; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(-6, -6); ctx.quadraticCurveTo(-10, -6, -8, -1);
     ctx.moveTo(6, -6); ctx.quadraticCurveTo(10, -6, 8, -1);
-    ctx.moveTo(0, 3); ctx.lineTo(0, 6);
-    ctx.moveTo(-4, 7); ctx.lineTo(4, 7);
     ctx.stroke();
+    // 柄 + 底座（实心）
+    ctx.fillRect(-1.2, 2, 2.4, 4);
+    ctx.beginPath();
+    ctx.moveTo(-4.5, 7.5); ctx.lineTo(4.5, 7.5); ctx.lineTo(3.5, 6); ctx.lineTo(-3.5, 6);
+    ctx.closePath(); ctx.fill();
     ctx.restore();
     ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
     if (!(daily.done[0] && daily.done[1] && daily.done[2])) {

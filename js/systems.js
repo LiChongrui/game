@@ -302,7 +302,7 @@
       running: !!(ng.active && ng.fromDaily && dchalRun)
     };
   }
-  function dchalHud() { return (ng.active && ng.fromDaily && dchalRun) ? { goal: dchalRun.goal, done: dchal.done } : null; }
+  // dchalHud() 已移除（v196）：HUD 统计精简为"最高/最远海域"后无调用方（原仅 drawHUD 用）
   function checkDailyChallenge() {
     if (!ng.active || !ng.fromDaily || !dchalRun) return;
     if (dchal.date !== todayStr()) { dchal.date = todayStr(); dchal.done = false; saveChal(); } // 跨天兜底（长时间挂机）
@@ -2032,12 +2032,12 @@
   }
 
   // ---------- 命中区域（圆形按钮；坐标全部由 layout 派生，与绘制同源）----------
-  var MUTE = { cx: C.W - 25, cy: MG.layout.hud.trophyCy, r: 15, pressT: 0 };
+  var MUTE = { cx: C.W - 25, cy: MG.layout.hud.trophyCy, r: MG.layout.hud.rowBtnR, pressT: 0 }; // v196：引 rowBtnR 真源（15→18）
   // 底部六钮（v195）：圆心/半径一律引 layout.band 真源（btnCx=35+i×(W−70)/5 均匀派生、
   // btnR=20 统一半径）——旧写死 45/115/185/255/325/395 + restart r15：左缘距 25≠右缘距 10
   var bookBtn = { cx: MG.layout.band.btnCx[0], cy: MG.layout.band.btnCy, r: MG.layout.band.btnR, pressT: 0 };
-  var trophyBtn = { cx: 25, cy: MG.layout.hud.trophyCy, r: 15, pressT: 0 }; // 成就页入口（奖杯；局内由 fit()/render 挂到刘海行 +hudInset）——与静音按钮(r15)同径
-  var menuTrophy = { cx: 25, cy: MG.layout.hud.trophyCy, r: 15, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——与静音按钮同径
+  var trophyBtn = { cx: 25, cy: MG.layout.hud.trophyCy, r: MG.layout.hud.rowBtnR, pressT: 0 }; // 成就页入口（奖杯；局内由 fit()/render 挂到刘海行 +hudInset）——v196 引 rowBtnR 真源，与静音按钮同径
+  var menuTrophy = { cx: 25, cy: MG.layout.hud.trophyCy, r: MG.layout.hud.rowBtnR, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——v196 引 rowBtnR 真源，与静音按钮同径
   var restartBtn = { cx: MG.layout.band.btnCx[5], cy: MG.layout.band.btnCy, r: MG.layout.band.btnR, pressT: 0 }; // 游戏内重开（带确认），右下角
   // 「深渊潜航」无局内悬浮钮：入口在结算页按钮组（主流 NG+ 模式选择设计）
   // 底部一排共 6 个按钮（图鉴 + 4 道具 + 重开）：35/105/175/245/315/385 均匀分布、
