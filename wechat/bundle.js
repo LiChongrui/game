@@ -5098,31 +5098,9 @@ MG.config = {
   // ---------- 容器：玻璃质感 + 底部焦散 ----------
   function drawContainer() {
     var floorY = FLOORY, FH = 12;
-    // 海底基色分两段，保证「块内底部带」观感不随分辨率变化（用户报：宽屏下道具区下方
-    // 出现蓝色方块——根因是单一渐变 673→VH 在宽屏/矮屏 VH=747 时把暗色 stops 全压缩进
-    // 按钮下方约 40px，急堕成蓝灰色块；高屏上同一渐变被拉长反而看不出）：
-    // ① 底部带（床面→块底 C.H）：恒定浅沙渐变，任何分辨率下按钮下方都是浅色海床；
-    // ② 块底以下延伸区（仅高屏有，屏底=VH-renderOy）：从①末端色顺势加深到屏底，同色拼接。
-    var bed = grad('bedband', function () {
-      var gg = ctx.createLinearGradient(0, floorY, 0, C.H);
-      gg.addColorStop(0, 'rgba(216,236,232,0.95)');
-      gg.addColorStop(1, 'rgba(170,208,204,0.95)');
-      return gg;
-    });
-    ctx.fillStyle = bed;
-    ctx.fillRect(0, floorY + 4, C.W, C.H - floorY - 4);
-    var extEnd = VH - renderOy;   // 屏底（块内坐标；居中后 = (VH+C.H)/2 ≥ C.H）
-    if (extEnd > C.H) {
-      var ext = grad('bedext' + Math.round(extEnd), function () {
-        var gg = ctx.createLinearGradient(0, C.H, 0, extEnd);
-        gg.addColorStop(0, 'rgba(170,208,204,0.95)');
-        gg.addColorStop(1, 'rgba(112,158,174,0.95)');
-        return gg;
-      });
-      ctx.fillStyle = ext;
-      ctx.fillRect(0, C.H, C.W, extEnd - C.H + 8); // +8 防震屏抖动露底
-    }
-    // 床面：圆角横条（半透明玻璃质感，透出海底基色，不再有硬边界）
+    // 底部不带独立海床色块：容器底（FLOORY）以下直接显示全屏背景水色渐变（用户定：
+    // 「去掉这个方块，不是变个颜色，直接显示整体的背景」），任何分辨率观感一致。
+    // 床面：圆角横条（半透明玻璃质感，透出背景色，不再有硬边界）
     var fg = grad('fg' + Math.round(VH), function () {
       var gg = ctx.createLinearGradient(0, floorY, 0, floorY + FH + 6);
       gg.addColorStop(0, 'rgba(255,255,255,0.6)');
@@ -5162,16 +5140,8 @@ MG.config = {
     ctx.fillStyle = dep;
     ctx.fillRect(0, floorY - 30, C.W, 30);
 
-    // 海底装饰（基色已由上面的 bed 连续渐变铺满，这里只画沙丘等点缀）
-    var sy0 = floorY + FH + 6;
-    // 沙丘
-    ctx.fillStyle = 'rgba(238,246,240,0.7)';
-    ctx.beginPath(); ctx.ellipse(C.W * 0.2, sy0 + 12, 95, 13, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(C.W * 0.74, sy0 + 14, 115, 15, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(228,240,234,0.55)';
-    ctx.beginPath(); ctx.ellipse(C.W * 0.47, sy0 + 18, 85, 11, 0, 0, Math.PI * 2); ctx.fill();
-    // 卵石（块内坐标，贴容器底；装饰 y 以 FLOORY=646 时代为基准，随床面整体下移，
-    // 块底以下的屏底延伸由海底基色渐变覆盖）
+    // 底部点缀（无海床基色，直接坐在背景水色上）：卵石 + 海星 + 扇贝
+    // 卵石（块内坐标，贴容器底；装饰 y 以 FLOORY=646 时代为基准，随床面整体下移）
     ctx.fillStyle = 'rgba(110,150,168,0.4)';
     var yoff = (floorY + FH + 6) - 664;
     var peb = [[24, 688, 3], [66, 700, 2], [112, 686, 2.5], [172, 702, 2], [246, 690, 2.5], [306, 700, 2], [352, 686, 2.5], [404, 696, 2.2]];
@@ -5703,8 +5673,8 @@ MG.config = {
   }
 
   function drawSkillBar() {
-    // 道具区不画独立背景（用户要求去掉道具区下方的蓝色方块背景）：按钮直接坐在海床渐变上，
-    // 块底下方的扩展区由 drawContainer 的海床渐变自然延展到屏底，无接缝、无突兀色块。
+    // 道具区不画独立背景（用户要求去掉道具区下方的色块）：按钮直接坐在全屏背景水色上，
+    // 无接缝、无突兀色块，任何分辨率观感一致。
     var readyPulse = 0.5 + 0.5 * Math.sin(time * 5);
 
     drawCircleBtn(bookBtn, '#4A7FA0', 1, false, readyPulse);
