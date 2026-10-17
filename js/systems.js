@@ -1987,8 +1987,9 @@
   function buildOverButtons() {
     overButtons = [];
     var bw = 240, bh = 42, gap = 10, x = (C.W - bw) / 2;
-    // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中（面板 py134/ph472，见 render.drawOver）
-    var areaTop = 134 + 186, areaBottom = 134 + 472 - 22;
+    // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中（面板几何见 overPanelRect）
+    var ovr = overPanelRect();
+    var areaTop = ovr.y + 186, areaBottom = ovr.y + ovr.h - 22;
     var n = 1 + (doubled ? 0 : 1) + 3; // 复活(无限)/双倍/分享/深渊潜航/重开
     var groupH = n * bh + (n - 1) * gap;
     var y = areaTop + (areaBottom - areaTop - groupH) / 2;
@@ -2014,17 +2015,17 @@
 
   // ---------- 命中区域（圆形按钮） ----------
   var MUTE = { cx: C.W - 24, cy: 36, r: 16, pressT: 0 };
-  var bookBtn = { cx: 46, cy: 688, r: 20, pressT: 0 };
+  var bookBtn = { cx: 46, cy: 701, r: 20, pressT: 0 };
   var trophyBtn = { cx: 24, cy: 36, r: 16, pressT: 0 }; // 成就页入口（奖杯；局内由 fit() 挂到刘海行，cy 为负）——与重开按钮(r16)同径
   var menuTrophy = { cx: 24, cy: 36, r: 16, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——与重开按钮同径
-  var restartBtn = { cx: C.W - 24, cy: 688, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
+  var restartBtn = { cx: C.W - 24, cy: 701, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
   // 「深渊潜航」无局内悬浮钮：入口在结算页按钮组（主流 NG+ 模式选择设计）
   // 底部一排共 6 个按钮（图鉴 + 4 道具 + 重开），中心等距 70px 均匀排列：46/116/186/256/326/396
   var SKILL_BTNS = [
-    { key: 'swap',   cx: 116, cy: 688, r: 20, pressT: 0 },
-    { key: 'ripple', cx: 186, cy: 688, r: 20, pressT: 0 },
-    { key: 'evap',   cx: 256, cy: 688, r: 20, pressT: 0 },
-    { key: 'flow',   cx: 326, cy: 688, r: 20, pressT: 0 }
+    { key: 'swap',   cx: 116, cy: 701, r: 20, pressT: 0 },
+    { key: 'ripple', cx: 186, cy: 701, r: 20, pressT: 0 },
+    { key: 'evap',   cx: 256, cy: 701, r: 20, pressT: 0 },
+    { key: 'flow',   cx: 326, cy: 701, r: 20, pressT: 0 }
   ];
   fit(); // 首次适配（按钮已定义，底部元素可同步贴底）
 

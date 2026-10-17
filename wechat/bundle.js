@@ -68,8 +68,8 @@ window.MG = window.MG || {};
 MG.config = {
   // 逻辑分辨率（画布固定，CSS 等比缩放）
   W: 420,
-  H: 747,              // 9:16（420×16/9≈746.7，取 747，偏差 0.04%）
-  floorY: 673,         // 容器底 y（下方保留技能栏区域）
+  H: 945,              // 8:18（420×18/8=945；用户定版比例，v172 由 9:16 747 改）
+  floorY: 673,         // 容器底 y（固定不随块高变化：坠落高度/堆叠空间恒定；块底至地板的距离拉宽为底部带）
 
   // 容器（适度压缩给顶部宽松：开口 190、容器 190~673 = 483px；顶部 HUD 区扩至 0~164，
   // 三组（统计/得分+进度条/任务+潮汐）行距舒适，开口上方留 26px 空隙带供水滴出生/虚影悬停）
@@ -419,21 +419,22 @@ MG.config = {
   };
 
   // ---------- 画布 ----------
-  // 逻辑高度动态（VH ≥ 747）：顶部元素（HUD/出生区/警戒线）按顶部坐标绘制，
-  // 底部元素（海底/技能栏/按钮）按 VH-偏移 贴底，中间水域随窗口高度自适应；
+  // 逻辑高度动态（VH ≥ 945）：顶部元素（HUD/出生区/警戒线）按顶部坐标绘制，
+  // 底部元素（海底/技能栏/按钮）按块内坐标贴块底，中间水域随窗口高度自适应；
   // 画布 CSS 高度恒等于窗口高度，CSS 宽度=游戏区宽度（两侧为页面深海背景）
   var canvas = document.getElementById('game');
   var ctx = canvas.getContext('2d');
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
-  var VH = C.H;           // 当前逻辑高度（全屏：h/view.s，≥747）
+  var VH = C.H;           // 当前逻辑高度（全屏：h/view.s，≥945）
   var LW = C.W;           // 当前逻辑宽度（≥ C.W，宽窗口下两侧为延伸海水）
   var BX = 0;             // 游戏区（420 逻辑宽）水平居中偏移
   var FLOORY = C.floorY;  // 容器底 y（游戏块内恒定：673）
   var view = { s: 1 };
-  // 游戏块 = 420×747 固定逻辑区（9:16；顶部 HUD 0~164 + 出生空隙带 26 + 容器 483 + 底部 74），
-  // 长宽比恒定，所有设备一致；坠落高度 = 最大可投放滴底触警戒线时的球心（dangerY - 45）；
-  // 高屏多余高度全部向下延伸（海底/技能栏贴屏底）；oy 为块顶部偏移：
-  // Web 贴屏顶（0），微信端贴在胶囊区下方（HUD 不被胶囊遮挡）
+  // 游戏块 = 420×945 固定逻辑区（8:18；顶部 HUD 0~164 + 出生空隙带 26 + 容器 483 + 底部带 272）。
+  // v172 由 9:16（747）改 8:18：多出的 198px 整段给底部带——容器 190~673、警戒线 254、
+  // 坠落高度 spawnY=209、堆叠空间 419 全部不变（用户定版「坠落区高度是核心」）；
+  // 长宽比恒定，所有设备一致；高屏多出的高度上下均分给背景延伸（oy 为块居中偏移，
+  // 菜单态铺满时为 0）
   var oy = 0;             // 游戏块顶部偏移（逻辑 px，≥0）
   var renderOy = 0;       // 渲染/点击实际使用的偏移：菜单态 0（铺满），其余态 oy
   var hudInset = 0;       // HUD 顶行避让胶囊的实际下挪量（菜单=oy；游戏态限幅 min(oy,24) 防止任务面板侵入容器）
@@ -445,7 +446,7 @@ MG.config = {
     VH = h / view.s;
     LW = w / view.s;                       // 逻辑宽度（≥420）
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
-    // 垂直居中：高屏多余的高度上下均分，游戏块（420×747）居中成为视觉焦点；
+    // 垂直居中：高屏多余的高度上下均分，游戏块（420×945）居中成为视觉焦点；
     // 块顶上方/块底下方由全屏背景渐变（水色）自然延展填充，无留白、无接缝。
     // （__safeTop 由 wx-shim 用 getMenuButtonBoundingClientRect 计算，单位=窗口 CSS px）
     oy = Math.max(0, (VH - C.H) / 2);
@@ -454,8 +455,9 @@ MG.config = {
     var capBottom = window.__safeTop ? (window.__safeTop - 8) / view.s : 0;
     hudInset = Math.max(0, Math.min(capBottom - oy - 20, 24));
     // 游戏块内全部恒定（=config 初始值）：容器底/容器顶/警戒线/出生点不随设备变化，
-    // 容器 420:483 恒定——不同设备游戏区大小比例完全一致；底部带 74 不变
-    FLOORY = C.H - 74;                     // 673
+    // 容器 420:483 恒定——不同设备游戏区大小比例完全一致。
+    // 8:18 改版：块高 747→945，多出的高度整段给底部带（地板仍固定 673，坠落高度/堆叠空间不变）
+    FLOORY = C.floorY;                     // 673 固定（容器底；不再随 C.H 下移）
     C.floorY = FLOORY;                     // 同步给物理引擎（每帧读取，水滴落到新地板）
     // 容器适度压缩给顶部宽松：容器 190~673 = 483px（块高/底部带 74 不变）
     C.containerTop = 190;
@@ -466,9 +468,9 @@ MG.config = {
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // 按钮恒落在块内底部带（容器底 673 ~ 块底 747，共 74）：图鉴/道具/重开在该带内近似垂直居中。
-    // 块贴顶后按钮随块整体上移，屏底多出的空间由海床/技能栏渐变自然延伸填充（不挪按钮）
-    var cy = C.H - 46;
+    // 按钮恒贴在容器底下方（cy=FLOORY+28=701，与容器底恒距 28，v163 定版）——
+    // 8:18 改版块高 747→945 后底部带拉厚，按钮不随块底下沉（用户：「怎么又贴底了」）
+    var cy = FLOORY + 28;
     // 注意：模块化后 bookBtn 等声明在 systems.js（后加载），早期触发时用 typeof 守卫
     if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {
       bookBtn.cy = cy; restartBtn.cy = cy;
@@ -2741,8 +2743,9 @@ MG.config = {
   function buildOverButtons() {
     overButtons = [];
     var bw = 240, bh = 42, gap = 10, x = (C.W - bw) / 2;
-    // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中（面板 py134/ph472，见 render.drawOver）
-    var areaTop = 134 + 186, areaBottom = 134 + 472 - 22;
+    // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中（面板几何见 overPanelRect）
+    var ovr = overPanelRect();
+    var areaTop = ovr.y + 186, areaBottom = ovr.y + ovr.h - 22;
     var n = 1 + (doubled ? 0 : 1) + 3; // 复活(无限)/双倍/分享/深渊潜航/重开
     var groupH = n * bh + (n - 1) * gap;
     var y = areaTop + (areaBottom - areaTop - groupH) / 2;
@@ -2768,17 +2771,17 @@ MG.config = {
 
   // ---------- 命中区域（圆形按钮） ----------
   var MUTE = { cx: C.W - 24, cy: 36, r: 16, pressT: 0 };
-  var bookBtn = { cx: 46, cy: 688, r: 20, pressT: 0 };
+  var bookBtn = { cx: 46, cy: 701, r: 20, pressT: 0 };
   var trophyBtn = { cx: 24, cy: 36, r: 16, pressT: 0 }; // 成就页入口（奖杯；局内由 fit() 挂到刘海行，cy 为负）——与重开按钮(r16)同径
   var menuTrophy = { cx: 24, cy: 36, r: 16, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——与重开按钮同径
-  var restartBtn = { cx: C.W - 24, cy: 688, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
+  var restartBtn = { cx: C.W - 24, cy: 701, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
   // 「深渊潜航」无局内悬浮钮：入口在结算页按钮组（主流 NG+ 模式选择设计）
   // 底部一排共 6 个按钮（图鉴 + 4 道具 + 重开），中心等距 70px 均匀排列：46/116/186/256/326/396
   var SKILL_BTNS = [
-    { key: 'swap',   cx: 116, cy: 688, r: 20, pressT: 0 },
-    { key: 'ripple', cx: 186, cy: 688, r: 20, pressT: 0 },
-    { key: 'evap',   cx: 256, cy: 688, r: 20, pressT: 0 },
-    { key: 'flow',   cx: 326, cy: 688, r: 20, pressT: 0 }
+    { key: 'swap',   cx: 116, cy: 701, r: 20, pressT: 0 },
+    { key: 'ripple', cx: 186, cy: 701, r: 20, pressT: 0 },
+    { key: 'evap',   cx: 256, cy: 701, r: 20, pressT: 0 },
+    { key: 'flow',   cx: 326, cy: 701, r: 20, pressT: 0 }
   ];
   fit(); // 首次适配（按钮已定义，底部元素可同步贴底）
 
@@ -3130,8 +3133,14 @@ MG.config = {
 
   // ---------- 面板几何（渲染与点击热区共用，一处定义） ----------
   var DEX_PANEL = { x: 20, y: 64, w: 380, h: 560 };
+  // 结算海报（over 态）：面板按游戏块高垂直居中（块高 747→945 改版后写死的 py=134 会偏上，
+  // 收敛为几何常量 + 每帧重算，与 DEX_PANEL 同法——渲染 drawOver 与命中 buildOverButtons 共用）
+  var OVER_PANEL = { w: 320, h: 472 };
+  function overPanelRect() {
+    return { x: (C.W - OVER_PANEL.w) / 2, y: Math.round((C.H - OVER_PANEL.h) / 2), w: OVER_PANEL.w, h: OVER_PANEL.h };
+  }
   var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 42, y: DEX_PANEL.y + 8, w: 28, h: 28 }; // 右上 × 关闭（中心 +22px，与页头标题文字对齐）
-  // 面板垂直居中：菜单态（铺满）以整屏 VH 为基准；局内游戏块为固定 747 逻辑（9:16，居中块=屏幕中心，
+  // 面板垂直居中：菜单态（铺满）以整屏 VH 为基准；局内游戏块为固定 945 逻辑（8:18，居中块=屏幕中心，
   // 块内 (C.H-h)/2 + 偏移 renderOy 恰好落在屏幕中央）——每帧绘制前重算，页签始终处于屏幕中央
   function layoutDexPanel() {
     var base = state === 'menu' ? VH : C.H;
@@ -3798,7 +3807,7 @@ MG.config = {
     if (!shareOpen) return;
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
-    var pw = 300, ph = 420, px = (C.W - pw) / 2, py = 160;
+    var pw = 300, ph = 420, px = (C.W - pw) / 2, py = Math.round((C.H - ph) / 2); // 按块高垂直居中（747→945 改版）
     panel(px, py, pw, ph, 16, 0.97);
     // 卡片头：深海渐变 + 标题
     var head = ctx.createLinearGradient(0, py, 0, py + 96);
@@ -4204,7 +4213,7 @@ MG.config = {
     var nk = Math.max(2, Math.min(3, Math.floor(w / 50)));
     for (k = 0; k < nk; k++) {
       var px = x0 + (k + 0.5) * w / nk + Math.sin(seed * 1.7 + k * 5.3) * w * 0.15;
-      var h = 95 + ((k * 53 + seed * 17) % 60) + (VH - 747) * 0.16;
+      var h = 95 + ((k * 53 + seed * 17) % 60) + (VH - C.H) * 0.16;
       h = Math.min(h, VH * 0.36);
       var bend = Math.sin(time * (0.45 + (k % 3) * 0.15) + seed + k * 2.2); // -1..1 摆幅
       var tone = k % 2 ? '15,64,94' : '22,84,110';
@@ -5140,7 +5149,8 @@ MG.config = {
     ctx.fillStyle = dep;
     ctx.fillRect(0, floorY - 30, C.W, 30);
 
-    // 底部装饰（无海床基色，直接坐在背景水色上）：沙丘起伏 + 卵石 + 海星 + 扇贝
+    // 底部装饰（无海床基色，直接坐在背景水色上）：沙丘起伏 + 卵石 + 海星 + 扇贝。
+    // 8:18 改版后底部带为 673~945（272px），装饰沿带铺开（避开按钮行 cy=899 的 879~919）
     var sy0 = floorY + FH + 6;
     // 沙丘（径向渐变柔边：中心实色 → 边缘全透明，消除硬边；scale 把椭圆映射到单位圆，
     // 保证渐变在椭圆各个方向均匀衰减，不会因径向渐变是圆形而被压扁）
@@ -5157,18 +5167,17 @@ MG.config = {
       ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
-    dune(C.W * 0.2, sy0 + 12, 95, 13, 'rgba(238,246,240,0.7)', 'rgba(238,246,240,0)');
-    dune(C.W * 0.74, sy0 + 14, 115, 15, 'rgba(238,246,240,0.7)', 'rgba(238,246,240,0)');
-    dune(C.W * 0.47, sy0 + 18, 85, 11, 'rgba(228,240,234,0.55)', 'rgba(228,240,234,0)');
-    // 卵石（块内坐标，贴容器底；装饰 y 以 FLOORY=646 时代为基准，随床面整体下移）
+    dune(C.W * 0.2, sy0 + 39, 95, 13, 'rgba(238,246,240,0.7)', 'rgba(238,246,240,0)');
+    dune(C.W * 0.74, sy0 + 99, 115, 15, 'rgba(238,246,240,0.7)', 'rgba(238,246,240,0)');
+    dune(C.W * 0.47, sy0 + 69, 85, 11, 'rgba(228,240,234,0.55)', 'rgba(228,240,234,0)');
+    // 卵石（块内绝对坐标，贴容器底；沿底部带铺开）
     ctx.fillStyle = 'rgba(110,150,168,0.4)';
-    var yoff = (floorY + FH + 6) - 664;
-    var peb = [[24, 688, 3], [66, 700, 2], [112, 686, 2.5], [172, 702, 2], [246, 690, 2.5], [306, 700, 2], [352, 686, 2.5], [404, 696, 2.2]];
+    var peb = [[24, 700, 3], [66, 860, 2], [112, 730, 2.5], [172, 845, 2], [246, 712, 2.5], [306, 855, 2], [352, 745, 2.5], [404, 838, 2.2]];
     for (var pi = 0; pi < peb.length; pi++) {
-      ctx.beginPath(); ctx.arc(peb[pi][0], peb[pi][1] + yoff, peb[pi][2], 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(peb[pi][0], peb[pi][1], peb[pi][2], 0, Math.PI * 2); ctx.fill();
     }
-    drawStarfish(88, 700 + yoff, 9);
-    drawShell(330, 702 + yoff, 9);
+    drawStarfish(88, 855, 9);
+    drawShell(330, 858, 9);
   }
 
   // 海星：五条圆钝臂 + 中心盘 + 亮斑
@@ -5934,8 +5943,10 @@ MG.config = {
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
 
-    // 结算海报：面板加高放宽（436→472、上移至134），统计区与按钮组均拉开呼吸感
-    var pw = 320, ph = 472, px = (C.W - pw) / 2, py = 134;
+    // 结算海报：面板几何收敛 panels.js（OVER_PANEL/overPanelRect），按块高垂直居中；
+    // 统计区与按钮组均拉开呼吸感（v161 排版放松沿用）
+    var ovr = overPanelRect();
+    var px = ovr.x, py = ovr.y, pw = ovr.w, ph = ovr.h;
     panel(px, py, pw, ph, 16, 0.97);
 
     ctx.textAlign = 'center';
@@ -6093,7 +6104,7 @@ MG.config = {
     ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, 0);
     drawBackground();
 
-    // 内容层：游戏块（420×747 ≈ 9:16 恒定比例）垂直居中——所有态一致居中（oy=(VH-C.H)/2），
+    // 内容层：游戏块（420×945 ≈ 8:18 恒定比例）垂直居中——所有态一致居中（oy=(VH-C.H)/2），
     // 高屏多余高度上下均分，块顶上方/块底下方由全屏背景渐变自然延展填充（无留白）。
     // transform y 偏移用 dpr*view.s*renderOy（renderOy 为逻辑 px，与 toLocal 的 -renderOy 同量纲，
     // 修早期漏乘 view.s 导致 view.s≠1 真机上偏移算少、游戏区偏上的问题）。
