@@ -326,7 +326,7 @@ MG.layout = {
     this.dangerShift = 40;   // 警戒线基准已含 +40（v178/v181 用户两次"加20"）——
     // 仅作标注，供锚在警戒线上、但位置不该被这次调整波及的组件（公告带）剥离，别无他用
     // 同步真源给物理引擎（每帧读 C.*）：容器/警戒线/容器底随 EXTRA 下移，容器高恒 483
-    C.containerTop = 190 + EXTRA;      // 容器开口（+EXTRA 下移）
+    C.containerTop = 150 + EXTRA;      // 容器开口（150+EXTRA；v181：基准 190→150，压缩 HUD 与容器间弹性空白 40px，容器长高 40）
     C.dangerY = 294 + EXTRA;           // 警戒线：基准 254→274(v178)→294(v181 再加20)，其余不动
     C.floorY = 673 + EXTRA;            // 容器底（+EXTRA 下移）
     // 坠落高度 = 最大可投放水滴（tiers 前 5 档中的溪流 r45）底部接触警戒线时的球心位置（公式派生，禁写死）
@@ -347,7 +347,7 @@ MG.layout = {
 
     // ---- ② 容器区（核心游戏几何：用户定版；随 EXTRA+DANGER_SHIFT 整体下移，容器 483 高不变）----
     this.body = {
-      containerTop: C.containerTop,     // 190+EXTRA 容器开口
+      containerTop: C.containerTop,     // 150+EXTRA 容器开口（v181：-40 压缩弹性空白，容器 483→523）
       dangerY: C.dangerY,               // 254+EXTRA+40 警戒线（v178/v181 两次 +20）
       floorY: C.floorY,                 // 673+EXTRA 容器底
       spawnY: C.spawnY,                 // 209+EXTRA+40 坠落高度（公式派生，禁写死）

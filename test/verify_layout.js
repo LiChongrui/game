@@ -38,7 +38,7 @@ eq('hud.quest.qh', L.hud.quest.qh, 34);
 eq('hud.tidePill.ty', L.hud.tidePill.ty, 130);
 eq('hud.tidePill.tx', L.hud.tidePill.tx, 298);
 eq('hud.tideBannerY', L.hud.tideBannerY, 250);
-eq('body.containerTop', L.body.containerTop, 190);
+eq('body.containerTop', L.body.containerTop, 150);   // v181：-40 压缩弹性空白
 eq('body.dangerY', L.body.dangerY, 254 + 40);   // v178+v181：两次+20
 eq('body.floorY', L.body.floorY, 673);
 eq('body.spawnY', L.body.spawnY, 209 + 40);     // v178+v181：两次+20（公式 dangerY-45 自动跟随）
@@ -80,12 +80,12 @@ function checkRatio(H, label) {
   eq('extra(' + label + ')', L.extra, X);
   // HUD 钉块顶：三组行位完全不动
   eq('hud 不动(' + label + ')', L.hud.row1Y + '/' + L.hud.scoreY + '/' + L.hud.seaBar.sy + '/' + L.hud.quest.qy + '/' + L.hud.trophyCy, '41/88/100/130/36');
-  // 容器/警戒线/坠落高度：+EXTRA(+DANGER_SHIFT) 下移（容器高恒 483）
-  eq('containerTop(' + label + ')', L.body.containerTop, 190 + X);
+  // 容器/警戒线/坠落高度：+EXTRA(+DANGER_SHIFT) 下移（容器高 523 = 483+40，v181）
+  eq('containerTop(' + label + ')', L.body.containerTop, 150 + X);
   eq('dangerY(' + label + ')', L.body.dangerY, 254 + X + DS);
   eq('floorY(' + label + ')', L.body.floorY, 673 + X);
   eq('spawnY(' + label + ')', L.body.spawnY, 209 + X + DS);
-  eq('容器高(' + label + ')', L.body.floorY - L.body.containerTop, 483);
+  eq('容器高(' + label + ')', L.body.floorY - L.body.containerTop, 523);  // v181：483+40
   eq('堆叠空间(' + label + ')', L.body.floorY - L.body.dangerY, 419 - DS);
   eq('tutY(' + label + ')', L.body.tutY, 480 + X);
   // ★ 多出的区域垫在 HUD 与坠落高度之间：164 → spawnY
@@ -117,7 +117,7 @@ function checkRatio(H, label) {
   eq('C.floorY回写(' + label + ')', C.floorY, 673 + X);
   eq('C.spawnY回写(' + label + ')', C.spawnY, 209 + X + DS);
   eq('C.dangerY回写(' + label + ')', C.dangerY, 254 + X + DS);
-  eq('C.containerTop回写(' + label + ')', C.containerTop, 190 + X);
+  eq('C.containerTop回写(' + label + ')', C.containerTop, 150 + X);
   // ★ v178：公告带锚 = dangerY - dangerShift（剥离 SHIFT，弹字位置不随警戒线调整漂移）
   eq('公告带锚(' + label + ')', C.dangerY - L.dangerShift, 254 + X);
   console.log('② ' + label + ' 自动重排断言: ' + pass + ' pass, ' + fail + ' fail');
