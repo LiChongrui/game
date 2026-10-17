@@ -5142,12 +5142,24 @@ MG.config = {
 
     // 底部装饰（无海床基色，直接坐在背景水色上）：沙丘起伏 + 卵石 + 海星 + 扇贝
     var sy0 = floorY + FH + 6;
-    // 沙丘（三块浅色起伏，原样式原坐标）
-    ctx.fillStyle = 'rgba(238,246,240,0.7)';
-    ctx.beginPath(); ctx.ellipse(C.W * 0.2, sy0 + 12, 95, 13, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(C.W * 0.74, sy0 + 14, 115, 15, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(228,240,234,0.55)';
-    ctx.beginPath(); ctx.ellipse(C.W * 0.47, sy0 + 18, 85, 11, 0, 0, Math.PI * 2); ctx.fill();
+    // 沙丘（径向渐变柔边：中心实色 → 边缘全透明，消除硬边；scale 把椭圆映射到单位圆，
+    // 保证渐变在椭圆各个方向均匀衰减，不会因径向渐变是圆形而被压扁）
+    function dune(cx, cy, rx, ry, c, c0) {
+      var R = Math.max(rx, ry);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(rx / R, ry / R);
+      var g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+      g.addColorStop(0, c);
+      g.addColorStop(0.72, c);
+      g.addColorStop(1, c0);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    dune(C.W * 0.2, sy0 + 12, 95, 13, 'rgba(238,246,240,0.7)', 'rgba(238,246,240,0)');
+    dune(C.W * 0.74, sy0 + 14, 115, 15, 'rgba(238,246,240,0.7)', 'rgba(238,246,240,0)');
+    dune(C.W * 0.47, sy0 + 18, 85, 11, 'rgba(228,240,234,0.55)', 'rgba(228,240,234,0)');
     // 卵石（块内坐标，贴容器底；装饰 y 以 FLOORY=646 时代为基准，随床面整体下移）
     ctx.fillStyle = 'rgba(110,150,168,0.4)';
     var yoff = (floorY + FH + 6) - 664;
