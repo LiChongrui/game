@@ -1945,7 +1945,10 @@
         phys.bodies[i].dangerT = 0;
         phys.bodies[i].grace = 0.8; // 短宽限，稳定局面
       }
-      if (removed > 0) addPopup(C.W / 2, 158, '越线水滴被冲走 ×' + removed, false, 0);
+      // v193：设计稿 y 158→250——addPopup 的公告带映射区间为 180~320，158 不进
+      // 映射、滞留 HUD 信息条（hudBottom=165，压任务条/潮汐胶囊）；250 与其余潮汐
+      // 公告（渐深提示/高潮/海事件）同带，经 annY 落到弹字带 mirrorCy+41=411
+      if (removed > 0) addPopup(C.W / 2, 250, '越线水滴被冲走 ×' + removed, false, 0);
       state = 'play';
     });
   }

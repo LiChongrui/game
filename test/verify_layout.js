@@ -197,6 +197,11 @@ eq('annY(300)=461', annYv(300), 461);
 // 落点 sanity：150 组不再落在 HUD 信息条内（hudBottom=165）；300 组仍在容器内（floorY=765）
 eq('annY(150)出HUD', annYv(150) > L.hud.hudBottom, true);
 eq('annY(300)在容器内', annYv(300) < L.body.floorY, true);
+// v193 防回归：居中公告弹字的设计稿 y 必须 ≥180（addPopup 映射区间 180~320，
+// <180 不进映射、滞留 HUD 信息条——v192 的 7 处 ring 与 v193 的"越线冲走"158 同类）
+var badY = [], ym, yre = /addPopup\(C\.W \/ 2, (\d+)/g;
+while ((ym = yre.exec(SRC))) { if (Number(ym[1]) < 180) badY.push(Number(ym[1])); }
+eq('居中弹字无HUD滞留(<180)', badY.join(','), '');
 console.log('④ v192 公告ring锚定断言: ' + pass + ' pass, ' + fail + ' fail');
 
 process.exit((fail + f2) ? 1 : 0);
