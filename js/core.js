@@ -46,9 +46,14 @@
     VH = h / view.s;
     LW = w / view.s;                       // 逻辑宽度（≥420）
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
-    // 块贴顶：HUD 首行（cy36/r16 → 顶缘 20）落在胶囊区下缘正下方；Web 无胶囊则 oy=0 贴屏顶
+    // 垂直居中：高屏多余的高度上下均分，游戏块（420×747）居中成为视觉焦点；
+    // 块顶上方/块底下方由全屏背景渐变（水色）自然延展填充，无留白、无接缝。
     // （__safeTop 由 wx-shim 用 getMenuButtonBoundingClientRect 计算，单位=窗口 CSS px）
-    oy = Math.max(0, Math.min((window.__safeTop || 0) / view.s - 20, VH - C.H));
+    oy = Math.max(0, (VH - C.H) / 2);
+    // 胶囊残余避让：居中后 HUD 顶行（块内 cy36/r16 → 顶缘 20）若仍在胶囊下缘之上才需额外下挪；
+    // 高屏居中量已远大于胶囊高度 → hudInset=0（无需再避让）；矮屏(≈块高)才给 ≤24 的残余量。
+    var capBottom = window.__safeTop ? (window.__safeTop - 8) / view.s : 0;
+    hudInset = Math.max(0, Math.min(capBottom - oy - 20, 24));
     // 游戏块内全部恒定（=config 初始值）：容器底/容器顶/警戒线/出生点不随设备变化，
     // 容器 420:483 恒定——不同设备游戏区大小比例完全一致；底部带 74 不变
     FLOORY = C.H - 74;                     // 673
@@ -71,9 +76,9 @@
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
     }
     if (typeof trophyBtn !== 'undefined' && typeof MUTE !== 'undefined') {
-      // 静音在 drawHUD 内、由 render 对 play 态 translate(0,oy) 下移，故 cy 保持 36；
-      // 奖杯在 HUD 之外（drawSkillBar 绘制路径）不吃该平移，故 cy 直接含胶囊避让偏移。
-      trophyBtn.cy = 36 + oy; MUTE.cy = 36;     // 奖杯/静音：块内左上/右上角落（与分数行同排）
+      // 静音在 drawHUD 内、由 render translate(0,hudInset) 下挪残余胶囊量，故 cy 保持 36；
+      // 奖杯在 HUD 之外（drawSkillBar 绘制路径）不吃该平移，故 cy 直接含 hudInset 残余偏移。
+      trophyBtn.cy = 36 + hudInset; MUTE.cy = 36;     // 奖杯/静音：块内左上/右上角落（与分数行同排）
     }
   }
   window.addEventListener('resize', fit);

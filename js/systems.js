@@ -1658,7 +1658,7 @@
       stage: seaStage(), daily: { done: daily.done.slice(), streak: daily.streak }, best: best,
       jellies: jellies.map(function (j) { return { x: Math.round(j.x), y: Math.round(j.y), s: Math.round(j.s) }; }),
       col: colProgress, chestTimer: Math.round(chestTimer * 10) / 10,
-      oy: oy, renderOy: renderOy, VH: VH, floorY: C.floorY, containerTop: C.containerTop, time: time,
+      oy: oy, renderOy: renderOy, hudInset: hudInset, VH: VH, floorY: C.floorY, containerTop: C.containerTop, time: time,
       dangerY: C.dangerY, spawnY: C.spawnY,
       offline: offlineGain ? { mins: offlineGain.mins, gain: offlineGain.gain } : null
     };

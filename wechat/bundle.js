@@ -445,9 +445,14 @@ MG.config = {
     VH = h / view.s;
     LW = w / view.s;                       // 逻辑宽度（≥420）
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
-    // 块贴顶：HUD 首行（cy36/r16 → 顶缘 20）落在胶囊区下缘正下方；Web 无胶囊则 oy=0 贴屏顶
+    // 垂直居中：高屏多余的高度上下均分，游戏块（420×747）居中成为视觉焦点；
+    // 块顶上方/块底下方由全屏背景渐变（水色）自然延展填充，无留白、无接缝。
     // （__safeTop 由 wx-shim 用 getMenuButtonBoundingClientRect 计算，单位=窗口 CSS px）
-    oy = Math.max(0, Math.min((window.__safeTop || 0) / view.s - 20, VH - C.H));
+    oy = Math.max(0, (VH - C.H) / 2);
+    // 胶囊残余避让：居中后 HUD 顶行（块内 cy36/r16 → 顶缘 20）若仍在胶囊下缘之上才需额外下挪；
+    // 高屏居中量已远大于胶囊高度 → hudInset=0（无需再避让）；矮屏(≈块高)才给 ≤24 的残余量。
+    var capBottom = window.__safeTop ? (window.__safeTop - 8) / view.s : 0;
+    hudInset = Math.max(0, Math.min(capBottom - oy - 20, 24));
     // 游戏块内全部恒定（=config 初始值）：容器底/容器顶/警戒线/出生点不随设备变化，
     // 容器 420:483 恒定——不同设备游戏区大小比例完全一致；底部带 74 不变
     FLOORY = C.H - 74;                     // 673
@@ -470,9 +475,9 @@ MG.config = {
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
     }
     if (typeof trophyBtn !== 'undefined' && typeof MUTE !== 'undefined') {
-      // 静音在 drawHUD 内、由 render 对 play 态 translate(0,oy) 下移，故 cy 保持 36；
-      // 奖杯在 HUD 之外（drawSkillBar 绘制路径）不吃该平移，故 cy 直接含胶囊避让偏移。
-      trophyBtn.cy = 36 + oy; MUTE.cy = 36;     // 奖杯/静音：块内左上/右上角落（与分数行同排）
+      // 静音在 drawHUD 内、由 render translate(0,hudInset) 下挪残余胶囊量，故 cy 保持 36；
+      // 奖杯在 HUD 之外（drawSkillBar 绘制路径）不吃该平移，故 cy 直接含 hudInset 残余偏移。
+      trophyBtn.cy = 36 + hudInset; MUTE.cy = 36;     // 奖杯/静音：块内左上/右上角落（与分数行同排）
     }
   }
   window.addEventListener('resize', fit);
@@ -2407,7 +2412,7 @@ MG.config = {
       stage: seaStage(), daily: { done: daily.done.slice(), streak: daily.streak }, best: best,
       jellies: jellies.map(function (j) { return { x: Math.round(j.x), y: Math.round(j.y), s: Math.round(j.s) }; }),
       col: colProgress, chestTimer: Math.round(chestTimer * 10) / 10,
-      oy: oy, renderOy: renderOy, VH: VH, floorY: C.floorY, containerTop: C.containerTop, time: time,
+      oy: oy, renderOy: renderOy, hudInset: hudInset, VH: VH, floorY: C.floorY, containerTop: C.containerTop, time: time,
       dangerY: C.dangerY, spawnY: C.spawnY,
       offline: offlineGain ? { mins: offlineGain.mins, gain: offlineGain.gain } : null
     };
@@ -5093,10 +5098,10 @@ MG.config = {
   // ---------- 容器：玻璃质感 + 底部焦散 ----------
   function drawContainer() {
     var floorY = FLOORY, FH = 12;
-    // 海底基色：从床面到屏幕底一条连续渐变（泡沫白 → 青 → 深海青）——块底以下（手势区）
-    // 由同一条渐变自然延伸，无接缝；块内坐标到屏底 = VH - renderOy
-    var bed = grad('bed' + Math.round(VH) + '_' + Math.round(renderOy), function () {
-      var gg = ctx.createLinearGradient(0, floorY, 0, VH - renderOy);
+    // 海底基色：从床面到屏幕底一条连续渐变（泡沫白 → 青 → 深海青）——块居中后块底下方
+    // 多出的空间由同一条渐变顺延到屏底（bandEnd=VH），无接缝。
+    var bed = grad('bed' + Math.round(VH), function () {
+      var gg = ctx.createLinearGradient(0, floorY, 0, VH);
       gg.addColorStop(0, 'rgba(216,236,232,0.95)');
       gg.addColorStop(0.3, 'rgba(170,208,204,0.95)');
       gg.addColorStop(0.62, 'rgba(112,158,174,0.95)');
@@ -5104,7 +5109,7 @@ MG.config = {
       return gg;
     });
     ctx.fillStyle = bed;
-    ctx.fillRect(0, floorY + 4, C.W, VH - renderOy - floorY - 4);
+    ctx.fillRect(0, floorY + 4, C.W, VH - floorY - 4);
     // 床面：圆角横条（半透明玻璃质感，透出海底基色，不再有硬边界）
     var fg = grad('fg' + Math.round(VH), function () {
       var gg = ctx.createLinearGradient(0, floorY, 0, floorY + FH + 6);
@@ -5686,10 +5691,10 @@ MG.config = {
   }
 
   function drawSkillBar() {
-    // 道具带：海底基色的柔和延续（同色系微加深），块内 691 起、向下延伸到屏底（块贴顶后屏底
+    // 道具带：海底基色的柔和延续（同色系微加深），块内 691 起、向下延伸到屏底（块居中后屏底
     // 多出的空间）。按钮仍在块内底部带（cy=701），只是深色渐变顺延到屏底，避免出现明暗接缝。
-    var bandEnd = VH - renderOy;
-    var g = grad('skbar' + Math.round(VH) + '_' + Math.round(renderOy), function () {
+    var bandEnd = VH;
+    var g = grad('skbar' + Math.round(VH), function () {
       var gg = ctx.createLinearGradient(0, C.H - 56, 0, bandEnd);
       gg.addColorStop(0, 'rgba(56,102,130,0)');
       gg.addColorStop(1, 'rgba(36,78,106,0.3)');
@@ -6097,10 +6102,12 @@ MG.config = {
     ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, 0);
     drawBackground();
 
-    // 内容层：游戏块（420×747 ≈ 9:16 恒定比例）垂直贴顶铺满——菜单态与游戏态均不整体下移，
-    // 顶部留白交由 HUD 单独 translate(0,oy) 避让胶囊（见 drawHUD 包裹）；其余（面板）态保留原下移。
-    renderOy = (state === 'menu' || state === 'play') ? 0 : oy;
-    ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, dpr * renderOy);
+    // 内容层：游戏块（420×747 ≈ 9:16 恒定比例）垂直居中——所有态一致居中（oy=(VH-C.H)/2），
+    // 高屏多余高度上下均分，块顶上方/块底下方由全屏背景渐变自然延展填充（无留白）。
+    // transform y 偏移用 dpr*view.s*renderOy（renderOy 为逻辑 px，与 toLocal 的 -renderOy 同量纲，
+    // 修早期漏乘 view.s 导致 view.s≠1 真机上偏移算少、游戏区偏上的问题）。
+    renderOy = oy;
+    ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, dpr * view.s * renderOy);
     if (shakeT > 0) {
       var s = shakeAmp * (shakeT / 0.4);
       ctx.translate((Math.random() - 0.5) * 2 * s, (Math.random() - 0.5) * 2 * s);
@@ -6111,12 +6118,11 @@ MG.config = {
     ctx.translate(BX, 0);
 
     if (state === 'menu') {
-      hudInset = oy;   // 菜单态整组下移 oy（用户确认此布局正确），同步给命中区
       drawMenu();
-      // 成就/音量按钮与局内同一屏幕位置：菜单态铺满（renderOy=0）需补 oy 与局内对齐
+      // 成就/音量按钮与局内同一屏幕位置：内容层已随 renderOy 居中，此处仅补胶囊残余量 hudInset
       ctx.save();
-      ctx.translate(0, oy);
-      drawTrophyBtn(menuTrophy);   // 成就殿堂/每日挑战入口（systems 菜单分支处理，命中区同步 +oy）
+      ctx.translate(0, hudInset);
+      drawTrophyBtn(menuTrophy);   // 成就殿堂/每日挑战入口（systems 菜单分支处理，命中区同步 +hudInset）
       drawMuteBtn();               // 初始界面右上角静音入口
       ctx.restore();
       if (achOpen) drawAchPanel(); // 面板盖在菜单之上（点击已放行到 achOpen 分支）
@@ -6237,11 +6243,10 @@ MG.config = {
     ctx.fillStyle = vg;
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
 
-    // HUD 整体随胶囊避让下挪 hudInset：游戏态内容层 renderOy=0（块顶铺满，消灭顶部留白），
-    // 故 HUD（分数/进度/任务/潮汐/涨潮横幅）统一 +hudInset 平移避让胶囊；
-    // hudInset=min(oy,24) 确保任务面板底边(164)不侵入容器顶(190)，且典型机型(oy≈23)可完整避让胶囊；
-    // 顶部奖杯按钮走 drawSkillBar 非平移路径，其 cy 同步设为 36+hudInset 与静音同高对齐。
-    hudInset = (state === 'menu') ? oy : (state === 'play' ? Math.min(oy, 24) : 0);
+    // HUD 整体随胶囊避让下挪 hudInset：内容层已随 renderOy 垂直居中，hudInset 仅为「居中后
+    // 仍在胶囊下缘之上」的残余量（fit 里算好：高屏居中即避开胶囊→0，矮屏才给 ≤24）；
+    // HUD（分数/进度/任务/潮汐/涨潮横幅）统一 +hudInset 平移；奖杯走 drawSkillBar 非平移路径，
+    // 其 cy 同步设为 36+hudInset 与静音同高对齐。
     trophyBtn.cy = 36 + hudInset;   // 与静音(36+hudInset)同高（奖杯不参与本平移，故直接烤进坐标）
     if (hudInset > 0) { ctx.save(); ctx.translate(0, hudInset); }
     drawHUD();
