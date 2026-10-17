@@ -47,9 +47,9 @@ eq('hud.tideBannerY', L.hud.tideBannerY, 250);
 eq('hud.hudBottom', L.hud.hudBottom, 164);
 // ---- 容器区：底部锚定链（floorY = H-74）；容器顶不设置 = 0（v184）----
 eq('body.containerTop', L.body.containerTop, 0);    // v184：容器顶不设置，容器从块顶开始长
-eq('body.dangerY', L.body.dangerY, 387);            // 失败线绝对基准（含 v178/v181 两次+40）
+eq('body.dangerY', L.body.dangerY, 367);            // 失败线绝对基准（v185：堆叠空间回收 20）
 eq('body.floorY', L.body.floorY, 766);              // 840-74（底部带恒 74）
-eq('body.spawnY', L.body.spawnY, 342);              // 387-45（公式派生）
+eq('body.spawnY', L.body.spawnY, 302);              // 367-45-20（公式派生；出生通道 45→65）
 eq('body.tutY', L.body.tutY, 573);
 eq('容器高(派生)', L.body.floorY - L.body.containerTop, 766);  // 堆叠空间退为派生量，不再设置
 // ---- 底部带：恒 74 贴块底，内部钉 floorY 相对位 ----
@@ -93,14 +93,16 @@ function checkRatio(H, label) {
   eq('hud 不动(' + label + ')', L.hud.row1Y + '/' + L.hud.scoreY + '/' + L.hud.seaBar.sy + '/' + L.hud.quest.qy + '/' + L.hud.trophyCy, '41/88/100/130/36');
   // 容器/警戒线/坠落高度：定版基准 + dy（容器顶=0 不设置，v184）
   eq('containerTop(' + label + ')', L.body.containerTop, 0);
-  eq('dangerY(' + label + ')', L.body.dangerY, 387 + D);
+  eq('dangerY(' + label + ')', L.body.dangerY, 367 + D);
   eq('floorY(' + label + ')', L.body.floorY, 766 + D);
-  eq('spawnY(' + label + ')', L.body.spawnY, 342 + D);
+  eq('spawnY(' + label + ')', L.body.spawnY, 302 + D);
   eq('容器高(派生)(' + label + ')', L.body.floorY - L.body.containerTop, 766 + D);
-  eq('堆叠空间(派生)(' + label + ')', L.body.floorY - L.body.dangerY, 379);
+  eq('堆叠空间(派生)(' + label + ')', L.body.floorY - L.body.dangerY, 399);
+  // ★ v185 用户指令核心量：坠落区至警戒线的高度 = dangerY - spawnY = 65（原 45+20）
+  eq('出生通道(派生)(' + label + ')', L.body.dangerY - L.body.spawnY, 65);
   eq('tutY(' + label + ')', L.body.tutY, 573 + D);
   // ★ 弹性残余不再有"容器顶空隙"：容器从块顶(0)开始长，HUD 浮在容器上（v184）
-  eq('HUD→坠落间距(' + label + ')', L.body.spawnY - L.hud.hudBottom, 178 + D);
+  eq('HUD→坠落间距(' + label + ')', L.body.spawnY - L.hud.hudBottom, 138 + D);
   // 底部带：高度恒 74，内部布局 +dy 平移（不打散）
   eq('band.h(' + label + ')', L.band.h, 74);
   eq('btnCy(' + label + ')', L.band.btnCy, 794 + D);          // = floorY+28
@@ -126,10 +128,10 @@ function checkRatio(H, label) {
      (311 + D) + '/' + (345 + D) + '/' + (409 + D) + '/' + (489 + D));
   // 回写 config 真源（物理引擎读 C.*）
   eq('C.floorY回写(' + label + ')', C.floorY, 766 + D);
-  eq('C.spawnY回写(' + label + ')', C.spawnY, 342 + D);
-  eq('C.dangerY回写(' + label + ')', C.dangerY, 387 + D);
+  eq('C.spawnY回写(' + label + ')', C.spawnY, 302 + D);
+  eq('C.dangerY回写(' + label + ')', C.dangerY, 367 + D);
   eq('C.containerTop回写(' + label + ')', C.containerTop, 0);
-  // 公告带锚 = dangerY - dangerShift(40)（剥离两次+20，弹字钉调整前警戒线，不随其漂移）
+  // 公告带锚 = dangerY - dangerShift(20)（v185 起；弹字钉 347+dy 不动）
   eq('公告带锚(' + label + ')', C.dangerY - L.dangerShift, 347 + D);
   console.log('② ' + label + ' 自动重排断言: ' + pass + ' pass, ' + fail + ' fail');
   return fail;
@@ -151,11 +153,11 @@ eq('交付 band.h', L.band.h, 74);
 eq('交付 btnCy', L.band.btnCy, 794);
 eq('交付 floorY', L.body.floorY, 766);
 eq('交付 containerTop', L.body.containerTop, 0);   // v184：容器顶不设置
-eq('交付 dangerY', L.body.dangerY, 387);
-eq('交付 spawnY', L.body.spawnY, 342);
+eq('交付 dangerY', L.body.dangerY, 367);
+eq('交付 spawnY', L.body.spawnY, 302);
 eq('交付 containerTop', L.body.containerTop, 0);   // v184：容器顶不设置
-eq('交付 堆叠空间(派生)', L.body.floorY - L.body.dangerY, 379);
-eq('交付 HUD→坠落间距', L.body.spawnY - L.hud.hudBottom, 178);
+eq('交付 堆叠空间(派生)', L.body.floorY - L.body.dangerY, 399);
+eq('交付 HUD→坠落间距', L.body.spawnY - L.hud.hudBottom, 138);
 console.log('③ 交付比例回归断言: ' + pass + ' pass, ' + fail + ' fail');
 
 process.exit((fail + f2) ? 1 : 0);
