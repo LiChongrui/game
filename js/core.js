@@ -20,33 +20,36 @@
   };
 
   // ---------- 画布 ----------
-  // 逻辑高度动态（VH ≥ 747）：顶部元素（HUD/出生区/警戒线）按顶部坐标绘制，
-  // 底部元素（海底/技能栏/按钮）按 VH-偏移 贴底，中间水域随窗口高度自适应；
+  // 逻辑高度动态（VH ≥ C.H）：顶部元素（HUD/出生区/警戒线）按块内绝对坐标绘制（layout.hud/body），
+  // 底部元素（按钮/装饰）钉在容器底相对位（layout.band），中间水域随窗口高度自适应；
   // 画布 CSS 高度恒等于窗口高度，CSS 宽度=游戏区宽度（两侧为页面深海背景）
   var canvas = document.getElementById('game');
   var ctx = canvas.getContext('2d');
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
-  var VH = C.H;           // 当前逻辑高度（全屏：h/view.s，≥747）
+  var VH = C.H;           // 当前逻辑高度（全屏：h/view.s，≥C.H）
   var LW = C.W;           // 当前逻辑宽度（≥ C.W，宽窗口下两侧为延伸海水）
   var BX = 0;             // 游戏区（420 逻辑宽）水平居中偏移
-  var FLOORY = C.floorY;  // 容器底 y（游戏块内恒定：673）
+  var FLOORY = C.floorY;  // 容器底 y（= layout.body.floorY，游戏块内恒定）
   var view = { s: 1 };
-  // 游戏块 = 420×747 固定逻辑区（9:16；顶部 HUD 0~164 + 出生空隙带 26 + 容器 483 + 底部 74），
+  // 游戏块 = 420×747 固定逻辑区（9:16；顶部 HUD 0~164 + 出生空隙带 26 + 容器 483 + 底部带 74）。
   // 长宽比恒定，所有设备一致；坠落高度 = 最大可投放滴底触警戒线时的球心（dangerY - 45）；
-  // 高屏多余高度全部向下延伸（海底/技能栏贴屏底）；oy 为块顶部偏移：
-  // Web 贴屏顶（0），微信端贴在胶囊区下方（HUD 不被胶囊遮挡）
+  // 高屏多余的高度上下均分（oy 为块居中偏移），块外由背景渐变延伸填充。
+  // ★ 改比例只改 config 的 C.H 一处：layout.build() 自动重算全部游戏内坐标
+  //   （底部带 floorY~H 吸收高度变化，按钮/装饰钉 floorY 相对位）；本 fit() 只负责
+  //   「块 → 窗口」适配（view.s / oy / hudInset），不再写死任何游戏内坐标。
   var oy = 0;             // 游戏块顶部偏移（逻辑 px，≥0）
-  var renderOy = 0;       // 渲染/点击实际使用的偏移：菜单态 0（铺满），其余态 oy
-  var hudInset = 0;       // HUD 顶行避让胶囊的实际下挪量（菜单=oy；游戏态限幅 min(oy,24) 防止任务面板侵入容器）
+  var renderOy = 0;       // 渲染/点击实际使用的偏移（全态 = oy，垂直居中）
+  var hudInset = 0;       // HUD 顶行避让胶囊的实际下挪量（= 居中后残余量，高屏→0，矮屏≤24）
 
   function fit() {
     var w = window.innerWidth, h = window.innerHeight;
+    MG.layout.build();                    // 几何真源重建（config 改 H 后全量自动重排）
     // 全屏铺满：刘海/挖孔、手势条区域都按正常区域对待，不做任何安全区缩进
     view.s = Math.min(w / C.W, h / C.H);   // 等比缩放，不变形
     VH = h / view.s;
     LW = w / view.s;                       // 逻辑宽度（≥420）
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
-    // 垂直居中：高屏多余的高度上下均分，游戏块（420×747）居中成为视觉焦点；
+    // 垂直居中：高屏多余的高度上下均分，游戏块（420×C.H）居中成为视觉焦点；
     // 块顶上方/块底下方由全屏背景渐变（水色）自然延展填充，无留白、无接缝。
     // （__safeTop 由 wx-shim 用 getMenuButtonBoundingClientRect 计算，单位=窗口 CSS px）
     oy = Math.max(0, (VH - C.H) / 2);
@@ -54,22 +57,16 @@
     // 高屏居中量已远大于胶囊高度 → hudInset=0（无需再避让）；矮屏(≈块高)才给 ≤24 的残余量。
     var capBottom = window.__safeTop ? (window.__safeTop - 8) / view.s : 0;
     hudInset = Math.max(0, Math.min(capBottom - oy - 20, 24));
-    // 游戏块内全部恒定（=config 初始值）：容器底/容器顶/警戒线/出生点不随设备变化，
-    // 容器 420:483 恒定——不同设备游戏区大小比例完全一致；底部带 74 不变
-    FLOORY = C.H - 74;                     // 673
-    C.floorY = FLOORY;                     // 同步给物理引擎（每帧读取，水滴落到新地板）
-    // 容器适度压缩给顶部宽松：容器 190~673 = 483px（块高/底部带 74 不变）
-    C.containerTop = 190;
-    C.dangerY = 254;
-    // 坠落高度：最大可投放水滴（tiers 前 5 档中的溪流 r45）底部接触警戒线时的球心位置
-    C.spawnY = C.dangerY - C.tiers[4].r;   // 254 - 45 = 209
+    // 游戏块内全部恒定（=config 初始值，layout.body 单一真源）：容器底/容器顶/警戒线/出生点
+    // 不随设备变化，容器 420:483 恒定——不同设备游戏区大小比例完全一致
+    FLOORY = MG.layout.body.floorY;        // 673（不再随 C.H 换算：底部带拉厚只加在 floorY~H 之间）
     canvas.width = Math.round(w * dpr);    // 画布铺满整个窗口（背景全程由游戏自绘）
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // 按钮恒落在块内底部带（容器底 673 ~ 块底 747，共 74）：图鉴/道具/重开在该带内近似垂直居中。
-    // 块贴顶后按钮随块整体上移，屏底多出的空间由海床/技能栏渐变自然延伸填充（不挪按钮）
-    var cy = C.H - 46;
+    // 按钮恒贴在容器底下方（cy=FLOORY+28=701，与容器底恒距 28，v163 定版）——
+    // 块高/比例变化时底部带拉厚，按钮钉 floorY 相对位、不随块底下沉（v172 贴底事故的根治）
+    var cy = MG.layout.band.btnCy;
     // 注意：模块化后 bookBtn 等声明在 systems.js（后加载），早期触发时用 typeof 守卫
     if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {
       bookBtn.cy = cy; restartBtn.cy = cy;
@@ -78,7 +75,7 @@
     if (typeof trophyBtn !== 'undefined' && typeof MUTE !== 'undefined') {
       // 静音在 drawHUD 内、由 render translate(0,hudInset) 下挪残余胶囊量，故 cy 保持 36；
       // 奖杯在 HUD 之外（drawSkillBar 绘制路径）不吃该平移，故 cy 直接含 hudInset 残余偏移。
-      trophyBtn.cy = 36 + hudInset; MUTE.cy = 36;     // 奖杯/静音：块内左上/右上角落（与分数行同排）
+      trophyBtn.cy = MG.layout.hud.trophyCy + hudInset; MUTE.cy = MG.layout.hud.trophyCy;
     }
   }
   window.addEventListener('resize', fit);

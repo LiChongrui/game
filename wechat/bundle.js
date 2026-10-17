@@ -69,6 +69,8 @@ MG.config = {
   // 逻辑分辨率（画布固定，CSS 等比缩放）
   W: 420,
   H: 747,              // 9:16（420×16/9≈746.7，取 747，偏差 0.04%）
+  // ★ 比例旋钮：改屏幕比例只改 H 这一处，其余元素位置由 js/layout.js 全部自动派生
+  //   （底部带 floorY~H 吸收全部高度变化；容器/HUD/装饰/面板锚点不变）。约束：H ≥ floorY+74。
   floorY: 673,         // 容器底 y（下方保留技能栏区域）
 
   // 容器（适度压缩给顶部宽松：开口 190、容器 190~673 = 483px；顶部 HUD 区扩至 0~164，
@@ -284,6 +286,113 @@ MG.config = {
 };
 
 ;
+// ===== js/layout.js =====
+// 水滴合成深海 - layout：布局几何唯一真源
+// 模块加载顺序 1.5/4（config 之后、physics 之前）。经典 script 共享全局作用域，
+// 本文件只依赖 MG.config；core/systems/panels/render 运行期经全局作用域解析引用。
+//
+// ★ 设计目标（v175）：改屏幕比例只改 config 的 C.H 一处，全游戏元素位置自动重排。
+// 一切坐标从「基础几何」经公式派生，分四层，层间锚点清晰：
+//   ① hud   顶部信息区（0~hudBottom）：手定版行位，绝对坐标——块高变化时本区不动
+//   ② body  容器区（containerTop~floorY）：核心游戏几何（用户定版），绝对坐标
+//   ③ band  底部带（floorY~H）：比例变化的唯一承接地——按钮/装饰全部钉在 floorY
+//           相对位，块高多出的高度整段给这一带（v172 教训：装饰绝不打散重排）
+//   ④ panel 全屏面板：锚定游戏区焦点（focusCy）或块中心（blockCy），不随块高漂流
+// 适配策略（view.s / oy / renderOy / hudInset）由 core.fit() 每帧重算，见其注释。
+//
+// ★ 使用规范：绘制与命中热区一律引用 MG.layout.xxx，禁止再写死坐标数字；
+//   config 改 C.H 后无需改任何其他文件（fit() 每次 resize 会调 build() 重算）。
+window.MG = window.MG || {};
+MG.layout = {
+  hud: null, body: null, band: null, panel: null, menu: null,
+
+  // 由基础几何重建全部派生坐标（幂等；config 被外部改动后调用即可同步）
+  build: function () {
+    var C = MG.config, W = C.W, H = C.H;
+    C.spawnY = C.dangerY - C.tiers[4].r; // 同步真源：坠落高度=最大可投放滴(溪流r45)底触警戒线时球心
+
+    // ---- ① 顶部 HUD 区（v149/v161 定版行位；与块高无关，块高变化时本区不动）----
+    this.hud = {
+      row1Y: 41,               // 统计最佳结果 / 计时 baseline（与奖杯·静音 cy36 垂直居中对齐同排）
+      trophyCy: 36,            // 奖杯 / 静音 / 菜单奖杯圆心（+hudInset 避让胶囊）
+      trophyCx: 24, muteCx: W - 24,
+      scoreY: 88,              // 当前得分 baseline（translate 锚点）
+      seaBar: { sx: 24, sy: 100, sw: W - 48, sh: 20 }, // 海域进度条（v151 定版 100~120）
+      quest: { qx: 12, qy: 130, qw: 206, qh: 34 },     // 任务条（v149 定版 130~164）
+      tidePill: { tx: W - 122, ty: 130, tw: 92, th: 34 }, // 潮汐胶囊（与任务条同高同排）
+      tideBannerY: 250,        // 涨潮横幅锚点
+      hudBottom: 164           // HUD 区底沿（任务条底；与容器开口之间为 26px 空隙带）
+    };
+
+    // ---- ② 容器区（核心游戏几何：用户定版，任何改版不得擅动）----
+    this.body = {
+      containerTop: C.containerTop,     // 190 容器开口
+      dangerY: C.dangerY,               // 254 警戒线
+      floorY: C.floorY,                 // 673 容器底
+      spawnY: C.spawnY,                 // 209 坠落高度（公式派生，禁写死）
+      tutY: 480                         // 首局引导胶囊锚点（容器中部）
+    };
+
+    // ---- ③ 底部带（floorY~H：比例变化的唯一承接地）----
+    this.band = {
+      top: C.floorY,
+      h: H - C.floorY,                  // 74（9:16）→ 272（8:18）：只随 C.H 变
+      btnCy: C.floorY + 28,             // 701：底部一排按钮圆心（v163 铁律：钉 floorY+28，不随块底漂）
+      labelDy: 12,                      // 按钮名称标签：圆心 + r + 12
+      decorBase: C.floorY + 18,         // 691：底部装饰基准线（床面玻璃横条底 FH12 + 6）
+      dunes: [                          // 三块沙丘（径向渐变柔边）：相对容器底固定，块高变化不重排
+        { xr: 0.20, dy: 12, rx: 95,  ry: 13, c: 'rgba(238,246,240,0.7)', c0: 'rgba(238,246,240,0)' },
+        { xr: 0.74, dy: 14, rx: 115, ry: 15, c: 'rgba(238,246,240,0.7)', c0: 'rgba(238,246,240,0)' },
+        { xr: 0.47, dy: 18, rx: 85,  ry: 11, c: 'rgba(228,240,234,0.55)', c0: 'rgba(228,240,234,0)' }
+      ],
+      pebbleYOff: (C.floorY + 18) - 664, // 卵石/海星/扇贝基准随动量（v136 时代 FLOORY=646 定版位）
+      pebbles: [[24, 688, 3], [66, 700, 2], [112, 686, 2.5], [172, 702, 2],
+                [246, 690, 2.5], [306, 700, 2], [352, 686, 2.5], [404, 696, 2.2]],
+      starfish: { x: 88, y: 700, s: 9 },
+      shell: { x: 330, y: 702, s: 9 }
+    };
+
+    // ---- ④ 全屏面板（锚定游戏区，块高变化不漂流）----
+    this.panel = {
+      blockCy: H / 2,                  // 块中心（全屏模态按块居中：NG 词缀/广告遮罩）
+      focusCy: 370,                    // 游戏区焦点中心（v161 定版：结算海报 py134/h472 与分享卡 py160/h420 的共同中心）
+      over: { w: 320, h: 472 },        // 结算海报（v161 排版放松定版）
+      share: { w: 300, h: 420 },       // 战报分享卡
+      confirm: { w: W - 120, h: 170, dy: 300, btnDy: 102 }, // 重开确认（py=300 定版；按钮 py+102）
+      ng: { w: 330, h: 348 },          // 深渊潜航词缀三选一（按块居中）
+      dex: { x: 20, w: 380, h: 560 }   // 图鉴/成就（layoutDexPanel 按态居中，y 动态）
+    };
+
+    // ---- 菜单（开始界面：全部位于块上半区，绝对定版）----
+    this.menu = {
+      titleY: 218, titleShadowY: 220, subY: 252, bestY: 294,
+      offlineY: 316, offlineW: 300, offlineH: 62,
+      startY: 396, startW: 220, startH: 60,
+      footDy: 56                       // 底部玩法一句话：距块底（VH-56）
+    };
+  },
+
+  // ---- 面板矩形（渲染与命中共用，一处定义）----
+  overRect: function () {
+    var p = this.panel.over, W = MG.config.W;
+    return { x: (W - p.w) / 2, y: this.panel.focusCy - p.h / 2, w: p.w, h: p.h };
+  },
+  shareRect: function () {
+    var p = this.panel.share, W = MG.config.W;
+    return { x: (W - p.w) / 2, y: this.panel.focusCy - p.h / 2, w: p.w, h: p.h };
+  },
+  confirmRect: function () {
+    var p = this.panel.confirm, W = MG.config.W;
+    return { x: (W - p.w) / 2, y: p.dy, w: p.w, h: p.h };
+  },
+  ngRect: function () {
+    var p = this.panel.ng, W = MG.config.W;
+    return { x: (W - p.w) / 2, y: (MG.config.H - p.h) / 2, w: p.w, h: p.h };
+  }
+};
+MG.layout.build();
+
+;
 // ===== js/physics.js =====
 // 水滴合成深海 - 极简圆形物理引擎
 // 纯 JS 实现（无依赖），后续可整体移植到微信小游戏（wx.createCanvas 同为 2D context）
@@ -419,33 +528,36 @@ MG.config = {
   };
 
   // ---------- 画布 ----------
-  // 逻辑高度动态（VH ≥ 747）：顶部元素（HUD/出生区/警戒线）按顶部坐标绘制，
-  // 底部元素（海底/技能栏/按钮）按 VH-偏移 贴底，中间水域随窗口高度自适应；
+  // 逻辑高度动态（VH ≥ C.H）：顶部元素（HUD/出生区/警戒线）按块内绝对坐标绘制（layout.hud/body），
+  // 底部元素（按钮/装饰）钉在容器底相对位（layout.band），中间水域随窗口高度自适应；
   // 画布 CSS 高度恒等于窗口高度，CSS 宽度=游戏区宽度（两侧为页面深海背景）
   var canvas = document.getElementById('game');
   var ctx = canvas.getContext('2d');
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
-  var VH = C.H;           // 当前逻辑高度（全屏：h/view.s，≥747）
+  var VH = C.H;           // 当前逻辑高度（全屏：h/view.s，≥C.H）
   var LW = C.W;           // 当前逻辑宽度（≥ C.W，宽窗口下两侧为延伸海水）
   var BX = 0;             // 游戏区（420 逻辑宽）水平居中偏移
-  var FLOORY = C.floorY;  // 容器底 y（游戏块内恒定：673）
+  var FLOORY = C.floorY;  // 容器底 y（= layout.body.floorY，游戏块内恒定）
   var view = { s: 1 };
-  // 游戏块 = 420×747 固定逻辑区（9:16；顶部 HUD 0~164 + 出生空隙带 26 + 容器 483 + 底部 74），
+  // 游戏块 = 420×747 固定逻辑区（9:16；顶部 HUD 0~164 + 出生空隙带 26 + 容器 483 + 底部带 74）。
   // 长宽比恒定，所有设备一致；坠落高度 = 最大可投放滴底触警戒线时的球心（dangerY - 45）；
-  // 高屏多余高度全部向下延伸（海底/技能栏贴屏底）；oy 为块顶部偏移：
-  // Web 贴屏顶（0），微信端贴在胶囊区下方（HUD 不被胶囊遮挡）
+  // 高屏多余的高度上下均分（oy 为块居中偏移），块外由背景渐变延伸填充。
+  // ★ 改比例只改 config 的 C.H 一处：layout.build() 自动重算全部游戏内坐标
+  //   （底部带 floorY~H 吸收高度变化，按钮/装饰钉 floorY 相对位）；本 fit() 只负责
+  //   「块 → 窗口」适配（view.s / oy / hudInset），不再写死任何游戏内坐标。
   var oy = 0;             // 游戏块顶部偏移（逻辑 px，≥0）
-  var renderOy = 0;       // 渲染/点击实际使用的偏移：菜单态 0（铺满），其余态 oy
-  var hudInset = 0;       // HUD 顶行避让胶囊的实际下挪量（菜单=oy；游戏态限幅 min(oy,24) 防止任务面板侵入容器）
+  var renderOy = 0;       // 渲染/点击实际使用的偏移（全态 = oy，垂直居中）
+  var hudInset = 0;       // HUD 顶行避让胶囊的实际下挪量（= 居中后残余量，高屏→0，矮屏≤24）
 
   function fit() {
     var w = window.innerWidth, h = window.innerHeight;
+    MG.layout.build();                    // 几何真源重建（config 改 H 后全量自动重排）
     // 全屏铺满：刘海/挖孔、手势条区域都按正常区域对待，不做任何安全区缩进
     view.s = Math.min(w / C.W, h / C.H);   // 等比缩放，不变形
     VH = h / view.s;
     LW = w / view.s;                       // 逻辑宽度（≥420）
     BX = (LW - C.W) / 2;                   // 游戏区水平居中
-    // 垂直居中：高屏多余的高度上下均分，游戏块（420×747）居中成为视觉焦点；
+    // 垂直居中：高屏多余的高度上下均分，游戏块（420×C.H）居中成为视觉焦点；
     // 块顶上方/块底下方由全屏背景渐变（水色）自然延展填充，无留白、无接缝。
     // （__safeTop 由 wx-shim 用 getMenuButtonBoundingClientRect 计算，单位=窗口 CSS px）
     oy = Math.max(0, (VH - C.H) / 2);
@@ -453,22 +565,16 @@ MG.config = {
     // 高屏居中量已远大于胶囊高度 → hudInset=0（无需再避让）；矮屏(≈块高)才给 ≤24 的残余量。
     var capBottom = window.__safeTop ? (window.__safeTop - 8) / view.s : 0;
     hudInset = Math.max(0, Math.min(capBottom - oy - 20, 24));
-    // 游戏块内全部恒定（=config 初始值）：容器底/容器顶/警戒线/出生点不随设备变化，
-    // 容器 420:483 恒定——不同设备游戏区大小比例完全一致；底部带 74 不变
-    FLOORY = C.H - 74;                     // 673
-    C.floorY = FLOORY;                     // 同步给物理引擎（每帧读取，水滴落到新地板）
-    // 容器适度压缩给顶部宽松：容器 190~673 = 483px（块高/底部带 74 不变）
-    C.containerTop = 190;
-    C.dangerY = 254;
-    // 坠落高度：最大可投放水滴（tiers 前 5 档中的溪流 r45）底部接触警戒线时的球心位置
-    C.spawnY = C.dangerY - C.tiers[4].r;   // 254 - 45 = 209
+    // 游戏块内全部恒定（=config 初始值，layout.body 单一真源）：容器底/容器顶/警戒线/出生点
+    // 不随设备变化，容器 420:483 恒定——不同设备游戏区大小比例完全一致
+    FLOORY = MG.layout.body.floorY;        // 673（不再随 C.H 换算：底部带拉厚只加在 floorY~H 之间）
     canvas.width = Math.round(w * dpr);    // 画布铺满整个窗口（背景全程由游戏自绘）
     canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // 按钮恒落在块内底部带（容器底 673 ~ 块底 747，共 74）：图鉴/道具/重开在该带内近似垂直居中。
-    // 块贴顶后按钮随块整体上移，屏底多出的空间由海床/技能栏渐变自然延伸填充（不挪按钮）
-    var cy = C.H - 46;
+    // 按钮恒贴在容器底下方（cy=FLOORY+28=701，与容器底恒距 28，v163 定版）——
+    // 块高/比例变化时底部带拉厚，按钮钉 floorY 相对位、不随块底下沉（v172 贴底事故的根治）
+    var cy = MG.layout.band.btnCy;
     // 注意：模块化后 bookBtn 等声明在 systems.js（后加载），早期触发时用 typeof 守卫
     if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {
       bookBtn.cy = cy; restartBtn.cy = cy;
@@ -477,7 +583,7 @@ MG.config = {
     if (typeof trophyBtn !== 'undefined' && typeof MUTE !== 'undefined') {
       // 静音在 drawHUD 内、由 render translate(0,hudInset) 下挪残余胶囊量，故 cy 保持 36；
       // 奖杯在 HUD 之外（drawSkillBar 绘制路径）不吃该平移，故 cy 直接含 hudInset 残余偏移。
-      trophyBtn.cy = 36 + hudInset; MUTE.cy = 36;     // 奖杯/静音：块内左上/右上角落（与分数行同排）
+      trophyBtn.cy = MG.layout.hud.trophyCy + hudInset; MUTE.cy = MG.layout.hud.trophyCy;
     }
   }
   window.addEventListener('resize', fit);
@@ -761,7 +867,7 @@ MG.config = {
   // ---------- 状态 ----------
   var phys = new MG.Physics();
   var state = 'menu'; // 开机先停在开始界面（主流小游戏设计：标题 + 开始按钮）
-  var menuStartBtn = { x: C.W / 2 - 110, y: 396, w: 220, h: 60 }; // 「开始游戏」主按钮
+  var menuStartBtn = { x: C.W / 2 - 110, y: MG.layout.menu.startY, w: MG.layout.menu.startW, h: MG.layout.menu.startH }; // 「开始游戏」主按钮
   var score = 0, displayScore = 0, scoreBump = 0;
   var best = 0; // 刷新页面即重新计，不跨刷新保留
   var nextTier = rollTier();
@@ -2414,6 +2520,9 @@ MG.config = {
       col: colProgress, chestTimer: Math.round(chestTimer * 10) / 10,
       oy: oy, renderOy: renderOy, hudInset: hudInset, VH: VH, floorY: C.floorY, containerTop: C.containerTop, time: time,
       dangerY: C.dangerY, spawnY: C.spawnY,
+      layout: { H: C.H, bandH: MG.layout.band.h, btnCy: MG.layout.band.btnCy, decorBase: MG.layout.band.decorBase,
+                overY: MG.layout.overRect().y, shareY: MG.layout.shareRect().y, confirmY: MG.layout.confirmRect().y,
+                focusCy: MG.layout.panel.focusCy, hudBottom: MG.layout.hud.hudBottom },
       offline: offlineGain ? { mins: offlineGain.mins, gain: offlineGain.gain } : null
     };
   };
@@ -2741,8 +2850,10 @@ MG.config = {
   function buildOverButtons() {
     overButtons = [];
     var bw = 240, bh = 42, gap = 10, x = (C.W - bw) / 2;
-    // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中（面板 py134/ph472，见 render.drawOver）
-    var areaTop = 134 + 186, areaBottom = 134 + 472 - 22;
+    // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中
+    // （面板几何走 MG.layout.overRect()，渲染 drawOver 与命中此处同源）
+    var ovr = MG.layout.overRect();
+    var areaTop = ovr.y + 186, areaBottom = ovr.y + ovr.h - 22;
     var n = 1 + (doubled ? 0 : 1) + 3; // 复活(无限)/双倍/分享/深渊潜航/重开
     var groupH = n * bh + (n - 1) * gap;
     var y = areaTop + (areaBottom - areaTop - groupH) / 2;
@@ -2766,26 +2877,26 @@ MG.config = {
     overButtons.push({ x: x, y: y, w: bw, h: bh, label: '重新开始', action: restart });
   }
 
-  // ---------- 命中区域（圆形按钮） ----------
-  var MUTE = { cx: C.W - 24, cy: 36, r: 16, pressT: 0 };
-  var bookBtn = { cx: 46, cy: 688, r: 20, pressT: 0 };
-  var trophyBtn = { cx: 24, cy: 36, r: 16, pressT: 0 }; // 成就页入口（奖杯；局内由 fit() 挂到刘海行，cy 为负）——与重开按钮(r16)同径
-  var menuTrophy = { cx: 24, cy: 36, r: 16, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——与重开按钮同径
-  var restartBtn = { cx: C.W - 24, cy: 688, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
+  // ---------- 命中区域（圆形按钮；坐标全部由 layout 派生，与绘制同源）----------
+  var MUTE = { cx: C.W - 24, cy: MG.layout.hud.trophyCy, r: 16, pressT: 0 };
+  var bookBtn = { cx: 46, cy: MG.layout.band.btnCy, r: 20, pressT: 0 };
+  var trophyBtn = { cx: 24, cy: MG.layout.hud.trophyCy, r: 16, pressT: 0 }; // 成就页入口（奖杯；局内由 fit()/render 挂到刘海行 +hudInset）——与重开按钮(r16)同径
+  var menuTrophy = { cx: 24, cy: MG.layout.hud.trophyCy, r: 16, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——与重开按钮同径
+  var restartBtn = { cx: C.W - 24, cy: MG.layout.band.btnCy, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
   // 「深渊潜航」无局内悬浮钮：入口在结算页按钮组（主流 NG+ 模式选择设计）
   // 底部一排共 6 个按钮（图鉴 + 4 道具 + 重开），中心等距 70px 均匀排列：46/116/186/256/326/396
   var SKILL_BTNS = [
-    { key: 'swap',   cx: 116, cy: 688, r: 20, pressT: 0 },
-    { key: 'ripple', cx: 186, cy: 688, r: 20, pressT: 0 },
-    { key: 'evap',   cx: 256, cy: 688, r: 20, pressT: 0 },
-    { key: 'flow',   cx: 326, cy: 688, r: 20, pressT: 0 }
+    { key: 'swap',   cx: 116, cy: MG.layout.band.btnCy, r: 20, pressT: 0 },
+    { key: 'ripple', cx: 186, cy: MG.layout.band.btnCy, r: 20, pressT: 0 },
+    { key: 'evap',   cx: 256, cy: MG.layout.band.btnCy, r: 20, pressT: 0 },
+    { key: 'flow',   cx: 326, cy: MG.layout.band.btnCy, r: 20, pressT: 0 }
   ];
   fit(); // 首次适配（按钮已定义，底部元素可同步贴底）
 
-  // 重开确认弹窗
+  // 重开确认弹窗（几何走 layout.confirmRect，渲染/命中共用）
   var confirmOpen = false;
-  var confirmYes = { x: C.W / 2 - 106, y: 402, w: 94, h: 42 };
-  var confirmNo = { x: C.W / 2 + 12, y: 402, w: 94, h: 42 };
+  var confirmYes = { x: C.W / 2 - 106, y: MG.layout.confirmRect().y + MG.layout.panel.confirm.btnDy, w: 94, h: 42 };
+  var confirmNo = { x: C.W / 2 + 12, y: MG.layout.confirmRect().y + MG.layout.panel.confirm.btnDy, w: 94, h: 42 };
 
   function inRect(p, r) {
     return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
@@ -3128,11 +3239,12 @@ MG.config = {
 // 拆分动机：面板几何此前散在 systems（命中判定）与 render（绘制）两处，改布局需全文搜索；
 // 现统一收敛到本文件——几何常量与绘制同源，渲染与点击热区天然一致。
 
-  // ---------- 面板几何（渲染与点击热区共用，一处定义） ----------
-  var DEX_PANEL = { x: 20, y: 64, w: 380, h: 560 };
+  // ---------- 面板几何（渲染与点击热区共用，一处定义）----------
+  // 尺寸/锚点走 MG.layout（改比例只改 config C.H，此处自动跟随）；y 为动态值：
+  var DEX_PANEL = { x: MG.layout.panel.dex.x, y: 64, w: MG.layout.panel.dex.w, h: MG.layout.panel.dex.h };
   var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 42, y: DEX_PANEL.y + 8, w: 28, h: 28 }; // 右上 × 关闭（中心 +22px，与页头标题文字对齐）
-  // 面板垂直居中：菜单态（铺满）以整屏 VH 为基准；局内游戏块为固定 747 逻辑（9:16，居中块=屏幕中心，
-  // 块内 (C.H-h)/2 + 偏移 renderOy 恰好落在屏幕中央）——每帧绘制前重算，页签始终处于屏幕中央
+  // 面板垂直居中：菜单态（铺满）以整屏 VH 为基准；局内游戏块高 C.H 为基准（比例旋钮，
+  // 居中块=屏幕中心，块内 (C.H-h)/2 + 偏移 renderOy 恰好落在屏幕中央）——每帧绘制前重算
   function layoutDexPanel() {
     var base = state === 'menu' ? VH : C.H;
     DEX_PANEL.y = Math.max(10, Math.round((base - DEX_PANEL.h) / 2));
@@ -3672,7 +3784,8 @@ MG.config = {
   // 菜单态离线收益告知卡（自动入账、无点击）：历史最佳行与开始按钮之间的空档，金色宝箱色系
   function drawOfflineCard() {
     if (state !== 'menu' || !offlineGain) return;
-    var w = 300, h = 62, x = (C.W - w) / 2, y = 316;
+    var mu = MG.layout.menu;
+    var w = mu.offlineW, h = mu.offlineH, x = (C.W - w) / 2, y = mu.offlineY;
     var og = ctx.createLinearGradient(0, y, 0, y + h);
     og.addColorStop(0, 'rgba(245,197,66,0.16)');
     og.addColorStop(1, 'rgba(217,169,63,0.08)');
@@ -3798,7 +3911,8 @@ MG.config = {
     if (!shareOpen) return;
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
-    var pw = 300, ph = 420, px = (C.W - pw) / 2, py = 160;
+    var sr = MG.layout.shareRect(); // 锚定游戏区焦点（v161 定版中心），块高变化不漂流
+    var pw = sr.w, ph = sr.h, px = sr.x, py = sr.y;
     panel(px, py, pw, ph, 16, 0.97);
     // 卡片头：深海渐变 + 标题
     var head = ctx.createLinearGradient(0, py, 0, py + 96);
@@ -4204,7 +4318,7 @@ MG.config = {
     var nk = Math.max(2, Math.min(3, Math.floor(w / 50)));
     for (k = 0; k < nk; k++) {
       var px = x0 + (k + 0.5) * w / nk + Math.sin(seed * 1.7 + k * 5.3) * w * 0.15;
-      var h = 95 + ((k * 53 + seed * 17) % 60) + (VH - 747) * 0.16;
+      var h = 95 + ((k * 53 + seed * 17) % 60) + (VH - C.H) * 0.16; // 侧栏植被随窗口高出块高的量增高
       h = Math.min(h, VH * 0.36);
       var bend = Math.sin(time * (0.45 + (k % 3) * 0.15) + seed + k * 2.2); // -1..1 摆幅
       var tone = k % 2 ? '15,64,94' : '22,84,110';
@@ -5140,8 +5254,9 @@ MG.config = {
     ctx.fillStyle = dep;
     ctx.fillRect(0, floorY - 30, C.W, 30);
 
-    // 底部装饰（无海床基色，直接坐在背景水色上）：沙丘起伏 + 卵石 + 海星 + 扇贝
-    var sy0 = floorY + FH + 6;
+    // 底部装饰（无海床基色，直接坐在背景水色上）：沙丘起伏 + 卵石 + 海星 + 扇贝。
+    // 坐标全部由 layout.band 派生（钉容器底相对位）：块高/比例变化时装饰不重排（v172 教训）
+    var sy0 = MG.layout.band.decorBase;
     // 沙丘（径向渐变柔边：中心实色 → 边缘全透明，消除硬边；scale 把椭圆映射到单位圆，
     // 保证渐变在椭圆各个方向均匀衰减，不会因径向渐变是圆形而被压扁）
     function dune(cx, cy, rx, ry, c, c0) {
@@ -5157,18 +5272,19 @@ MG.config = {
       ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
-    dune(C.W * 0.2, sy0 + 12, 95, 13, 'rgba(238,246,240,0.7)', 'rgba(238,246,240,0)');
-    dune(C.W * 0.74, sy0 + 14, 115, 15, 'rgba(238,246,240,0.7)', 'rgba(238,246,240,0)');
-    dune(C.W * 0.47, sy0 + 18, 85, 11, 'rgba(228,240,234,0.55)', 'rgba(228,240,234,0)');
+    for (var di = 0; di < MG.layout.band.dunes.length; di++) {
+      var du = MG.layout.band.dunes[di];
+      dune(C.W * du.xr, sy0 + du.dy, du.rx, du.ry, du.c, du.c0);
+    }
     // 卵石（块内坐标，贴容器底；装饰 y 以 FLOORY=646 时代为基准，随床面整体下移）
     ctx.fillStyle = 'rgba(110,150,168,0.4)';
-    var yoff = (floorY + FH + 6) - 664;
-    var peb = [[24, 688, 3], [66, 700, 2], [112, 686, 2.5], [172, 702, 2], [246, 690, 2.5], [306, 700, 2], [352, 686, 2.5], [404, 696, 2.2]];
+    var yoff = MG.layout.band.pebbleYOff;
+    var peb = MG.layout.band.pebbles;
     for (var pi = 0; pi < peb.length; pi++) {
       ctx.beginPath(); ctx.arc(peb[pi][0], peb[pi][1] + yoff, peb[pi][2], 0, Math.PI * 2); ctx.fill();
     }
-    drawStarfish(88, 700 + yoff, 9);
-    drawShell(330, 702 + yoff, 9);
+    drawStarfish(MG.layout.band.starfish.x, MG.layout.band.starfish.y + yoff, MG.layout.band.starfish.s);
+    drawShell(MG.layout.band.shell.x, MG.layout.band.shell.y + yoff, MG.layout.band.shell.s);
   }
 
   // 海星：五条圆钝臂 + 中心盘 + 亮斑
@@ -5380,15 +5496,15 @@ MG.config = {
       t1Font--;
       ctx.font = t1Font + 'px system-ui, sans-serif';
     }
-    ctx.strokeText(top1, 48, 41);
+    ctx.strokeText(top1, 48, MG.layout.hud.row1Y);
     ctx.fillStyle = chal && !chal.done ? '#7B6FD0' : (ng.active ? '#6B5AA8' : '#3E6E90');
-    ctx.fillText(top1, 48, 41);
+    ctx.fillText(top1, 48, MG.layout.hud.row1Y);
 
     // 第二组（中轴）：当前得分居中 + 正下方海域进度条（分数涨→进度前进，垂直联动）
     var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
     ctx.save();
     ctx.textAlign = 'center';
-    ctx.translate(C.W / 2, 88);
+    ctx.translate(C.W / 2, MG.layout.hud.scoreY);
     ctx.scale(bump, bump);
     ctx.font = 'bold 34px system-ui, sans-serif';
     ctx.lineWidth = 4;
@@ -5410,9 +5526,9 @@ MG.config = {
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     var em = Math.floor(levelElapsed / 60), es = Math.floor(levelElapsed % 60);
     var etxt = '已进行 ' + em + ':' + (es < 10 ? '0' + es : es);
-    ctx.strokeText(etxt, C.W - 78, 41);
+    ctx.strokeText(etxt, C.W - 78, MG.layout.hud.row1Y);
     ctx.fillStyle = '#2E7DA8';
-    ctx.fillText(etxt, C.W - 78, 41);
+    ctx.fillText(etxt, C.W - 78, MG.layout.hud.row1Y);
 
     // 静音按钮（右上角，小号）：局内与初始界面共用同一入口
     drawMuteBtn();
@@ -5454,7 +5570,8 @@ MG.config = {
   }
   // 潮汐信息胶囊（右侧，与任务条同行同高，左右对称）
   function drawTidePill() {
-    var tx = C.W - 122, tw = 92, ty = 130, th = 34; // 第三组：与任务条(qy130/qh34)同高同排
+    var tp = MG.layout.hud.tidePill;
+    var tx = tp.tx, tw = tp.tw, ty = tp.ty, th = tp.th; // 第三组：与任务条同高同排
     var active = tide.phase === 'active';
     var warn = !active && tide.timer <= C.tide.warnTime;
     var pulse = 0.5 + 0.5 * Math.sin(time * 6);
@@ -5478,7 +5595,7 @@ MG.config = {
     ctx.save();
     ctx.globalAlpha = a;
     ctx.textAlign = 'center';
-    ctx.translate(C.W / 2, 250);
+    ctx.translate(C.W / 2, MG.layout.hud.tideBannerY);
     ctx.scale(scale, scale);
     ctx.font = 'bold 43px system-ui, sans-serif';
     ctx.strokeStyle = 'rgba(255,255,255,0.9)';
@@ -5530,7 +5647,8 @@ MG.config = {
     if (!confirmOpen) return;
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
-    var px = 60, py = 300, pw = C.W - 120, ph = 170;
+    var cr = MG.layout.confirmRect();
+    var px = cr.x, py = cr.y, pw = cr.w, ph = cr.h;
     panel(px, py, pw, ph, 14, 0.97);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#155A8A';
@@ -5561,7 +5679,8 @@ MG.config = {
     ctx.save();
     ctx.textAlign = 'center';
     // 任务条：第三组左侧（两行：进度 + 星级/奖励，与任务难度匹配）
-    var qw = 206, qx = 12, qy = 130, qh = 34;
+    var q = MG.layout.hud.quest;
+    var qw = q.qw, qx = q.qx, qy = q.qy, qh = q.qh;
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     roundRect(qx, qy, qw, qh, 10); ctx.fill();
     var prog = Math.min(1, quest.have / quest.need);
@@ -5592,14 +5711,15 @@ MG.config = {
     var r = Math.round(((n >> 16) & 255) * 0.8), g = Math.round(((n >> 8) & 255) * 0.8), b = Math.round((n & 255) * 0.8);
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   }
-  // 海域进度条：满宽细条（y100~116，位于当前得分下方、任务条之上的宽松段；容器开口 190）
-  // 出生点 147 在条下方 25px，条不压坠落区），显示累计分距下一海域的进度
+  // 海域进度条：宽松段（当前得分下方、任务条同排区之上；容器开口 190）
+  // 出生点 209 在条下方，条不压坠落区），显示累计分距下一海域的进度
   // 配色：填充=当前海域深水色（与背景同族），右端小圆点=下一海域徽章色（目的地），左端骑线徽章=当前位置
   function drawSeaProgress() {
     var cur = seaStage(), ts = totalScore();
     var last = C.seaStages.length - 1;
     var maxed = cur >= last;
-    var sx = 24, sy = 100, sw = C.W - 48, sh = 20; // 两侧各留 24：端点徽章(r10)不顶屏幕边界
+    var sb = MG.layout.hud.seaBar;
+    var sx = sb.sx, sy = sb.sy, sw = sb.sw, sh = sb.sh; // 两侧各留 24：端点徽章(r10)不顶屏幕边界
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     roundRect(sx, sy, sw, sh, 8); ctx.fill();
     var frac = 1;
@@ -5768,7 +5888,8 @@ MG.config = {
   function drawNgPick() {
     ctx.fillStyle = 'rgba(10,40,70,0.66)';
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
-    var pw = 330, ph = 348, px = (C.W - pw) / 2, py = (C.H - ph) / 2;
+    var nr = MG.layout.ngRect();
+    var pw = nr.w, ph = nr.h, px = nr.x, py = nr.y;
     panel(px, py, pw, ph, 14, 0.97);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#5B4A94';
@@ -5907,7 +6028,8 @@ MG.config = {
     }
     // 漂流瓶（随水流轻摆）
     ctx.save();
-    ctx.translate(C.W / 2, C.H / 2 - 64);
+    var bcy = MG.layout.panel.blockCy;
+    ctx.translate(C.W / 2, bcy - 64);
     ctx.rotate(Math.sin(time * 1.4) * 0.12);
     ctx.fillStyle = 'rgba(150,220,200,0.9)';
     roundRect(-13, -10, 26, 34, 8); ctx.fill();
@@ -5921,12 +6043,12 @@ MG.config = {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 25px system-ui, sans-serif';
-    ctx.fillText('深海漂流瓶 · 激励视频', C.W / 2, C.H / 2 + 26);
+    ctx.fillText('深海漂流瓶 · 激励视频', C.W / 2, bcy + 26);
     ctx.font = '18px system-ui, sans-serif';
-    ctx.fillText(adOverlay.label + ' · ' + adOverlay.t.toFixed(1) + 's 后发放奖励', C.W / 2, C.H / 2 + 52);
+    ctx.fillText(adOverlay.label + ' · ' + adOverlay.t.toFixed(1) + 's 后发放奖励', C.W / 2, bcy + 52);
     ctx.font = '14px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.fillText('（演示占位：上线微信时替换为 wx.createRewardedVideoAd）', C.W / 2, C.H / 2 + 78);
+    ctx.fillText('（演示占位：上线微信时替换为 wx.createRewardedVideoAd）', C.W / 2, bcy + 78);
   }
 
   function drawOver() {
@@ -5935,7 +6057,9 @@ MG.config = {
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
 
     // 结算海报：面板加高放宽（436→472、上移至134），统计区与按钮组均拉开呼吸感
-    var pw = 320, ph = 472, px = (C.W - pw) / 2, py = 134;
+    // 几何走 layout.overRect()（锚定游戏区焦点，块高变化不漂流；渲染与命中共用）
+    var ovr = MG.layout.overRect();
+    var px = ovr.x, py = ovr.y, pw = ovr.w, ph = ovr.h;
     panel(px, py, pw, ph, 16, 0.97);
 
     ctx.textAlign = 'center';
@@ -5989,7 +6113,7 @@ MG.config = {
   function drawTutorial() {
     if (tutDone || state !== 'play' || adOverlay || dexOpen || confirmOpen) return;
     var step = Math.min(dropCount, TUT_STEPS.length - 1);
-    var ty = 480;
+    var ty = MG.layout.body.tutY;
     var pulse = 0.5 + 0.5 * Math.sin(time * 4);
     ctx.save();
     ctx.textAlign = 'center';
@@ -6037,23 +6161,24 @@ MG.config = {
     var pulse = 0.5 + 0.5 * Math.sin(time * 2.4);
 
     // 标题（双描层：暗色投影 + 白蓝渐变）
+    var mu = MG.layout.menu;
     ctx.font = 'bold 46px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
-    ctx.fillText('水滴合成深海', C.W / 2 + 2, 220);
+    ctx.fillText('水滴合成深海', C.W / 2 + 2, mu.titleShadowY);
     var tg = ctx.createLinearGradient(0, 180, 0, 224);
     tg.addColorStop(0, '#FFFFFF');
     tg.addColorStop(1, '#BDE8FF');
     ctx.fillStyle = tg;
-    ctx.fillText('水滴合成深海', C.W / 2, 218);
+    ctx.fillText('水滴合成深海', C.W / 2, mu.titleY);
     ctx.font = '16px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(230,246,255,0.85)';
-    ctx.fillText('合成大水滴 · 汇入无垠深海', C.W / 2, 252);
+    ctx.fillText('合成大水滴 · 汇入无垠深海', C.W / 2, mu.subY);
 
     // 历史最佳
     if (best > 0) {
       ctx.font = '14px system-ui, sans-serif';
       ctx.fillStyle = 'rgba(230,246,255,0.6)';
-      ctx.fillText('历史最佳 ' + best, C.W / 2, 294);
+      ctx.fillText('历史最佳 ' + best, C.W / 2, mu.bestY);
     }
 
     // 离线收益告知卡（有离线收益时显示，开局自动入账）
@@ -6084,7 +6209,7 @@ MG.config = {
     // 底部玩法一句话
     ctx.font = '12px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(220,240,255,0.5)';
-    ctx.fillText('投放水滴 · 同级相融合成 · 小心警戒线', C.W / 2, VH - 56);
+    ctx.fillText('投放水滴 · 同级相融合成 · 小心警戒线', C.W / 2, VH - MG.layout.menu.footDy);
   }
 
   // ---------- 主渲染 ----------
@@ -6238,7 +6363,7 @@ MG.config = {
     // 仍在胶囊下缘之上」的残余量（fit 里算好：高屏居中即避开胶囊→0，矮屏才给 ≤24）；
     // HUD（分数/进度/任务/潮汐/涨潮横幅）统一 +hudInset 平移；奖杯走 drawSkillBar 非平移路径，
     // 其 cy 同步设为 36+hudInset 与静音同高对齐。
-    trophyBtn.cy = 36 + hudInset;   // 与静音(36+hudInset)同高（奖杯不参与本平移，故直接烤进坐标）
+    trophyBtn.cy = MG.layout.hud.trophyCy + hudInset;   // 与静音(36+hudInset)同高（奖杯不参与本平移，故直接烤进坐标）
     if (hudInset > 0) { ctx.save(); ctx.translate(0, hudInset); }
     drawHUD();
     drawQuest();

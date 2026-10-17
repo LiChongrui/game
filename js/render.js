@@ -331,7 +331,7 @@
     var nk = Math.max(2, Math.min(3, Math.floor(w / 50)));
     for (k = 0; k < nk; k++) {
       var px = x0 + (k + 0.5) * w / nk + Math.sin(seed * 1.7 + k * 5.3) * w * 0.15;
-      var h = 95 + ((k * 53 + seed * 17) % 60) + (VH - 747) * 0.16;
+      var h = 95 + ((k * 53 + seed * 17) % 60) + (VH - C.H) * 0.16; // 侧栏植被随窗口高出块高的量增高
       h = Math.min(h, VH * 0.36);
       var bend = Math.sin(time * (0.45 + (k % 3) * 0.15) + seed + k * 2.2); // -1..1 摆幅
       var tone = k % 2 ? '15,64,94' : '22,84,110';
@@ -1267,8 +1267,9 @@
     ctx.fillStyle = dep;
     ctx.fillRect(0, floorY - 30, C.W, 30);
 
-    // 底部装饰（无海床基色，直接坐在背景水色上）：沙丘起伏 + 卵石 + 海星 + 扇贝
-    var sy0 = floorY + FH + 6;
+    // 底部装饰（无海床基色，直接坐在背景水色上）：沙丘起伏 + 卵石 + 海星 + 扇贝。
+    // 坐标全部由 layout.band 派生（钉容器底相对位）：块高/比例变化时装饰不重排（v172 教训）
+    var sy0 = MG.layout.band.decorBase;
     // 沙丘（径向渐变柔边：中心实色 → 边缘全透明，消除硬边；scale 把椭圆映射到单位圆，
     // 保证渐变在椭圆各个方向均匀衰减，不会因径向渐变是圆形而被压扁）
     function dune(cx, cy, rx, ry, c, c0) {
@@ -1284,18 +1285,19 @@
       ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
-    dune(C.W * 0.2, sy0 + 12, 95, 13, 'rgba(238,246,240,0.7)', 'rgba(238,246,240,0)');
-    dune(C.W * 0.74, sy0 + 14, 115, 15, 'rgba(238,246,240,0.7)', 'rgba(238,246,240,0)');
-    dune(C.W * 0.47, sy0 + 18, 85, 11, 'rgba(228,240,234,0.55)', 'rgba(228,240,234,0)');
+    for (var di = 0; di < MG.layout.band.dunes.length; di++) {
+      var du = MG.layout.band.dunes[di];
+      dune(C.W * du.xr, sy0 + du.dy, du.rx, du.ry, du.c, du.c0);
+    }
     // 卵石（块内坐标，贴容器底；装饰 y 以 FLOORY=646 时代为基准，随床面整体下移）
     ctx.fillStyle = 'rgba(110,150,168,0.4)';
-    var yoff = (floorY + FH + 6) - 664;
-    var peb = [[24, 688, 3], [66, 700, 2], [112, 686, 2.5], [172, 702, 2], [246, 690, 2.5], [306, 700, 2], [352, 686, 2.5], [404, 696, 2.2]];
+    var yoff = MG.layout.band.pebbleYOff;
+    var peb = MG.layout.band.pebbles;
     for (var pi = 0; pi < peb.length; pi++) {
       ctx.beginPath(); ctx.arc(peb[pi][0], peb[pi][1] + yoff, peb[pi][2], 0, Math.PI * 2); ctx.fill();
     }
-    drawStarfish(88, 700 + yoff, 9);
-    drawShell(330, 702 + yoff, 9);
+    drawStarfish(MG.layout.band.starfish.x, MG.layout.band.starfish.y + yoff, MG.layout.band.starfish.s);
+    drawShell(MG.layout.band.shell.x, MG.layout.band.shell.y + yoff, MG.layout.band.shell.s);
   }
 
   // 海星：五条圆钝臂 + 中心盘 + 亮斑
@@ -1507,15 +1509,15 @@
       t1Font--;
       ctx.font = t1Font + 'px system-ui, sans-serif';
     }
-    ctx.strokeText(top1, 48, 41);
+    ctx.strokeText(top1, 48, MG.layout.hud.row1Y);
     ctx.fillStyle = chal && !chal.done ? '#7B6FD0' : (ng.active ? '#6B5AA8' : '#3E6E90');
-    ctx.fillText(top1, 48, 41);
+    ctx.fillText(top1, 48, MG.layout.hud.row1Y);
 
     // 第二组（中轴）：当前得分居中 + 正下方海域进度条（分数涨→进度前进，垂直联动）
     var bump = scoreBump > 0 ? 1 + Math.sin((0.35 - scoreBump) / 0.35 * Math.PI) * 0.12 : 1;
     ctx.save();
     ctx.textAlign = 'center';
-    ctx.translate(C.W / 2, 88);
+    ctx.translate(C.W / 2, MG.layout.hud.scoreY);
     ctx.scale(bump, bump);
     ctx.font = 'bold 34px system-ui, sans-serif';
     ctx.lineWidth = 4;
@@ -1537,9 +1539,9 @@
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     var em = Math.floor(levelElapsed / 60), es = Math.floor(levelElapsed % 60);
     var etxt = '已进行 ' + em + ':' + (es < 10 ? '0' + es : es);
-    ctx.strokeText(etxt, C.W - 78, 41);
+    ctx.strokeText(etxt, C.W - 78, MG.layout.hud.row1Y);
     ctx.fillStyle = '#2E7DA8';
-    ctx.fillText(etxt, C.W - 78, 41);
+    ctx.fillText(etxt, C.W - 78, MG.layout.hud.row1Y);
 
     // 静音按钮（右上角，小号）：局内与初始界面共用同一入口
     drawMuteBtn();
@@ -1581,7 +1583,8 @@
   }
   // 潮汐信息胶囊（右侧，与任务条同行同高，左右对称）
   function drawTidePill() {
-    var tx = C.W - 122, tw = 92, ty = 130, th = 34; // 第三组：与任务条(qy130/qh34)同高同排
+    var tp = MG.layout.hud.tidePill;
+    var tx = tp.tx, tw = tp.tw, ty = tp.ty, th = tp.th; // 第三组：与任务条同高同排
     var active = tide.phase === 'active';
     var warn = !active && tide.timer <= C.tide.warnTime;
     var pulse = 0.5 + 0.5 * Math.sin(time * 6);
@@ -1605,7 +1608,7 @@
     ctx.save();
     ctx.globalAlpha = a;
     ctx.textAlign = 'center';
-    ctx.translate(C.W / 2, 250);
+    ctx.translate(C.W / 2, MG.layout.hud.tideBannerY);
     ctx.scale(scale, scale);
     ctx.font = 'bold 43px system-ui, sans-serif';
     ctx.strokeStyle = 'rgba(255,255,255,0.9)';
@@ -1657,7 +1660,8 @@
     if (!confirmOpen) return;
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
-    var px = 60, py = 300, pw = C.W - 120, ph = 170;
+    var cr = MG.layout.confirmRect();
+    var px = cr.x, py = cr.y, pw = cr.w, ph = cr.h;
     panel(px, py, pw, ph, 14, 0.97);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#155A8A';
@@ -1688,7 +1692,8 @@
     ctx.save();
     ctx.textAlign = 'center';
     // 任务条：第三组左侧（两行：进度 + 星级/奖励，与任务难度匹配）
-    var qw = 206, qx = 12, qy = 130, qh = 34;
+    var q = MG.layout.hud.quest;
+    var qw = q.qw, qx = q.qx, qy = q.qy, qh = q.qh;
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     roundRect(qx, qy, qw, qh, 10); ctx.fill();
     var prog = Math.min(1, quest.have / quest.need);
@@ -1719,14 +1724,15 @@
     var r = Math.round(((n >> 16) & 255) * 0.8), g = Math.round(((n >> 8) & 255) * 0.8), b = Math.round((n & 255) * 0.8);
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   }
-  // 海域进度条：满宽细条（y100~116，位于当前得分下方、任务条之上的宽松段；容器开口 190）
-  // 出生点 147 在条下方 25px，条不压坠落区），显示累计分距下一海域的进度
+  // 海域进度条：宽松段（当前得分下方、任务条同排区之上；容器开口 190）
+  // 出生点 209 在条下方，条不压坠落区），显示累计分距下一海域的进度
   // 配色：填充=当前海域深水色（与背景同族），右端小圆点=下一海域徽章色（目的地），左端骑线徽章=当前位置
   function drawSeaProgress() {
     var cur = seaStage(), ts = totalScore();
     var last = C.seaStages.length - 1;
     var maxed = cur >= last;
-    var sx = 24, sy = 100, sw = C.W - 48, sh = 20; // 两侧各留 24：端点徽章(r10)不顶屏幕边界
+    var sb = MG.layout.hud.seaBar;
+    var sx = sb.sx, sy = sb.sy, sw = sb.sw, sh = sb.sh; // 两侧各留 24：端点徽章(r10)不顶屏幕边界
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     roundRect(sx, sy, sw, sh, 8); ctx.fill();
     var frac = 1;
@@ -1895,7 +1901,8 @@
   function drawNgPick() {
     ctx.fillStyle = 'rgba(10,40,70,0.66)';
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
-    var pw = 330, ph = 348, px = (C.W - pw) / 2, py = (C.H - ph) / 2;
+    var nr = MG.layout.ngRect();
+    var pw = nr.w, ph = nr.h, px = nr.x, py = nr.y;
     panel(px, py, pw, ph, 14, 0.97);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#5B4A94';
@@ -2034,7 +2041,8 @@
     }
     // 漂流瓶（随水流轻摆）
     ctx.save();
-    ctx.translate(C.W / 2, C.H / 2 - 64);
+    var bcy = MG.layout.panel.blockCy;
+    ctx.translate(C.W / 2, bcy - 64);
     ctx.rotate(Math.sin(time * 1.4) * 0.12);
     ctx.fillStyle = 'rgba(150,220,200,0.9)';
     roundRect(-13, -10, 26, 34, 8); ctx.fill();
@@ -2048,12 +2056,12 @@
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 25px system-ui, sans-serif';
-    ctx.fillText('深海漂流瓶 · 激励视频', C.W / 2, C.H / 2 + 26);
+    ctx.fillText('深海漂流瓶 · 激励视频', C.W / 2, bcy + 26);
     ctx.font = '18px system-ui, sans-serif';
-    ctx.fillText(adOverlay.label + ' · ' + adOverlay.t.toFixed(1) + 's 后发放奖励', C.W / 2, C.H / 2 + 52);
+    ctx.fillText(adOverlay.label + ' · ' + adOverlay.t.toFixed(1) + 's 后发放奖励', C.W / 2, bcy + 52);
     ctx.font = '14px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.fillText('（演示占位：上线微信时替换为 wx.createRewardedVideoAd）', C.W / 2, C.H / 2 + 78);
+    ctx.fillText('（演示占位：上线微信时替换为 wx.createRewardedVideoAd）', C.W / 2, bcy + 78);
   }
 
   function drawOver() {
@@ -2062,7 +2070,9 @@
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
 
     // 结算海报：面板加高放宽（436→472、上移至134），统计区与按钮组均拉开呼吸感
-    var pw = 320, ph = 472, px = (C.W - pw) / 2, py = 134;
+    // 几何走 layout.overRect()（锚定游戏区焦点，块高变化不漂流；渲染与命中共用）
+    var ovr = MG.layout.overRect();
+    var px = ovr.x, py = ovr.y, pw = ovr.w, ph = ovr.h;
     panel(px, py, pw, ph, 16, 0.97);
 
     ctx.textAlign = 'center';
@@ -2116,7 +2126,7 @@
   function drawTutorial() {
     if (tutDone || state !== 'play' || adOverlay || dexOpen || confirmOpen) return;
     var step = Math.min(dropCount, TUT_STEPS.length - 1);
-    var ty = 480;
+    var ty = MG.layout.body.tutY;
     var pulse = 0.5 + 0.5 * Math.sin(time * 4);
     ctx.save();
     ctx.textAlign = 'center';
@@ -2164,23 +2174,24 @@
     var pulse = 0.5 + 0.5 * Math.sin(time * 2.4);
 
     // 标题（双描层：暗色投影 + 白蓝渐变）
+    var mu = MG.layout.menu;
     ctx.font = 'bold 46px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(10,40,70,0.55)';
-    ctx.fillText('水滴合成深海', C.W / 2 + 2, 220);
+    ctx.fillText('水滴合成深海', C.W / 2 + 2, mu.titleShadowY);
     var tg = ctx.createLinearGradient(0, 180, 0, 224);
     tg.addColorStop(0, '#FFFFFF');
     tg.addColorStop(1, '#BDE8FF');
     ctx.fillStyle = tg;
-    ctx.fillText('水滴合成深海', C.W / 2, 218);
+    ctx.fillText('水滴合成深海', C.W / 2, mu.titleY);
     ctx.font = '16px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(230,246,255,0.85)';
-    ctx.fillText('合成大水滴 · 汇入无垠深海', C.W / 2, 252);
+    ctx.fillText('合成大水滴 · 汇入无垠深海', C.W / 2, mu.subY);
 
     // 历史最佳
     if (best > 0) {
       ctx.font = '14px system-ui, sans-serif';
       ctx.fillStyle = 'rgba(230,246,255,0.6)';
-      ctx.fillText('历史最佳 ' + best, C.W / 2, 294);
+      ctx.fillText('历史最佳 ' + best, C.W / 2, mu.bestY);
     }
 
     // 离线收益告知卡（有离线收益时显示，开局自动入账）
@@ -2211,7 +2222,7 @@
     // 底部玩法一句话
     ctx.font = '12px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(220,240,255,0.5)';
-    ctx.fillText('投放水滴 · 同级相融合成 · 小心警戒线', C.W / 2, VH - 56);
+    ctx.fillText('投放水滴 · 同级相融合成 · 小心警戒线', C.W / 2, VH - MG.layout.menu.footDy);
   }
 
   // ---------- 主渲染 ----------
@@ -2365,7 +2376,7 @@
     // 仍在胶囊下缘之上」的残余量（fit 里算好：高屏居中即避开胶囊→0，矮屏才给 ≤24）；
     // HUD（分数/进度/任务/潮汐/涨潮横幅）统一 +hudInset 平移；奖杯走 drawSkillBar 非平移路径，
     // 其 cy 同步设为 36+hudInset 与静音同高对齐。
-    trophyBtn.cy = 36 + hudInset;   // 与静音(36+hudInset)同高（奖杯不参与本平移，故直接烤进坐标）
+    trophyBtn.cy = MG.layout.hud.trophyCy + hudInset;   // 与静音(36+hudInset)同高（奖杯不参与本平移，故直接烤进坐标）
     if (hudInset > 0) { ctx.save(); ctx.translate(0, hudInset); }
     drawHUD();
     drawQuest();

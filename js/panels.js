@@ -6,11 +6,12 @@
 // 拆分动机：面板几何此前散在 systems（命中判定）与 render（绘制）两处，改布局需全文搜索；
 // 现统一收敛到本文件——几何常量与绘制同源，渲染与点击热区天然一致。
 
-  // ---------- 面板几何（渲染与点击热区共用，一处定义） ----------
-  var DEX_PANEL = { x: 20, y: 64, w: 380, h: 560 };
+  // ---------- 面板几何（渲染与点击热区共用，一处定义）----------
+  // 尺寸/锚点走 MG.layout（改比例只改 config C.H，此处自动跟随）；y 为动态值：
+  var DEX_PANEL = { x: MG.layout.panel.dex.x, y: 64, w: MG.layout.panel.dex.w, h: MG.layout.panel.dex.h };
   var dexCloseBtn = { x: DEX_PANEL.x + DEX_PANEL.w - 42, y: DEX_PANEL.y + 8, w: 28, h: 28 }; // 右上 × 关闭（中心 +22px，与页头标题文字对齐）
-  // 面板垂直居中：菜单态（铺满）以整屏 VH 为基准；局内游戏块为固定 747 逻辑（9:16，居中块=屏幕中心，
-  // 块内 (C.H-h)/2 + 偏移 renderOy 恰好落在屏幕中央）——每帧绘制前重算，页签始终处于屏幕中央
+  // 面板垂直居中：菜单态（铺满）以整屏 VH 为基准；局内游戏块高 C.H 为基准（比例旋钮，
+  // 居中块=屏幕中心，块内 (C.H-h)/2 + 偏移 renderOy 恰好落在屏幕中央）——每帧绘制前重算
   function layoutDexPanel() {
     var base = state === 'menu' ? VH : C.H;
     DEX_PANEL.y = Math.max(10, Math.round((base - DEX_PANEL.h) / 2));
@@ -550,7 +551,8 @@
   // 菜单态离线收益告知卡（自动入账、无点击）：历史最佳行与开始按钮之间的空档，金色宝箱色系
   function drawOfflineCard() {
     if (state !== 'menu' || !offlineGain) return;
-    var w = 300, h = 62, x = (C.W - w) / 2, y = 316;
+    var mu = MG.layout.menu;
+    var w = mu.offlineW, h = mu.offlineH, x = (C.W - w) / 2, y = mu.offlineY;
     var og = ctx.createLinearGradient(0, y, 0, y + h);
     og.addColorStop(0, 'rgba(245,197,66,0.16)');
     og.addColorStop(1, 'rgba(217,169,63,0.08)');
@@ -676,7 +678,8 @@
     if (!shareOpen) return;
     ctx.fillStyle = 'rgba(10,40,70,0.6)';
     ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
-    var pw = 300, ph = 420, px = (C.W - pw) / 2, py = 160;
+    var sr = MG.layout.shareRect(); // 锚定游戏区焦点（v161 定版中心），块高变化不漂流
+    var pw = sr.w, ph = sr.h, px = sr.x, py = sr.y;
     panel(px, py, pw, ph, 16, 0.97);
     // 卡片头：深海渐变 + 标题
     var head = ctx.createLinearGradient(0, py, 0, py + 96);

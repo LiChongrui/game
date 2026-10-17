@@ -7,7 +7,7 @@
   // ---------- 状态 ----------
   var phys = new MG.Physics();
   var state = 'menu'; // 开机先停在开始界面（主流小游戏设计：标题 + 开始按钮）
-  var menuStartBtn = { x: C.W / 2 - 110, y: 396, w: 220, h: 60 }; // 「开始游戏」主按钮
+  var menuStartBtn = { x: C.W / 2 - 110, y: MG.layout.menu.startY, w: MG.layout.menu.startW, h: MG.layout.menu.startH }; // 「开始游戏」主按钮
   var score = 0, displayScore = 0, scoreBump = 0;
   var best = 0; // 刷新页面即重新计，不跨刷新保留
   var nextTier = rollTier();
@@ -1660,6 +1660,9 @@
       col: colProgress, chestTimer: Math.round(chestTimer * 10) / 10,
       oy: oy, renderOy: renderOy, hudInset: hudInset, VH: VH, floorY: C.floorY, containerTop: C.containerTop, time: time,
       dangerY: C.dangerY, spawnY: C.spawnY,
+      layout: { H: C.H, bandH: MG.layout.band.h, btnCy: MG.layout.band.btnCy, decorBase: MG.layout.band.decorBase,
+                overY: MG.layout.overRect().y, shareY: MG.layout.shareRect().y, confirmY: MG.layout.confirmRect().y,
+                focusCy: MG.layout.panel.focusCy, hudBottom: MG.layout.hud.hudBottom },
       offline: offlineGain ? { mins: offlineGain.mins, gain: offlineGain.gain } : null
     };
   };
@@ -1987,8 +1990,10 @@
   function buildOverButtons() {
     overButtons = [];
     var bw = 240, bh = 42, gap = 10, x = (C.W - bw) / 2;
-    // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中（面板 py134/ph472，见 render.drawOver）
-    var areaTop = 134 + 186, areaBottom = 134 + 472 - 22;
+    // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中
+    // （面板几何走 MG.layout.overRect()，渲染 drawOver 与命中此处同源）
+    var ovr = MG.layout.overRect();
+    var areaTop = ovr.y + 186, areaBottom = ovr.y + ovr.h - 22;
     var n = 1 + (doubled ? 0 : 1) + 3; // 复活(无限)/双倍/分享/深渊潜航/重开
     var groupH = n * bh + (n - 1) * gap;
     var y = areaTop + (areaBottom - areaTop - groupH) / 2;
@@ -2012,26 +2017,26 @@
     overButtons.push({ x: x, y: y, w: bw, h: bh, label: '重新开始', action: restart });
   }
 
-  // ---------- 命中区域（圆形按钮） ----------
-  var MUTE = { cx: C.W - 24, cy: 36, r: 16, pressT: 0 };
-  var bookBtn = { cx: 46, cy: 688, r: 20, pressT: 0 };
-  var trophyBtn = { cx: 24, cy: 36, r: 16, pressT: 0 }; // 成就页入口（奖杯；局内由 fit() 挂到刘海行，cy 为负）——与重开按钮(r16)同径
-  var menuTrophy = { cx: 24, cy: 36, r: 16, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——与重开按钮同径
-  var restartBtn = { cx: C.W - 24, cy: 688, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
+  // ---------- 命中区域（圆形按钮；坐标全部由 layout 派生，与绘制同源）----------
+  var MUTE = { cx: C.W - 24, cy: MG.layout.hud.trophyCy, r: 16, pressT: 0 };
+  var bookBtn = { cx: 46, cy: MG.layout.band.btnCy, r: 20, pressT: 0 };
+  var trophyBtn = { cx: 24, cy: MG.layout.hud.trophyCy, r: 16, pressT: 0 }; // 成就页入口（奖杯；局内由 fit()/render 挂到刘海行 +hudInset）——与重开按钮(r16)同径
+  var menuTrophy = { cx: 24, cy: MG.layout.hud.trophyCy, r: 16, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——与重开按钮同径
+  var restartBtn = { cx: C.W - 24, cy: MG.layout.band.btnCy, r: 16, pressT: 0 }; // 游戏内重开（带确认），右下角
   // 「深渊潜航」无局内悬浮钮：入口在结算页按钮组（主流 NG+ 模式选择设计）
   // 底部一排共 6 个按钮（图鉴 + 4 道具 + 重开），中心等距 70px 均匀排列：46/116/186/256/326/396
   var SKILL_BTNS = [
-    { key: 'swap',   cx: 116, cy: 688, r: 20, pressT: 0 },
-    { key: 'ripple', cx: 186, cy: 688, r: 20, pressT: 0 },
-    { key: 'evap',   cx: 256, cy: 688, r: 20, pressT: 0 },
-    { key: 'flow',   cx: 326, cy: 688, r: 20, pressT: 0 }
+    { key: 'swap',   cx: 116, cy: MG.layout.band.btnCy, r: 20, pressT: 0 },
+    { key: 'ripple', cx: 186, cy: MG.layout.band.btnCy, r: 20, pressT: 0 },
+    { key: 'evap',   cx: 256, cy: MG.layout.band.btnCy, r: 20, pressT: 0 },
+    { key: 'flow',   cx: 326, cy: MG.layout.band.btnCy, r: 20, pressT: 0 }
   ];
   fit(); // 首次适配（按钮已定义，底部元素可同步贴底）
 
-  // 重开确认弹窗
+  // 重开确认弹窗（几何走 layout.confirmRect，渲染/命中共用）
   var confirmOpen = false;
-  var confirmYes = { x: C.W / 2 - 106, y: 402, w: 94, h: 42 };
-  var confirmNo = { x: C.W / 2 + 12, y: 402, w: 94, h: 42 };
+  var confirmYes = { x: C.W / 2 - 106, y: MG.layout.confirmRect().y + MG.layout.panel.confirm.btnDy, w: 94, h: 42 };
+  var confirmNo = { x: C.W / 2 + 12, y: MG.layout.confirmRect().y + MG.layout.panel.confirm.btnDy, w: 94, h: 42 };
 
   function inRect(p, r) {
     return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
