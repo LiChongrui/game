@@ -326,6 +326,7 @@ MG.layout = {
     //   堆叠空间相应 419→399，容器/底部带不动）
     var DANGER_SHIFT = 20;
     this.extra = EXTRA;
+    this.dangerShift = DANGER_SHIFT; // 暴露：供公告带等"锚警戒线但不随其调整漂移"的组件剥离
     // 同步真源给物理引擎（每帧读 C.*）：容器/警戒线/容器底随 EXTRA 下移，容器高恒 483
     C.containerTop = 190 + EXTRA;      // 容器开口（+EXTRA 下移）
     C.dangerY = 254 + EXTRA + DANGER_SHIFT; // 警戒线（+EXTRA+DANGER_SHIFT 下移）
@@ -1461,8 +1462,10 @@ MG.layout.build();
   }
   function addPopup(x, y, text, isBig, mult) {
     // 公告带（居中 + 设计稿 y 180~320）改为底部锚定：跟随警戒线，不随窗口高度漂移
-    // 基准 209 = 旧版设计稿警戒线，随 dangerY 平移（容器压缩/警戒线变动时公告带自动跟随）
-    if (x === C.W / 2 && y >= 180 && y <= 320) y = C.dangerY + (y - 209);
+    // 基准 209 = 旧版设计稿警戒线，随警戒线平移（容器压缩时公告带自动跟随）
+    // ★ v178 修正：警戒线的 DANGER_SHIFT(+20) 调整不波及公告带——用户只要求动警戒线/坠落区，
+    //   公告弹字位置必须钉在调整前的警戒线上（= dangerY - dangerShift）
+    if (x === C.W / 2 && y >= 180 && y <= 320) y = (C.dangerY - MG.layout.dangerShift) + (y - 209);
     // 防重叠：与仍在显示中的弹字同带（横向接近）时向下顺移一行，多条同时弹出不再叠字
     for (var i = 0; i < popups.length; i++) {
       var op = popups[i];

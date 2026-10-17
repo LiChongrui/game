@@ -118,6 +118,8 @@ function checkRatio(H, label) {
   eq('C.spawnY回写(' + label + ')', C.spawnY, 209 + X + DS);
   eq('C.dangerY回写(' + label + ')', C.dangerY, 254 + X + DS);
   eq('C.containerTop回写(' + label + ')', C.containerTop, 190 + X);
+  // ★ v178：公告带锚 = dangerY - dangerShift（剥离 SHIFT，弹字位置不随警戒线调整漂移）
+  eq('公告带锚(' + label + ')', C.dangerY - L.dangerShift, 254 + X);
   console.log('② ' + label + ' 自动重排断言: ' + pass + ' pass, ' + fail + ' fail');
   return fail;
 }

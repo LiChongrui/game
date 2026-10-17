@@ -36,6 +36,7 @@ MG.layout = {
     //   堆叠空间相应 419→399，容器/底部带不动）
     var DANGER_SHIFT = 20;
     this.extra = EXTRA;
+    this.dangerShift = DANGER_SHIFT; // 暴露：供公告带等"锚警戒线但不随其调整漂移"的组件剥离
     // 同步真源给物理引擎（每帧读 C.*）：容器/警戒线/容器底随 EXTRA 下移，容器高恒 483
     C.containerTop = 190 + EXTRA;      // 容器开口（+EXTRA 下移）
     C.dangerY = 254 + EXTRA + DANGER_SHIFT; // 警戒线（+EXTRA+DANGER_SHIFT 下移）

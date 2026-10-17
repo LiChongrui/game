@@ -577,8 +577,10 @@
   }
   function addPopup(x, y, text, isBig, mult) {
     // 公告带（居中 + 设计稿 y 180~320）改为底部锚定：跟随警戒线，不随窗口高度漂移
-    // 基准 209 = 旧版设计稿警戒线，随 dangerY 平移（容器压缩/警戒线变动时公告带自动跟随）
-    if (x === C.W / 2 && y >= 180 && y <= 320) y = C.dangerY + (y - 209);
+    // 基准 209 = 旧版设计稿警戒线，随警戒线平移（容器压缩时公告带自动跟随）
+    // ★ v178 修正：警戒线的 DANGER_SHIFT(+20) 调整不波及公告带——用户只要求动警戒线/坠落区，
+    //   公告弹字位置必须钉在调整前的警戒线上（= dangerY - dangerShift）
+    if (x === C.W / 2 && y >= 180 && y <= 320) y = (C.dangerY - MG.layout.dangerShift) + (y - 209);
     // 防重叠：与仍在显示中的弹字同带（横向接近）时向下顺移一行，多条同时弹出不再叠字
     for (var i = 0; i < popups.length; i++) {
       var op = popups[i];
