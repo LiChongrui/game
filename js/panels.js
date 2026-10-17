@@ -13,7 +13,7 @@
   // 面板垂直居中：菜单态（铺满）以整屏 VH 为基准；局内游戏块高 C.H 为基准（比例旋钮，
   // 居中块=屏幕中心，块内 (C.H-h)/2 + 偏移 renderOy 恰好落在屏幕中央）——每帧绘制前重算
   function layoutDexPanel() {
-    // 局内按底部锚定链（layout.panel.dexY = 140+dy，随块底平移）；菜单态铺满全屏按 VH 居中
+    // 局内按底部锚定链（layout.panel.dexY = 120+dy，随块底平移）；菜单态铺满全屏按 VH 居中
     DEX_PANEL.y = state === 'menu'
       ? Math.max(10, Math.round((VH - DEX_PANEL.h) / 2))
       : Math.max(10, Math.round(MG.layout.panel.dexY));
@@ -28,15 +28,17 @@
   function spSlotRect(stg, s) {
     // 海域演进行右侧的特殊滴槽位（s=0/1），宝箱也占一个槽位；与 stageRowRect 同基
     var r = stageRowRect(stg);
-    return { x: r.x + r.w - 196 + s * 98, y: r.y + 4, w: 92, h: 32 };
+    return { x: r.x + r.w - 196 + s * 98, y: r.y + 7, w: 92, h: 32 }; // v194：行高 40→46，槽位 32 随行高居中（(46-32)/2）
   }
   function tierCellRect(t) {
-    // 合成链分节：3 列 × 3 行（9 档），格高 122 填满说明区以上空间
-    return { x: DEX_PANEL.x + 14 + (t % 3) * 118, y: DEX_PANEL.y + 76 + Math.floor(t / 3) * 130, w: 108, h: 122 };
+    // 合成链分节：3 列 × 3 行（9 档），格高 136 填满说明区以上空间（v194：面板 560→600；
+    // 横距 118→120 令三列左右边距各 14 对称——原 108/118 右边距被挤到 22）
+    return { x: DEX_PANEL.x + 14 + (t % 3) * 120, y: DEX_PANEL.y + 76 + Math.floor(t / 3) * 144, w: 112, h: 136 };
   }
   function stageRowRect(g) {
-    // 海域演进分节：8 行纵向列表（由浅入深），行距 48 填满说明区以上空间
-    return { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 80 + g * 48, w: DEX_PANEL.w - 28, h: 40 };
+    // 海域演进分节：8 行纵向列表（由浅入深），行高 46 / 行距 54 填满说明区以上空间
+    // （v194：面板 560→600，行高 40→46、行距 48→54——用户"海域演进紧凑，放宽松和谐"）
+    return { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 80 + g * 54, w: DEX_PANEL.w - 28, h: 46 };
   }
   function dexSecRect(i) {
     // 分节切换：通栏分段控件（合成链 / 海域演进——特殊滴已并入海域行），样式与顶部页签区分
@@ -168,7 +170,7 @@
           ctx.strokeStyle = '#2E86B4'; ctx.lineWidth = 1.5;
           roundRect(tRect.x + 0.5, tRect.y + 0.5, tRect.w - 1, tRect.h - 1, 10); ctx.stroke();
         }
-        var bx = tRect.x + tRect.w / 2, by = tRect.y + 44;
+        var bx = tRect.x + tRect.w / 2, by = tRect.y + 48;
         if (unlocked) {
           drawBall({ x: bx, y: by, r: 24, tier: t, vx: 0, vy: 0 }, 1);
         } else {
@@ -180,10 +182,10 @@
         }
         ctx.fillStyle = unlocked ? '#155A8A' : '#8AA5B8';
         ctx.font = 'bold 16px system-ui, sans-serif';
-        ctx.fillText(unlocked ? T[t].name : '？？？', bx, tRect.y + 88);
+        ctx.fillText(unlocked ? T[t].name : '？？？', bx, tRect.y + 96);
         ctx.font = '13px system-ui, sans-serif';
         ctx.fillStyle = '#4A7FA0';
-        ctx.fillText(unlocked ? ('分值 ' + T[t].score + ' · ×' + (dexCounts[t] || 0)) : '未解锁', bx, tRect.y + 108);
+        ctx.fillText(unlocked ? ('分值 ' + T[t].score + ' · ×' + (dexCounts[t] || 0)) : '未解锁', bx, tRect.y + 118);
       }
     } else if (dexSec === 1) {
 
@@ -310,18 +312,18 @@
       sub = known ? (isChestSel ? '深海随机事件' : '已发现') : '未发现';
       body = known ? dsc.desc : '在海域中发现它即可点亮说明。';
     }
-    // 说明区：贴面板底部（消除底部大片空白）
+    // 说明区：贴面板底部（消除底部大片空白；v194 随面板 560→600 下移 478→518）
     ctx.fillStyle = 'rgba(46,134,180,0.10)';
-    roundRect(DEX_PANEL.x + 12, DEX_PANEL.y + 478, DEX_PANEL.w - 24, 68, 8); ctx.fill();
+    roundRect(DEX_PANEL.x + 12, DEX_PANEL.y + 518, DEX_PANEL.w - 24, 68, 8); ctx.fill();
     ctx.textAlign = 'left';
     ctx.fillStyle = known ? '#155A8A' : '#8AA5B8';
     ctx.font = 'bold 16px system-ui, sans-serif';
-    ctx.fillText(title, DEX_PANEL.x + 24, DEX_PANEL.y + 498);
+    ctx.fillText(title, DEX_PANEL.x + 24, DEX_PANEL.y + 538);
     ctx.font = '13px system-ui, sans-serif';
     ctx.fillStyle = known ? '#1E7A6F' : '#B0584A';
-    ctx.fillText(sub, DEX_PANEL.x + 24, DEX_PANEL.y + 516);
+    ctx.fillText(sub, DEX_PANEL.x + 24, DEX_PANEL.y + 556);
     ctx.fillStyle = '#4A7FA0';
-    ctx.fillText(body, DEX_PANEL.x + 24, DEX_PANEL.y + 536);
+    ctx.fillText(body, DEX_PANEL.x + 24, DEX_PANEL.y + 576);
     ctx.textAlign = 'center';
   }
 
@@ -495,8 +497,10 @@
   // 成就页签：常驻目标列表（跨局累计，达成给分与充能奖励）
   function drawAchTab() {
     ctx.textAlign = 'center';
-    // 双列紧凑布局（12 项成就）：难度看星数、奖励看卡片内一行，页首不再放说明行
-    var cw = 178, ch = 70, gap = 8;
+    // 双列布局（12 项成就）：难度看星数、奖励看卡片内一行，页首不再放说明行
+    // （v194：卡 178→172 令双列左右边距各 14 对称——原总宽 364>可用 352、右边距被挤到 2；
+    //   卡高 70→76、行距 78→84，随面板 560→600 放宽）
+    var cw = 172, ch = 76, gap = 8;
     for (var i = 0; i < ACH_DEFS.length; i++) {
       var a = ACH_DEFS[i];
       var cx0 = DEX_PANEL.x + 14 + (i % 2) * (cw + gap);
@@ -513,13 +517,13 @@
       // 名称 + 难度星（达成金色，未达成灰蓝）
       ctx.fillStyle = done ? '#B8860B' : (d === 3 ? '#6B5AA8' : '#155A8A');
       ctx.font = 'bold 15px system-ui, sans-serif';
-      ctx.fillText((done ? '✓ ' : '') + a.name, cx0 + 10, ry + 16);
+      ctx.fillText((done ? '✓ ' : '') + a.name, cx0 + 10, ry + 18);
       ctx.textAlign = 'right';
       ctx.fillStyle = d === 3 ? '#9B7FD0' : (d === 2 ? '#C99B3F' : '#9AB4C4');
       ctx.font = '11px system-ui, sans-serif';
       var starTxt = '';
       for (var st = 0; st < d; st++) starTxt += '★';
-      ctx.fillText(starTxt, cx0 + cw - 10, ry + 15);
+      ctx.fillText(starTxt, cx0 + cw - 10, ry + 17);
       ctx.textAlign = 'left';
       // 描述（一行截断：双列较窄，超宽省略）
       ctx.fillStyle = '#4A7FA0';
@@ -527,16 +531,16 @@
       var desc = a.desc;
       while (ctx.measureText(desc).width > cw - 20 && desc.length > 4) desc = desc.slice(0, -2);
       if (desc !== a.desc) desc += '…';
-      ctx.fillText(desc, cx0 + 10, ry + 31);
+      ctx.fillText(desc, cx0 + 10, ry + 33);
       // 奖励说明
       ctx.fillStyle = done ? '#1E7A6F' : '#9AB4C4';
       ctx.font = '10px system-ui, sans-serif';
       var perk = a.perk;
       while (ctx.measureText(perk).width > cw - 20 && perk.length > 4) perk = perk.slice(0, -2);
       if (perk !== a.perk) perk += '…';
-      ctx.fillText(perk, cx0 + 10, ry + 43);
+      ctx.fillText(perk, cx0 + 10, ry + 46);
       // 进度条（左）+ 状态文字（右，同一行垂直居中，不再压在条上）
-      var barX = cx0 + 10, barW = cw - 64, barY = ry + 52;
+      var barX = cx0 + 10, barW = cw - 64, barY = ry + 58;
       ctx.fillStyle = 'rgba(46,134,180,0.15)';
       roundRect(barX, barY, barW, 9, 4.5); ctx.fill();
       ctx.fillStyle = done ? '#F5C542' : '#2E86B4';
@@ -611,28 +615,28 @@
     drawDchalCard();
     for (var i = 0; i < daily.tasks.length; i++) {
       var t = daily.tasks[i], done = daily.done[i];
-      var ry = DEX_PANEL.y + 184 + i * 106;
+      var ry = DEX_PANEL.y + 184 + i * 138;
       ctx.fillStyle = done ? 'rgba(245,197,66,0.14)' : 'rgba(46,134,180,0.07)';
-      roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 84, 10); ctx.fill();
+      roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 108, 10); ctx.fill();
       // 达成金饰条
-      if (done) { ctx.fillStyle = '#F5C542'; roundRect(DEX_PANEL.x + 14, ry + 10, 3, 64, 1.5); ctx.fill(); }
+      if (done) { ctx.fillStyle = '#F5C542'; roundRect(DEX_PANEL.x + 14, ry + 12, 3, 84, 1.5); ctx.fill(); }
       ctx.textAlign = 'left';
       ctx.fillStyle = done ? '#B8860B' : '#155A8A';
       ctx.font = 'bold 16px system-ui, sans-serif';
-      ctx.fillText((done ? '✓ ' : '') + t.text, DEX_PANEL.x + 26, ry + 26);
+      ctx.fillText((done ? '✓ ' : '') + t.text, DEX_PANEL.x + 26, ry + 32);
       // 难度星级（右侧）+ 分级奖励
       ctx.textAlign = 'right';
       ctx.fillStyle = (t.stars || 1) === 3 ? '#9B7FD0' : ((t.stars || 1) === 2 ? '#C99B3F' : '#9AB4C4');
       ctx.font = '13px system-ui, sans-serif';
       var dstar = '';
       for (var ds = 0; ds < (t.stars || 1); ds++) dstar += '★';
-      ctx.fillText(dstar, DEX_PANEL.x + DEX_PANEL.w - 26, ry + 24);
+      ctx.fillText(dstar, DEX_PANEL.x + DEX_PANEL.w - 26, ry + 30);
       ctx.textAlign = 'left';
       ctx.fillStyle = '#4A7FA0';
       ctx.font = '14px system-ui, sans-serif';
-      ctx.fillText('奖励 +' + Math.round(C.daily.rewardScore * (1 + ((t.stars || 1) - 1) * 0.5)) + ' 分', DEX_PANEL.x + 26, ry + 50);
+      ctx.fillText('奖励 +' + Math.round(C.daily.rewardScore * (1 + ((t.stars || 1) - 1) * 0.5)) + ' 分', DEX_PANEL.x + 26, ry + 60);
       // 进度条
-      var barX = DEX_PANEL.x + 26, barW = DEX_PANEL.w - 120, barY = ry + 62;
+      var barX = DEX_PANEL.x + 26, barW = DEX_PANEL.w - 120, barY = ry + 78;
       ctx.fillStyle = 'rgba(46,134,180,0.15)';
       roundRect(barX, barY, barW, 9, 4.5); ctx.fill();
       if (daily.prog[i] > 0) {
@@ -652,25 +656,25 @@
     var rows = friendBoard();
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
-      var ry = DEX_PANEL.y + 86 + i * 50;
+      var ry = DEX_PANEL.y + 86 + i * 72;
       ctx.fillStyle = r.me ? 'rgba(245,197,66,0.16)' : (i % 2 ? 'rgba(46,134,180,0.05)' : 'rgba(46,134,180,0.09)');
-      roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 42, 9); ctx.fill();
+      roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 58, 9); ctx.fill();
       // 名次徽章（序号必须显式居中：上一轮循环末尾的 textAlign 会污染到这里）
       var badge = ['#F5C542', '#B9C4CC', '#D2955B'][i] || 'rgba(46,134,180,0.35)';
       ctx.fillStyle = badge;
-      ctx.beginPath(); ctx.arc(DEX_PANEL.x + 38, ry + 21, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(DEX_PANEL.x + 38, ry + 29, 12, 0, Math.PI * 2); ctx.fill();
       ctx.textAlign = 'center';
       ctx.fillStyle = i < 3 ? '#FFFFFF' : '#3E6E90';
       ctx.font = 'bold 14px system-ui, sans-serif';
-      ctx.fillText(String(i + 1), DEX_PANEL.x + 38, ry + 26);
+      ctx.fillText(String(i + 1), DEX_PANEL.x + 38, ry + 34);
       ctx.textAlign = 'left';
       ctx.fillStyle = r.me ? '#B8860B' : '#155A8A';
       ctx.font = (r.me ? 'bold ' : '') + '16px system-ui, sans-serif';
-      ctx.fillText(r.me ? r.name + '（你）' : r.name, DEX_PANEL.x + 60, ry + 26);
+      ctx.fillText(r.me ? r.name + '（你）' : r.name, DEX_PANEL.x + 60, ry + 34);
       ctx.textAlign = 'right';
       ctx.fillStyle = r.me ? '#B8860B' : '#3E6E90';
       ctx.font = 'bold 16px system-ui, sans-serif';
-      ctx.fillText(String(r.score), DEX_PANEL.x + DEX_PANEL.w - 26, ry + 26);
+      ctx.fillText(String(r.score), DEX_PANEL.x + DEX_PANEL.w - 26, ry + 34);
       ctx.textAlign = 'left';
     }
   }

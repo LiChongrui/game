@@ -1815,7 +1815,10 @@
     }
     if (seaEvent.type === 'storm') {
       seaEvent.x = C.W * (0.25 + Math.random() * 0.5);
-      seaEvent.y = C.containerTop + (FLOORY - C.containerTop) * 0.45;
+      // v194：锚堆叠区中心（layout.body.stackCy = (dangerY+floorY)/2 = 540+dy）。
+      // 旧公式"从容器顶往下 45%"在 v184 容器顶改 0 后静默漂移到 344，漩涡盘
+      // （半径110、y 轴压扁 0.55）盘顶压过警戒线 31px——用户报"每次都接近警戒线"
+      seaEvent.y = MG.layout.body.stackCy;
     }
     audio.tide();
   }
