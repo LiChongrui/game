@@ -4,8 +4,11 @@
 //   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少！"）：
 //   HUD(0~164) 钉块顶，绝对定版不动；其余一切 = 9:18 定版基准值 + dy，随块底整体平移；
 //   HUD 底与容器顶之间的空隙 = 79+dy，自然伸缩、不显式分配。
+// ★★ v184：容器顶不设置（用户："容器到HUD顶部，直接到窗口最大位置即可，相当于不设置容器顶；
+//   堆叠空间没必要，堆叠区从堆叠底部开始，高度上限不需要设置"）：containerTop = 0，
+//   容器从块顶开始长；dangerY 直接钉绝对基准 387+dy（含 v178/v181 两次+40），
+//   "堆叠空间"退为派生量 floorY-dangerY=379 自动守恒，不再是反推参数。
 //   dy = C.H - 840（9:18 定版基准块高）：H=840 → 0（= 当前交付逐像素一致）。
-//   约束：H ≥ 761（容器顶 243+dy 不侵入 HUD 底 164）。
 // 运行：node test/verify_layout.js
 const fs = require('fs');
 const path = require('path');
@@ -42,13 +45,13 @@ eq('hud.tidePill.ty', L.hud.tidePill.ty, 130);
 eq('hud.tidePill.tx', L.hud.tidePill.tx, 298);
 eq('hud.tideBannerY', L.hud.tideBannerY, 250);
 eq('hud.hudBottom', L.hud.hudBottom, 164);
-// ---- 容器区：底部锚定链（floorY = H-74）----
-eq('body.containerTop', L.body.containerTop, 243);   // 766-523（容器高 523 定版，v182 +40）
-eq('body.dangerY', L.body.dangerY, 387);             // 766-379（堆叠空间 379 定版，v178/v181 +40）
-eq('body.floorY', L.body.floorY, 766);               // 840-74（底部带恒 74）
-eq('body.spawnY', L.body.spawnY, 342);               // 387-45（公式派生）
+// ---- 容器区：底部锚定链（floorY = H-74）；容器顶不设置 = 0（v184）----
+eq('body.containerTop', L.body.containerTop, 0);    // v184：容器顶不设置，容器从块顶开始长
+eq('body.dangerY', L.body.dangerY, 387);            // 失败线绝对基准（含 v178/v181 两次+40）
+eq('body.floorY', L.body.floorY, 766);              // 840-74（底部带恒 74）
+eq('body.spawnY', L.body.spawnY, 342);              // 387-45（公式派生）
 eq('body.tutY', L.body.tutY, 573);
-eq('HUD→容器顶空隙(定版)', L.body.containerTop - L.hud.hudBottom, 79); // 弹性残余：有多少是多少
+eq('容器高(派生)', L.body.floorY - L.body.containerTop, 766);  // 堆叠空间退为派生量，不再设置
 // ---- 底部带：恒 74 贴块底，内部钉 floorY 相对位 ----
 eq('band.h', L.band.h, 74);
 eq('band.btnCy', L.band.btnCy, 794);                 // 766+28（v163 铁律）
@@ -88,16 +91,15 @@ function checkRatio(H, label) {
   eq('dy(' + label + ')', L.dy, D);
   // HUD 钉块顶：三组行位完全不动
   eq('hud 不动(' + label + ')', L.hud.row1Y + '/' + L.hud.scoreY + '/' + L.hud.seaBar.sy + '/' + L.hud.quest.qy + '/' + L.hud.trophyCy, '41/88/100/130/36');
-  // 容器/警戒线/坠落高度：定版基准 + dy（容器高恒 523、堆叠空间恒 379）
-  eq('containerTop(' + label + ')', L.body.containerTop, 243 + D);
+  // 容器/警戒线/坠落高度：定版基准 + dy（容器顶=0 不设置，v184）
+  eq('containerTop(' + label + ')', L.body.containerTop, 0);
   eq('dangerY(' + label + ')', L.body.dangerY, 387 + D);
   eq('floorY(' + label + ')', L.body.floorY, 766 + D);
   eq('spawnY(' + label + ')', L.body.spawnY, 342 + D);
-  eq('容器高(' + label + ')', L.body.floorY - L.body.containerTop, 523);
-  eq('堆叠空间(' + label + ')', L.body.floorY - L.body.dangerY, 379);
+  eq('容器高(派生)(' + label + ')', L.body.floorY - L.body.containerTop, 766 + D);
+  eq('堆叠空间(派生)(' + label + ')', L.body.floorY - L.body.dangerY, 379);
   eq('tutY(' + label + ')', L.body.tutY, 573 + D);
-  // ★ 弹性残余：HUD 底与容器顶之间 = 79+dy，有多少是多少（不显式分配）
-  eq('HUD→容器顶空隙(' + label + ')', L.body.containerTop - L.hud.hudBottom, 79 + D);
+  // ★ 弹性残余不再有"容器顶空隙"：容器从块顶(0)开始长，HUD 浮在容器上（v184）
   eq('HUD→坠落间距(' + label + ')', L.body.spawnY - L.hud.hudBottom, 178 + D);
   // 底部带：高度恒 74，内部布局 +dy 平移（不打散）
   eq('band.h(' + label + ')', L.band.h, 74);
@@ -126,7 +128,7 @@ function checkRatio(H, label) {
   eq('C.floorY回写(' + label + ')', C.floorY, 766 + D);
   eq('C.spawnY回写(' + label + ')', C.spawnY, 342 + D);
   eq('C.dangerY回写(' + label + ')', C.dangerY, 387 + D);
-  eq('C.containerTop回写(' + label + ')', C.containerTop, 243 + D);
+  eq('C.containerTop回写(' + label + ')', C.containerTop, 0);
   // 公告带锚 = dangerY - dangerShift(40)（剥离两次+20，弹字钉调整前警戒线，不随其漂移）
   eq('公告带锚(' + label + ')', C.dangerY - L.dangerShift, 347 + D);
   console.log('② ' + label + ' 自动重排断言: ' + pass + ' pass, ' + fail + ' fail');
@@ -134,9 +136,9 @@ function checkRatio(H, label) {
 }
 var f2 = 0;
 f2 += checkRatio(840, '9:18定版');  // 当前交付：dy=0
-f2 += checkRatio(880, 'H=880');     // 更高块高：dy=+40，其余全部上移 40、HUD 不动、空隙 119
+f2 += checkRatio(880, 'H=880');     // 更高块高：dy=+40，其余全部上移 40、HUD 不动
 f2 += checkRatio(945, '8:18场景');  // 历史场景：dy=+105
-f2 += checkRatio(747, 'H=747');     // 9:16 数值回归：dy=-93；空隙 -14（<761 会侵入 HUD，非交付比例）
+f2 += checkRatio(747, 'H=747');     // 9:16 数值回归：dy=-93（容器顶=0，不再有 HUD 侵入问题）
 
 // ===== ③ 交付比例回归：config 当前 H =====
 pass = 0; fail = 0;
@@ -148,10 +150,12 @@ eq('交付 dy', L.dy, 0);
 eq('交付 band.h', L.band.h, 74);
 eq('交付 btnCy', L.band.btnCy, 794);
 eq('交付 floorY', L.body.floorY, 766);
-eq('交付 containerTop', L.body.containerTop, 243);
+eq('交付 containerTop', L.body.containerTop, 0);   // v184：容器顶不设置
 eq('交付 dangerY', L.body.dangerY, 387);
 eq('交付 spawnY', L.body.spawnY, 342);
-eq('交付 HUD→容器顶空隙', L.body.containerTop - L.hud.hudBottom, 79);
+eq('交付 containerTop', L.body.containerTop, 0);   // v184：容器顶不设置
+eq('交付 堆叠空间(派生)', L.body.floorY - L.body.dangerY, 379);
+eq('交付 HUD→坠落间距', L.body.spawnY - L.hud.hudBottom, 178);
 console.log('③ 交付比例回归断言: ' + pass + ' pass, ' + fail + ' fail');
 
 process.exit((fail + f2) ? 1 : 0);
