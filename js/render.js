@@ -2231,7 +2231,7 @@
     ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, 0, 0);
     drawBackground();
 
-    // 内容层：游戏块（420×747 ≈ 9:16 恒定比例）垂直居中——所有态一致居中（oy=(VH-C.H)/2），
+    // 内容层：游戏块（420×C.H，当前交付 9:18=840）垂直居中——所有态一致居中（oy=(VH-C.H)/2），
     // 高屏多余高度上下均分，块顶上方/块底下方由全屏背景渐变自然延展填充（无留白）。
     // transform y 偏移用 dpr*view.s*renderOy（renderOy 为逻辑 px，与 toLocal 的 -renderOy 同量纲，
     // 修早期漏乘 view.s 导致 view.s≠1 真机上偏移算少、游戏区偏上的问题）。

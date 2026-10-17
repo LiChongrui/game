@@ -14,6 +14,7 @@ ctx.window = ctx; // 浏览器里 window 即全局自身；config/layout 的 win
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'config.js'), 'utf8'), ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'layout.js'), 'utf8'), ctx);
 const L = ctx.window.MG.layout, C = ctx.window.MG.config;
+const CONFIG_H0 = C.H; // config 交付比例（改比例只改 config 这一处；先记录再被各段覆盖）
 
 let pass = 0, fail = 0;
 function eq(name, got, want) {
@@ -22,6 +23,8 @@ function eq(name, got, want) {
 }
 
 // ===== ① H=747：全部派生值必须等于 v171 硬编码值（像素级不变）=====
+// 显式设基线，与 config 当前交付值解耦（config 改比例后本段仍回归 9:16）
+C.H = 747; L.build();
 eq('hud.row1Y', L.hud.row1Y, 41);
 eq('hud.trophyCy', L.hud.trophyCy, 36);
 eq('hud.scoreY', L.hud.scoreY, 88);
@@ -92,10 +95,29 @@ C.H = 800; L.build();
 eq('H=800 band.h', L.band.h, 127);
 eq('H=800 btnCy', L.band.btnCy, 701);
 eq('H=800 overRect.y', L.overRect().y, 134);
-C.H = 747; L.build();
-eq('回 747 band.h', L.band.h, 74);
-eq('回 747 spawnY', C.spawnY, 209);
-eq('回 747 dune0', L.band.decorBase + L.band.dunes[0].dy, 703);
+
+// ---- 交付比例回归：config 当前 H（9:18=840）----
+var initialH = CONFIG_H0;         // config 交付值（各段不得污染，从加载瞬间记录）
+eq('config.H(交付比例)', initialH, 840);
+C.H = initialH; L.build();       // 以 config 交付值为准重建
+eq('H=840 band.h', L.band.h, initialH - 673);          // 167：多出高度整段给底部带
+eq('H=840 btnCy', L.band.btnCy, 701);                  // 按钮钉 floorY+28 不动
+eq('H=840 decorBase', L.band.decorBase, 691);          // 装饰基准不动
+eq('H=840 dune0.abs', L.band.decorBase + L.band.dunes[0].dy, 703);
+eq('H=840 dune1.abs', L.band.decorBase + L.band.dunes[1].dy, 705);
+eq('H=840 dune2.abs', L.band.decorBase + L.band.dunes[2].dy, 709);
+eq('H=840 pebble0.abs', L.band.pebbles[0][1] + L.band.pebbleYOff, 715);
+eq('H=840 pebble7.abs', L.band.pebbles[7][1] + L.band.pebbleYOff, 723);
+eq('H=840 starfish.abs', L.band.starfish.y + L.band.pebbleYOff, 727);
+eq('H=840 shell.abs', L.band.shell.y + L.band.pebbleYOff, 729);
+eq('H=840 hud 不动', L.hud.row1Y + '/' + L.hud.scoreY + '/' + L.hud.quest.qy, '41/88/130');
+eq('H=840 body 不动', L.body.floorY + '/' + L.body.spawnY + '/' + L.body.containerTop + '/' + L.body.dangerY, '673/209/190/254');
+eq('H=840 overRect.y', L.overRect().y, 134);           // 面板锚定焦点不漂流
+eq('H=840 shareRect.y', L.shareRect().y, 160);
+eq('H=840 confirmRect.y', L.confirmRect().y, 300);
+eq('H=840 menu 不动', L.menu.startY + '/' + L.menu.titleY + '/' + L.menu.offlineY, '396/218/316');
+eq('H=840 ngRect.y', L.ngRect().y, (initialH - 348) / 2);  // NG 弹窗按块居中（246）
+eq('H=840 blockCy', L.panel.blockCy, initialH / 2);        // 420
 console.log('③ 多比例抽查: ' + pass + ' pass, ' + fail + ' fail');
 
 process.exit(fail ? 1 : 0);

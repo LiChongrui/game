@@ -47,7 +47,7 @@ MG.layout = {
     // ---- ③ 底部带（floorY~H：比例变化的唯一承接地）----
     this.band = {
       top: C.floorY,
-      h: H - C.floorY,                  // 74（9:16）→ 272（8:18）：只随 C.H 变
+      h: H - C.floorY,                  // 74（9:16=747）→ 167（9:18=840）→ 272（8:18=945）：只随 C.H 变
       btnCy: C.floorY + 28,             // 701：底部一排按钮圆心（v163 铁律：钉 floorY+28，不随块底漂）
       labelDy: 12,                      // 按钮名称标签：圆心 + r + 12
       decorBase: C.floorY + 18,         // 691：底部装饰基准线（床面玻璃横条底 FH12 + 6）
