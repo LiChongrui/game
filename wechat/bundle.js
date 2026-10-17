@@ -317,6 +317,14 @@ MG.config = {
 // ★ v194 堆叠空间中点 stackCy = (dangerY+floorY)/2 = 540+dy：深海事件"漩涡风暴"锚点
 //   （旧公式 containerTop+(floorY-containerTop)*0.45 的语义"从容器顶往下 45%"在 v184
 //    容器顶改 0 后静默漂移到 344，漩涡盘顶压过警戒线 31px；改锚堆叠区中心永不再压线）。
+// ★ v195 HUD 下探 + 底部六钮均匀化（用户："HUD信息区可以设置更大的范围（例如占用部分伸缩区），
+//   请重新调整这部分的样式，尤其是任务元素（太丑了，请重新设计）"；"底部按钮/道具应当均匀
+//   分布，且左侧按钮（图鉴）与右侧按钮（重开）距离左右边界的距离应该是一定的"）：
+//   · hudBottom 165→190：占用伸缩区 25，余 70 = 特殊滴虚影标签空间（r≤36 不碰 HUD）；
+//   · 任务条 205×35 → 任务卡 285×60（靶心图标+标题+星级+金色进度条）；潮汐胶囊 90×35
+//     → 潮汐卡 95×60（同高同款，左右边距各 15、卡间 10，全部 5 的倍数，守 v191 规范）；
+//   · 底部六钮：band.btnCx = 35+i×(W−70)/5 公式派生、band.btnR=20 统一半径
+//     （旧写死 45/115/…/395 左右缘距 25≠10、重开 r15 偏小）。
 // ★ 数值规范（v191 用户要求"值要求是 0 或者 5 结尾"）：本文件所有基准值统一为
 //   5 的倍数（坐标/尺寸/偏移全部整齐，便于目测核对与微调）。
 //   dy = C.H - 840（9:18 定版基准块高）：H=840 → 0（= 当前交付逐像素一致）；
@@ -354,9 +362,15 @@ MG.layout = {
       trophyCx: 25, muteCx: W - 25,
       scoreY: 90,              // 当前得分 baseline（translate 锚点）
       seaBar: { sx: 25, sy: 100, sw: W - 50, sh: 20 }, // 海域进度条（v151 定版 100~120）
-      quest: { qx: 10, qy: 130, qw: 205, qh: 35 },     // 任务条（v149 定版 130~165）
-      tidePill: { tx: W - 120, ty: 130, tw: 90, th: 35 }, // 潮汐胶囊（与任务条同高同排）
-      hudBottom: 165           // HUD 区底沿（任务条底）；容器顶=0（v184），HUD 直接浮在容器上
+      // ★ v195 HUD 下探 + 任务元素重设计（用户："HUD信息区可以设置更大的范围（例如占用部分
+      //   伸缩区），请重新调整这部分的样式，尤其是任务元素（太丑了，请重新设计）"）：
+      //   hudBottom 165→190：占用"HUD底→出生点260"伸缩区 25，余 70 = 特殊滴虚影标签空间
+      //   （标签 17px 贴球顶；r≤36 不碰 HUD；刘海 hudInset≤25 时视觉底 215，距出生点仍 45）；
+      //   任务条 205×35 两行挤压 → 任务卡 285×60（靶心图标+标题+星级+金色进度条）；
+      //   潮汐胶囊 90×35 → 潮汐卡 95×60（与任务卡同高同款白底，左右边距各 15、卡间 10）。
+      quest: { qx: 15, qy: 125, qw: 285, qh: 60 },     // 任务卡（v195 重设计，15~300 × 125~185）
+      tidePill: { tx: W - 110, ty: 125, tw: 95, th: 60 }, // 潮汐卡（310~405 × 125~185，与任务卡同高）
+      hudBottom: 190           // HUD 区底沿（v195：任务卡底+5）；容器顶=0（v184），HUD 直接浮在容器上
     };
 
     // ---- ② 容器区（核心游戏几何：底部锚定，随 dy 整体平移；容器顶不设置=0，v184）----
@@ -378,10 +392,19 @@ MG.layout = {
     };
 
     // ---- ③ 底部带（floorY~H：高度恒 75 贴块底，内部钉 floorY 相对位，绝不打散）----
+    // 底部六钮圆心 x（v195 用户："底部按钮/道具应当均匀分布，且左侧按钮（图鉴）与右侧
+    // 按钮（重开）距离左右边界的距离应该是一定的"）：旧 systems.js 写死 45/115/185/255/
+    // 325/395 + restart r15 → 左缘距 25≠右缘距 10、重开钮偏小、整排视觉重心偏右。
+    // 现由 W 公式派生：边距 35、间距 (W-70)/5（9:18=70），六钮统一 r=20 → 左右缘距各 15，
+    // 完全均匀对称；systems.js 的 bookBtn/SKILL_BTNS/restartBtn 改引本真源（禁写死坐标）。
+    var btnCx = [], bi;
+    for (bi = 0; bi < 6; bi++) btnCx.push(35 + bi * (W - 70) / 5);
     this.band = {
       top: C.floorY,
       h: H - C.floorY,                  // 恒 75（底部带固定不变，v177 用户定版）
       btnCy: C.floorY + 30,             // 795+dy：底部一排按钮圆心（v163 铁律：与容器底恒距 30）
+      btnCx: btnCx,                     // v195 六钮圆心 x：[图鉴,交换,涟漪,蒸发,水流,重开]（公式派生）
+      btnR: 20,                         // v195 六钮统一半径（重开 15→20，消除大小不一）
       labelDy: 10,                      // 按钮名称标签：圆心 + r + 10
       decorBase: C.floorY + 20,         // 785+dy：底部装饰基准线（床面玻璃横条底 FH12 + 8）
       dunes: [                          // 三块沙丘（径向渐变柔边）：相对容器底固定，随 dy 平移不重排
@@ -2940,17 +2963,20 @@ MG.layout.build();
 
   // ---------- 命中区域（圆形按钮；坐标全部由 layout 派生，与绘制同源）----------
   var MUTE = { cx: C.W - 25, cy: MG.layout.hud.trophyCy, r: 15, pressT: 0 };
-  var bookBtn = { cx: 45, cy: MG.layout.band.btnCy, r: 20, pressT: 0 };
-  var trophyBtn = { cx: 25, cy: MG.layout.hud.trophyCy, r: 15, pressT: 0 }; // 成就页入口（奖杯；局内由 fit()/render 挂到刘海行 +hudInset）——与重开按钮(r15)同径
-  var menuTrophy = { cx: 25, cy: MG.layout.hud.trophyCy, r: 15, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——与重开按钮同径
-  var restartBtn = { cx: C.W - 25, cy: MG.layout.band.btnCy, r: 15, pressT: 0 }; // 游戏内重开（带确认），右下角
+  // 底部六钮（v195）：圆心/半径一律引 layout.band 真源（btnCx=35+i×(W−70)/5 均匀派生、
+  // btnR=20 统一半径）——旧写死 45/115/185/255/325/395 + restart r15：左缘距 25≠右缘距 10
+  var bookBtn = { cx: MG.layout.band.btnCx[0], cy: MG.layout.band.btnCy, r: MG.layout.band.btnR, pressT: 0 };
+  var trophyBtn = { cx: 25, cy: MG.layout.hud.trophyCy, r: 15, pressT: 0 }; // 成就页入口（奖杯；局内由 fit()/render 挂到刘海行 +hudInset）——与静音按钮(r15)同径
+  var menuTrophy = { cx: 25, cy: MG.layout.hud.trophyCy, r: 15, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——与静音按钮同径
+  var restartBtn = { cx: MG.layout.band.btnCx[5], cy: MG.layout.band.btnCy, r: MG.layout.band.btnR, pressT: 0 }; // 游戏内重开（带确认），右下角
   // 「深渊潜航」无局内悬浮钮：入口在结算页按钮组（主流 NG+ 模式选择设计）
-  // 底部一排共 6 个按钮（图鉴 + 4 道具 + 重开），中心等距 70px 均匀排列：45/115/185/255/325/395
+  // 底部一排共 6 个按钮（图鉴 + 4 道具 + 重开）：35/105/175/245/315/385 均匀分布、
+  // 间距 70、左右缘距各 15（v195，全部由 layout.band 派生，改宽度自动重排）
   var SKILL_BTNS = [
-    { key: 'swap',   cx: 115, cy: MG.layout.band.btnCy, r: 20, pressT: 0 },
-    { key: 'ripple', cx: 185, cy: MG.layout.band.btnCy, r: 20, pressT: 0 },
-    { key: 'evap',   cx: 255, cy: MG.layout.band.btnCy, r: 20, pressT: 0 },
-    { key: 'flow',   cx: 325, cy: MG.layout.band.btnCy, r: 20, pressT: 0 }
+    { key: 'swap',   cx: MG.layout.band.btnCx[1], cy: MG.layout.band.btnCy, r: MG.layout.band.btnR, pressT: 0 },
+    { key: 'ripple', cx: MG.layout.band.btnCx[2], cy: MG.layout.band.btnCy, r: MG.layout.band.btnR, pressT: 0 },
+    { key: 'evap',   cx: MG.layout.band.btnCx[3], cy: MG.layout.band.btnCy, r: MG.layout.band.btnR, pressT: 0 },
+    { key: 'flow',   cx: MG.layout.band.btnCx[4], cy: MG.layout.band.btnCy, r: MG.layout.band.btnR, pressT: 0 }
   ];
   fit(); // 首次适配（按钮已定义，底部元素可同步贴底）
 
@@ -5635,23 +5661,26 @@ MG.layout.build();
     ctx.beginPath(); ctx.arc(0, 0, c.r, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
-  // 潮汐信息胶囊（右侧，与任务条同行同高，左右对称）
+  // 潮汐卡（v195）：与任务卡同高同款白底（左右边距各 15、卡间 10）；
+  // 上行状态标签（潮汐/涨潮，保留预警脉冲色），下行 24px 大倒计时
   function drawTidePill() {
     var tp = MG.layout.hud.tidePill;
-    var tx = tp.tx, tw = tp.tw, ty = tp.ty, th = tp.th; // 第三组：与任务条同高同排
+    var tx = tp.tx, tw = tp.tw, ty = tp.ty, th = tp.th; // 第三组：与任务卡同高同排
     var active = tide.phase === 'active';
     var warn = !active && tide.timer <= C.tide.warnTime;
     var pulse = 0.5 + 0.5 * Math.sin(time * 6);
-    ctx.fillStyle = active ? 'rgba(40,130,200,0.25)' : 'rgba(255,255,255,0.6)';
-    roundRect(tx, ty, tw, th, 10); ctx.fill();
-    ctx.font = 'bold 15px system-ui, sans-serif';
-    if (active) {
-      ctx.fillStyle = 'rgba(25,105,185,' + (0.75 + pulse * 0.25) + ')';
-      ctx.fillText('涨潮 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 22);
-    } else {
-      ctx.fillStyle = warn ? 'rgba(200,90,40,' + (0.7 + pulse * 0.3) + ')' : '#4A7FA0';
-      ctx.fillText('潮汐 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 22);
-    }
+    ctx.fillStyle = 'rgba(255,255,255,0.66)';
+    roundRect(tx, ty, tw, th, 14); ctx.fill();
+    ctx.strokeStyle = 'rgba(90,140,180,0.28)'; ctx.lineWidth = 1;
+    roundRect(tx + 0.5, ty + 0.5, tw - 1, th - 1, 14); ctx.stroke();
+    var ccx = tx + tw / 2;
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 12px system-ui, sans-serif';
+    ctx.fillStyle = active ? 'rgba(25,105,185,' + (0.75 + pulse * 0.25) + ')'
+      : (warn ? 'rgba(200,90,40,' + (0.7 + pulse * 0.3) + ')' : '#4A7FA0');
+    ctx.fillText(active ? '涨潮' : '潮汐', ccx, ty + 25);
+    ctx.font = 'bold 24px system-ui, sans-serif';
+    ctx.fillText(Math.ceil(tide.timer) + 's', ccx, ty + 50);
   }
   // 涨潮横幅
   function drawTideBanner() {
@@ -5740,28 +5769,63 @@ MG.layout.build();
     ctx.fillText('重新开始', confirmYes.x + confirmYes.w / 2, confirmYes.y + 27);
   }
 
-  // ---------- 任务条 + 潮汐胶囊 + 海域进度条 ----------
+  // 任务卡（v195 重设计，用户："尤其是任务元素（太丑了，请重新设计），让效果更好更合理"）：
+  // 旧 205×35 条里塞两行 15/13px 字 → 白底圆角卡 285×60：金色靶心图标 + 标题/星级
+  // + 金色进度条（have/need 白字描边骑条居中）+ 奖励；几何全部引 layout.hud.quest
   function drawQuest() {
     if (!quest) return;
     ctx.save();
     ctx.textAlign = 'center';
-    // 任务条：第三组左侧（两行：进度 + 星级/奖励，与任务难度匹配）
     var q = MG.layout.hud.quest;
     var qw = q.qw, qx = q.qx, qy = q.qy, qh = q.qh;
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    roundRect(qx, qy, qw, qh, 10); ctx.fill();
-    var prog = Math.min(1, quest.have / quest.need);
-    if (prog > 0) {
-      ctx.fillStyle = 'rgba(245,197,66,0.35)';
-      roundRect(qx + 2, qy + 2, Math.max(10, (qw - 4) * prog), qh - 4, 8); ctx.fill();
-    }
+    // 卡体：白底 + 淡蓝描边（与潮汐卡同款，两卡并排同高）
+    ctx.fillStyle = 'rgba(255,255,255,0.66)';
+    roundRect(qx, qy, qw, qh, 14); ctx.fill();
+    ctx.strokeStyle = 'rgba(90,140,180,0.28)'; ctx.lineWidth = 1;
+    roundRect(qx + 0.5, qy + 0.5, qw - 1, qh - 1, 14); ctx.stroke();
+    // 靶心图标（左）：金圆 + 白色同心环 + 圆心点
+    var icx = qx + 25, icy = qy + 30;
+    ctx.fillStyle = '#F5C542';
+    ctx.beginPath(); ctx.arc(icx, icy, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.8; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.arc(icx, icy, 7, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath(); ctx.arc(icx, icy, 2.6, 0, Math.PI * 2); ctx.fill();
+    // 标题行：任务名（左，超宽自适应缩字号）+ 星级（右）
+    ctx.textAlign = 'left';
     ctx.fillStyle = '#7A5B10';
-    ctx.font = 'bold 15px system-ui, sans-serif';
-    ctx.fillText(quest.text + ' ' + quest.have + '/' + quest.need, qx + qw / 2, qy + 14);
+    var tf = 15;
+    ctx.font = 'bold ' + tf + 'px system-ui, sans-serif';
+    while (tf > 12 && ctx.measureText(quest.text).width > 170) { // 右端让位星级(≈40px)，不重叠
+      tf--;
+      ctx.font = 'bold ' + tf + 'px system-ui, sans-serif';
+    }
+    ctx.fillText(quest.text, qx + 50, qy + 25);
+    ctx.textAlign = 'right';
     ctx.fillStyle = '#B8860B';
-    ctx.font = '13px system-ui, sans-serif';
+    ctx.font = '12px system-ui, sans-serif';
     var stars = '★★★'.slice(0, quest.stars || 1);
-    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 30);
+    ctx.fillText(stars, qx + qw - 15, qy + 25);
+    // 进度条（金）+ have/need 骑条 + 奖励
+    var prog = Math.min(1, quest.have / quest.need);
+    var bx = qx + 50, bw = 170, by = qy + 35, bh = 10;
+    ctx.fillStyle = 'rgba(46,134,180,0.12)';
+    roundRect(bx, by, bw, bh, 5); ctx.fill();
+    if (prog > 0) {
+      ctx.fillStyle = '#F5C542';
+      roundRect(bx + 1, by + 1, Math.max(8, (bw - 2) * prog), bh - 2, 4); ctx.fill();
+    }
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(60,40,5,0.45)'; ctx.lineJoin = 'round';
+    var hn = quest.have + '/' + quest.need;
+    ctx.strokeText(hn, bx + bw / 2, by + 8);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(hn, bx + bw / 2, by + 8);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#B8860B';
+    ctx.font = 'bold 12px system-ui, sans-serif';
+    ctx.fillText('+' + quest.rewardScore + ' 分', bx + bw + 6, by + 10);
     drawTidePill();
     drawSeaProgress();
     ctx.restore();
@@ -5896,14 +5960,14 @@ MG.layout.build();
     drawCircleBtn(restartBtn, '#5E90B4', 0.85, false, 0);
     var rx0 = restartBtn.cx, ry0 = restartBtn.cy;
     ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(rx0, ry0, 8, -Math.PI * 0.35, Math.PI * 1.25); ctx.stroke();
-    // 箭头头部
-    var ax = Math.cos(-Math.PI * 0.35) * 8, ay = Math.sin(-Math.PI * 0.35) * 8;
+    ctx.beginPath(); ctx.arc(rx0, ry0, 9, -Math.PI * 0.35, Math.PI * 1.25); ctx.stroke();
+    // 箭头头部（v195：钮 r15→20，图标半径 8→9 等比放大）
+    var ax = Math.cos(-Math.PI * 0.35) * 9, ay = Math.sin(-Math.PI * 0.35) * 9;
     ctx.fillStyle = '#FFFFFF';
     ctx.beginPath();
-    ctx.moveTo(rx0 + ax + 5, ry0 + ay - 1);
-    ctx.lineTo(rx0 + ax - 4, ry0 + ay - 3);
-    ctx.lineTo(rx0 + ax + 1, ry0 + ay + 6);
+    ctx.moveTo(rx0 + ax + 5.5, ry0 + ay - 1);
+    ctx.lineTo(rx0 + ax - 4.5, ry0 + ay - 3);
+    ctx.lineTo(rx0 + ax + 1, ry0 + ay + 6.5);
     ctx.closePath(); ctx.fill();
 
     ctx.textAlign = 'center';

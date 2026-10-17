@@ -1,8 +1,8 @@
-// 布局几何验证（v194）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量静态核查
+// 布局几何验证（v195）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮静态核查
 // 纯 node 计算（vm 加载 config + layout，无浏览器/无 canvas）。
 // ★ v183 新定位语义（覆盖 v175~v182 的 EXTRA 分配方案；用户：
 //   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少！"）：
-//   HUD(0~165) 钉块顶，绝对定版不动；其余一切 = 9:18 定版基准值 + dy，随块底整体平移。
+//   HUD(0~190, v195 下探占用伸缩区 25) 钉块顶，绝对定版不动；其余一切 = 9:18 定版基准值 + dy，随块底整体平移。
 // ★★ v184：容器顶不设置（用户："容器到HUD顶部，直接到窗口最大位置即可，相当于不设置容器顶；
 //   堆叠空间没必要，堆叠区从堆叠底部开始，高度上限不需要设置"）：containerTop = 0，
 //   容器从块顶开始长；dangerY 直接钉绝对基准，"堆叠空间"退为派生量自动守恒，不再是反推参数。
@@ -44,18 +44,19 @@ eq('hud.seaBar.sy', L.hud.seaBar.sy, 100);
 eq('hud.seaBar.sh', L.hud.seaBar.sh, 20);
 eq('hud.seaBar.sx', L.hud.seaBar.sx, 25);
 eq('hud.seaBar.sw', L.hud.seaBar.sw, 370);
-eq('hud.quest.qy', L.hud.quest.qy, 130);
-eq('hud.quest.qh', L.hud.quest.qh, 35);
-eq('hud.quest.qx', L.hud.quest.qx, 10);
-eq('hud.quest.qw', L.hud.quest.qw, 205);
-eq('hud.tidePill.ty', L.hud.tidePill.ty, 130);
-eq('hud.tidePill.th', L.hud.tidePill.th, 35);
-eq('hud.tidePill.tx', L.hud.tidePill.tx, 300);
-eq('hud.tidePill.tw', L.hud.tidePill.tw, 90);
+eq('hud.quest.qy', L.hud.quest.qy, 125);
+eq('hud.quest.qh', L.hud.quest.qh, 60);
+eq('hud.quest.qx', L.hud.quest.qx, 15);
+eq('hud.quest.qw', L.hud.quest.qw, 285);
+eq('hud.tidePill.ty', L.hud.tidePill.ty, 125);
+eq('hud.tidePill.th', L.hud.tidePill.th, 60);
+eq('hud.tidePill.tx', L.hud.tidePill.tx, 310);
+eq('hud.tidePill.tw', L.hud.tidePill.tw, 95);
 eq('body.mirrorCy', L.body.mirrorCy, 370);             // v190 镜像锚 = 315+(315-260)
 eq('body.stackCy', L.body.stackCy, 540);               // v194 堆叠空间中点 = (315+765)/2：漩涡风暴锚点
 eq('漩涡距警戒线', L.body.stackCy - L.body.dangerY, 225); // 盘顶(540-61)远在警戒线下方，永不再压线
-eq('hud.hudBottom', L.hud.hudBottom, 165);
+eq('hud.hudBottom', L.hud.hudBottom, 190);           // v195：HUD 底沿 165→190（占用伸缩区 25）
+eq('HUD底→出生点残余', L.body.spawnY - L.hud.hudBottom, 70); // 特殊滴虚影标签空间（r≤36 不碰 HUD）
 // ---- 容器区：底部锚定链（floorY = H-75）；容器顶不设置 = 0（v184）----
 eq('body.containerTop', L.body.containerTop, 0);    // v184：容器顶不设置，容器从块顶开始长
 eq('body.dangerY', L.body.dangerY, 315);            // 失败线绝对基准（v188 下移10 + v191 取整）
@@ -67,6 +68,12 @@ eq('容器高(派生)', L.body.floorY - L.body.containerTop, 765);  // 堆叠空
 // ---- 底部带：恒 75 贴块底，内部钉 floorY 相对位 ----
 eq('band.h', L.band.h, 75);
 eq('band.btnCy', L.band.btnCy, 795);                 // 765+30（v163 铁律）
+// ★ v195 底部六钮：均匀分布 + 两端等距（用户："底部按钮/道具应当均匀分布，且左侧按钮（图鉴）
+//   与右侧按钮（重开）距离左右边界的距离应该是一定的"）
+eq('band.btnCx', L.band.btnCx.join('/'), '35/105/175/245/315/385');
+eq('band.btnR', L.band.btnR, 20);                    // 六钮统一半径（重开 15→20）
+eq('六钮等距70', L.band.btnCx[1] - L.band.btnCx[0] + '/' + (L.band.btnCx[5] - L.band.btnCx[4]), '70/70');
+eq('左缘距=右缘距', (L.band.btnCx[0] - L.band.btnR) + '/' + (C.W - L.band.btnCx[5] - L.band.btnR), '15/15');
 eq('band.decorBase', L.band.decorBase, 785);         // 765+20
 eq('band.pebbleYOff', L.band.pebbleYOff, 120);
 eq('dune0.abs', L.band.decorBase + L.band.dunes[0].dy, 795);
@@ -102,7 +109,7 @@ function checkRatio(H, label) {
   C.H = H; L.build();
   eq('dy(' + label + ')', L.dy, D);
   // HUD 钉块顶：三组行位完全不动
-  eq('hud 不动(' + label + ')', L.hud.row1Y + '/' + L.hud.scoreY + '/' + L.hud.seaBar.sy + '/' + L.hud.quest.qy + '/' + L.hud.trophyCy, '40/90/100/130/35');
+  eq('hud 不动(' + label + ')', L.hud.row1Y + '/' + L.hud.scoreY + '/' + L.hud.seaBar.sy + '/' + L.hud.quest.qy + '/' + L.hud.trophyCy, '40/90/100/125/35');
   // 容器/警戒线/出生点：定版基准 + dy（容器顶=0 不设置，v184）
   eq('containerTop(' + label + ')', L.body.containerTop, 0);
   eq('dangerY(' + label + ')', L.body.dangerY, 315 + D);
@@ -117,10 +124,12 @@ function checkRatio(H, label) {
   eq('弹出提示锚=镜像位(' + label + ')', L.body.mirrorCy, 370 + D);
   eq('stackCy(' + label + ')', L.body.stackCy, 540 + D);   // v194：堆叠空间中点随底部锚定链平移
   // ★ 弹性残余不再有"容器顶空隙"：容器从块顶(0)开始长，HUD 浮在容器上（v184）
-  eq('HUD→坠落间距(' + label + ')', L.body.spawnY - L.hud.hudBottom, 95 + D);
+  eq('HUD→坠落间距(' + label + ')', L.body.spawnY - L.hud.hudBottom, 70 + D);
   // 底部带：高度恒 75，内部布局 +dy 平移（不打散）
   eq('band.h(' + label + ')', L.band.h, 75);
   eq('btnCy(' + label + ')', L.band.btnCy, 795 + D);          // = floorY+30
+  eq('btnCx(' + label + ')', L.band.btnCx.join('/'), '35/105/175/245/315/385'); // v195：由 W 派生，与比例无关
+  eq('btnR(' + label + ')', L.band.btnR, 20);
   eq('decorBase(' + label + ')', L.band.decorBase, 785 + D);
   eq('dune0.abs(' + label + ')', L.band.decorBase + L.band.dunes[0].dy, 795 + D);
   eq('dune1.abs(' + label + ')', L.band.decorBase + L.band.dunes[1].dy, 800 + D);
@@ -171,7 +180,9 @@ eq('交付 spawnY', L.body.spawnY, 260);
 eq('交付 mirrorCy', L.body.mirrorCy, 370);          // v190 镜像锚 = 315+(315-260)
 eq('交付 stackCy', L.body.stackCy, 540);            // v194 漩涡锚点 = (315+765)/2
 eq('交付 堆叠空间(派生)', L.body.floorY - L.body.dangerY, 450);
-eq('交付 HUD→坠落间距', L.body.spawnY - L.hud.hudBottom, 95);
+eq('交付 HUD→坠落间距', L.body.spawnY - L.hud.hudBottom, 70);  // v195：hudBottom 190
+eq('交付 btnCx', L.band.btnCx.join('/'), '35/105/175/245/315/385');
+eq('交付 btnR', L.band.btnR, 20);
 console.log('③ 交付比例回归断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail; // 修复：③ 段失败此前被 ④ 段重置、不进退出码
 
@@ -201,7 +212,7 @@ eq('annY(205)=366', annYv(205), 366);
 eq('annY(232)=393', annYv(232), 393);
 eq('annY(285)=446', annYv(285), 446);
 eq('annY(300)=461', annYv(300), 461);
-// 落点 sanity：150 组不再落在 HUD 信息条内（hudBottom=165）；300 组仍在容器内（floorY=765）
+// 落点 sanity：150 组不再落在 HUD 信息条内（hudBottom=190）；300 组仍在容器内（floorY=765）
 eq('annY(150)出HUD', annYv(150) > L.hud.hudBottom, true);
 eq('annY(300)在容器内', annYv(300) < L.body.floorY, true);
 // v193 防回归：居中公告弹字的设计稿 y 必须 ≥180（addPopup 映射区间 180~320，
@@ -231,6 +242,28 @@ eq('每日卡：高108', /DEX_PANEL\.w - 28, 108, 10/.test(PSRC), true);
 eq('榜单行：距72', /DEX_PANEL\.y \+ 86 \+ i \* 72/.test(PSRC), true);
 eq('榜单行：高58', /DEX_PANEL\.w - 28, 58, 9/.test(PSRC), true);
 console.log('⑤ v194 图鉴/成就面板度量断言: ' + pass + ' pass, ' + fail + ' fail');
+f2 += fail;
+
+// ===== ⑥ v195 底部六钮真源 + HUD 任务/潮汐卡（systems.js/render.js 静态核查）=====
+// 底部六钮：坐标/半径一律引 layout.band 真源（旧 systems.js 写死 45/115/185/255/325/395
+// + restart r15：左缘距 25≠右缘距 10、重开偏小）。HUD 卡：任务条 205×35 → 任务卡 285×60
+// （靶心图标+标题+星级+金色进度条）；潮汐胶囊 90×35 → 潮汐卡 95×60（同高同款）。
+pass = 0; fail = 0;
+var RSRC = fs.readFileSync(path.join(__dirname, '..', 'js', 'render.js'), 'utf8');
+eq('六钮引真源处数', (SRC.match(/cx: MG\.layout\.band\.btnCx\[\d\], cy: MG\.layout\.band\.btnCy, r: MG\.layout\.band\.btnR/g) || []).length, 6);
+eq('无写死钮坐标', /cx: (45|115|185|255|325|395),/.test(SRC), false);
+eq('无写死restart右角', /cx: C\.W - 25, cy: MG\.layout\.band\.btnCy/.test(SRC), false);
+// 任务卡（render.js drawQuest）
+eq('任务卡卡体', /roundRect\(qx, qy, qw, qh, 14\); ctx\.fill\(\);/.test(RSRC), true);
+eq('任务卡靶心图标', /ctx\.arc\(icx, icy, 15, 0, Math\.PI \* 2\); ctx\.fill\(\);/.test(RSRC), true);
+eq('任务卡进度条', /var bx = qx \+ 50, bw = 170, by = qy \+ 35, bh = 10;/.test(RSRC), true);
+eq('have/need骑条', /ctx\.strokeText\(hn, bx \+ bw \/ 2, by \+ 8\);/.test(RSRC), true);
+// 潮汐卡（render.js drawTidePill）
+eq('潮汐卡卡体', /roundRect\(tx, ty, tw, th, 14\); ctx\.fill\(\);/.test(RSRC), true);
+eq('潮汐卡大倒计时', /ctx\.fillText\(Math\.ceil\(tide\.timer\) \+ 's', ccx, ty \+ 50\);/.test(RSRC), true);
+// 重开图标随钮放大（r15→20：弧半径 8→9）
+eq('重开图标半径9', /ctx\.arc\(rx0, ry0, 9, -Math\.PI \* 0\.35, Math\.PI \* 1\.25\); ctx\.stroke\(\);/.test(RSRC), true);
+console.log('⑥ v195 六钮真源+HUD卡度量断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
 process.exit(f2 ? 1 : 0);

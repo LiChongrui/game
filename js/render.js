@@ -1581,23 +1581,26 @@
     ctx.beginPath(); ctx.arc(0, 0, c.r, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
-  // 潮汐信息胶囊（右侧，与任务条同行同高，左右对称）
+  // 潮汐卡（v195）：与任务卡同高同款白底（左右边距各 15、卡间 10）；
+  // 上行状态标签（潮汐/涨潮，保留预警脉冲色），下行 24px 大倒计时
   function drawTidePill() {
     var tp = MG.layout.hud.tidePill;
-    var tx = tp.tx, tw = tp.tw, ty = tp.ty, th = tp.th; // 第三组：与任务条同高同排
+    var tx = tp.tx, tw = tp.tw, ty = tp.ty, th = tp.th; // 第三组：与任务卡同高同排
     var active = tide.phase === 'active';
     var warn = !active && tide.timer <= C.tide.warnTime;
     var pulse = 0.5 + 0.5 * Math.sin(time * 6);
-    ctx.fillStyle = active ? 'rgba(40,130,200,0.25)' : 'rgba(255,255,255,0.6)';
-    roundRect(tx, ty, tw, th, 10); ctx.fill();
-    ctx.font = 'bold 15px system-ui, sans-serif';
-    if (active) {
-      ctx.fillStyle = 'rgba(25,105,185,' + (0.75 + pulse * 0.25) + ')';
-      ctx.fillText('涨潮 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 22);
-    } else {
-      ctx.fillStyle = warn ? 'rgba(200,90,40,' + (0.7 + pulse * 0.3) + ')' : '#4A7FA0';
-      ctx.fillText('潮汐 ' + Math.ceil(tide.timer) + 's', tx + tw / 2, ty + 22);
-    }
+    ctx.fillStyle = 'rgba(255,255,255,0.66)';
+    roundRect(tx, ty, tw, th, 14); ctx.fill();
+    ctx.strokeStyle = 'rgba(90,140,180,0.28)'; ctx.lineWidth = 1;
+    roundRect(tx + 0.5, ty + 0.5, tw - 1, th - 1, 14); ctx.stroke();
+    var ccx = tx + tw / 2;
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 12px system-ui, sans-serif';
+    ctx.fillStyle = active ? 'rgba(25,105,185,' + (0.75 + pulse * 0.25) + ')'
+      : (warn ? 'rgba(200,90,40,' + (0.7 + pulse * 0.3) + ')' : '#4A7FA0');
+    ctx.fillText(active ? '涨潮' : '潮汐', ccx, ty + 25);
+    ctx.font = 'bold 24px system-ui, sans-serif';
+    ctx.fillText(Math.ceil(tide.timer) + 's', ccx, ty + 50);
   }
   // 涨潮横幅
   function drawTideBanner() {
@@ -1686,28 +1689,63 @@
     ctx.fillText('重新开始', confirmYes.x + confirmYes.w / 2, confirmYes.y + 27);
   }
 
-  // ---------- 任务条 + 潮汐胶囊 + 海域进度条 ----------
+  // 任务卡（v195 重设计，用户："尤其是任务元素（太丑了，请重新设计），让效果更好更合理"）：
+  // 旧 205×35 条里塞两行 15/13px 字 → 白底圆角卡 285×60：金色靶心图标 + 标题/星级
+  // + 金色进度条（have/need 白字描边骑条居中）+ 奖励；几何全部引 layout.hud.quest
   function drawQuest() {
     if (!quest) return;
     ctx.save();
     ctx.textAlign = 'center';
-    // 任务条：第三组左侧（两行：进度 + 星级/奖励，与任务难度匹配）
     var q = MG.layout.hud.quest;
     var qw = q.qw, qx = q.qx, qy = q.qy, qh = q.qh;
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    roundRect(qx, qy, qw, qh, 10); ctx.fill();
-    var prog = Math.min(1, quest.have / quest.need);
-    if (prog > 0) {
-      ctx.fillStyle = 'rgba(245,197,66,0.35)';
-      roundRect(qx + 2, qy + 2, Math.max(10, (qw - 4) * prog), qh - 4, 8); ctx.fill();
-    }
+    // 卡体：白底 + 淡蓝描边（与潮汐卡同款，两卡并排同高）
+    ctx.fillStyle = 'rgba(255,255,255,0.66)';
+    roundRect(qx, qy, qw, qh, 14); ctx.fill();
+    ctx.strokeStyle = 'rgba(90,140,180,0.28)'; ctx.lineWidth = 1;
+    roundRect(qx + 0.5, qy + 0.5, qw - 1, qh - 1, 14); ctx.stroke();
+    // 靶心图标（左）：金圆 + 白色同心环 + 圆心点
+    var icx = qx + 25, icy = qy + 30;
+    ctx.fillStyle = '#F5C542';
+    ctx.beginPath(); ctx.arc(icx, icy, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.8; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.arc(icx, icy, 7, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath(); ctx.arc(icx, icy, 2.6, 0, Math.PI * 2); ctx.fill();
+    // 标题行：任务名（左，超宽自适应缩字号）+ 星级（右）
+    ctx.textAlign = 'left';
     ctx.fillStyle = '#7A5B10';
-    ctx.font = 'bold 15px system-ui, sans-serif';
-    ctx.fillText(quest.text + ' ' + quest.have + '/' + quest.need, qx + qw / 2, qy + 14);
+    var tf = 15;
+    ctx.font = 'bold ' + tf + 'px system-ui, sans-serif';
+    while (tf > 12 && ctx.measureText(quest.text).width > 170) { // 右端让位星级(≈40px)，不重叠
+      tf--;
+      ctx.font = 'bold ' + tf + 'px system-ui, sans-serif';
+    }
+    ctx.fillText(quest.text, qx + 50, qy + 25);
+    ctx.textAlign = 'right';
     ctx.fillStyle = '#B8860B';
-    ctx.font = '13px system-ui, sans-serif';
+    ctx.font = '12px system-ui, sans-serif';
     var stars = '★★★'.slice(0, quest.stars || 1);
-    ctx.fillText(stars + ' · 完成 +' + quest.rewardScore + ' 分', qx + qw / 2, qy + 30);
+    ctx.fillText(stars, qx + qw - 15, qy + 25);
+    // 进度条（金）+ have/need 骑条 + 奖励
+    var prog = Math.min(1, quest.have / quest.need);
+    var bx = qx + 50, bw = 170, by = qy + 35, bh = 10;
+    ctx.fillStyle = 'rgba(46,134,180,0.12)';
+    roundRect(bx, by, bw, bh, 5); ctx.fill();
+    if (prog > 0) {
+      ctx.fillStyle = '#F5C542';
+      roundRect(bx + 1, by + 1, Math.max(8, (bw - 2) * prog), bh - 2, 4); ctx.fill();
+    }
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(60,40,5,0.45)'; ctx.lineJoin = 'round';
+    var hn = quest.have + '/' + quest.need;
+    ctx.strokeText(hn, bx + bw / 2, by + 8);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(hn, bx + bw / 2, by + 8);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#B8860B';
+    ctx.font = 'bold 12px system-ui, sans-serif';
+    ctx.fillText('+' + quest.rewardScore + ' 分', bx + bw + 6, by + 10);
     drawTidePill();
     drawSeaProgress();
     ctx.restore();
@@ -1842,14 +1880,14 @@
     drawCircleBtn(restartBtn, '#5E90B4', 0.85, false, 0);
     var rx0 = restartBtn.cx, ry0 = restartBtn.cy;
     ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(rx0, ry0, 8, -Math.PI * 0.35, Math.PI * 1.25); ctx.stroke();
-    // 箭头头部
-    var ax = Math.cos(-Math.PI * 0.35) * 8, ay = Math.sin(-Math.PI * 0.35) * 8;
+    ctx.beginPath(); ctx.arc(rx0, ry0, 9, -Math.PI * 0.35, Math.PI * 1.25); ctx.stroke();
+    // 箭头头部（v195：钮 r15→20，图标半径 8→9 等比放大）
+    var ax = Math.cos(-Math.PI * 0.35) * 9, ay = Math.sin(-Math.PI * 0.35) * 9;
     ctx.fillStyle = '#FFFFFF';
     ctx.beginPath();
-    ctx.moveTo(rx0 + ax + 5, ry0 + ay - 1);
-    ctx.lineTo(rx0 + ax - 4, ry0 + ay - 3);
-    ctx.lineTo(rx0 + ax + 1, ry0 + ay + 6);
+    ctx.moveTo(rx0 + ax + 5.5, ry0 + ay - 1);
+    ctx.lineTo(rx0 + ax - 4.5, ry0 + ay - 3);
+    ctx.lineTo(rx0 + ax + 1, ry0 + ay + 6.5);
     ctx.closePath(); ctx.fill();
 
     ctx.textAlign = 'center';
