@@ -5098,18 +5098,30 @@ MG.config = {
   // ---------- 容器：玻璃质感 + 底部焦散 ----------
   function drawContainer() {
     var floorY = FLOORY, FH = 12;
-    // 海底基色：从床面到屏幕底一条连续渐变（泡沫白 → 青 → 深海青）——块居中后块底下方
-    // 多出的空间由同一条渐变顺延到屏底（bandEnd=VH），无接缝。
-    var bed = grad('bed' + Math.round(VH), function () {
-      var gg = ctx.createLinearGradient(0, floorY, 0, VH);
+    // 海底基色分两段，保证「块内底部带」观感不随分辨率变化（用户报：宽屏下道具区下方
+    // 出现蓝色方块——根因是单一渐变 673→VH 在宽屏/矮屏 VH=747 时把暗色 stops 全压缩进
+    // 按钮下方约 40px，急堕成蓝灰色块；高屏上同一渐变被拉长反而看不出）：
+    // ① 底部带（床面→块底 C.H）：恒定浅沙渐变，任何分辨率下按钮下方都是浅色海床；
+    // ② 块底以下延伸区（仅高屏有，屏底=VH-renderOy）：从①末端色顺势加深到屏底，同色拼接。
+    var bed = grad('bedband', function () {
+      var gg = ctx.createLinearGradient(0, floorY, 0, C.H);
       gg.addColorStop(0, 'rgba(216,236,232,0.95)');
-      gg.addColorStop(0.3, 'rgba(170,208,204,0.95)');
-      gg.addColorStop(0.62, 'rgba(112,158,174,0.95)');
-      gg.addColorStop(1, 'rgba(56,102,130,0.95)');
+      gg.addColorStop(1, 'rgba(170,208,204,0.95)');
       return gg;
     });
     ctx.fillStyle = bed;
-    ctx.fillRect(0, floorY + 4, C.W, VH - floorY - 4);
+    ctx.fillRect(0, floorY + 4, C.W, C.H - floorY - 4);
+    var extEnd = VH - renderOy;   // 屏底（块内坐标；居中后 = (VH+C.H)/2 ≥ C.H）
+    if (extEnd > C.H) {
+      var ext = grad('bedext' + Math.round(extEnd), function () {
+        var gg = ctx.createLinearGradient(0, C.H, 0, extEnd);
+        gg.addColorStop(0, 'rgba(170,208,204,0.95)');
+        gg.addColorStop(1, 'rgba(112,158,174,0.95)');
+        return gg;
+      });
+      ctx.fillStyle = ext;
+      ctx.fillRect(0, C.H, C.W, extEnd - C.H + 8); // +8 防震屏抖动露底
+    }
     // 床面：圆角横条（半透明玻璃质感，透出海底基色，不再有硬边界）
     var fg = grad('fg' + Math.round(VH), function () {
       var gg = ctx.createLinearGradient(0, floorY, 0, floorY + FH + 6);
