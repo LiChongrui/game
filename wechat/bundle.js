@@ -5232,7 +5232,7 @@ MG.layout.build();
     ctx.textAlign = 'center';
     ctx.font = 'bold 14px system-ui, sans-serif';
     var tw = ctx.measureText(label).width + 12;
-    var ly = Math.max(C.containerTop + 14, C.spawnY - r - 6); // 紧贴球顶；大档虚影时钳制在容器内，不越过开口顶到 HUD
+    var ly = Math.max(C.containerTop + 14, C.spawnY - r - 11); // 距球顶约5px间距；大档虚影时钳制在容器内，不越块顶
     ctx.fillStyle = 'rgba(255,255,255,0.88)';
     roundRect(aimX - tw / 2, ly - 12, tw, 17, 8); ctx.fill();
     ctx.fillStyle = nextIron ? '#6B6353' : (nextSpecial ? specialColor(nextSpecial) : runeColor(nextRune));
