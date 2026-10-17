@@ -576,11 +576,10 @@
     }
   }
   function addPopup(x, y, text, isBig, mult) {
-    // 公告带（居中 + 设计稿 y 180~320）改为底部锚定：跟随警戒线，不随窗口高度漂移
-    // 基准 209 = 旧版设计稿警戒线，随警戒线平移（容器压缩时公告带自动跟随）
-    // ★ v178 修正：警戒线的 DANGER_SHIFT(+20) 调整不波及公告带——用户只要求动警戒线/坠落区，
-    //   公告弹字位置必须钉在调整前的警戒线上（= dangerY - dangerShift）
-    if (x === C.W / 2 && y >= 180 && y <= 320) y = (C.dangerY - MG.layout.dangerShift) + (y - 209);
+    // 公告带（居中 + 设计稿 y 180~320）锚定堆叠空间中心（v188 用户："弹出提示（如涨潮等），
+    // 要默认出现在堆叠空间的中心"）：基准 = layout.body.stackCy = (dangerY+floorY)/2，
+    // 保留设计稿相对 209 的偏移让多条弹字错开；警戒线调整不再波及弹字锚（无需剥离）
+    if (x === C.W / 2 && y >= 180 && y <= 320) y = MG.layout.body.stackCy + (y - 209);
     // 防重叠：与仍在显示中的弹字同带（横向接近）时向下顺移一行，多条同时弹出不再叠字
     for (var i = 0; i < popups.length; i++) {
       var op = popups[i];

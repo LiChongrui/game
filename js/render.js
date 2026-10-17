@@ -1608,7 +1608,7 @@
     ctx.save();
     ctx.globalAlpha = a;
     ctx.textAlign = 'center';
-    ctx.translate(C.W / 2, MG.layout.hud.tideBannerY);
+    ctx.translate(C.W / 2, MG.layout.body.stackCy); // v188：涨潮横幅锚堆叠空间中心
     ctx.scale(scale, scale);
     ctx.font = 'bold 43px system-ui, sans-serif';
     ctx.strokeStyle = 'rgba(255,255,255,0.9)';
@@ -2374,14 +2374,14 @@
 
     // HUD 整体随胶囊避让下挪 hudInset：内容层已随 renderOy 垂直居中，hudInset 仅为「居中后
     // 仍在胶囊下缘之上」的残余量（fit 里算好：高屏居中即避开胶囊→0，矮屏才给 ≤24）；
-    // HUD（分数/进度/任务/潮汐/涨潮横幅）统一 +hudInset 平移；奖杯走 drawSkillBar 非平移路径，
-    // 其 cy 同步设为 36+hudInset 与静音同高对齐。
+    // HUD（分数/进度/任务/潮汐胶囊）统一 +hudInset 平移；奖杯走 drawSkillBar 非平移路径，
+    // 其 cy 同步设为 36+hudInset 与静音同高对齐。涨潮横幅 v188 起锚堆叠空间中心，不参与平移。
     trophyBtn.cy = MG.layout.hud.trophyCy + hudInset;   // 与静音(36+hudInset)同高（奖杯不参与本平移，故直接烤进坐标）
     if (hudInset > 0) { ctx.save(); ctx.translate(0, hudInset); }
     drawHUD();
     drawQuest();
-    drawTideBanner();
     if (hudInset > 0) ctx.restore();
+    drawTideBanner(); // v188：涨潮横幅锚堆叠空间中心（非 HUD 元素，不吃 hudInset 平移）
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
     drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）
     drawSkillBar();

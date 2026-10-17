@@ -325,18 +325,16 @@ MG.layout = {
   build: function () {
     var C = MG.config, W = C.W, H = C.H;
     // ★★ 容器顶不设置（v184 用户定版）：containerTop = 0，容器从块顶开始长；
-    //   失败线 dangerY 直接钉绝对基准（307+dy，v187 用户"警戒线也要同步上移"——
-    //   与出生点同步：spawnY 累计上移 80 后警戒线追上，恢复 spawnY=dangerY-45 原始关系），
-    //   "堆叠空间"不再作为反推参数——它只是派生量 floorY - dangerY = 459，自动守恒。
+    //   失败线 dangerY 直接钉绝对基准（317+dy，v188 用户"单独给警戒线往下移10"——
+    //   在 v187 的 307 基础上下移 10，其余不动），
+    //   "堆叠空间"不再作为反推参数——它只是派生量 floorY - dangerY = 449，自动守恒。
     var dy = H - 840;                  // 9:18 定版基准块高 840；H=840 → 0
     this.dy = dy;
-    this.dangerShift = -40;            // 警戒线相对公告锚(347+dy)的偏移量（v187 起 = 307-347）——
-    // 仅作标注，供锚在警戒线上、但位置不该被这次调整波及的组件（公告带）剥离，别无只用
     C.floorY = H - 74;                 // 766（9:18）：容器底 = 块底 - 底部带 74
     C.containerTop = 0;                // 容器顶不设置（v184）：容器从块顶（窗口最大位置）开始长
-    C.dangerY = 307 + dy;              // 307（9:18）：失败线绝对基准（254+两次+40-同步上移80+dy）
+    C.dangerY = 317 + dy;              // 317（9:18）：失败线绝对基准（v187 的 307 下移 10，v188）
     // 坠落高度 = 最大可投放水滴（tiers 前 5 档中的溪流 r45）底部接触警戒线时的球心位置（公式派生，禁写死）
-    C.spawnY = C.dangerY - C.tiers[4].r; // 307-45 = 262（9:18；v186 出生点上移 80 后钉住，公式恢复原始关系）
+    C.spawnY = C.dangerY - C.tiers[4].r; // 317-45 = 272（9:18；公式自动跟随警戒线的+10）
 
     // ---- ① 顶部 HUD 区（v149/v161 定版行位；★ 钉块顶，块高变化时本区不动）----
     this.hud = {
@@ -347,16 +345,16 @@ MG.layout = {
       seaBar: { sx: 24, sy: 100, sw: W - 48, sh: 20 }, // 海域进度条（v151 定版 100~120）
       quest: { qx: 12, qy: 130, qw: 206, qh: 34 },     // 任务条（v149 定版 130~164）
       tidePill: { tx: W - 122, ty: 130, tw: 92, th: 34 }, // 潮汐胶囊（与任务条同高同排）
-      tideBannerY: 250,        // 涨潮横幅锚点
       hudBottom: 164           // HUD 区底沿（任务条底）；容器顶=0（v184），HUD 直接浮在容器上
     };
 
     // ---- ② 容器区（核心游戏几何：底部锚定，随 dy 整体平移；容器顶不设置=0，v184）----
     this.body = {
       containerTop: C.containerTop,     // 0：容器顶不设置（容器从块顶开始长，v184 用户定版）
-      dangerY: C.dangerY,               // 307+dy 警戒线（绝对基准，v187：与出生点同步上移）
+      dangerY: C.dangerY,               // 317+dy 警戒线（绝对基准，v188 下移 10）
       floorY: C.floorY,                 // 766+dy 容器底
-      spawnY: C.spawnY,                 // 262+dy 坠落高度（公式派生，禁写死；v187 与警戒线同步）
+      spawnY: C.spawnY,                 // 272+dy 坠落高度（公式派生，禁写死；随警戒线联动）
+      stackCy: (C.dangerY + C.floorY) / 2, // 541.5+dy 堆叠空间中心（v188：弹出提示默认锚点）
       tutY: 573 + dy                    // 首局引导胶囊锚点（容器中部，随底部锚定链平移）
     };
 
@@ -1466,11 +1464,10 @@ MG.layout.build();
     }
   }
   function addPopup(x, y, text, isBig, mult) {
-    // 公告带（居中 + 设计稿 y 180~320）改为底部锚定：跟随警戒线，不随窗口高度漂移
-    // 基准 209 = 旧版设计稿警戒线，随警戒线平移（容器压缩时公告带自动跟随）
-    // ★ v178 修正：警戒线的 DANGER_SHIFT(+20) 调整不波及公告带——用户只要求动警戒线/坠落区，
-    //   公告弹字位置必须钉在调整前的警戒线上（= dangerY - dangerShift）
-    if (x === C.W / 2 && y >= 180 && y <= 320) y = (C.dangerY - MG.layout.dangerShift) + (y - 209);
+    // 公告带（居中 + 设计稿 y 180~320）锚定堆叠空间中心（v188 用户："弹出提示（如涨潮等），
+    // 要默认出现在堆叠空间的中心"）：基准 = layout.body.stackCy = (dangerY+floorY)/2，
+    // 保留设计稿相对 209 的偏移让多条弹字错开；警戒线调整不再波及弹字锚（无需剥离）
+    if (x === C.W / 2 && y >= 180 && y <= 320) y = MG.layout.body.stackCy + (y - 209);
     // 防重叠：与仍在显示中的弹字同带（横向接近）时向下顺移一行，多条同时弹出不再叠字
     for (var i = 0; i < popups.length; i++) {
       var op = popups[i];
@@ -5629,7 +5626,7 @@ MG.layout.build();
     ctx.save();
     ctx.globalAlpha = a;
     ctx.textAlign = 'center';
-    ctx.translate(C.W / 2, MG.layout.hud.tideBannerY);
+    ctx.translate(C.W / 2, MG.layout.body.stackCy); // v188：涨潮横幅锚堆叠空间中心
     ctx.scale(scale, scale);
     ctx.font = 'bold 43px system-ui, sans-serif';
     ctx.strokeStyle = 'rgba(255,255,255,0.9)';
@@ -6395,14 +6392,14 @@ MG.layout.build();
 
     // HUD 整体随胶囊避让下挪 hudInset：内容层已随 renderOy 垂直居中，hudInset 仅为「居中后
     // 仍在胶囊下缘之上」的残余量（fit 里算好：高屏居中即避开胶囊→0，矮屏才给 ≤24）；
-    // HUD（分数/进度/任务/潮汐/涨潮横幅）统一 +hudInset 平移；奖杯走 drawSkillBar 非平移路径，
-    // 其 cy 同步设为 36+hudInset 与静音同高对齐。
+    // HUD（分数/进度/任务/潮汐胶囊）统一 +hudInset 平移；奖杯走 drawSkillBar 非平移路径，
+    // 其 cy 同步设为 36+hudInset 与静音同高对齐。涨潮横幅 v188 起锚堆叠空间中心，不参与平移。
     trophyBtn.cy = MG.layout.hud.trophyCy + hudInset;   // 与静音(36+hudInset)同高（奖杯不参与本平移，故直接烤进坐标）
     if (hudInset > 0) { ctx.save(); ctx.translate(0, hudInset); }
     drawHUD();
     drawQuest();
-    drawTideBanner();
     if (hudInset > 0) ctx.restore();
+    drawTideBanner(); // v188：涨潮横幅锚堆叠空间中心（非 HUD 元素，不吃 hudInset 平移）
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
     drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）
     drawSkillBar();
