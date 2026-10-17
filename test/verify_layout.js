@@ -1,4 +1,4 @@
-// 布局几何验证（v191）：MG.layout 单一几何真源
+// 布局几何验证（v192）：MG.layout 单一几何真源 + 公告类 ring 锚定静态核查
 // 纯 node 计算（vm 加载 config + layout，无浏览器/无 canvas）。
 // ★ v183 新定位语义（覆盖 v175~v182 的 EXTRA 分配方案；用户：
 //   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少！"）：
@@ -167,5 +167,36 @@ eq('交付 mirrorCy', L.body.mirrorCy, 370);          // v190 镜像锚 = 315+(3
 eq('交付 堆叠空间(派生)', L.body.floorY - L.body.dangerY, 450);
 eq('交付 HUD→坠落间距', L.body.spawnY - L.hud.hudBottom, 95);
 console.log('③ 交付比例回归断言: ' + pass + ' pass, ' + fail + ' fail');
+
+// ===== ④ v192 公告类 ring 锚定（systems.js annY 静态核查 + 映射算术）=====
+// v190 只迁移了 addPopup 的文本映射，7 处公告 ring 遗留 9:16 旧稿坐标（y=150 三处
+// 落进 HUD 信息条 hudBottom=165、环与文字分离）。v192 起公告类特效一律经
+// annY(y) = mirrorCy + (y-209) 派生（与 addPopup 同一映射）。systems.js 依赖
+// 物理/音频/存档不在 vm 中加载，故此处做源码静态核查 + 基于 mirrorCy 的映射算术。
+pass = 0; fail = 0;
+var SRC = fs.readFileSync(path.join(__dirname, '..', 'js', 'systems.js'), 'utf8');
+C.H = initialH; L.build(); // 以交付比例重建
+function annYv(y) { return L.body.mirrorCy + (y - 209); }
+eq('annY定义', /function annY\(y\) \{ return MG\.layout\.body\.mirrorCy \+ \(y - 209\); \}/.test(SRC), true);
+eq('addPopup复用annY', /if \(x === C\.W \/ 2 && y >= 180 && y <= 320\) y = annY\(y\);/.test(SRC), true);
+// 7 处公告 ring 全部改为 annY(设计稿y)：150×3（任务完成/成就/图鉴）、205（每日挑战）、
+// 232（今日全勤）、285（海域演进）、300（离线收益）
+eq('annY(150)处数', (SRC.match(/y: annY\(150\),/g) || []).length, 3);
+eq('annY(205)处数', (SRC.match(/y: annY\(205\),/g) || []).length, 1);
+eq('annY(232)处数', (SRC.match(/y: annY\(232\),/g) || []).length, 1);
+eq('annY(285)处数', (SRC.match(/y: annY\(285\),/g) || []).length, 1);
+eq('annY(300)处数', (SRC.match(/y: annY\(300\),/g) || []).length, 1);
+// 居中公告 ring 不得再出现写死数字 y
+eq('残留写死y的公告ring', /type: 'ring', x: C\.W \/ 2, y: \d/.test(SRC), false);
+// 映射算术（dy=0 交付值）：设计稿 y → 弹字带实际 y
+eq('annY(150)=311', annYv(150), 311);
+eq('annY(205)=366', annYv(205), 366);
+eq('annY(232)=393', annYv(232), 393);
+eq('annY(285)=446', annYv(285), 446);
+eq('annY(300)=461', annYv(300), 461);
+// 落点 sanity：150 组不再落在 HUD 信息条内（hudBottom=165）；300 组仍在容器内（floorY=765）
+eq('annY(150)出HUD', annYv(150) > L.hud.hudBottom, true);
+eq('annY(300)在容器内', annYv(300) < L.body.floorY, true);
+console.log('④ v192 公告ring锚定断言: ' + pass + ' pass, ' + fail + ' fail');
 
 process.exit((fail + f2) ? 1 : 0);

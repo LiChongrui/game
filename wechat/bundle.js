@@ -1155,7 +1155,7 @@ MG.layout.build();
       skillCharge[pk.key] += 2;
       addPopup(C.W / 2, 232, '今日全勤！连续 ' + daily.streak + ' 天 +' + bonus, true, 0);
       addPopup(C.W / 2, 258, '「' + pk.name + '」充能 +2', false, 0);
-      parts.push({ type: 'ring', x: C.W / 2, y: 232, r: 30, life: 0.7, max: 0.7, color: '#F5C542' });
+      parts.push({ type: 'ring', x: C.W / 2, y: annY(232), r: 30, life: 0.7, max: 0.7, color: '#F5C542' });
       audio.quest();
     }
     saveDaily();
@@ -1219,7 +1219,7 @@ MG.layout.build();
     skillCharge[pk.key] += C.dailyChal.charge;
     addPopup(C.W / 2, 205, '每日挑战达成！+' + gain, true, 0);
     addPopup(C.W / 2, 232, '连续 ' + dchal.streak + ' 天 ·「' + pk.name + '」充能 +' + C.dailyChal.charge, false, 0);
-    parts.push({ type: 'ring', x: C.W / 2, y: 205, r: 30, life: 0.7, max: 0.7, color: '#F5C542' });
+    parts.push({ type: 'ring', x: C.W / 2, y: annY(205), r: 30, life: 0.7, max: 0.7, color: '#F5C542' });
     audio.quest();
     saveChal();
   }
@@ -1475,12 +1475,18 @@ MG.layout.build();
         tx: x, ty: y, r: 2.5, life: 0.28, max: 0.28, color: '#FFFFFF' });
     }
   }
+  // 公告类特效锚定（v192）：设计稿 y（保留相对 209 的偏移让多条弹字错开）→ 镜像到
+  // 警戒线下方的弹字带 mirrorCy = dangerY + 出生通道（出生区相对警戒线的镜像对称位，v190）。
+  // addPopup 的文本映射与伴随 ring 粒子共用此换算——v190 只迁移了文本，7 处公告 ring
+  // 遗留 9:16 旧稿坐标（y=150 三处落进 HUD 信息条 hudBottom=165、环与文字分离），
+  // 自此公告类特效一律经 annY 派生，禁止再写死旧坐标。
+  function annY(y) { return MG.layout.body.mirrorCy + (y - 209); }
   function addPopup(x, y, text, isBig, mult) {
     // 公告带（居中 + 设计稿 y 180~320）锚定堆叠区镜像位（v190 用户："弹出提示（如涨潮等），
     // 要默认出现在出生区相对于警戒线在堆叠区中的镜像对称位置"）：基准 =
     // layout.body.mirrorCy = dangerY + 出生通道（出生区相对警戒线镜像到警戒线下方），
     // 保留设计稿相对 209 的偏移让多条弹字错开
-    if (x === C.W / 2 && y >= 180 && y <= 320) y = MG.layout.body.mirrorCy + (y - 209);
+    if (x === C.W / 2 && y >= 180 && y <= 320) y = annY(y);
     // 防重叠：与仍在显示中的弹字同带（横向接近）时向下顺移一行，多条同时弹出不再叠字
     for (var i = 0; i < popups.length; i++) {
       var op = popups[i];
@@ -1622,7 +1628,7 @@ MG.layout.build();
       skillCharge[pick.key] += d === 3 ? 4 : (d === 2 ? 2 : 1);
       addPopup(C.W / 2, 240, '成就达成 · ' + a.name + ' +' + gain, true, 0);
       addPopup(C.W / 2, 266, '「' + pick.name + '」充能 +' + (d === 3 ? 4 : (d === 2 ? 2 : 1)), false, 0);
-      parts.push({ type: 'ring', x: C.W / 2, y: 150, r: 26, life: 0.6, max: 0.6, color: '#F5C542' });
+      parts.push({ type: 'ring', x: C.W / 2, y: annY(150), r: 26, life: 0.6, max: 0.6, color: '#F5C542' });
       audio.quest();
       saveDex();
     }
@@ -1715,7 +1721,7 @@ MG.layout.build();
       if (sub) addPopup(C.W / 2, 266, sub, false, 0);
       if (m.id === 'm100') addPopup(C.W / 2, 292, '成就称号 · 深海博物学家', false, 0);
       if (m.chest && !chest && state === 'play') chestTimer = Math.min(chestTimer, 4); // 稍后沉一只宝箱贺礼
-      parts.push({ type: 'ring', x: C.W / 2, y: 150, r: 26, life: 0.6, max: 0.6, color: '#F5C542' });
+      parts.push({ type: 'ring', x: C.W / 2, y: annY(150), r: 26, life: 0.6, max: 0.6, color: '#F5C542' });
       audio.quest();
       saveDex();
     }
@@ -1763,7 +1769,7 @@ MG.layout.build();
     skillCharge[pick.key] = pick.cost;
     addPopup(C.W / 2, 240, '任务完成 +' + gain, true, 0);
     addPopup(C.W / 2, 266, '「' + pick.name + '」已充满', false, 0);
-    parts.push({ type: 'ring', x: C.W / 2, y: 150, r: 20, life: 0.5, max: 0.5, color: '#F5C542' });
+    parts.push({ type: 'ring', x: C.W / 2, y: annY(150), r: 20, life: 0.5, max: 0.5, color: '#F5C542' });
     audio.quest();
     if (score > best) { best = score; saveNum('mg_best', best); }
     makeQuest(questDepth + 1);
@@ -2858,7 +2864,7 @@ MG.layout.build();
       score += offlineGain.gain; displayScore = score;
       var om = offlineGain.mins;
       addPopup(C.W / 2, 300, '离线收益 · 离开 ' + (om >= 60 ? Math.floor(om / 60) + ' 时 ' + (om % 60) + ' 分' : om + ' 分钟') + '，深海攒下 ' + offlineGain.gain + ' 分', true, 0);
-      parts.push({ type: 'ring', x: C.W / 2, y: 300, r: 46, life: 0.9, max: 0.9, color: '#F2C14E' });
+      parts.push({ type: 'ring', x: C.W / 2, y: annY(300), r: 46, life: 0.9, max: 0.9, color: '#F2C14E' });
       audio.blip(880, 0.16, 'sine', 0.1, 0.5);
       offlineGain = null;
     }
@@ -3190,7 +3196,7 @@ MG.layout.build();
       seaFade = { from: stageSeen, to: stg, t: 0, dur: 1.8 };
       stageSeen = stg;
       addPopup(C.W / 2, 285, '海域演进 · 潜入「' + C.seaStages[stg].name + '」', true, 0);
-      parts.push({ type: 'ring', x: C.W / 2, y: 285, r: 40, life: 0.9, max: 0.9, color: '#7FD4FF' });
+      parts.push({ type: 'ring', x: C.W / 2, y: annY(285), r: 40, life: 0.9, max: 0.9, color: '#7FD4FF' });
       audio.big();
     }
     achTick -= dt;
