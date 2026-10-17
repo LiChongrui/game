@@ -5691,18 +5691,8 @@ MG.config = {
   }
 
   function drawSkillBar() {
-    // 道具带：海底基色的柔和延续（同色系微加深），块内 691 起、向下延伸到屏底（块居中后屏底
-    // 多出的空间）。按钮仍在块内底部带（cy=701），只是深色渐变顺延到屏底，避免出现明暗接缝。
-    var bandEnd = VH;
-    var g = grad('skbar' + Math.round(VH), function () {
-      var gg = ctx.createLinearGradient(0, C.H - 56, 0, bandEnd);
-      gg.addColorStop(0, 'rgba(56,102,130,0)');
-      gg.addColorStop(1, 'rgba(36,78,106,0.3)');
-      return gg;
-    });
-    ctx.fillStyle = g;
-    ctx.fillRect(0, C.H - 56, C.W, bandEnd - (C.H - 56));
-
+    // 道具区不画独立背景（用户要求去掉道具区下方的蓝色方块背景）：按钮直接坐在海床渐变上，
+    // 块底下方的扩展区由 drawContainer 的海床渐变自然延展到屏底，无接缝、无突兀色块。
     var readyPulse = 0.5 + 0.5 * Math.sin(time * 5);
 
     drawCircleBtn(bookBtn, '#4A7FA0', 1, false, readyPulse);
