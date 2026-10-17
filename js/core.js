@@ -75,11 +75,8 @@
       bookBtn.cy = cy; restartBtn.cy = cy;
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
     }
-    if (typeof trophyBtn !== 'undefined' && typeof MUTE !== 'undefined') {
-      // 静音在 drawHUD 内、由 render translate(0,hudInset) 下挪残余胶囊量，故 cy 保持 36；
-      // 奖杯在 HUD 之外（drawSkillBar 绘制路径）不吃该平移，故 cy 直接含 hudInset 残余偏移。
-      trophyBtn.cy = MG.layout.hud.trophyCy + hudInset; MUTE.cy = MG.layout.hud.trophyCy;
-    }
+    // v197：成就/音量按钮已移除，设置钮（setBtn）画在 HUD 平移块内（drawHUD），
+    // cy 恒为 layout.hud.trophyCy、命中侧 +hudInset，无需在此烤入坐标。
   }
   window.addEventListener('resize', fit);
   window.addEventListener('orientationchange', fit);
@@ -118,9 +115,16 @@
 
 
   // ---------- 音效（WebAudio 合成，无素材文件） ----------
+  // ★ v197 音频拆三开关（用户："游戏内这个地方改成设置按钮，用来弹出设置音效、音乐和震动"）：
+  //   sfxOn   音效（复用旧静音键 mg_mute：旧值 1=静音 → sfxOn = 旧值反读，向后兼容老存档）
+  //   musicOn 音乐（新键 mg_music；存档缺失时继承旧 mute 的反值——曾全局静音的用户
+  //            升级后不会突然开唱）
+  //   vibOn   震动（新键 mg_vib 默认开；经 hap() 走 MG.platform.vibrate，不支持时静默）
   var audio = {
     ctx: null,
-    muted: loadFlag('mg_mute'),
+    sfxOn: !loadFlag('mg_mute'),
+    musicOn: (function () { var v = MG.platform.get('mg_music'); return v == null ? !loadFlag('mg_mute') : v === '1'; })(),
+    vibOn: (function () { var v = MG.platform.get('mg_vib'); return v == null ? true : v === '1'; })(),
     ensure: function () {
       var self = this;
       if (!this.ctx) {
@@ -136,10 +140,10 @@
           }, 250);
         }
       }
-      if (this.ctx && !this.muted) this.bgm.start();
+      if (this.ctx && this.musicOn) this.bgm.start();
     },
     blip: function (freq, dur, type, vol, slide) {
-      if (this.muted || !this.ctx) return;
+      if (!this.sfxOn || !this.ctx) return;
       try {
         var t0 = this.ctx.currentTime;
         var osc = this.ctx.createOscillator(), gn = this.ctx.createGain();
@@ -152,26 +156,32 @@
         osc.start(t0); osc.stop(t0 + dur + 0.02);
       } catch (e) {}
     },
-    drop: function () { this.blip(320, 0.08, 'triangle', 0.12, 0.6); },
-    pop: function (tier) { this.blip(480 + tier * 45, 0.14, 'sine', 0.18, 1.6); },
-    big: function () { this.blip(200, 0.45, 'sine', 0.22, 2.4); },
-    swirl: function () { this.blip(220, 0.5, 'sine', 0.12, 2.8); },
-    freeze: function () { this.blip(1250, 0.09, 'sine', 0.12, 1.1); },
-    thaw: function () { this.blip(700, 0.18, 'sine', 0.10, 1.5); },
-    over: function () { this.blip(300, 0.5, 'sawtooth', 0.10, 0.3) },
+    drop: function () { this.blip(320, 0.08, 'triangle', 0.12, 0.6); hap(8); },
+    pop: function (tier) { this.blip(480 + tier * 45, 0.14, 'sine', 0.18, 1.6); hap(12); },
+    big: function () { this.blip(200, 0.45, 'sine', 0.22, 2.4); hap(30); },
+    swirl: function () { this.blip(220, 0.5, 'sine', 0.12, 2.8); hap(20); },
+    freeze: function () { this.blip(1250, 0.09, 'sine', 0.12, 1.1); hap(10); },
+    thaw: function () { this.blip(700, 0.18, 'sine', 0.10, 1.5); hap(10); },
+    over: function () { this.blip(300, 0.5, 'sawtooth', 0.10, 0.3); hap(60); },
     quest: function () {
-      if (this.muted) return;
+      if (!this.sfxOn) return;
       this.blip(660, 0.10, 'sine', 0.14, 1.2);
       var self = this;
       setTimeout(function () { self.blip(880, 0.16, 'sine', 0.14, 1.2); }, 90);
+      hap(20);
     },
     tide: function () {
-      if (this.muted || !this.ctx) return;
+      if (!this.sfxOn || !this.ctx) return;
       // 涨潮：低频上滑长音
       this.blip(110, 0.9, 'sine', 0.14, 2.2);
       this.blip(165, 0.7, 'triangle', 0.07, 2.0);
+      hap(40);
     }
   };
+
+  // ---------- 震动反馈（v197：设置弹窗"震动"开关；平台不支持时静默） ----------
+  // 音效/音乐/震动三开关相互独立：震动只认 vibOn，与静音状态无关。
+  function hap(ms) { if (audio.vibOn) MG.platform.vibrate(ms || 20); }
 
   // ---------- 背景音乐（深海氛围：母线低通呼吸 + 双振荡器暖垫 + 五声琶音 + 水底涌动噪声 + 水滴点缀） ----------
   audio.bgm = {
@@ -225,7 +235,7 @@
       this._amb = { src: src, lfo: lfo };
     },
     start: function () {
-      if (this.on || audio.muted || !audio.ctx) return;
+      if (this.on || !audio.musicOn || !audio.ctx) return;
       this.on = true;
       this.master(); this.ambience();
       var self = this;
@@ -298,12 +308,12 @@
     },
     // 声音预警①：危险度 0~1 → 母线低通收紧（水堆越贴近警戒线，音色越闷越紧）
     setDanger: function (x) {
-      if (!audio.ctx || !this._flt || audio.muted) return;
+      if (!audio.ctx || !this._flt || !audio.musicOn) return;
       try { this._flt.frequency.setTargetAtTime(1150 - x * 480, audio.ctx.currentTime, 0.5); } catch (e) {}
     },
     // 声音预警②：潮汐低频隆隆（progress 渐入，预警期脉冲）
     setTide: function (progress, warn) {
-      if (!audio.ctx || audio.muted) return;
+      if (!audio.ctx || !audio.musicOn) return;
       try {
         if (!this._drone) {
           var c = audio.ctx;

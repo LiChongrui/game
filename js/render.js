@@ -1490,7 +1490,7 @@
   function drawHUD() {
     ctx.textAlign = 'left';
     ctx.lineJoin = 'round';
-    // 第一组（左上）：成就奖杯图标 + 最高分 · 最远海域（历史信息退居角落，实时信息居中）
+    // 第一组（左上）：设置按钮 + 最高分 · 最远海域（历史信息退居角落，实时信息居中）
     // ★ v196：统计只保留"最高 / 最远海域"两项（用户："只统计最大得分和最远海就行了，
     //   其他的统计就不要显示了"）——移除 海域×N / 每日挑战 X/Y / 「NG」×N 三项，
     //   颜色随之固定 #3E6E90（原随每日挑战/NG 变紫的逻辑一并移除）
@@ -1529,10 +1529,10 @@
     ctx.textAlign = 'left';
 
     // 右上角：计时（下一滴预览已移除——容器内虚影已直观展示下一滴，此处改回计时）
-    // 与左侧统计行同排、与静音按钮(cy35)垂直居中对齐
+    // 与左侧统计行同排、与设置按钮(cy35)垂直居中对齐
     ctx.textAlign = 'center';
     ctx.lineJoin = 'round';
-    // 计时沿用原样式（12px bold / #2E7DA8），与静音按钮(cy35)垂直居中对齐、与左侧统计行同排
+    // 计时沿用原样式（12px bold / #2E7DA8），与设置按钮(cy35)垂直居中对齐、与左侧统计行同排
     ctx.font = 'bold 12px system-ui, sans-serif';
     ctx.lineWidth = 2.5;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
@@ -1542,32 +1542,79 @@
     ctx.fillStyle = '#2E7DA8';
     ctx.fillText(etxt, C.W - 80, MG.layout.hud.row1Y);
 
-    // 静音按钮（右上角，小号）：局内与初始界面共用同一入口
-    drawMuteBtn();
+    // 设置按钮（左上角，v197：替代原成就奖杯位；右上角音量钮已移除）——局内与初始界面共用
+    drawSetBtn();
   }
-  // 静音按钮（局内 HUD 与初始界面共用；坐标 MUTE.cx/cy 恒定，菜单态铺满时为同一屏幕位置）
-  function drawMuteBtn() {
-    drawRowBtn(MUTE, '#3E6E90'); // v196：与成就殿堂图标同款同大小（白底圆+主题色环）
+  // 设置按钮（v197：用户"游戏内这个地方改成设置按钮，用来弹出设置音效、音乐和震动"）：
+  // 白底圆 + 蓝灰环 + 齿轮图标（沿用 v196 drawRowBtn 统一样式，与旧音量钮同 accent）
+  function drawSetBtn() {
+    drawRowBtn(setBtn, '#3E6E90');
     ctx.save();
-    ctx.translate(MUTE.cx, MUTE.cy);
-    var ms = MUTE.r / 13;        // 图标随按钮半径等比缩放（按钮放大后图标同步放大）
-    ctx.scale(ms, ms);
-    var mx = 0, my = 0;
-    ctx.fillStyle = '#3E6E90';
-    ctx.beginPath();
-    ctx.moveTo(mx - 7, my - 3); ctx.lineTo(mx - 3, my - 3); ctx.lineTo(mx + 1, my - 7);
-    ctx.lineTo(mx + 1, my + 7); ctx.lineTo(mx - 3, my + 3); ctx.lineTo(mx - 7, my + 3);
-    ctx.closePath(); ctx.fill();
-    if (audio.muted) {
-      ctx.strokeStyle = '#C0504D'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(mx + 4, my - 5); ctx.lineTo(mx + 11, my + 5); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(mx + 11, my - 5); ctx.lineTo(mx + 4, my + 5); ctx.stroke();
-    } else {
-      ctx.strokeStyle = '#3E6E90'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(mx + 3, my, 5, -0.9, 0.9); ctx.stroke();
-      ctx.beginPath(); ctx.arc(mx + 3, my, 9, -0.9, 0.9); ctx.stroke();
+    ctx.translate(setBtn.cx, setBtn.cy);
+    var gs = setBtn.r / 13;       // 图标随按钮半径等比缩放（与奖杯/喇叭同系数）
+    ctx.scale(gs, gs);
+    ctx.strokeStyle = '#3E6E90';
+    ctx.lineWidth = 1.6;
+    // 八齿
+    for (var gi = 0; gi < 8; gi++) {
+      ctx.save();
+      ctx.rotate(gi * Math.PI / 4);
+      ctx.beginPath();
+      ctx.moveTo(0, -10); ctx.lineTo(0, -6.5);
+      ctx.stroke();
+      ctx.restore();
     }
+    // 齿圈 + 中心孔
+    ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 2.4, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
+  }
+  // 设置弹窗（v197：音效/音乐/震动三开关；几何走 layout.setRect/setRowRect/setCloseRect）
+  // 用户要求底部不放说明文本，故面板 300×260：标题 + ✕ + 三行开关排满仅余 12
+  function drawSettings() {
+    if (!setOpen) return;
+    ctx.fillStyle = 'rgba(10,40,70,0.55)';
+    ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
+    var r = MG.layout.setRect();
+    var px = r.x, py = r.y, pw = r.w, ph = r.h;
+    panel(px, py, pw, ph, 14, 0.97);
+    // 标题
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#155A8A';
+    ctx.font = 'bold 23px system-ui, sans-serif';
+    ctx.fillText('设 置', C.W / 2, py + 42);
+    // 右上角 ✕（几何与命中共用 setCloseRect）
+    var cb = MG.layout.setCloseRect();
+    ctx.strokeStyle = '#8AA5B8'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cb.x + 9, cb.y + 9); ctx.lineTo(cb.x + 21, cb.y + 21);
+    ctx.moveTo(cb.x + 21, cb.y + 9); ctx.lineTo(cb.x + 9, cb.y + 21);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+    // 三行开关（点整行即切换； systems.js toggleSet）
+    var names = ['音效', '音乐', '震动'];
+    var descs = ['水滴合成与技能音效', '深海氛围背景音乐', '合成与事件震动反馈'];
+    for (var si = 0; si < 3; si++) {
+      var row = MG.layout.setRowRect(si);
+      ctx.fillStyle = 'rgba(46,134,180,0.07)';
+      roundRect(row.x, row.y, row.w, row.h, 10); ctx.fill();
+      ctx.strokeStyle = 'rgba(90,140,180,0.18)'; ctx.lineWidth = 1;
+      roundRect(row.x + 0.5, row.y + 0.5, row.w - 1, row.h - 1, 10); ctx.stroke();
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#155A8A';
+      ctx.font = 'bold 16px system-ui, sans-serif';
+      ctx.fillText(names[si], row.x + 18, row.y + 24);
+      ctx.fillStyle = '#4A7FA0';
+      ctx.font = '12px system-ui, sans-serif';
+      ctx.fillText(descs[si], row.x + 18, row.y + 42);
+      // 滑块开关（52×30 右侧垂直居中；on 态蓝底白钮右置）
+      var on = si === 0 ? audio.sfxOn : (si === 1 ? audio.musicOn : audio.vibOn);
+      var sx = row.x + row.w - 18 - 52, sy = row.y + 13;
+      ctx.fillStyle = on ? '#2E86B4' : 'rgba(120,150,175,0.35)';
+      roundRect(sx, sy, 52, 30, 15); ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath(); ctx.arc(on ? sx + 52 - 15 : sx + 15, sy + 15, 11, 0, Math.PI * 2); ctx.fill();
+    }
   }
   // 第一排圆钮统一样式（v196）：白底圆 + 主题色 2px 环 + 按压动画
   // （旧：奖杯 = 金实心球+白线框、音量 = 白底小圆+蓝灰细边——两钮风格尺寸都不一致；
@@ -1628,45 +1675,6 @@
   }
 
   // ---------- 顶部中央计时：本局已进行时长 ----------
-  // 成就殿堂入口按钮（🏆 奖杯，每日未全勤显红点）——局内刘海行（trophyBtn）与菜单态（menuTrophy）共用
-  // ★ v196：白底圆 + 金环 + 实心金奖杯（旧为金实心球+白线框奖杯，像颗游戏棋子，与深海主题不搭；
-  //   实心奖杯在小尺寸下比线框清晰；缩放系数 r/14 → r/13，随 rowBtnR 15→18 等比放大）
-  function drawTrophyBtn(btn) {
-    btn = btn || trophyBtn;
-    drawRowBtn(btn, '#B8912F'); // 与静音按钮同款白底圆环（accent 金 vs 蓝灰，两钮成对）
-    var tx = btn.cx, ty = btn.cy;
-    // 图标随按钮半径等比缩放（按钮放大后图标同步放大，不留空壳感）
-    ctx.save();
-    ctx.translate(tx, ty);
-    var ts = btn.r / 13;
-    ctx.scale(ts, ts);
-    ctx.fillStyle = '#B8860B';
-    // 杯体（实心）：上宽下窄
-    ctx.beginPath();
-    ctx.moveTo(-6, -8); ctx.lineTo(6, -8); ctx.lineTo(5, -1);
-    ctx.quadraticCurveTo(0, 4, -5, -1);
-    ctx.closePath(); ctx.fill();
-    // 双耳（描边）
-    ctx.strokeStyle = '#B8860B'; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(-6, -6); ctx.quadraticCurveTo(-10, -6, -8, -1);
-    ctx.moveTo(6, -6); ctx.quadraticCurveTo(10, -6, 8, -1);
-    ctx.stroke();
-    // 柄 + 底座（实心）
-    ctx.fillRect(-1.2, 2, 2.4, 4);
-    ctx.beginPath();
-    ctx.moveTo(-4.5, 7.5); ctx.lineTo(4.5, 7.5); ctx.lineTo(3.5, 6); ctx.lineTo(-3.5, 6);
-    ctx.closePath(); ctx.fill();
-    ctx.restore();
-    ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
-    if (!(daily.done[0] && daily.done[1] && daily.done[2])) {
-      ctx.fillStyle = '#E2705E';
-      ctx.beginPath(); ctx.arc(tx + btn.r - 3, ty - btn.r + 3, 3.4, 0, Math.PI * 2); ctx.fill();
-    }
-  }
-
-  // 顶部计时已移除（休闲合成局内无时间压力，信息价值低于得分/进度）；
-  // 每日挑战局的目标进度并入 HUD 第一组第二行（左上角，与最高分同组）
 
   // ---------- 重开确认弹窗 ----------
   function drawConfirm() {
@@ -1883,8 +1891,7 @@
     ctx.strokeRect(bx - 8, by - 6, 16, 12);
     ctx.beginPath(); ctx.moveTo(bx, by - 6); ctx.lineTo(bx, by + 6); ctx.stroke();
 
-    // 成就页入口（🏆 奖杯，图鉴旁；每日未全勤显红点）
-    drawTrophyBtn(trophyBtn);
+    // v197：成就殿堂入口（奖杯）已按用户要求隐藏；设置钮移入 HUD 第一排（drawHUD 内绘制）
 
     // 重开按钮（↻ 循环箭头，点击弹确认）
     drawCircleBtn(restartBtn, '#5E90B4', 0.85, false, 0);
@@ -2296,15 +2303,16 @@
 
     if (state === 'menu') {
       drawMenu();
-      // 成就/音量按钮与局内同一屏幕位置：内容层已随 renderOy 居中，此处仅补胶囊残余量 hudInset
+      // v197：设置按钮与局内同一屏幕位置（内容层已随 renderOy 居中，此处仅补胶囊残余量 hudInset）；
+      // 旧成就奖杯/右上角音量入口已按用户要求移除（"成就按钮先隐藏掉…右侧的音量按钮移除掉"）
       ctx.save();
       ctx.translate(0, hudInset);
-      drawTrophyBtn(menuTrophy);   // 成就殿堂/每日挑战入口（systems 菜单分支处理，命中区同步 +hudInset）
-      drawMuteBtn();               // 初始界面右上角静音入口
+      drawSetBtn();               // 设置入口（音效/音乐/震动弹窗，systems 菜单分支处理）
       ctx.restore();
+      if (setOpen) drawSettings(); // 设置弹窗盖在菜单之上（点击已放行到 setOpen 分支）
       if (achOpen) drawAchPanel(); // 面板盖在菜单之上（点击已放行到 achOpen 分支）
       ctx.restore(); return;
-    } // 开始界面：背景之上画菜单 + 奖杯入口 + 音量入口 + 成就殿堂面板
+    } // 开始界面：背景之上画菜单 + 设置入口 + 设置弹窗 + 成就殿堂面板
 
     drawContainer();
     drawDangerLine();
@@ -2422,9 +2430,8 @@
 
     // HUD 整体随胶囊避让下挪 hudInset：内容层已随 renderOy 垂直居中，hudInset 仅为「居中后
     // 仍在胶囊下缘之上」的残余量（fit 里算好：高屏居中即避开胶囊→0，矮屏才给 ≤24）；
-    // HUD（分数/进度/任务/潮汐胶囊）统一 +hudInset 平移；奖杯走 drawSkillBar 非平移路径，
-    // 其 cy 同步设为 36+hudInset 与静音同高对齐。涨潮横幅 v188 起锚堆叠空间中心，不参与平移。
-    trophyBtn.cy = MG.layout.hud.trophyCy + hudInset;   // 与静音(cy35+hudInset)同高（奖杯不参与本平移，故直接烤进坐标）
+    // HUD（分数/进度/任务/潮汐胶囊/设置钮）统一 +hudInset 平移；设置钮命中侧同步 +hudInset。
+    // 涨潮横幅 v188 起锚堆叠空间中心，不参与平移。
     if (hudInset > 0) { ctx.save(); ctx.translate(0, hudInset); }
     drawHUD();
     drawQuest();
@@ -2434,6 +2441,7 @@
     drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）
     drawSkillBar();
     drawConfirm();
+    drawSettings();   // v197：设置弹窗（音效/音乐/震动；打开时输入已被 setOpen 门禁屏蔽）
     if (adOverlay) drawAdOverlay();
     if (state === 'over') drawOver();
     if (dexOpen) drawDex();

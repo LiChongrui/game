@@ -663,9 +663,7 @@
     if (scoreBump > 0) scoreBump -= dt;
     // 按钮按压反馈计时
     if (bookBtn.pressT > 0) bookBtn.pressT -= dt;
-    if (trophyBtn.pressT > 0) trophyBtn.pressT -= dt;
-    if (menuTrophy.pressT > 0) menuTrophy.pressT -= dt;
-    if (MUTE.pressT > 0) MUTE.pressT -= dt;
+    if (setBtn.pressT > 0) setBtn.pressT -= dt; // v197：设置钮（原奖杯×2/静音三处已移除）
     if (restartBtn.pressT > 0) restartBtn.pressT -= dt;
     for (i = 0; i < SKILL_BTNS.length; i++) if (SKILL_BTNS[i].pressT > 0) SKILL_BTNS[i].pressT -= dt;
   }
@@ -1965,6 +1963,7 @@
     ngEndRun(); // 二周目词缀只在单局内生效（普通重开回到常态）
     phys.bodies.length = 0;
     confirmOpen = false;
+    setOpen = false; // v197：新局关闭设置弹窗（防跨局残留）
     score = 0; displayScore = 0; scoreBump = 0;
     if (offlineGain) { // 离线收益：开局自动入账
       score += offlineGain.gain; displayScore = score;
@@ -2032,12 +2031,14 @@
   }
 
   // ---------- 命中区域（圆形按钮；坐标全部由 layout 派生，与绘制同源）----------
-  var MUTE = { cx: C.W - 25, cy: MG.layout.hud.trophyCy, r: MG.layout.hud.rowBtnR, pressT: 0 }; // v196：引 rowBtnR 真源（15→18）
+  // ★ v197 第一排重排（用户："图标也太丑了，成就按钮先隐藏掉吧。游戏内这个地方改成设置按钮，
+  //   用来弹出设置音效、音乐和震动，右侧的音量按钮移除掉"）：成就按钮（奖杯）与右上角
+  //   音量钮整套移除，左上角原位（原奖杯位）新增设置钮——半径引 rowBtnR 真源，
+  //   样式/命中与绘制同源（render.js drawSetBtn，白底圆+蓝灰环+齿轮图标）
+  var setBtn = { cx: MG.layout.hud.setCx, cy: MG.layout.hud.trophyCy, r: MG.layout.hud.rowBtnR, pressT: 0 };
   // 底部六钮（v195）：圆心/半径一律引 layout.band 真源（btnCx=35+i×(W−70)/5 均匀派生、
   // btnR=20 统一半径）——旧写死 45/115/185/255/325/395 + restart r15：左缘距 25≠右缘距 10
   var bookBtn = { cx: MG.layout.band.btnCx[0], cy: MG.layout.band.btnCy, r: MG.layout.band.btnR, pressT: 0 };
-  var trophyBtn = { cx: 25, cy: MG.layout.hud.trophyCy, r: MG.layout.hud.rowBtnR, pressT: 0 }; // 成就页入口（奖杯；局内由 fit()/render 挂到刘海行 +hudInset）——v196 引 rowBtnR 真源，与静音按钮同径
-  var menuTrophy = { cx: 25, cy: MG.layout.hud.trophyCy, r: MG.layout.hud.rowBtnR, pressT: 0 }; // 菜单态奖杯固定位（菜单铺满全屏不偏移，与局内刘海行分用）——v196 引 rowBtnR 真源，与静音按钮同径
   var restartBtn = { cx: MG.layout.band.btnCx[5], cy: MG.layout.band.btnCy, r: MG.layout.band.btnR, pressT: 0 }; // 游戏内重开（带确认），右下角
   // 「深渊潜航」无局内悬浮钮：入口在结算页按钮组（主流 NG+ 模式选择设计）
   // 底部一排共 6 个按钮（图鉴 + 4 道具 + 重开）：35/105/175/245/315/385 均匀分布、
@@ -2055,6 +2056,19 @@
   var confirmYes = { x: C.W / 2 - 105, y: MG.layout.confirmRect().y + MG.layout.panel.confirm.btnDy, w: 95, h: 40 };
   var confirmNo = { x: C.W / 2 + 15, y: MG.layout.confirmRect().y + MG.layout.panel.confirm.btnDy, w: 95, h: 40 };
 
+  // ---------- 设置弹窗（v197：音效/音乐/震动三开关） ----------
+  // 旧静音入口（MUTE 钮 + mg_mute 单键）拆除，改为三开关：音效复用旧键 mg_mute（1=静音，
+  // 向后兼容）、音乐 mg_music（缺失时继承旧 mute 反值）、震动 mg_vib（默认开）。
+  var setOpen = false;
+  function toggleSet(i) {
+    if (i === 0) { audio.sfxOn = !audio.sfxOn; saveFlag('mg_mute', !audio.sfxOn); }
+    else if (i === 1) {
+      audio.musicOn = !audio.musicOn; saveFlag('mg_music', audio.musicOn);
+      if (audio.musicOn) audio.bgm.start(); else audio.bgm.stop();
+    } else { audio.vibOn = !audio.vibOn; saveFlag('mg_vib', audio.vibOn); if (audio.vibOn) hap(20); }
+    audio.blip(660, 0.08, 'sine', 0.06, 0.3); // 开关反馈（音效刚开启时即听到，符合直觉）
+  }
+
   function inRect(p, r) {
     return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
   }
@@ -2062,7 +2076,6 @@
     var dx = p.x - c.cx, dy = p.y - c.cy;
     return dx * dx + dy * dy <= (c.r + 5) * (c.r + 5);
   }
-  function inMute(p) { var dx = p.x - MUTE.cx, dy = p.y - (MUTE.cy + hudInset); return dx * dx + dy * dy <= (MUTE.r + 5) * (MUTE.r + 5); } // 命中区随按钮半径（与其他圆钮同为 r+5）；+hudInset 与 HUD 平移一致（菜单=oy，游戏态=min(oy,25)）
   function toLocal(e) {
     var rect = canvas.getBoundingClientRect();
     // 内容层游戏块垂直居中偏移 renderOy（菜单态 0），触摸 y 同量补偿还原块内坐标
@@ -2133,6 +2146,15 @@
       else if (inRect(p, confirmNo)) confirmOpen = false;
       return;
     }
+    if (setOpen) {
+      // v197 设置弹窗：点三个开关行切换，点 ✕ 或面板外关闭（与重开确认同门禁）
+      if (inRect(p, MG.layout.setCloseRect())) { setOpen = false; return; }
+      for (var si = 0; si < 3; si++) {
+        if (inRect(p, MG.layout.setRowRect(si))) { toggleSet(si); return; }
+      }
+      setOpen = false;
+      return;
+    }
     if (shareOpen) {
       // 战报卡片：复制文案 / 点面板外关闭
       if (inRect(p, shareCopyBtn)) {
@@ -2142,12 +2164,12 @@
       shareOpen = false;
       return;
     }
-    // 开始界面：响应「开始游戏」与奖杯（每日挑战从菜单发起，成就殿堂随时可看）；
+    // 开始界面：响应「开始游戏」与设置钮（音效/音乐/震动；v197 起菜单也放设置入口——
+    // BGM 在菜单就播放，菜单必须有音频入口，否则只剩开始按钮）；
     // 面板打开时放行到下方 dexOpen/achOpen 分支，否则面板内点击会被这里提前吞掉
-    if (state === 'menu' && !achOpen && !dexOpen) {
-      // 初始界面静音入口（未开局即可静音，复用局内同一逻辑与存档键）；命中区与绘制一致 +oy
-      if (inCircle(p, { cx: MUTE.cx, cy: MUTE.cy + hudInset, r: MUTE.r })) { MUTE.pressT = 0.16; audio.muted = !audio.muted; saveFlag('mg_mute', audio.muted); if (audio.muted) audio.bgm.stop(); else audio.bgm.start(); return; }
-      if (inCircle(p, { cx: menuTrophy.cx, cy: menuTrophy.cy + hudInset, r: menuTrophy.r })) { menuTrophy.pressT = 0.16; achOpen = true; dexOpen = false; dexTab = 1; return; }
+    if (state === 'menu' && !achOpen && !dexOpen && !setOpen) {
+      // 设置入口（未开局即可调音效/音乐/震动）；命中区与绘制一致 +hudInset
+      if (inCircle(p, { cx: setBtn.cx, cy: setBtn.cy + hudInset, r: setBtn.r })) { setBtn.pressT = 0.16; setOpen = true; return; }
       if (inRect(p, menuStartBtn)) {
         menuStartBtn.pressT = 0.2;
         audio.blip(660, 0.12, 'sine', 0.1, 0.4);
@@ -2196,7 +2218,8 @@
       if (dexTab === 1 && inRect(p, dchalBtnRect())) { audio.blip(660, 0.1, 'triangle', 0.1, 1.4); dchalStart(); return; }
       return;
     }
-    if (inMute(p)) { MUTE.pressT = 0.16; audio.muted = !audio.muted; saveFlag('mg_mute', audio.muted); if (audio.muted) audio.bgm.stop(); else audio.bgm.start(); return; }
+    // v197：左上角设置钮（音效/音乐/震动弹窗；原静音/奖杯位）——命中区 +hudInset 与 HUD 平移一致
+    if (inCircle(p, { cx: setBtn.cx, cy: setBtn.cy + hudInset, r: setBtn.r })) { setBtn.pressT = 0.16; setOpen = true; return; }
     if (inCircle(p, bookBtn)) {
       bookBtn.pressT = 0.16; dexOpen = true; achOpen = false;
       // 默认选中与分节匹配的条目（说明区开局即有内容，不显"未发现"空态）
@@ -2209,7 +2232,6 @@
       }
       return;
     }
-    if (inCircle(p, trophyBtn)) { trophyBtn.pressT = 0.16; achOpen = true; dexOpen = false; dexTab = 0; return; }
     // 「深渊潜航」：词缀三选一弹窗（结算页/局内点卡片开跑，点外关闭）
     if (ngOpen) {
       for (var ni = 0; ni < ngPickRects.length; ni++) {
@@ -2259,11 +2281,11 @@
   canvas.addEventListener('pointermove', function (e) {
     var p = toLocal(e);
     lastPointer = p;
-    if (state !== 'play' || adOverlay || dexOpen || evapMode || flowMode || confirmOpen) return;
+    if (state !== 'play' || adOverlay || dexOpen || evapMode || flowMode || confirmOpen || setOpen) return;
     aimX = clampAim(p.x);
   });
   canvas.addEventListener('pointerup', function (e) {
-    if (!aiming || state !== 'play' || adOverlay || dexOpen || evapMode || flowMode || rippleMode || confirmOpen) { aiming = false; return; }
+    if (!aiming || state !== 'play' || adOverlay || dexOpen || evapMode || flowMode || rippleMode || confirmOpen || setOpen) { aiming = false; return; }
     aiming = false;
     aimX = clampAim(toLocal(e).x);
     tryDrop();
