@@ -167,13 +167,13 @@
         osc.start(t0); osc.stop(t0 + dur + 0.02);
       } catch (e) {}
     },
-    drop: function () { this.blip(320, 0.08, 'triangle', 0.12, 0.6); hap(8); },
-    pop: function (tier) { this.blip(480 + tier * 45, 0.14, 'sine', 0.18, 1.6); hap(12); },
-    big: function () { this.blip(200, 0.45, 'sine', 0.22, 2.4); hap(30); },
-    swirl: function () { this.blip(220, 0.5, 'sine', 0.12, 2.8); hap(20); },
-    freeze: function () { this.blip(1250, 0.09, 'sine', 0.12, 1.1); hap(10); },
-    thaw: function () { this.blip(700, 0.18, 'sine', 0.10, 1.5); hap(10); },
-    over: function () { this.blip(300, 0.5, 'sawtooth', 0.10, 0.3); hap(60); },
+    drop: function () { this.blip(320, 0.08, 'triangle', 0.12, 0.6); hap(15); },
+    pop: function (tier) { this.blip(480 + tier * 45, 0.14, 'sine', 0.18, 1.6); hap(20); },
+    big: function () { this.blip(200, 0.45, 'sine', 0.22, 2.4); hap(45); },
+    swirl: function () { this.blip(220, 0.5, 'sine', 0.12, 2.8); hap(25); },
+    freeze: function () { this.blip(1250, 0.09, 'sine', 0.12, 1.1); hap(15); },
+    thaw: function () { this.blip(700, 0.18, 'sine', 0.10, 1.5); hap(15); },
+    over: function () { this.blip(300, 0.5, 'sawtooth', 0.10, 0.3); hap(80); },
     quest: function () {
       if (!this.sfxOn) return;
       this.blip(660, 0.10, 'sine', 0.14, 1.2);

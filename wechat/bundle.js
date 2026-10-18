@@ -151,15 +151,14 @@ MG.config = {
   rainCombo: 3,        // 甘霖触发：连击达到该次数时馈赠下一滴
 
   // 技能（充能次数达标后可用；顺序对应底部按钮）
+  // v316：解锁条件改为「对应符文滴首次出现即解锁」（跨刷新持久，见 systems.js runeSeen/seeRune）——
+  // 旧版按累计分解锁（skillUnlock 分数门槛）已删除：未出现符文的技能保持锁定。
   skills: [
     { key: 'swap',   name: '换滴', cost: 4 },
     { key: 'ripple', name: '涟漪', cost: 6 },
     { key: 'evap',   name: '蒸发', cost: 10 },
     { key: 'flow',   name: '水流', cost: 6 }
   ],
-
-  // 技能渐进解锁：按累计得分（跨局）逐个点亮，压第一分钟认知负荷（0 = 开局即有）
-  skillUnlock: { swap: 0, ripple: 1500, evap: 6000, flow: 15000 },
 
   // 二周目「深渊潜航」：累计 5 万分解锁，结算页选一条海况词缀开高危高收益的无尽局
   ng: {
@@ -202,6 +201,7 @@ MG.config = {
   // 特殊水滴（随机混入投放队列）
   specialChance: 0.15,           // 每次投放出现特殊滴的概率
   // 符文水滴（随机附带道具属性）：合成带符文的水滴为对应技能 +1 充能（特殊滴/礁石不带符文）
+  // v316：符文池不再按"已解锁技能"过滤——未解锁技能的符文正是解锁来源（滚出即解锁，见 systems.js rollRune/seeRune）
   rune: {
     chance: 0.30,                                      // 普通投放带符文的概率
     weights: { swap: 0.28, ripple: 0.24, evap: 0.20, flow: 0.28 } // 四种符文的分布权重
@@ -256,11 +256,11 @@ MG.config = {
   // 潮汐系统（周期性涨潮：水滴受浮力上浮重排；浮起越线同样判负）
   // 潮位设计：满潮水面最矮距容器底 1/4 容器高，最高距警戒线 1/4 容器高，
   // 每推进一个海域在两端之间线性推进（由几何推导，水面永远碰不到警戒线）
-  tide: {
-    firstDelay: 18,      // 首次涨潮倒计时（给新手留学习时间）
-    cycleInterval: 26,   // 两次涨潮间隔
+    tide: {
+      // v315：首潮倒计时不再单独设值，直接用 cycleInterval（用户："首次涨潮倒计时也用潮汐间隔的时间"）
+    cycleInterval: 42,   // 两次涨潮间隔（v313：32→42，用户"初始增加到 40 以上"；随海域推进线性压到 tideIntervalMin）
     duration: 7,         // 涨潮持续
-    buoyancy: 2300,      // 浮力加速度（大于重力才能浮起）
+    buoyancy: 2900,      // 浮力加速度（v308：2300→2900——深水滴净上托 1400，配合抬高后的水位足以浮起高堆叠）
     warnTime: 3          // 涨潮前预警秒数
   },
 
@@ -835,13 +835,13 @@ MG.layout.build();
         osc.start(t0); osc.stop(t0 + dur + 0.02);
       } catch (e) {}
     },
-    drop: function () { this.blip(320, 0.08, 'triangle', 0.12, 0.6); hap(8); },
-    pop: function (tier) { this.blip(480 + tier * 45, 0.14, 'sine', 0.18, 1.6); hap(12); },
-    big: function () { this.blip(200, 0.45, 'sine', 0.22, 2.4); hap(30); },
-    swirl: function () { this.blip(220, 0.5, 'sine', 0.12, 2.8); hap(20); },
-    freeze: function () { this.blip(1250, 0.09, 'sine', 0.12, 1.1); hap(10); },
-    thaw: function () { this.blip(700, 0.18, 'sine', 0.10, 1.5); hap(10); },
-    over: function () { this.blip(300, 0.5, 'sawtooth', 0.10, 0.3); hap(60); },
+    drop: function () { this.blip(320, 0.08, 'triangle', 0.12, 0.6); hap(15); },
+    pop: function (tier) { this.blip(480 + tier * 45, 0.14, 'sine', 0.18, 1.6); hap(20); },
+    big: function () { this.blip(200, 0.45, 'sine', 0.22, 2.4); hap(45); },
+    swirl: function () { this.blip(220, 0.5, 'sine', 0.12, 2.8); hap(25); },
+    freeze: function () { this.blip(1250, 0.09, 'sine', 0.12, 1.1); hap(15); },
+    thaw: function () { this.blip(700, 0.18, 'sine', 0.10, 1.5); hap(15); },
+    over: function () { this.blip(300, 0.5, 'sawtooth', 0.10, 0.3); hap(80); },
     quest: function () {
       if (!this.sfxOn) return;
       this.blip(660, 0.10, 'sine', 0.14, 1.2);
@@ -1076,12 +1076,27 @@ MG.layout.build();
     { side: 'R', i: 1, icon: '🥇', label: '榜单', act: function () { achOpen = true; dexOpen = false; dexTab = 3; } }
   ];
   for (var mti = 0; mti < menuTiles.length; mti++) menuTiles[mti].pressT = 0;
+  // ---------- 道具解锁（v316）：对应「符文」首次出现即永久解锁 ----------
+  // 解锁条件 = 该技能的符文滴在预览里出现过一次（rollRune 滚出即记录，mg_rune 跨刷新持久）；
+  // 未出现前道具保持锁定：底部钮显示挂锁，点击仅提示。充能（符文合成 / 宝箱 / 图鉴里程碑）
+  // 不受锁影响——解锁前照常累积，解锁后即可用。替换旧版"累计分解锁"（C.skillUnlock 已删）。
+  // ★ 本块必须在下方首次 rollRune()（next-drop 初始化）之前求值——seeRune 要写 runeSeen。
+  var runeSeen = (function () {
+    var d = MG.platform.getJSON('mg_rune', null) || {}, out = {}, i;
+    for (i = 0; i < C.skills.length; i++) out[C.skills[i].key] = !!d[C.skills[i].key];
+    return out;
+  })();
+  function saveRuneSeen() { MG.platform.setJSON('mg_rune', runeSeen); }
+  function seeRune(key) {
+    if (!key || runeSeen[key]) return;
+    runeSeen[key] = 1;
+    saveRuneSeen();
+  }
   var score = 0, displayScore = 0, scoreBump = 0;
   var best = 0; // 刷新页面即重新计，不跨刷新保留
   var nextTier = rollTier();
-  var nextSpecial = rollSpecial();
-  var nextRune = nextSpecial ? null : rollRune();
-  var nextIron = rollIron();
+  var nextSpecial, nextRune, nextIron;
+  rollNextDrop();
   var runeHintShown = false; // 符文玩法一次性提示
   var aimX = C.W / 2;
   var aiming = false;
@@ -1164,7 +1179,7 @@ MG.layout.build();
   function totalScore() { return lifeScore + (score - runCounted); }
 
   // 潮汐状态
-  var tide = { phase: 'idle', timer: C.tide.firstDelay, progress: 0, banner: 0 };
+  var tide = { phase: 'idle', timer: C.tide.cycleInterval, progress: 0, banner: 0 }; // v315：首潮倒计时直接用潮汐间隔（用户："首次涨潮倒计时也用潮汐间隔的时间"）
   var achTick = 0; // 成就周期检查计时
   // 无尽模式渐进加压：随时长线性到满（潮汐更频/礁石更多/投放向高级倾斜）
   var endlessT = 0, rampStage = 0;
@@ -1191,7 +1206,8 @@ MG.layout.build();
   function cm(m) { return Math.min(m, C.multCap); }
 
   // 技能渐进解锁：按累计得分逐个点亮（换滴开局即有，涟漪/蒸发/水流递进）
-  function skillUnlocked(key) { return totalScore() >= (C.skillUnlock[key] || 0); }
+  // v316：解锁判定 = 对应符文已出现（runeSeen，mg_rune 持久）——替代旧版累计分门槛
+  function skillUnlocked(key) { return !!runeSeen[key]; }
 
   // ---------- 二周目「深渊潜航」（累计 5 万解锁：带词缀的高危高收益无尽局，结算页开启） ----------
   var ng = { unlocked: loadFlag('mg_ng'), active: null };
@@ -1591,19 +1607,31 @@ MG.layout.build();
     if (ng && ng.active && ng.active.ironX) ch *= ng.active.ironX; // 二周目「暗礁密布」
     return Math.random() < ch;
   } // 礁石概率随渐进加压提升
-  // 符文：普通水滴随机附带的道具属性，合成时为对应技能充能（只出已解锁的技能符文）
+  // 符文：普通水滴随机附带的道具属性，合成时为对应技能充能
+  // v316：① 池子不再按 skillUnlocked 过滤——未解锁技能的符文正是解锁来源（旧过滤下永远解锁不了）；
+  //       ② 滚出即 seeRune 记录"已出现"→ 对应道具解锁（预览可见即生效，mg_rune 持久）。
+  //       调用方须保证只在"这一滴确实带符文"时调用（礁石/特殊滴占位不滚，见 rollNextDrop）。
   function rollRune() {
     if (seaStage() < ((C.specialStage && C.specialStage.rune) || 2)) return null; // 蔚蓝深海起才带符文
     if (Math.random() >= C.rune.chance) return null;
     var keys = [], ws = [], total = 0, k;
     for (k in C.rune.weights) {
-      if (!C.rune.weights.hasOwnProperty(k) || !skillUnlocked(k)) continue;
+      if (!C.rune.weights.hasOwnProperty(k)) continue;
       keys.push(k); ws.push(C.rune.weights[k]); total += C.rune.weights[k];
     }
     if (!keys.length) return null;
-    var r = Math.random() * total;
-    for (k = 0; k < keys.length; k++) { r -= ws[k]; if (r <= 0) return keys[k]; }
-    return keys[keys.length - 1];
+    var r = Math.random() * total, pick = keys[keys.length - 1];
+    for (k = 0; k < keys.length; k++) { r -= ws[k]; if (r <= 0) { pick = keys[k]; break; } }
+    seeRune(pick); // 符文在预览中出现 → 对应道具解锁（持久）
+    return pick;
+  }
+  // 下一滴预览三连滚（v316 合并原 4 处重复写法：初始化 / 每次投放后 / 换滴 / 重开）：
+  // 特殊滴 → 礁石 → 符文。礁石/特殊滴占位的滴不带符文——预览所见即所得，
+  // 也保证 rollRune（内含 seeRune 解锁）只在符文真正会出现时被调用。
+  function rollNextDrop() {
+    nextSpecial = rollSpecial();
+    nextIron = rollIron();
+    nextRune = (!nextSpecial && !nextIron) ? rollRune() : null;
   }
   function runeName(key) {
     for (var i = 0; i < C.skills.length; i++) if (C.skills[i].key === key) return C.skills[i].name;
@@ -1908,8 +1936,11 @@ MG.layout.build();
       if (score > best) { best = score; saveNum('mg_best', best); }
       var sub = null, s;
       if (m.charge) {
+        // v316：优先充已解锁技能；全部未解锁时兜底充任意技能（充能可预先累积，解锁即用）——
+        // 旧版 filter 后 keys 可能为空（开局全锁），keys[random] 会写出 skillCharge[undefined]
         var keys = [];
         for (s = 0; s < C.skills.length; s++) if (skillUnlocked(C.skills[s].key)) keys.push(C.skills[s]);
+        if (!keys.length) keys = C.skills.slice();
         if (keys.length) {
           var pick = keys[(Math.random() * keys.length) | 0];
           skillCharge[pick.key] += m.charge;
@@ -1980,29 +2011,34 @@ MG.layout.build();
 
   // ---------- 合成 ----------
   function processMerges() {
-    var bs = phys.bodies, used = {}, merges = [], i, j;
+    var bs = phys.bodies, used = {}, merges = [], rainbowPairs = [], i, j;
     // 彩虹滴：接触任意普通水滴 → 目标滴直接跳 2 级（趣味高光时刻，优先于普通合成）
+    // v305：扫描与执行分离——原实现边遍历边 doRainbowMerge（内含 phys.remove 的 splice
+    // 移位），同帧会漏检移位处的一个实体；改为标记收集、扫描完统一执行
     for (i = 0; i < bs.length; i++) {
       var rb = bs[i];
       if (used[rb.id] || rb.special !== 'rainbow' || rb.frozen > 0 || rb.iron) continue;
       for (j = 0; j < bs.length; j++) {
         var tb = bs[j];
-        if (tb === rb || used[tb.id] || tb.special || tb.frozen > 0 || tb.iron || tb.tier < 0) continue;
+        if (tb === rb || used[tb.id] || tb.special || tb.frozen > 0 || tb.iron) continue;
         var rdx = tb.x - rb.x, rdy = tb.y - rb.y;
         var rminD = rb.r + tb.r + 0.5;
         if (rdx * rdx + rdy * rdy <= rminD * rminD) {
           used[rb.id] = used[tb.id] = 1;
-          doRainbowMerge(rb, tb);
+          rainbowPairs.push([rb, tb]);
           break;
         }
       }
     }
+    for (i = 0; i < rainbowPairs.length; i++) doRainbowMerge(rainbowPairs[i][0], rainbowPairs[i][1]);
     for (i = 0; i < bs.length; i++) {
       var a = bs[i];
-      if (used[a.id] || a.special || a.frozen > 0 || a.iron) continue;
+      // v305：pop 弹出动画期（popT>0，尺寸 60%~115% 过渡）不参与合成——避免"小水滴跟
+      // 正常水滴消除"的观感；pop 结束后下一接触帧立即正常合成，连击链只多 0.28s 步进
+      if (used[a.id] || a.special || a.frozen > 0 || a.iron || a.popT > 0) continue;
       for (j = i + 1; j < bs.length; j++) {
         var b = bs[j];
-        if (used[b.id] || b.special || b.frozen > 0 || b.iron || b.tier !== a.tier) continue;
+        if (used[b.id] || b.special || b.frozen > 0 || b.iron || b.tier !== a.tier || b.popT > 0) continue;
         // 潮汐限定合成：两枚「江河」只能在涨潮时聚成「大海」（彩虹跳级不受限）
         if (a.tier === C.tidePair.tier && tide.progress < C.tidePair.threshold) {
           if (!tideGateHint) {
@@ -2348,7 +2384,9 @@ MG.layout.build();
     for (var i = 0; i < bs.length; i++) {
       var o = bs[i];
       if (o.tier !== t || o.iron || o.chest || o.special || o.frozen > 0) continue;
-      o.tier += 1; o.popT = 0.3; n++;
+      // v305：升档必须同步半径——此前只改 tier 不改 r，升档滴永远保持旧档的小半径，
+      // 却能与新档正常大小的水滴合成（用户："不同大小的相同类型水滴可以消除"）
+      o.tier += 1; o.r = T[o.tier].r; o.popT = 0.3; n++;
       parts.push({ type: 'ring', x: o.x, y: o.y, r: o.r * 0.6, life: 0.45, max: 0.45, color: '#F0E6D2' });
     }
     addPopup(C.W / 2, 250, '珍珠祝福！「' + T[t].name + '」全体 +1', true, 0);
@@ -2459,12 +2497,13 @@ MG.layout.build();
   }
 
   // ---------- 潮汐 ----------
-  // 潮位设计（几何推导）：满潮水面最矮距容器底 1/4 容器高，最高距警戒线 1/4 容器高，
-  // 每推进一个海域在两端之间线性推进——水面永远碰不到警戒线，且随海域可见上涨
+  // 潮位设计：满潮水面最矮距容器底 1/4 容器高；v308 按用户新要求——满潮水面最高升到
+  // 警戒线下 40px（原为警戒线下 1/4 容器高），配合浮力把堆叠托向警戒线形成清场压力
+  //（"涨潮可能会使水滴超过警戒线死亡"）；随海域推进线性加满
   function tideWaterMax() {
     var H = FLOORY - C.containerTop;
     var lo = 1 / 4;
-    var hi = (FLOORY - C.dangerY - H / 4) / H;
+    var hi = (FLOORY - C.dangerY - 40) / H;
     return lo + (hi - lo) * (seaStage() / (C.seaStages.length - 1));
   }
   function tideY() {
@@ -2499,7 +2538,9 @@ MG.layout.build();
       tide.timer -= dt;
       if (tide.timer <= 0) {
         tide.phase = 'idle';
-        var tiv = C.tide.cycleInterval - (C.tide.cycleInterval - C.ramp.tideIntervalMin) * endlessRamp(); // 渐进加压：潮汐更频
+        // v311：潮汐间隔改为随海域推进变短（原为随局内时长 endlessRamp）——
+        // 初始 cycleInterval 32s 线性压到深海的 tideIntervalMin 16s；词缀局再乘疾风骤雨系数
+        var tiv = C.tide.cycleInterval - (C.tide.cycleInterval - C.ramp.tideIntervalMin) * (seaStage() / (C.seaStages.length - 1));
         if (ng.active && ng.active.tideInt) tiv *= ng.active.tideInt; // 二周目「疾风骤雨」
         tide.timer = tiv;
         bumpStat('tide');                      // 成就：经历涨潮次数（跨局累计）
@@ -2521,7 +2562,9 @@ MG.layout.build();
     for (i = 0; i < bs.length; i++) {
       var b = bs[i];
       if (b.iron || b.chest || b.special || b.tier >= T.length - 1) continue;
+      // v305：同珍珠滴——升档同步半径（否则祝福后全体水滴都小一号，与合成产物大小不一）
       b.tier += 1;
+      b.r = T[b.tier].r;
       b.popT = 0.3;
       parts.push({ type: 'ring', x: b.x, y: b.y, r: b.r * 0.6, life: 0.5, max: 0.5, color: '#F5D76E' });
     }
@@ -2578,7 +2621,7 @@ MG.layout.build();
   function useSkill(key) {
     var i;
     if (!skillUnlocked(key)) {
-      flashSkill(key, '累计 ' + C.skillUnlock[key] + ' 分解锁');
+      flashSkill(key, '「' + runeName(key) + '符文」出现后解锁');
       return;
     }
     if (key === 'evap') {
@@ -2604,9 +2647,7 @@ MG.layout.build();
     if (key === 'swap') {
       skillCharge.swap = 0;
       nextTier = rollTier();
-      nextSpecial = rollSpecial();
-      nextRune = nextSpecial ? null : rollRune();
-      nextIron = rollIron();
+      rollNextDrop();
       aimX = clampAim(aimX);
       addPopup(aimX, C.spawnY + 66, '换滴', false, 0); // 移到虚影下方，不压住水滴
       audio.drop();
@@ -2785,6 +2826,7 @@ MG.layout.build();
       nextIron = !!opt.iron;
       nextSpecial = opt.special || null;
       nextRune = !opt.special && !opt.iron ? (opt.rune || null) : null;
+      if (nextRune) seeRune(nextRune); // 与 rollRune 同一不变量：符文出现 ⇒ 道具解锁
       if (opt.tier != null) nextTier = opt.tier;
     },
     chestNow: function (x) {
@@ -2863,7 +2905,9 @@ MG.layout.build();
       if (score > best) { best = score; saveNum('mg_best', best); }
       addPopup(x, y - 30, '宝箱开启 +' + gain, true, 0);
     } else if (r < 0.75) {
+      // v316：优先充已解锁技能；全锁时兜底充任意技能（充能预先累积，解锁即用；防 keys 空写 undefined）
       var keys = ['swap', 'ripple', 'evap', 'flow'].filter(function (k) { return skillUnlocked(k); });
+      if (!keys.length) keys = ['swap', 'ripple', 'evap', 'flow'];
       var k = keys[(Math.random() * keys.length) | 0];
       skillCharge[k] += perkOn('chest5') ? 3 : 2;
       addPopup(x, y - 30, '宝箱开启：' + runeName(k) + ' +2 充能', true, 0);
@@ -2928,10 +2972,13 @@ MG.layout.build();
   function applySeaEvent(dt) {
     var bs = phys.bodies, i, b;
     if (seaEvent.type === 'surge') {
+      // v307：上托力 1500→2700——原值与重力（1500）恰好抵消，净加速度为零，水滴只是悬停
+      // 根本不会被"托起"（用户："施加的力似乎有点小"）；作用区 190→210，涌泉感更明显
+      // v308：上托力回调 2700→1900（净上托 400，"轻轻托起"的温和感；v307 的 2700 过猛）
       for (i = 0; i < bs.length; i++) {
         b = bs[i];
         if (b.iron) continue;
-        if (b.y + b.r > FLOORY - 190) b.vy -= 1500 * dt;
+        if (b.y + b.r > FLOORY - 210) b.vy -= 1900 * dt;
       }
       if (Math.random() < 0.5) {
         parts.push({ type: 'dot', x: 30 + Math.random() * (C.W - 60), y: FLOORY, vx: 0,
@@ -2939,14 +2986,19 @@ MG.layout.build();
           color: 'rgba(220,244,255,0.8)' });
       }
     } else if (seaEvent.type === 'storm') {
+      // v307：卷力 260→620、切向分量 0.7→0.9、作用半径 300→320——原力只有重力的 1/6，
+      // 漩涡几乎看不出卷动；并按水滴当前速度做阻尼（>700px/s 递减），保证"卷得动但不失控"
+      // v308：卷力回调 620→430、切向 0.9→0.8（v307 过猛）；速度阻尼保留防失控
       for (i = 0; i < bs.length; i++) {
         b = bs[i];
         if (b.iron) continue;
         var dx = seaEvent.x - b.x, dy = seaEvent.y - b.y, d = Math.sqrt(dx * dx + dy * dy);
-        if (d > 8 && d < 300) {
-          var f = 260 * (1 - d / 300);
-          b.vx += ((dx / d) * f - (dy / d) * f * 0.7) * dt;
-          b.vy += ((dy / d) * f + (dx / d) * f * 0.7) * dt;
+        if (d > 8 && d < 320) {
+          var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+          var damp = sp > 700 ? Math.max(0.25, 1 - (sp - 700) / 600) : 1;
+          var f = 430 * (1 - d / 320) * damp;
+          b.vx += ((dx / d) * f - (dy / d) * f * 0.8) * dt;
+          b.vy += ((dy / d) * f + (dx / d) * f * 0.8) * dt;
         }
       }
     }
@@ -3106,12 +3158,10 @@ MG.layout.build();
     tideGateHint = false;
     levelElapsed = 0; runCounted = 0;
     nextTier = rollTier();
-    nextSpecial = rollSpecial();
-    nextRune = nextSpecial ? null : rollRune();
-    nextIron = rollIron();
+    rollNextDrop();
     aimX = C.W / 2;
     popups.length = 0; parts.length = 0; rippleQueue.length = 0;
-    tide.phase = 'idle'; tide.timer = C.tide.firstDelay; tide.progress = 0; tide.banner = 0;
+    tide.phase = 'idle'; tide.timer = C.tide.cycleInterval; tide.progress = 0; tide.banner = 0; // v315：同上
     endlessT = 0; rampStage = 0; climaxMark = 0;
     makeQuest(0);
     // 成就加成：深海富豪开局随机技能充能 +2
@@ -3241,9 +3291,7 @@ MG.layout.build();
     nextTier = rollTier();
     // 甘霖期间：虚影预览也显示馈赠档位，所见即所得
     if (!nextSpecial && !nextIron && seaEvent.type === 'bless' && seaEvent.data && seaEvent.data.left > 0) nextTier = seaEvent.data.tier;
-    nextSpecial = rollSpecial();
-    nextRune = nextSpecial ? null : rollRune();
-    nextIron = rollIron();
+    rollNextDrop();
     aimX = clampAim(aimX);
   }
 
@@ -3794,7 +3842,14 @@ MG.layout.build();
     var secNames = ['合成链', '海域演进'];
     var secRects = [dexSecRect(0), dexSecRect(1)];
     drawSegTabs(secRects, secNames, dexSec, -1, 'dexsec');
-    var curStage = seaStage(), tsNow = totalScore();
+    var curStage = seaStage(), tsNow = totalScore(), bestScore = Math.max(tsNow, careerPeak);
+    // v316：解锁状态统一按「本局 + 生涯最高」中已抵达的进度渲染——刷新/重开后本局分归零，
+    // 但生涯抵达仍在，否则已解锁海域会退化成"累计 X 分解锁"的未解锁文案（用户实测反馈）。
+    // nextIdx = 首个未抵达海域（全部抵达则为长度值，即没有任何行命中"下一海域"）
+    var nextIdx = C.seaStages.length;
+    for (var si = 0; si < C.seaStages.length; si++) {
+      if (bestScore < C.seaStages[si].at) { nextIdx = si; break; }
+    }
     ctx.textAlign = 'center';
 
     if (dexSec === 0) {
@@ -3840,8 +3895,8 @@ MG.layout.build();
       for (var stg = 0; stg < C.seaStages.length; stg++) {
         var ss = C.seaStages[stg];
         var sRow = stageRowRect(stg);
-        var isCur = stg === curStage, reached = Math.max(tsNow, careerPeak) >= ss.at, sel = dexSelStage === stg;
-        var isNext = stg === curStage + 1, hiddenStg = !isCur && !reached && !isNext;
+        var isCur = stg === curStage, reached = bestScore >= ss.at, sel = dexSelStage === stg;
+        var isNext = !reached && stg === nextIdx, hiddenStg = !isCur && !reached && !isNext;
         var rowCy = sRow.y + sRow.h / 2;
         if (isCur) {
           // 当前海域行铺该海域背景主题色（bg 渐变中段→深段，与游戏内一致）
@@ -3870,14 +3925,14 @@ MG.layout.build();
         }
         if (isCur || reached || isNext) drawSeaBadge(stg, dotX, dotY, reached || isCur);
         var nameTxt = isCur || reached || isNext ? ss.name : '？？？';
-        var gateTxt = isCur ? '当前海域' : (isNext ? '下一海域 · 累计' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + '分' : '累计 ' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + ' 分解锁');
+        var gateTxt = isCur ? '当前海域' : (reached ? '已抵达' : (isNext ? '下一海域 · 累计' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + '分' : '累计 ' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + ' 分解锁'));
         // v289：两行文本整块按字形像素框（actualBoundingBox）居中于行中线——不再用"下移 3px"凑
         //（用户："请用居中来处理"）。块高 = 首行 asc + 行距 + 末行 desc，块心对齐 rowCy
         // v300：测量改恒等变换（微信端 measureText 受 CTM 影响会把度量放大）
         var mN = measureInk('bold 15px system-ui, sans-serif', nameTxt);
         var mG = measureInk('11px system-ui, sans-serif', gateTxt);
-        var aN = mN.has ? mN.a : 11;
-        var dG = mG.has ? mG.d : 2.5;
+        var aN = mN.has ? mN.a : 15 * 0.84; // v300：无像素框 API（微信）回退 CJK 排印常数
+        var dG = mG.has ? mG.d : 11 * 0.06;
         var LINE_GAP = 14;                                  // 两行基线间距
         var yN = rowCy - (aN + LINE_GAP + dG) / 2 + aN;     // 首行基线：块顶 = rowCy - 块高/2
         var yG = yN + LINE_GAP;                             // 第二行基线
@@ -3914,7 +3969,7 @@ MG.layout.build();
           var tw2 = m2.w;
           var TXT_COL = 57;                                    // 文本列宽（恒定，跨行同宽）
           var tx2 = slotR.x + 30 + Math.max(0, (TXT_COL - tw2) / 2); // 列内居中（列左缘 = 图标右缘 +4）
-          var y2 = cy2 + ((m2.has ? m2.a : 9.5) - (m2.has ? m2.d : 2.5)) / 2;
+          var y2 = cy2 + ((m2.has ? m2.a : 13 * 0.84) - (m2.has ? m2.d : 13 * 0.06)) / 2; // v300：回退 CJK 排印常数
           if ((hiddenStg || isNext) && !reached) { // 生涯未抵达：虚线空位 + "？？？"（特殊滴内容不剧透，海域名/解锁积分仍可见）
             ctx.save();
             ctx.setLineDash([3, 3]);
@@ -3950,7 +4005,7 @@ MG.layout.build();
             ctx.font = 'bold 14px system-ui, sans-serif';
             ctx.textAlign = 'center';
             var mq = measureInk('bold 14px system-ui, sans-serif', '?'); // v300：恒等变换下测量
-            var yq = cy2 + ((mq.has ? mq.a : 10) - (mq.has ? mq.d : 2)) / 2;
+            var yq = cy2 + ((mq.has ? mq.a : 14 * 0.72) - (mq.has ? mq.d : 14 * 0.02)) / 2;
             ctx.fillText('?', cx2, yq);
             ctx.textAlign = 'left';
           }
@@ -3979,9 +4034,10 @@ MG.layout.build();
       body = tu ? '与同档水滴相触即合成更高阶。' : '继续合成，遇见它便会点亮。';
     } else if (dexSelStage >= 0) {
       var stgS = C.seaStages[dexSelStage];
-      var stgReached = Math.max(tsNow, careerPeak) >= stgS.at, stgCur = dexSelStage === curStage;
+      var stgReached = bestScore >= stgS.at, stgCur = dexSelStage === curStage;
       title = stgReached || stgCur ? stgS.name : '？？？';
-      sub = stgCur ? '当前海域' : (stgReached ? '已抵达' : ('累计 ' + (stgS.at >= 10000 ? (stgS.at / 10000) + '万' : stgS.at) + ' 分解锁'));
+      // v316：与行内三态词汇统一（当前海域 / 已抵达 / 下一海域 / 累计分解锁）
+      sub = stgCur ? '当前海域' : (stgReached ? '已抵达' : (dexSelStage === nextIdx ? '下一海域 · 累计' + (stgS.at >= 10000 ? (stgS.at / 10000) + '万' : stgS.at) + '分' : '累计 ' + (stgS.at >= 10000 ? (stgS.at / 10000) + '万' : stgS.at) + ' 分解锁'));
       body = '越深水色越暗：潮汐更频、礁石更多。';
     } else {
       var CHEST_INFO = { key: 'chest', name: '宝箱', desc: '沉底木箱，沉走前点开：得分或充能。' };
@@ -5944,6 +6000,43 @@ MG.layout.build();
   }
 
   // ---------- 瞄准虚影 ----------
+  // v307：落点预测——沿竖直方向找第一接触点（海床 或 任意实体的圆表面），供指示线与预览圈
+  function landingYFor(x, r) {
+    var y = FLOORY - r;                                  // 默认落在床面
+    var bs = phys.bodies, i;
+    for (i = 0; i < bs.length; i++) {
+      var b = bs[i];
+      if (Math.abs(b.vy) > 40) continue;                 // v308：跳过飞行中的水滴（含正在下落的
+                                                         // 那颗）——否则预览圈会骑在坠落滴头顶上
+      var dx = Math.abs(b.x - x), rr = r + b.r;
+      if (dx >= rr) continue;                            // 与本列不相交
+      var cy = b.y - Math.sqrt(rr * rr - dx * dx);       // 圆面接触高度
+      if (cy < y) y = cy;
+    }
+    if (y < C.containerTop + r) y = C.containerTop + r;  // 不越容器顶
+    return y;
+  }
+  // v310：指示线与虚影球分离——指示线在实体层"之后"绘制（坠落中的水滴从线上方经过，
+  // 线不会被盖在滴上），虚影球保持原位
+  function drawGhostGuide(x, tier) {
+    var r = nextIron ? C.iron.r : T[tier].r;
+    var landY = landingYFor(x, r);
+    ctx.save();
+    if (landY - r > C.spawnY + r + 4) {                  // 有可视长度才画线（堆到出生点下时只留短提示）
+      var lg = ctx.createLinearGradient(0, C.spawnY + r, 0, landY - r);
+      lg.addColorStop(0, 'rgba(140,205,245,0.85)');
+      lg.addColorStop(1, 'rgba(140,205,245,0.30)');
+      ctx.strokeStyle = lg;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([7, 9]);
+      ctx.lineDashOffset = -time * 46;
+      ctx.beginPath();
+      ctx.moveTo(x, C.spawnY + r + 2);
+      ctx.lineTo(x, landY - r - 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   function drawGhost(x, y, tier, alpha) {
     var r = nextIron ? C.iron.r : T[tier].r;
     if (nextIron) {
@@ -5951,15 +6044,6 @@ MG.layout.build();
     } else {
       drawBall({ x: x, y: y, r: r, tier: tier, vx: 0, vy: 0, special: nextSpecial, rune: nextRune }, alpha);
     }
-    ctx.save();
-    ctx.setLineDash([4, 6]);
-    ctx.strokeStyle = 'rgba(80,140,180,0.35)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(x, y + r);
-    ctx.lineTo(x, FLOORY);
-    ctx.stroke();
-    ctx.restore();
   }
 
   // 特殊滴/符文/礁石名称标签：紧贴虚影球顶（在 render 末尾绘制，保证不被 HUD 盖住）
@@ -5985,7 +6069,7 @@ MG.layout.build();
     ctx.fillStyle = nextIron ? '#6B6353' : (nextSpecial ? specialColor(nextSpecial) : runeColor(nextRune));
     // v276：用实际字形边界（actualBoundingBox）精确垂直居中——canvas 'middle' 基线按 em 盒
     // 取中，CJK 字形实际偏上/偏下因字而异；胶囊几何中心 = ly-5，基线补 (asc-desc)/2 修正
-    var asc = ink.has ? ink.a : 10, desc = ink.has ? ink.d : 3;
+    var asc = ink.has ? ink.a : 14 * 0.84, desc = ink.has ? ink.d : 14 * 0.06; // v300：无像素框 API 时用 CJK 排印常数
     ctx.fillText(label, Math.round(aimX), ly - 5 + (asc - desc) / 2);
     ctx.restore();
   }
@@ -6572,13 +6656,16 @@ MG.layout.build();
     // 标签（v286：真·垂直居中——middle 基线按 em 盒取中，中文与数字字形偏差方向不同，
     // 用户："倒计时读秒比潮汐二字靠下"；改按各自字形像素框补偿，两段视觉中心都对齐 midY）
     var lm = measureInk('bold 15px system-ui, sans-serif', label);
-    var lBase = lm.has ? midY + (lm.a - lm.d) / 2 : midY;
+    // v301 补充：不支持 actualBoundingBox 的内核（微信部分基础库实测不支持）回退不能取
+    // midY——alphabetic 基线压在中线会把整行墨迹顶进上半格（用户真机实测"偏上"）。
+    // 按典型墨迹比例给常数：中文墨心 ≈ 基线上方 0.40em、数字（含小写 s）≈ 0.35em
+    var lBase = lm.has ? midY + (lm.a - lm.d) / 2 : midY + 15 * 0.40;
     ctx.font = 'bold 15px system-ui, sans-serif';
     ctx.strokeText(label, sx, lBase); ctx.fillText(label, sx, lBase);
     // 倒计时数字（紧跟标签，整体居中；脉冲缩放；同像素框补偿，视觉中心与标签对齐）
     var sc = 1 + (warn || active ? pulse * 0.06 : 0);
     var nm = measureInk('bold 22px system-ui, sans-serif', ns);
-    var nBase = nm.has ? midY + (nm.a - nm.d) / 2 : midY;
+    var nBase = nm.has ? midY + (nm.a - nm.d) / 2 : midY + 22 * 0.35;
     ctx.font = 'bold 22px system-ui, sans-serif';
     ctx.save();
     ctx.translate(sx + lw + gap + nw / 2, midY);
@@ -6673,21 +6760,25 @@ MG.layout.build();
     }
     ctx.restore();
     // 文本：主行（名称+海域百分比）白描边+深海蓝、水平居中；小字行（完整增益）居中；最深海转金
+    // v300：微信基础库无像素框 API 且 middle 的 em 盒会让数字比中文低（v286 用户实测）——
+    // 改 alphabetic + 排印常数：中文墨心 ≈ 基线上 0.40em、数字 ≈ 0.35em、混排行 ≈ 0.38em
     ctx.lineJoin = 'round';
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(255,255,255,0.9)';
     ctx.fillStyle = gold ? '#B8860B' : '#12517E';
     ctx.font = 'bold 16px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle'; // v300：行中心 y1/y2 按 middle 语义算，绘制基线必须同为 middle
+    ctx.textBaseline = 'alphabetic';
+    var nameBase = y1 + 16 * 0.40, pctBase = y1 + 16 * 0.35;
     var nameX = cx0 - l1w / 2 + nw1 / 2;
     var pctX = cx0 + l1w / 2 - pw1 / 2;
-    ctx.strokeText(name, nameX, y1); ctx.fillText(name, nameX, y1);
-    ctx.strokeText(pctStr, pctX, y1); ctx.fillText(pctStr, pctX, y1);
+    ctx.strokeText(name, nameX, nameBase); ctx.fillText(name, nameX, nameBase);
+    ctx.strokeText(pctStr, pctX, pctBase); ctx.fillText(pctStr, pctX, pctBase);
     ctx.lineWidth = 2.5;
     ctx.fillStyle = gold ? '#9A7420' : '#4A7FA0';
     ctx.font = '11px system-ui, sans-serif';
-    ctx.strokeText(sub, cx0, y2); ctx.fillText(sub, cx0, y2);
+    var subBase = y2 + 11 * 0.38;
+    ctx.strokeText(sub, cx0, subBase); ctx.fillText(sub, cx0, subBase);
     ctx.textBaseline = 'alphabetic';
   }
   // 涨潮横幅
@@ -6947,8 +7038,10 @@ MG.layout.build();
       cyT = sy + (sh - (probe.a + probe.d)) / 2 + probe.a;
       vBase = 'alphabetic';
     } else {
-      cyT = sy + sh / 2;   // 老内核无像素框 API：退回 middle 基线几何居中
-      vBase = 'middle';
+      // v300：无像素框 API 的内核（微信）也统一 alphabetic + 排印常数（CJK 墨心 ≈ 基线上 0.39em），
+      // 不再退 middle（em 盒中心与视觉中心有差，真机上偏上）
+      cyT = sy + (sh - lf * 0.90) / 2 + lf * 0.84;
+      vBase = 'alphabetic';
     }
     ctx.save();
     ctx.textBaseline = vBase;
@@ -7051,11 +7144,10 @@ MG.layout.build();
         ctx.beginPath(); ctx.arc(btn.cx, btn.cy - 9, 4.5, Math.PI, 0); ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.9)';
         roundRect(btn.cx - 6.5, btn.cy - 9, 13, 10, 2); ctx.fill();
+        // v316：解锁条件改为"对应符文出现"——锁定态提示同步换文案（旧版显示累计分数门槛）
         ctx.fillStyle = 'rgba(230,242,248,0.75)';
         ctx.font = '10px system-ui, sans-serif';
-        ctx.fillText('累计', btn.cx, btn.cy + 1); // 门槛分两行：整行放不下（会与相邻钮重叠）
-        ctx.font = 'bold 11px system-ui, sans-serif';
-        ctx.fillText(C.skillUnlock[cfg.key] + '分', btn.cx, btn.cy + 13);
+        ctx.fillText('待符文', btn.cx, btn.cy + 13);
       } else if (!ready) {
         ctx.strokeStyle = 'rgba(255,255,255,0.85)';
         ctx.lineWidth = 3;
@@ -7846,6 +7938,10 @@ MG.layout.build();
     drawContainer();
     drawDangerLine();
     drawWaterBack();
+    // v310：指示线在实体层之前绘制（坠落中的水滴盖在线上，线在"水滴后面"）
+    if (state === 'play' && !adOverlay && !evapMode && !flowMode && !rippleMode && !confirmOpen) {
+      drawGhostGuide(aimX, nextTier);
+    }
 
     var i;
     for (i = 0; i < phys.bodies.length; i++) drawBall(phys.bodies[i], 1);

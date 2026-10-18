@@ -230,7 +230,14 @@
     var secNames = ['合成链', '海域演进'];
     var secRects = [dexSecRect(0), dexSecRect(1)];
     drawSegTabs(secRects, secNames, dexSec, -1, 'dexsec');
-    var curStage = seaStage(), tsNow = totalScore();
+    var curStage = seaStage(), tsNow = totalScore(), bestScore = Math.max(tsNow, careerPeak);
+    // v316：解锁状态统一按「本局 + 生涯最高」中已抵达的进度渲染——刷新/重开后本局分归零，
+    // 但生涯抵达仍在，否则已解锁海域会退化成"累计 X 分解锁"的未解锁文案（用户实测反馈）。
+    // nextIdx = 首个未抵达海域（全部抵达则为长度值，即没有任何行命中"下一海域"）
+    var nextIdx = C.seaStages.length;
+    for (var si = 0; si < C.seaStages.length; si++) {
+      if (bestScore < C.seaStages[si].at) { nextIdx = si; break; }
+    }
     ctx.textAlign = 'center';
 
     if (dexSec === 0) {
@@ -276,8 +283,8 @@
       for (var stg = 0; stg < C.seaStages.length; stg++) {
         var ss = C.seaStages[stg];
         var sRow = stageRowRect(stg);
-        var isCur = stg === curStage, reached = Math.max(tsNow, careerPeak) >= ss.at, sel = dexSelStage === stg;
-        var isNext = stg === curStage + 1, hiddenStg = !isCur && !reached && !isNext;
+        var isCur = stg === curStage, reached = bestScore >= ss.at, sel = dexSelStage === stg;
+        var isNext = !reached && stg === nextIdx, hiddenStg = !isCur && !reached && !isNext;
         var rowCy = sRow.y + sRow.h / 2;
         if (isCur) {
           // 当前海域行铺该海域背景主题色（bg 渐变中段→深段，与游戏内一致）
@@ -306,14 +313,14 @@
         }
         if (isCur || reached || isNext) drawSeaBadge(stg, dotX, dotY, reached || isCur);
         var nameTxt = isCur || reached || isNext ? ss.name : '？？？';
-        var gateTxt = isCur ? '当前海域' : (isNext ? '下一海域 · 累计' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + '分' : '累计 ' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + ' 分解锁');
+        var gateTxt = isCur ? '当前海域' : (reached ? '已抵达' : (isNext ? '下一海域 · 累计' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + '分' : '累计 ' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + ' 分解锁'));
         // v289：两行文本整块按字形像素框（actualBoundingBox）居中于行中线——不再用"下移 3px"凑
         //（用户："请用居中来处理"）。块高 = 首行 asc + 行距 + 末行 desc，块心对齐 rowCy
         // v300：测量改恒等变换（微信端 measureText 受 CTM 影响会把度量放大）
         var mN = measureInk('bold 15px system-ui, sans-serif', nameTxt);
         var mG = measureInk('11px system-ui, sans-serif', gateTxt);
-        var aN = mN.has ? mN.a : 11;
-        var dG = mG.has ? mG.d : 2.5;
+        var aN = mN.has ? mN.a : 15 * 0.84; // v300：无像素框 API（微信）回退 CJK 排印常数
+        var dG = mG.has ? mG.d : 11 * 0.06;
         var LINE_GAP = 14;                                  // 两行基线间距
         var yN = rowCy - (aN + LINE_GAP + dG) / 2 + aN;     // 首行基线：块顶 = rowCy - 块高/2
         var yG = yN + LINE_GAP;                             // 第二行基线
@@ -350,7 +357,7 @@
           var tw2 = m2.w;
           var TXT_COL = 57;                                    // 文本列宽（恒定，跨行同宽）
           var tx2 = slotR.x + 30 + Math.max(0, (TXT_COL - tw2) / 2); // 列内居中（列左缘 = 图标右缘 +4）
-          var y2 = cy2 + ((m2.has ? m2.a : 9.5) - (m2.has ? m2.d : 2.5)) / 2;
+          var y2 = cy2 + ((m2.has ? m2.a : 13 * 0.84) - (m2.has ? m2.d : 13 * 0.06)) / 2; // v300：回退 CJK 排印常数
           if ((hiddenStg || isNext) && !reached) { // 生涯未抵达：虚线空位 + "？？？"（特殊滴内容不剧透，海域名/解锁积分仍可见）
             ctx.save();
             ctx.setLineDash([3, 3]);
@@ -386,7 +393,7 @@
             ctx.font = 'bold 14px system-ui, sans-serif';
             ctx.textAlign = 'center';
             var mq = measureInk('bold 14px system-ui, sans-serif', '?'); // v300：恒等变换下测量
-            var yq = cy2 + ((mq.has ? mq.a : 10) - (mq.has ? mq.d : 2)) / 2;
+            var yq = cy2 + ((mq.has ? mq.a : 14 * 0.72) - (mq.has ? mq.d : 14 * 0.02)) / 2;
             ctx.fillText('?', cx2, yq);
             ctx.textAlign = 'left';
           }
@@ -415,9 +422,10 @@
       body = tu ? '与同档水滴相触即合成更高阶。' : '继续合成，遇见它便会点亮。';
     } else if (dexSelStage >= 0) {
       var stgS = C.seaStages[dexSelStage];
-      var stgReached = Math.max(tsNow, careerPeak) >= stgS.at, stgCur = dexSelStage === curStage;
+      var stgReached = bestScore >= stgS.at, stgCur = dexSelStage === curStage;
       title = stgReached || stgCur ? stgS.name : '？？？';
-      sub = stgCur ? '当前海域' : (stgReached ? '已抵达' : ('累计 ' + (stgS.at >= 10000 ? (stgS.at / 10000) + '万' : stgS.at) + ' 分解锁'));
+      // v316：与行内三态词汇统一（当前海域 / 已抵达 / 下一海域 / 累计分解锁）
+      sub = stgCur ? '当前海域' : (stgReached ? '已抵达' : (dexSelStage === nextIdx ? '下一海域 · 累计' + (stgS.at >= 10000 ? (stgS.at / 10000) + '万' : stgS.at) + '分' : '累计 ' + (stgS.at >= 10000 ? (stgS.at / 10000) + '万' : stgS.at) + ' 分解锁'));
       body = '越深水色越暗：潮汐更频、礁石更多。';
     } else {
       var CHEST_INFO = { key: 'chest', name: '宝箱', desc: '沉底木箱，沉走前点开：得分或充能。' };

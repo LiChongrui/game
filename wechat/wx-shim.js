@@ -55,12 +55,13 @@
     vibrate: function (ms) {
       try {
         ms = ms || 20;
+        // v313：真机反馈加档——'light' 在多数机型上几乎无感（用户实测"没有效果"）；
+        // 短震统一 medium/heavy，长震走 vibrateLong；type 不被支持时 fail 回退无参短震
         if (ms >= 40) {
-          wx.vibrateLong({ fail: function () { try { wx.vibrateShort(); } catch (e2) {} } });
+          wx.vibrateLong({ fail: function () { try { wx.vibrateShort({ type: 'heavy' }); } catch (e2) {} } });
         } else {
-          // v287：部分基础库/机型不支持 type 参数会静默 fail——回退无参短震，保证马达一定响应
           wx.vibrateShort({
-            type: ms >= 20 ? 'medium' : 'light',
+            type: ms >= 20 ? 'heavy' : 'medium',
             fail: function () { try { wx.vibrateShort(); } catch (e2) {} }
           });
         }

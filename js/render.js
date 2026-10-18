@@ -1173,6 +1173,43 @@
   }
 
   // ---------- 瞄准虚影 ----------
+  // v307：落点预测——沿竖直方向找第一接触点（海床 或 任意实体的圆表面），供指示线与预览圈
+  function landingYFor(x, r) {
+    var y = FLOORY - r;                                  // 默认落在床面
+    var bs = phys.bodies, i;
+    for (i = 0; i < bs.length; i++) {
+      var b = bs[i];
+      if (Math.abs(b.vy) > 40) continue;                 // v308：跳过飞行中的水滴（含正在下落的
+                                                         // 那颗）——否则预览圈会骑在坠落滴头顶上
+      var dx = Math.abs(b.x - x), rr = r + b.r;
+      if (dx >= rr) continue;                            // 与本列不相交
+      var cy = b.y - Math.sqrt(rr * rr - dx * dx);       // 圆面接触高度
+      if (cy < y) y = cy;
+    }
+    if (y < C.containerTop + r) y = C.containerTop + r;  // 不越容器顶
+    return y;
+  }
+  // v310：指示线与虚影球分离——指示线在实体层"之后"绘制（坠落中的水滴从线上方经过，
+  // 线不会被盖在滴上），虚影球保持原位
+  function drawGhostGuide(x, tier) {
+    var r = nextIron ? C.iron.r : T[tier].r;
+    var landY = landingYFor(x, r);
+    ctx.save();
+    if (landY - r > C.spawnY + r + 4) {                  // 有可视长度才画线（堆到出生点下时只留短提示）
+      var lg = ctx.createLinearGradient(0, C.spawnY + r, 0, landY - r);
+      lg.addColorStop(0, 'rgba(140,205,245,0.85)');
+      lg.addColorStop(1, 'rgba(140,205,245,0.30)');
+      ctx.strokeStyle = lg;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([7, 9]);
+      ctx.lineDashOffset = -time * 46;
+      ctx.beginPath();
+      ctx.moveTo(x, C.spawnY + r + 2);
+      ctx.lineTo(x, landY - r - 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   function drawGhost(x, y, tier, alpha) {
     var r = nextIron ? C.iron.r : T[tier].r;
     if (nextIron) {
@@ -1180,15 +1217,6 @@
     } else {
       drawBall({ x: x, y: y, r: r, tier: tier, vx: 0, vy: 0, special: nextSpecial, rune: nextRune }, alpha);
     }
-    ctx.save();
-    ctx.setLineDash([4, 6]);
-    ctx.strokeStyle = 'rgba(80,140,180,0.35)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(x, y + r);
-    ctx.lineTo(x, FLOORY);
-    ctx.stroke();
-    ctx.restore();
   }
 
   // 特殊滴/符文/礁石名称标签：紧贴虚影球顶（在 render 末尾绘制，保证不被 HUD 盖住）
@@ -1214,7 +1242,7 @@
     ctx.fillStyle = nextIron ? '#6B6353' : (nextSpecial ? specialColor(nextSpecial) : runeColor(nextRune));
     // v276：用实际字形边界（actualBoundingBox）精确垂直居中——canvas 'middle' 基线按 em 盒
     // 取中，CJK 字形实际偏上/偏下因字而异；胶囊几何中心 = ly-5，基线补 (asc-desc)/2 修正
-    var asc = ink.has ? ink.a : 10, desc = ink.has ? ink.d : 3;
+    var asc = ink.has ? ink.a : 14 * 0.84, desc = ink.has ? ink.d : 14 * 0.06; // v300：无像素框 API 时用 CJK 排印常数
     ctx.fillText(label, Math.round(aimX), ly - 5 + (asc - desc) / 2);
     ctx.restore();
   }
@@ -1801,13 +1829,16 @@
     // 标签（v286：真·垂直居中——middle 基线按 em 盒取中，中文与数字字形偏差方向不同，
     // 用户："倒计时读秒比潮汐二字靠下"；改按各自字形像素框补偿，两段视觉中心都对齐 midY）
     var lm = measureInk('bold 15px system-ui, sans-serif', label);
-    var lBase = lm.has ? midY + (lm.a - lm.d) / 2 : midY;
+    // v301 补充：不支持 actualBoundingBox 的内核（微信部分基础库实测不支持）回退不能取
+    // midY——alphabetic 基线压在中线会把整行墨迹顶进上半格（用户真机实测"偏上"）。
+    // 按典型墨迹比例给常数：中文墨心 ≈ 基线上方 0.40em、数字（含小写 s）≈ 0.35em
+    var lBase = lm.has ? midY + (lm.a - lm.d) / 2 : midY + 15 * 0.40;
     ctx.font = 'bold 15px system-ui, sans-serif';
     ctx.strokeText(label, sx, lBase); ctx.fillText(label, sx, lBase);
     // 倒计时数字（紧跟标签，整体居中；脉冲缩放；同像素框补偿，视觉中心与标签对齐）
     var sc = 1 + (warn || active ? pulse * 0.06 : 0);
     var nm = measureInk('bold 22px system-ui, sans-serif', ns);
-    var nBase = nm.has ? midY + (nm.a - nm.d) / 2 : midY;
+    var nBase = nm.has ? midY + (nm.a - nm.d) / 2 : midY + 22 * 0.35;
     ctx.font = 'bold 22px system-ui, sans-serif';
     ctx.save();
     ctx.translate(sx + lw + gap + nw / 2, midY);
@@ -1902,21 +1933,25 @@
     }
     ctx.restore();
     // 文本：主行（名称+海域百分比）白描边+深海蓝、水平居中；小字行（完整增益）居中；最深海转金
+    // v300：微信基础库无像素框 API 且 middle 的 em 盒会让数字比中文低（v286 用户实测）——
+    // 改 alphabetic + 排印常数：中文墨心 ≈ 基线上 0.40em、数字 ≈ 0.35em、混排行 ≈ 0.38em
     ctx.lineJoin = 'round';
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(255,255,255,0.9)';
     ctx.fillStyle = gold ? '#B8860B' : '#12517E';
     ctx.font = 'bold 16px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle'; // v300：行中心 y1/y2 按 middle 语义算，绘制基线必须同为 middle
+    ctx.textBaseline = 'alphabetic';
+    var nameBase = y1 + 16 * 0.40, pctBase = y1 + 16 * 0.35;
     var nameX = cx0 - l1w / 2 + nw1 / 2;
     var pctX = cx0 + l1w / 2 - pw1 / 2;
-    ctx.strokeText(name, nameX, y1); ctx.fillText(name, nameX, y1);
-    ctx.strokeText(pctStr, pctX, y1); ctx.fillText(pctStr, pctX, y1);
+    ctx.strokeText(name, nameX, nameBase); ctx.fillText(name, nameX, nameBase);
+    ctx.strokeText(pctStr, pctX, pctBase); ctx.fillText(pctStr, pctX, pctBase);
     ctx.lineWidth = 2.5;
     ctx.fillStyle = gold ? '#9A7420' : '#4A7FA0';
     ctx.font = '11px system-ui, sans-serif';
-    ctx.strokeText(sub, cx0, y2); ctx.fillText(sub, cx0, y2);
+    var subBase = y2 + 11 * 0.38;
+    ctx.strokeText(sub, cx0, subBase); ctx.fillText(sub, cx0, subBase);
     ctx.textBaseline = 'alphabetic';
   }
   // 涨潮横幅
@@ -2176,8 +2211,10 @@
       cyT = sy + (sh - (probe.a + probe.d)) / 2 + probe.a;
       vBase = 'alphabetic';
     } else {
-      cyT = sy + sh / 2;   // 老内核无像素框 API：退回 middle 基线几何居中
-      vBase = 'middle';
+      // v300：无像素框 API 的内核（微信）也统一 alphabetic + 排印常数（CJK 墨心 ≈ 基线上 0.39em），
+      // 不再退 middle（em 盒中心与视觉中心有差，真机上偏上）
+      cyT = sy + (sh - lf * 0.90) / 2 + lf * 0.84;
+      vBase = 'alphabetic';
     }
     ctx.save();
     ctx.textBaseline = vBase;
@@ -2280,11 +2317,10 @@
         ctx.beginPath(); ctx.arc(btn.cx, btn.cy - 9, 4.5, Math.PI, 0); ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.9)';
         roundRect(btn.cx - 6.5, btn.cy - 9, 13, 10, 2); ctx.fill();
+        // v316：解锁条件改为"对应符文出现"——锁定态提示同步换文案（旧版显示累计分数门槛）
         ctx.fillStyle = 'rgba(230,242,248,0.75)';
         ctx.font = '10px system-ui, sans-serif';
-        ctx.fillText('累计', btn.cx, btn.cy + 1); // 门槛分两行：整行放不下（会与相邻钮重叠）
-        ctx.font = 'bold 11px system-ui, sans-serif';
-        ctx.fillText(C.skillUnlock[cfg.key] + '分', btn.cx, btn.cy + 13);
+        ctx.fillText('待符文', btn.cx, btn.cy + 13);
       } else if (!ready) {
         ctx.strokeStyle = 'rgba(255,255,255,0.85)';
         ctx.lineWidth = 3;
@@ -3075,6 +3111,10 @@
     drawContainer();
     drawDangerLine();
     drawWaterBack();
+    // v310：指示线在实体层之前绘制（坠落中的水滴盖在线上，线在"水滴后面"）
+    if (state === 'play' && !adOverlay && !evapMode && !flowMode && !rippleMode && !confirmOpen) {
+      drawGhostGuide(aimX, nextTier);
+    }
 
     var i;
     for (i = 0; i < phys.bodies.length; i++) drawBall(phys.bodies[i], 1);
