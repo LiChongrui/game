@@ -666,7 +666,20 @@
   // 遗留 9:16 旧稿坐标（y=150 三处落进 HUD 信息条 hudBottom=165、环与文字分离），
   // 自此公告类特效一律经 annY 派生，禁止再写死旧坐标。
   function annY(y) { return MG.layout.body.mirrorCy + (y - 209); }
-  function addPopup(x, y, text, isBig, mult, life) {
+  // v329：提示分色（按语义类别），默认按文案关键词推断，调用方可显式传 kind 覆盖：
+  //   event 青 — 深海事件 / 海域演进 / 机制提示 / 特殊滴触发
+  //   good  绿 — 奖励 / 解锁 / 成就 / 充能 / 合成 / 复活 / 收益
+  //   warn  琥珀 — 待操作提醒（点宝箱 / 预告）
+  //   bad   暗红 — 错失 / 失败 / 负面
+  //   info  蓝 — 通用信息 / 中性反馈（默认）
+  function inferKind(t) {
+    if (/沉大宝箱！点它开启|甘霖·下一滴/.test(t)) return 'warn';
+    if (/沉入深渊|落空|黯淡|空空如也|枯了|熄灭|复制失败|错过/.test(t)) return 'bad';
+    if (/开启|达成|解锁|充能|成就|图鉴|奖励|恩泽|复活|收益|富豪|合成|祝福|吞噬|引合|发现|收集|全勤|任务完成|任务已更新|海神|汇入|×|\+/.test(t)) return 'good';
+    if (/漩涡|风暴|涌泉|甘霖降临|潮位|涨潮|高潮|海域|深渊潜航|渐深|演进|机制|江河|冰封|疾风|雷霆|极光|间歇泉|雨云|虚空|珍珠|彩虹|熔岩|珊瑚礁|海潮/.test(t)) return 'event';
+    return 'info';
+  }
+  function addPopup(x, y, text, isBig, mult, life, kind, attach) {
     // 公告带（居中 + 设计稿 y 180~320）锚定堆叠区镜像位（v190 用户："弹出提示（如涨潮等），
     // 要默认出现在出生区相对于警戒线在堆叠区中的镜像对称位置"）：基准 =
     // layout.body.mirrorCy = dangerY + 出生通道（出生区相对警戒线镜像到警戒线下方），
@@ -697,7 +710,10 @@
     // 4 倍于原可读时间）；+分数/技能短标签等微反馈仍 1.0s；个别重要小字提示
     // （甘霖预告/符文教程/越线冲走/任务更新/宝箱错过）显式传 life 延长。
     var lf = life || (isBig ? 2.0 : 1.0);
-    popups.push({ x: x, y: y, text: text, life: lf, max: lf, big: !!isBig, mult: mult || 0, scale: 0.4 });
+    var p = { x: x, y: y, text: text, life: lf, max: lf, big: !!isBig, mult: mult || 0, scale: 0.4, kind: kind || inferKind(text) };
+    // 跟随实体（如大宝箱）：弹字贴着实体走，实体被移除即消失——避免"宝箱降落、文本上升"错位
+    if (attach) { p.attach = attach; p.attachOff = { x: x - attach.x, y: y - attach.y }; }
+    popups.push(p);
   }
   function addShake(amp, dur) {
     shakeAmp = Math.max(shakeAmp, amp);
@@ -727,6 +743,14 @@
     }
     for (i = popups.length - 1; i >= 0; i--) {
       p = popups[i];
+      if (p.attach) { // 跟随实体：贴着目标移动；目标已不在场上（宝箱开启/沉走）则移除
+        if (phys.bodies.indexOf(p.attach) < 0) { popups.splice(i, 1); continue; }
+        p.x = p.attach.x + p.attachOff.x;
+        p.y = p.attach.y + p.attachOff.y;
+        if (p.scale < 1) p.scale = Math.min(1, p.scale + dt * 5);
+        if (p.life <= 0) popups.splice(i, 1);
+        continue;
+      }
       p.life -= dt; p.y -= 28 * dt;
       if (p.scale < 1) p.scale = Math.min(1, p.scale + dt * 5);
       if (p.life <= 0) popups.splice(i, 1);
@@ -1874,7 +1898,8 @@
     b.chest = true;
     b.r = 17; b.m = b.r * b.r * 6; // 比礁石轻，不会被砸得太凶
     chest = { b: b, t: 0, life: 14 }; // 14 秒内不点就沉走
-    addPopup(b.x, C.dangerY + 10, '沉大宝箱！点它开启', true, 0);
+    // v329：提示跟随宝箱实体（attach=b），宝箱降落时文字同步下移，不再"宝箱落、文本升"错位
+    addPopup(b.x, C.dangerY + 10, '沉大宝箱！点它开启', true, 0, 0, 'warn', b);
     audio.blip(392, 0.25, 'triangle', 0.14, 1.5);
   }
   function expireChest() {
@@ -1897,17 +1922,32 @@
       var gain = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
       score += gain; scoreBump = 0.4;
       if (score > best) { best = score; saveNum('mg_best', best); }
-      addPopup(x, y - 30, '大宝箱开启 +' + gain, true, 0);
+      addPopup(x, y - 30, '大宝箱开启 +' + gain, true, 0, 0, 'good');
     } else if (r < 0.75) {
-      // v316：优先充已解锁技能；全锁时兜底充任意技能（充能预先累积，解锁即用；防 keys 空写 undefined）
+      // v316：只充已解锁技能（符文道具）；v329：未解锁任何技能时不开符文道具，改发积分
+      // （用户："宝箱不能开出未出现的道具，例如符文道具还没激活"）——移除旧"全锁兜底充任意"逻辑
       var keys = ['swap', 'ripple', 'evap', 'flow'].filter(function (k) { return skillUnlocked(k); });
-      if (!keys.length) keys = ['swap', 'ripple', 'evap', 'flow'];
-      var k = keys[(Math.random() * keys.length) | 0];
-      skillCharge[k] += perkOn('chest5') ? 3 : 2;
-      addPopup(x, y - 30, '大宝箱开启：' + runeName(k) + ' +2 充能', true, 0);
+      if (keys.length) {
+        var k = keys[(Math.random() * keys.length) | 0];
+        skillCharge[k] += perkOn('chest5') ? 3 : 2;
+        addPopup(x, y - 30, '大宝箱开启：' + runeName(k) + ' +2 充能', true, 0, 0, 'good');
+      } else {
+        var g2 = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
+        score += g2; scoreBump = 0.4;
+        if (score > best) { best = score; saveNum('mg_best', best); }
+        addPopup(x, y - 30, '大宝箱开启 +' + g2, true, 0, 0, 'good');
+      }
     } else {
-      nextSpecial = 'rainbow'; nextIron = false; nextRune = null;
-      addPopup(x, y - 30, '大宝箱开启：下一滴是彩虹滴！', true, 0);
+      // v329：彩虹滴未曾在图鉴出现（dexSpecial）前不开出，改发积分——同理不提前放出未解锁道具
+      if (dexSpecial['rainbow']) {
+        nextSpecial = 'rainbow'; nextIron = false; nextRune = null;
+        addPopup(x, y - 30, '大宝箱开启：下一滴是彩虹滴！', true, 0, 0, 'good');
+      } else {
+        var g3 = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
+        score += g3; scoreBump = 0.4;
+        if (score > best) { best = score; saveNum('mg_best', best); }
+        addPopup(x, y - 30, '大宝箱开启 +' + g3, true, 0, 0, 'good');
+      }
     }
     for (var i = 0; i < 12; i++) {
       var ang = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 130;
@@ -1977,10 +2017,14 @@
       //    同档滴被压紧合成、产物继承撞速+反冲上抛，混合堆堆顶反而 234→316px 变高
       //    （sim_surge.js 实测）。同步把力降到 1700（出口速度 204px/s）让撞堆变缓，
       //    堆叠局面的抬升才真正减半。
+      // v329：修复"轻轻托起"失效——净上托 200 在密集堆叠下被挤压抵消、几乎看不出抬升
+      // （用户："深海涌泉不能轻轻托起底部水滴"）。恢复可见的温和上托：力 1700→2000
+      // （净上托 200→500）、作用区 105→160（更多底部滴被卷入），底部滴明显上飘后回落，
+      // 仍远低于 v307 的猛烈上抛，保持"轻轻"手感。
       for (i = 0; i < bs.length; i++) {
         b = bs[i];
         if (b.iron) continue;
-        if (b.y + b.r > FLOORY - 105) b.vy -= 1700 * dt;
+        if (b.y + b.r > FLOORY - 160) b.vy -= 2000 * dt;
       }
       if (Math.random() < 0.5) {
         parts.push({ type: 'dot', x: 30 + Math.random() * (C.W - 60), y: FLOORY, vx: 0,
@@ -2032,54 +2076,60 @@
       ctx.save();
       ctx.globalAlpha = fadeK;
       ctx.translate(seaEvent.x, seaEvent.y);
-      var R = 160;
-      // 外发光漩涡盘（v328 重绘：海洋青蓝配色）
-      ctx.fillStyle = grad('stormGlow', function () {
-        var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, R + 10);
-        gg.addColorStop(0, 'rgba(74,162,210,0.22)');
-        gg.addColorStop(0.55, 'rgba(70,140,200,0.10)');
-        gg.addColorStop(1, 'rgba(70,140,200,0)');
+      var R = 170;
+      // ① 漩涡漏斗：中心深、外缘透——暗示吸卷下沉（深海洋流感）
+      ctx.fillStyle = grad('stormFunnel', function () {
+        var gg = ctx.createRadialGradient(0, 0, 4, 0, 0, R + 20);
+        gg.addColorStop(0, 'rgba(16,48,78,0.46)');
+        gg.addColorStop(0.5, 'rgba(38,104,156,0.16)');
+        gg.addColorStop(1, 'rgba(70,150,210,0)');
         return gg;
       });
-      ctx.beginPath(); ctx.arc(0, 0, R + 10, 0, Math.PI * 2); ctx.fill();
-      // 5 条螺旋臂（对数螺旋，渐隐）——整臂单路径连续描边，俯视漩涡感（v328 重绘）
-      ctx.rotate(time * 1.6);
+      ctx.beginPath(); ctx.arc(0, 0, R + 20, 0, Math.PI * 2); ctx.fill();
+      // ② 双层反向缓旋的流丝（对数螺旋，渐隐渐细）——俯视漩涡的灵动水流
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      for (var k = 0; k < 5; k++) {
-        var a0 = k * Math.PI * 2 / 5;
-        (function (a0, k) {
-          ctx.strokeStyle = grad('stormArm' + k, function () {
-            var gg = ctx.createLinearGradient(0, 0, Math.cos(a0) * R, Math.sin(a0) * R);
-            gg.addColorStop(0, 'rgba(200,232,252,0.6)');
-            gg.addColorStop(1, 'rgba(86,150,212,0.05)');
-            return gg;
-          });
-          ctx.lineWidth = 6;
-          ctx.beginPath();
-          for (var i2 = 0; i2 <= 48; i2++) {
-            var tt = i2 / 48;
-            var aa = a0 + tt * Math.PI * 2.3;      // 每条臂绕 ~1.15 圈
-            var rr = 8 + (R - 8) * tt;             // 从核心向外展开
-            var x2 = Math.cos(aa) * rr, y2 = Math.sin(aa) * rr;
-            if (i2 === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
-          }
-          ctx.stroke();
-        })(a0, k);
+      for (var layer = 0; layer < 2; layer++) {
+        var dir = layer === 0 ? 1 : -1;
+        var rot = time * (0.85 + layer * 0.55) * dir;
+        ctx.rotate(rot);
+        var arms = 4;
+        for (var k = 0; k < arms; k++) {
+          var a0 = k * Math.PI * 2 / arms;
+          (function (a0, layer) {
+            ctx.strokeStyle = grad('stormArm' + layer + '_' + k, function () {
+              var gg = ctx.createLinearGradient(0, 0, Math.cos(a0) * R, Math.sin(a0) * R);
+              gg.addColorStop(0, layer === 0 ? 'rgba(222,246,255,0.6)' : 'rgba(150,212,245,0.42)');
+              gg.addColorStop(1, 'rgba(70,150,210,0)');
+              return gg;
+            });
+            ctx.lineWidth = layer === 0 ? 5 : 3.4;
+            ctx.beginPath();
+            for (var i2 = 0; i2 <= 40; i2++) {
+              var tt = i2 / 40;
+              var aa = a0 + dir * tt * Math.PI * 2.2;       // 绕 ~1.1 圈
+              var rr = 6 + (R - 6) * Math.pow(tt, 0.82);    // 对数感展开
+              var x2 = Math.cos(aa) * rr, y2 = Math.sin(aa) * rr;
+              if (i2 === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
+            }
+            ctx.stroke();
+          })(a0, layer);
+        }
+        ctx.rotate(-rot); // 复位，避免叠加旋转
       }
-      // 同心旋转虚线环（2 圈，增强漩涡动感）
-      ctx.setLineDash([10, 12]);
-      for (var r = 0; r < 2; r++) {
-        var rad = 55 + r * 48;
-        ctx.strokeStyle = 'rgba(165,212,242,' + (0.38 - r * 0.14) + ')';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(0, 0, rad, time * (2.2 - r * 0.6), time * (2.2 - r * 0.6) + Math.PI * 1.6);
-        ctx.stroke();
+      // ③ 螺旋上升的气泡（动点，增强灵动感）
+      for (var bI = 0; bI < 16; bI++) {
+        var bt = time * 0.6 + bI * 0.41;
+        var br2 = 16 + (R - 16) * ((bI * 0.137) % 1);
+        var ba = bt * (1 + (bI % 3) * 0.28);
+        var bx = Math.cos(ba) * br2, by = Math.sin(ba) * br2;
+        var bp = 0.55 + 0.45 * Math.sin(bt * 2 + bI);
+        ctx.fillStyle = 'rgba(226,246,255,' + (0.08 + 0.16 * bp).toFixed(3) + ')';
+        ctx.beginPath(); ctx.arc(bx, by, 1.3 + bp * 1.9, 0, Math.PI * 2); ctx.fill();
       }
-      ctx.setLineDash([]);
-      // 中心亮核（呼吸）
-      ctx.fillStyle = 'rgba(228,242,255,' + (0.6 + 0.2 * Math.sin(time * 4)).toFixed(2) + ')';
-      ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.fill();
+      // ④ 呼吸亮核（柔光，漩涡眼）
+      var core = 0.5 + 0.28 * Math.sin(time * 3.2);
+      ctx.fillStyle = 'rgba(232,246,255,' + core.toFixed(3) + ')';
+      ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     } else if (seaEvent.type === 'surge') {
       var g = grad('surge' + Math.round(FLOORY), function () {

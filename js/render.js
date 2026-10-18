@@ -1552,9 +1552,12 @@
     ctx.textAlign = 'center';
     // v328：越线提示放大（用户"越线提示要大一些"）+ 死亡缓冲倒计时（用户"要包含缓冲倒计时"）；
     // 方波 1.2~1.8Hz 平缓（v327 降闪）
-    var dHz = 1.2 + dangerAlert * 0.6;
+    var dHz = 1.2 + dangerAlert * 0.6;            // 警示文字脉动（保持危险感，不变）
     var dsq = Math.pow(0.5 + 0.5 * Math.sin(time * dHz * 2 * Math.PI), 3);
     var wa = Math.min(1, 0.5 + dangerAlert * 0.6) * (0.45 + 0.55 * dsq);
+    // 死亡缓冲倒计时：1Hz 缓闪（用户 v329：原随警示文字 1.2~1.8Hz 太快）
+    var csq = Math.pow(0.5 + 0.5 * Math.sin(time * 1.0 * 2 * Math.PI), 2);
+    var ca = 0.55 + 0.45 * csq;
     ctx.lineJoin = 'round';
     // 大字「堆高越线」
     ctx.font = 'bold 26px system-ui, sans-serif';
@@ -1563,13 +1566,13 @@
     ctx.strokeText('堆高越线', C.W / 2, C.dangerY - 42);
     ctx.fillStyle = 'rgba(196,48,42,' + wa + ')';
     ctx.fillText('堆高越线', C.W / 2, C.dangerY - 42);
-    // 死亡缓冲倒计时（危险越高闪得越明显）
+    // 死亡缓冲倒计时（1Hz 缓闪，单独 alpha，不随警示文字快闪）
     var sec = Math.max(0, dangerRemain);
     ctx.font = 'bold 34px system-ui, sans-serif';
-    ctx.strokeStyle = 'rgba(255,255,255,' + wa + ')';
+    ctx.strokeStyle = 'rgba(255,255,255,' + ca + ')';
     ctx.lineWidth = 6;
     ctx.strokeText(sec.toFixed(1) + 's', C.W / 2, C.dangerY - 4);
-    ctx.fillStyle = 'rgba(255,86,40,' + wa + ')';
+    ctx.fillStyle = 'rgba(255,86,40,' + ca + ')';
     ctx.fillText(sec.toFixed(1) + 's', C.W / 2, C.dangerY - 4);
   }
 
@@ -2558,6 +2561,14 @@
     ctx.globalAlpha = 1;
   }
 
+  // v329：提示分色表（语义类别 → 颜色）
+  var PCOLMAP = {
+    info:  '#1C5F8C',   // 蓝 — 通用信息 / 中性反馈
+    event: '#0E7C9E',   // 青 — 深海事件 / 海域演进 / 机制提示
+    good:  '#1E9E6A',   // 绿 — 奖励 / 解锁 / 成就 / 合成
+    warn:  '#C9821A',   // 琥珀 — 待操作提醒（点宝箱 / 预告）
+    bad:   '#9E4B47'    // 暗红 — 错失 / 失败（降饱和，不再刺眼）
+  };
   // 浮动文字（最后绘制，保证不被 HUD 遮挡）
   function drawPopups() {
     var i, p;
@@ -2569,7 +2580,7 @@
       ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.max * 1.5));
       ctx.translate(p.x, p.y);
       ctx.scale(p.scale, p.scale);
-      ctx.fillStyle = p.big ? '#D64541' : '#155A8A';
+      ctx.fillStyle = PCOLMAP[p.kind] || PCOLMAP.info;
       ctx.font = (p.big ? 'bold 20px' : 'bold 17px') + ' system-ui, sans-serif';
       ctx.strokeStyle = 'rgba(255,255,255,0.85)';
       ctx.lineWidth = 3;
@@ -2577,7 +2588,7 @@
       ctx.fillText(p.text, 0, 0);
       if (p.mult > 1) {
         ctx.font = 'bold 18px system-ui, sans-serif';
-        ctx.fillStyle = '#E24B4A';
+        ctx.fillStyle = PCOLMAP.good;
         ctx.strokeStyle = 'rgba(255,255,255,0.85)';
         ctx.lineWidth = 3;
         ctx.strokeText('连击 x' + p.mult, 0, -24);

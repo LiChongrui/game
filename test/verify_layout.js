@@ -266,16 +266,18 @@ eq('漩涡旧公式已移除', /seaEvent\.y = C\.containerTop/.test(SRC), false)
 // 两个杠杆都必须动——只砍作用区会让底部滴以更集中的出口速度（410→290px/s）撞上半堆，
 // 同档滴压紧合成、产物继承撞速+反冲上抛，混合堆堆顶反而 234→316px 变高（sim_surge.js
 // 实测）；同步降力（出口 204px/s）撞堆变缓才真正减半（单滴 252→117、混合堆 234→107）。
-eq('涌泉作用区105', /if \(b\.y \+ b\.r > FLOORY - 105\) b\.vy -= 1700 \* dt;/.test(SRC), true);
+eq('涌泉作用区160(v329)', /if \(b\.y \+ b\.r > FLOORY - 160\) b\.vy -= 2000 \* dt;/.test(SRC), true);
 eq('涌泉旧作用区210已移除', /FLOORY - 210\)/.test(SRC), false);
 eq('涌泉旧力1900已移除', /b\.vy -= 1900 \* dt;/.test(SRC), false);
+eq('涌泉旧力1700已移除', /b\.vy -= 1700 \* dt;/.test(SRC), false);
 eq('涌泉辉光带保持90', /ctx\.fillRect\(0, FLOORY - 90, C\.W, 90\);/.test(SRC), true);
 // ---- v325 公告弹字时长（用户："有些提示信息出现的太短了，比如海神恩泽等，出现时间要稍微长一点！请梳理一下类似的提示并做出优化！"）----
 // 原一律 life=1.0s，渲染 alpha=life/max×1.5 ⇒ 前 1/3 时长（0.33s）后即淡出，公告一闪而过。
 // 改：addPopup 增 life 参数；大字号公告默认 2.0s（不透明段 1.33s，4 倍可读时间），微反馈仍 1.0s。
-eq('addPopup支持life参数', /function addPopup\(x, y, text, isBig, mult, life\) \{/.test(SRC), true);
+eq('addPopup支持life+kind+attach', /function addPopup\(x, y, text, isBig, mult, life, kind, attach\) \{/.test(SRC), true);
 eq('大字号公告默认2s', /var lf = life \|\| \(isBig \? 2\.0 : 1\.0\);/.test(SRC), true);
-eq('弹字生命引lf', /popups\.push\(\{ x: x, y: y, text: text, life: lf, max: lf, big: !!isBig, mult: mult \|\| 0, scale: 0\.4 \}\);/.test(SRC), true);
+eq('弹字生命引lf', /var p = \{ x: x, y: y, text: text, life: lf, max: lf, big: !!isBig, mult: mult \|\| 0, scale: 0\.4, kind: kind \|\| inferKind\(text\) \};/.test(SRC), true);
+eq('弹字压入p对象', /popups\.push\(p\);/.test(SRC), true);
 eq('甘霖下一滴预告1.6s', /'甘霖 · 下一滴是「' \+ T\[t\]\.name \+ '」', false, 0, 1\.6\);/.test(SRC), true);
 eq('符文教程提示2s', /'带符文的水滴：合成即可为技能充能', false, 0, 2\.0\);/.test(SRC), true);
 // v327：复活功能已移除（先不做广告），原"越线水滴被冲走 ×N"公告随 doRevive 一并删除；负向回归见 ⑧
@@ -611,6 +613,35 @@ eq('重压深潜+80%(config)', /id: 'heavy', name: '重压深潜', desc: '重力
 eq('重压深潜+80%(DCHAL)', /id: 'heavy',\s*name: '重压深潜', desc: '重力 \+80%',\s*grav: 1\.8/.test(SRC), true);
 eq('深渊试炼+40%且潮汐-65%(DCHAL)', /id: 'abyss',\s*name: '深渊试炼',\s*desc: '重力 \+40% 且潮汐 -65%',\s*grav: 1\.4, tideInt: 0\.35/.test(SRC), true);
 console.log('⑧ v327/v328 漩涡/特殊滴豁免+降闪+涨潮持续+广告移除+复活恢复+词缀加重断言: ' + pass + ' pass, ' + fail + ' fail');
+f2 += fail;
+
+// ===== ⑨ v329：死亡缓冲倒计时1Hz + 提示分色(5类) + 大宝箱提示跟随宝箱 + 宝箱不开未解锁道具 + 涌泉修复 + 漩涡风暴重绘 =====
+pass = 0; fail = 0;
+// ① 死亡缓冲倒计时 1Hz 缓闪（用户"闪的太快了，可以1s闪一次"）——新增独立 ca(alpha)，不再随警示文字 1.2~1.8Hz
+eq('倒计时1Hz缓闪', /var csq = Math\.pow\(0\.5 \+ 0\.5 \* Math\.sin\(time \* 1\.0 \* 2 \* Math\.PI\), 2\);/.test(RSRC), true);
+eq('倒计时用独立alpha(ca)', /ctx\.fillStyle = 'rgba\(255,86,40,' \+ ca \+ '\)';/.test(RSRC), true);
+// ② 提示分色（用户"不同的提示类型要区分一下；红色的提示太多了"）：渲染端 PCOLMAP 五类 + 按 p.kind 取色
+eq('提示分色表PCOLMAP', /var PCOLMAP = \{[\s\S]*?info:[\s\S]*?event:[\s\S]*?good:[\s\S]*?warn:[\s\S]*?bad:/.test(RSRC), true);
+eq('弹字按p.kind取色', /ctx\.fillStyle = PCOLMAP\[p\.kind\] \|\| PCOLMAP\.info;/.test(RSRC), true);
+// ③ addPopup 支持 kind + attach + inferKind 自动归类（默认按文案关键词，调用方可显式覆盖）
+eq('addPopup支持kind+attach', /function addPopup\(x, y, text, isBig, mult, life, kind, attach\)/.test(SRC), true);
+eq('inferKind自动归类', /function inferKind\(t\) \{/.test(SRC), true);
+eq('弹字记录attachOffset', /p\.attachOff = \{ x: x - attach\.x, y: y - attach\.y \};/.test(SRC), true);
+eq('跟随实体每帧贴附', /p\.x = p\.attach\.x \+ p\.attachOff\.x;/.test(SRC), true);
+eq('实体移除弹字即删', /if \(phys\.bodies\.indexOf\(p\.attach\) < 0\) \{ popups\.splice\(i, 1\); continue; \}/.test(SRC), true);
+// ④ 大宝箱提示跟随宝箱（用户"宝箱降落、文本上升，一点也不和谐"）：spawn 弹字 attach=b
+eq('宝箱提示跟随宝箱', /addPopup\(b\.x, C\.dangerY \+ 10, '沉大宝箱！点它开启', true, 0, 0, 'warn', b\);/.test(SRC), true);
+// ⑤ 宝箱不开未解锁道具（用户"宝箱不能开出未出现的道具，例如符文道具还没激活"）
+eq('宝箱移除全锁兜底充任意', /if \(!keys\.length\) keys = \['swap', 'ripple', 'evap', 'flow'\];/.test(SRC), false);
+eq('宝箱仅充已解锁技能', /var keys = \['swap', 'ripple', 'evap', 'flow'\]\.filter\(function \(k\) \{ return skillUnlocked\(k\); \}\);[\s\S]*?if \(keys\.length\)/.test(SRC), true);
+eq('宝箱彩虹滴需已发现', /if \(dexSpecial\['rainbow'\]\) \{[\s\S]*?nextSpecial = 'rainbow';/.test(SRC), true);
+// ⑥ 深海涌泉修复（用户"不能轻轻托起底部水滴"）：力 1700→2000、作用区 105→160（净上托 200→500，温和可见）
+eq('涌泉力2000', /if \(b\.y \+ b\.r > FLOORY - 160\) b\.vy -= 2000 \* dt;/.test(SRC), true);
+// ⑦ 漩涡风暴重绘（用户"依旧很丑，要好好设计，跟主题匹配，显得灵动"）：漏斗+双层反向螺旋+气泡，旧单盘发光移除
+eq('漩涡漏斗重绘', /grad\('stormFunnel'/.test(SRC), true);
+eq('漩涡双层反向螺旋', /for \(var layer = 0; layer < 2; layer\+\+\) \{[\s\S]*?var rot = time \* \(0\.85 \+ layer \* 0\.55\) \* dir;/.test(SRC), true);
+eq('漩涡旧发光盘已移除', /grad\('stormGlow'/.test(SRC), false);
+console.log('⑨ v329 倒计时1Hz+提示分色+宝箱跟随+宝箱不开未解锁+涌泉修复+漩涡重绘断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
 process.exit(f2 ? 1 : 0);
