@@ -1191,12 +1191,18 @@
   }
   // v310：指示线与虚影球分离——指示线在实体层"之后"绘制（坠落中的水滴从线上方经过，
   // 线不会被盖在滴上），虚影球保持原位
+  // v320：待投虚影"活"起来（用户："水滴没有坠落时，可以加一个合适的效果吗?目前看水滴是虚的
+  // 而且看起来呆呆的"）——纵向轻轻漂浮 + 同色系光晕呼吸。虚影球/指示线顶/名称标签同源一个
+  // ghostBob()，整组预览作为一个整体呼吸；横向严格钉 aimX 不误导瞄准，只做纵向漂浮与亮度呼吸。
+  // 幅度上限 4.2px（3+1.2）：标签与球顶间距恒为 5px，永不相撞
+  function ghostBob() { return Math.sin(time * 2.1) * 3 + Math.sin(time * 3.9 + 1.3) * 1.2; }
   function drawGhostGuide(x, tier) {
     var r = nextIron ? C.iron.r : T[tier].r;
+    var gy = C.spawnY + ghostBob(); // v320：线顶跟随虚影漂浮，不断连
     var landY = landingYFor(x, r);
     ctx.save();
-    if (landY - r > C.spawnY + r + 4) {                  // 有可视长度才画线（堆到出生点下时只留短提示）
-      var lg = ctx.createLinearGradient(0, C.spawnY + r, 0, landY - r);
+    if (landY - r > gy + r + 4) {                  // 有可视长度才画线（堆到出生点下时只留短提示）
+      var lg = ctx.createLinearGradient(0, gy + r, 0, landY - r);
       lg.addColorStop(0, 'rgba(140,205,245,0.85)');
       lg.addColorStop(1, 'rgba(140,205,245,0.30)');
       ctx.strokeStyle = lg;
@@ -1204,7 +1210,7 @@
       ctx.setLineDash([7, 9]);
       ctx.lineDashOffset = -time * 46;
       ctx.beginPath();
-      ctx.moveTo(x, C.spawnY + r + 2);
+      ctx.moveTo(x, gy + r + 2);
       ctx.lineTo(x, landY - r - 2);
       ctx.stroke();
     }
@@ -1212,16 +1218,26 @@
   }
   function drawGhost(x, y, tier, alpha) {
     var r = nextIron ? C.iron.r : T[tier].r;
+    var gy = y + ghostBob(); // v320：虚影轻轻漂浮
+    // 呼吸光晕：滴体同色系（特殊滴/符文取各自识别色），亮度随漂浮相位呼吸——
+    // 给"虚影"以形体感，不再是一片平淡的半透明圆（v320）
+    var glowC = nextIron ? '#8FA0AE' : (nextSpecial ? specialColor(nextSpecial) : (nextRune ? runeColor(nextRune) : T[tier].color));
+    var pulse = 0.5 + 0.5 * Math.sin(time * 2.1 - 0.6);
+    var hg = ctx.createRadialGradient(x, gy, r * 0.2, x, gy, r * 1.55);
+    hg.addColorStop(0, hexToRgba(glowC, (0.22 + 0.10 * pulse) * (alpha / 0.6)));
+    hg.addColorStop(1, hexToRgba(glowC, 0));
+    ctx.fillStyle = hg;
+    ctx.beginPath(); ctx.arc(x, gy, r * 1.55, 0, Math.PI * 2); ctx.fill();
     if (nextIron) {
-      drawIronBall({ x: x, y: y, r: r, vx: 0, vy: 0 }, alpha);
+      drawIronBall({ x: x, y: gy, r: r, vx: 0, vy: 0 }, alpha);
     } else {
-      drawBall({ x: x, y: y, r: r, tier: tier, vx: 0, vy: 0, special: nextSpecial, rune: nextRune }, alpha);
+      drawBall({ x: x, y: gy, r: r, tier: tier, vx: 0, vy: 0, special: nextSpecial, rune: nextRune }, alpha);
     }
   }
 
   // 特殊滴/符文/礁石名称标签：紧贴虚影球顶（在 render 末尾绘制，保证不被 HUD 盖住）
   function drawGhostLabel() {
-    if (state !== 'play' || adOverlay || evapMode || rippleMode || confirmOpen) return;
+    if (state !== 'play' || adOverlay || evapMode || flowMode || rippleMode || confirmOpen) return; // v320：补 flowMode，与虚影球同显隐
     var r = nextIron ? C.iron.r : T[nextTier].r;
     var label = nextIron ? '珊瑚礁' : (nextSpecial ? specialLabel(nextSpecial) : (nextRune ? runeName(nextRune) + '符文' : null));
     if (!label) return;
@@ -1233,7 +1249,7 @@
     ctx.font = 'bold 14px system-ui, sans-serif';
     var ink = measureInk('bold 14px system-ui, sans-serif', label); // v300：恒等变换下测量
     var tw = ink.w + 14;
-    var ly = Math.max(C.containerTop + 15, C.spawnY - r - 10); // 距球顶5px间距；大档虚影时钳制在容器内，不越块顶
+    var ly = Math.max(C.containerTop + 15, C.spawnY - r - 10 + ghostBob()); // v320：标签随虚影同浮（与球顶间距恒 5px）
     ctx.fillStyle = 'rgba(255,255,255,0.88)';
     // v285：胶囊 17→20 高（下缘不动仍距球顶 5px，上缘抬高 3px）——旧 17 高时 14px 粗体字面
     // 距胶囊边只剩 ≈0.7px，字形的不对称留白被放大成"没居中"的观感；20 高给足 ≈3px 呼吸，

@@ -1,4 +1,4 @@
-// 布局几何验证（v319）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗（含第4行清空存档+二级确认面板，v318 文案精简）+潮汐满潮没入警戒线（v319）/设置图标静态核查
+// 布局几何验证（v320）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗（含第4行清空存档+二级确认面板，v318 文案精简）+潮汐满潮没入警戒线（v319）+待投虚影生命感（v320）/设置图标静态核查
 // 纯 node 计算（vm 加载 config + layout，无浏览器/无 canvas）。
 // ★ v183 新定位语义（覆盖 v175~v182 的 EXTRA 分配方案；用户：
 //   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少！"）：
@@ -333,6 +333,19 @@ eq('浅海(sea0)满潮仍在警戒线下方', (function () { // 渐变起点不�
   var H = L.body.floorY - L.body.containerTop;
   return L.body.floorY - H * (1 / 4) > L.body.dangerY;
 })(), true);
+// ---- v320 待投虚影生命感（用户："水滴没有坠落时，可以加一个合适的效果吗?目前看水滴是虚的而且看起来呆呆的"）----
+// ghostBob 单一相位源驱动整组预览：虚影球纵向漂浮 + 滴体同色系光晕呼吸，指示线顶与名称
+// 标签跟随同浮不断连；横向严格钉 aimX 不误导瞄准（幅度上限 4.2px=3+1.2，标签与球顶间距恒 5px）
+eq('ghostBob定义', /function ghostBob\(\) \{ return Math\.sin\(time \* 2\.1\) \* 3 \+ Math\.sin\(time \* 3\.9 \+ 1\.3\) \* 1\.2; \}/.test(RSRC), true);
+eq('虚影球纵向漂浮', /var gy = y \+ ghostBob\(\);/.test(RSRC), true);
+eq('虚影呼吸光晕', /createRadialGradient\(x, gy, r \* 0\.2, x, gy, r \* 1\.55\)/.test(RSRC), true);
+eq('光晕随冷却变暗', /hexToRgba\(glowC, \(0\.22 \+ 0\.10 \* pulse\) \* \(alpha \/ 0\.6\)\)/.test(RSRC), true);
+eq('指示线顶跟随漂浮', /var gy = C\.spawnY \+ ghostBob\(\);/.test(RSRC), true);
+eq('标签随虚影同浮', /C\.spawnY - r - 10 \+ ghostBob\(\)/.test(RSRC), true);
+eq('标签与球同显隐flowMode', /state !== 'play' \|\| adOverlay \|\| evapMode \|\| flowMode/.test(RSRC), true);
+eq('虚影横向不漂移', /drawGhost\(aimX, C\.spawnY, nextTier,/.test(RSRC), true);
+eq('虚影无横向偏移量', /drawGhost\(aimX \+ /.test(RSRC), false);
+eq('旧静态虚影drawBall已移除', /drawBall\(\{ x: x, y: y, r: r, tier: tier/.test(RSRC), false);
 // 重开图标随钮放大（r15→20：弧半径 8→9）
 eq('重开图标半径9', /ctx\.arc\(rx0, ry0, 9, -Math\.PI \* 0\.35, Math\.PI \* 1\.25\); ctx\.stroke\(\);/.test(RSRC), true);
 // ---- v196 第一排圆钮：统一样式 + 半径真源 + 统计精简 ----
