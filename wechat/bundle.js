@@ -1265,7 +1265,7 @@ MG.layout.build();
     ng.active = affix;                 // restart 会清 active，重设
     ng.fromDaily = !!fromDaily;
     C.gravity = GRAV0 * (affix.grav || 1);
-    addPopup(C.W / 2, 300, (fromDaily ? '每日挑战 ·「' : '深渊潜航 ·「') + affix.name + '」', true, 0);
+    addPopup(C.W / 2, 300, (fromDaily ? '每日挑战 ·「' : '深渊潜航 ·「') + affix.name + '」', true, 0, 0, 'event'); // v330：挑战开局公告显式归 event（词缀名如"重压深潜"不含事件关键词，否则落到 info 蓝）
     ngOpen = false;
   }
   function ngEndRun() {
@@ -1764,7 +1764,7 @@ MG.layout.build();
   function inferKind(t) {
     if (/沉大宝箱！点它开启|甘霖·下一滴/.test(t)) return 'warn';
     if (/沉入深渊|落空|黯淡|空空如也|枯了|熄灭|复制失败|错过/.test(t)) return 'bad';
-    if (/开启|达成|解锁|充能|成就|图鉴|奖励|恩泽|复活|收益|富豪|合成|祝福|吞噬|引合|发现|收集|全勤|任务完成|任务已更新|海神|汇入|×|\+/.test(t)) return 'good';
+    if (/开启|达成|解锁|充能|充满|成就|图鉴|奖励|恩泽|复活|收益|富豪|合成|祝福|吞噬|引合|发现|收集|全勤|任务完成|任务已更新|海神|汇入|×|\+/.test(t)) return 'good';
     if (/漩涡|风暴|涌泉|甘霖降临|潮位|涨潮|高潮|海域|深渊潜航|渐深|演进|机制|江河|冰封|疾风|雷霆|极光|间歇泉|雨云|虚空|珍珠|彩虹|熔岩|珊瑚礁|海潮/.test(t)) return 'event';
     return 'info';
   }
@@ -2868,7 +2868,8 @@ MG.layout.build();
         if (!runBuffered) { // 每局一次首死宽限：清空全体计时再续（即"缓冲"），不弹字（用户："原来的缓冲提示是不需要的"）
           runBuffered = true;
           for (var j = 0; j < bs.length; j++) { bs[j].dangerT = 0; bs[j].grace = 0; }
-          worst = 0; minRemain = C.dangerTime * 3; break;
+          // v330：worst/minRemain 给非零值——倒计时从 3s 无缝接到常规引信 1.1s，不再"归零闪没一帧又跳回"
+          worst = 0.999; minRemain = C.dangerTime; break;
         } else { dangerAlert = 0; dangerRemain = 0; gameOver(); return; }
       }
       var w = b.dangerT / fuse;
@@ -3242,12 +3243,36 @@ MG.layout.build();
   }
   // 直接复活（v328 恢复：用户"是不要广告，复活动能还在，要直接复活"）——清空越线判负状态、
   // 保留当前局面与得分，给全体短暂宽限让玩家抢救；先不做广告，故无 ads.show 门控。
+  // ★ v330：复活清场（用户："复活时要移除适当的水滴！结算页签弹不出来"）——不移滴的话，
+  // 越线堆原样留在场上，宽限 1.5s + 引信 1.1s 耗尽后立刻二次判负，玩家视角"复活点了、
+  // 结算页马上又弹回来（游戏回不去）"。规则：普通水滴（铁礁/宝箱除外；冰冻/特殊滴也是
+  // 水滴照移）自堆顶向下移除，直到剩余堆顶退到「警戒线下方 70px」安全区内才停手；
+  // 被移除的水滴化作气泡消散（不给分——复活是抢救不是奖励）。
   function doRevive() {
     state = 'play';
     dangerAlert = 0; dangerRemain = 0; runBuffered = true; // 直接回到对局；本局缓冲已用（避免再吃一次首死宽限）
-    for (var i = 0; i < phys.bodies.length; i++) { phys.bodies[i].dangerT = 0; phys.bodies[i].grace = 1.5; } // 全体 1.5s 抢救宽限
+    var bs = phys.bodies, i, j;
+    var drops = [];
+    for (i = 0; i < bs.length; i++) { if (!bs[i].iron && !bs[i].chest) drops.push(bs[i]); }
+    drops.sort(function (a, c) { return (a.y - a.r) - (c.y - c.r); }); // 堆顶（y 最小）先移
+    var keep = C.dangerY + 70; // 复活安全线：剩余堆顶至少低于警戒线 70px（5 的倍数，v191 规范）
+    var removed = 0;
+    for (i = 0; i < drops.length; i++) {
+      var d = drops[i];
+      if (d.y - d.r >= keep) break; // 已退到安全区，停止移除
+      var idx = bs.indexOf(d);
+      if (idx >= 0) bs.splice(idx, 1);
+      removed++;
+      parts.push({ type: 'ring', x: d.x, y: d.y, r: d.r * 0.6, life: 0.5, max: 0.5, color: '#BFE3F7' });
+      for (j = 0; j < 6; j++) {
+        var ang = Math.random() * Math.PI * 2, sp = 40 + Math.random() * 90;
+        parts.push({ type: 'dot', x: d.x, y: d.y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 60,
+          r: 1.5 + Math.random() * 2, life: 0.5, max: 0.5, color: '#CFEAF9' });
+      }
+    }
+    for (i = 0; i < bs.length; i++) { bs[i].dangerT = 0; bs[i].grace = 1.5; } // 全体 1.5s 抢救宽限
     reviveCount++;
-    addPopup(C.W / 2, 300, '复活！继续深潜', true, 0);
+    addPopup(C.W / 2, 300, removed > 0 ? '复活！清走 ' + removed + ' 滴 · 继续深潜' : '复活！继续深潜', true, 0);
     audio.blip(660, 0.22, 'sine', 0.12, 1.2);
   }
   // 返回主页（v234 重开确认新增）：局面数据不动（主页「开始游戏」会走 restart() 全量重置），仅切态+收起瞄准；
@@ -3424,7 +3449,7 @@ MG.layout.build();
         discoverSpecial('rune');
         if (!runeHintShown) {
           runeHintShown = true;
-          addPopup(C.W / 2, 244, '带符文的水滴：合成即可为技能充能', false, 0, 2.0); // v325：一次性教程提示，2.0s 读全
+          addPopup(C.W / 2, 244, '带符文的水滴：合成即可为技能充能', false, 0, 2.0, 'event'); // v325：一次性教程提示，2.0s 读全；v330 显式归 event（文案含"合成/充能"否则误归 good）
         }
       }
       if (ng.active && ng.active.ice && Math.random() < ng.active.ice) nb.ngIce = true; // 二周目「冰封之海」

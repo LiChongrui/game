@@ -279,7 +279,7 @@ eq('大字号公告默认2s', /var lf = life \|\| \(isBig \? 2\.0 : 1\.0\);/.tes
 eq('弹字生命引lf', /var p = \{ x: x, y: y, text: text, life: lf, max: lf, big: !!isBig, mult: mult \|\| 0, scale: 0\.4, kind: kind \|\| inferKind\(text\) \};/.test(SRC), true);
 eq('弹字压入p对象', /popups\.push\(p\);/.test(SRC), true);
 eq('甘霖下一滴预告1.6s', /'甘霖 · 下一滴是「' \+ T\[t\]\.name \+ '」', false, 0, 1\.6\);/.test(SRC), true);
-eq('符文教程提示2s', /'带符文的水滴：合成即可为技能充能', false, 0, 2\.0\);/.test(SRC), true);
+eq('符文教程提示2s', /'带符文的水滴：合成即可为技能充能', false, 0, 2\.0, 'event'\);/.test(SRC), true); // v330：显式归 event
 // v327：复活功能已移除（先不做广告），原"越线水滴被冲走 ×N"公告随 doRevive 一并删除；负向回归见 ⑧
 eq('任务已更新提示1.6s', /'任务已更新', false, 0, 1\.6\);/.test(SRC), true);
 eq('大宝箱错过提示1.6s', /'大宝箱沉入深渊…', false, 0, 1\.6\);/.test(SRC), true);
@@ -642,6 +642,26 @@ eq('漩涡漏斗重绘', /grad\('stormFunnel'/.test(SRC), true);
 eq('漩涡双层反向螺旋', /for \(var layer = 0; layer < 2; layer\+\+\) \{[\s\S]*?var rot = time \* \(0\.85 \+ layer \* 0\.55\) \* dir;/.test(SRC), true);
 eq('漩涡旧发光盘已移除', /grad\('stormGlow'/.test(SRC), false);
 console.log('⑨ v329 倒计时1Hz+提示分色+宝箱跟随+宝箱不开未解锁+涌泉修复+漩涡重绘断言: ' + pass + ' pass, ' + fail + ' fail');
+f2 += fail;
+
+// ===== ⑩ v330：复活清场 + 缓冲倒计时无缝续接 + 提示分色梳理 =====
+pass = 0; fail = 0;
+// ① 复活清场（用户"复活时要移除适当的水滴！结算页签弹不出来"）：不移滴则越线堆原样留存，
+//    宽限+引信耗尽立刻二次判负，玩家视角"复活点了、结算页马上弹回来"。规则：普通水滴
+//    （铁礁/宝箱除外）自堆顶向下移除至剩余堆顶退到警戒线下方 70px 安全区。
+eq('复活清场-堆顶排序', /drops\.sort\(function \(a, c\) \{ return \(a\.y - a\.r\) - \(c\.y - c\.r\); \}\);/.test(SRC), true);
+eq('复活清场-安全线70', /var keep = C\.dangerY \+ 70;/.test(SRC), true);
+eq('复活清场-排除铁礁宝箱', /if \(!bs\[i\]\.iron && !bs\[i\]\.chest\) drops\.push\(bs\[i\]\);/.test(SRC), true);
+eq('复活清场-气泡消散特效', /parts\.push\(\{ type: 'ring', x: d\.x, y: d\.y, r: d\.r \* 0\.6, life: 0\.5, max: 0\.5, color: '#BFE3F7' \}\);/.test(SRC), true);
+eq('复活清场-清走计数弹字', /'复活！清走 ' \+ removed \+ ' 滴 · 继续深潜'/.test(SRC), true);
+// ② 缓冲倒计时无缝续接：缓冲分支不再 worst=0（倒计时归零闪没一帧又跳回）
+eq('缓冲倒计时无缝续接', /worst = 0\.999; minRemain = C\.dangerTime; break;/.test(SRC), true);
+// ③ 提示分色梳理：词缀公告/符文教程显式 event；good 词表补"充满"
+eq('词缀公告显式event', /affix\.name \+ '」', true, 0, 0, 'event'\);/.test(SRC), true);
+eq('符文教程显式event', /'带符文的水滴：合成即可为技能充能', false, 0, 2\.0, 'event'\);/.test(SRC), true);
+eq('good词表含充满', /充能\|充满\|成就/.test(SRC), true);
+eq('分色仍为5类', (function () { var m = SRC.match(/return '(info|event|good|warn|bad)'/g) || []; return m.length >= 4; })(), true);
+console.log('⑩ v330 复活清场+倒计时续接+分色梳理断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
 process.exit(f2 ? 1 : 0);
