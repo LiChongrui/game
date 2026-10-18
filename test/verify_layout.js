@@ -422,7 +422,16 @@ eq('警示文字独立函数', /function drawDangerText\(\) \{/.test(RSRC), true
 eq('警示文字在实体层之后', (function () {
   return RSRC.indexOf('drawDangerText();') > RSRC.indexOf('for (i = 0; i < phys.bodies.length; i++) drawBall(phys.bodies[i], 1);');
 })(), true);
-eq('警示文字仅drawDangerText绘制', (RSRC.match(/fillText\('堆高越线'/g) || []).length, 1);
+// v333：警戒线整体叠在水滴之上（用户"警戒线，越界提示等要叠在水滴上面"）——
+// 唯一调用点从 drawWaterBack 之前移到 bodies 之后、drawDangerText 之前
+eq('警戒线叠在水滴上层', (function () {
+  var bodiesIdx = RSRC.indexOf('for (i = 0; i < phys.bodies.length; i++) drawBall(phys.bodies[i], 1);');
+  var calls = [], idx = 0;
+  while ((idx = RSRC.indexOf('drawDangerLine();', idx)) >= 0) { calls.push(idx); idx += 1; }
+  return bodiesIdx >= 0 && calls.length === 1 && calls[0] > bodiesIdx;
+})(), true);
+eq('旧实体层前调用已移除', /drawDangerLine\(\);\s*\n\s*drawWaterBack\(\);/.test(RSRC), false);
+eq('警示文字仅drawDangerText绘制', (RSRC.match(/fillText\('堆高越线/g) || []).length, 1); // v333：合并后带秒数后缀
 eq('drawDangerLine不再画警示文字', (function () {
   var i0 = RSRC.indexOf('function drawDangerLine()'), i1 = RSRC.indexOf('function drawDangerText()');
   return i0 >= 0 && i1 > i0 && RSRC.slice(i0, i1).indexOf('堆高越线') < 0;
@@ -432,8 +441,12 @@ eq('drawDangerLine不再画警示文字', (function () {
 eq('dangerRemain全局定义', /var dangerRemain = 0;/.test(SRC), true);
 eq('倒计时引dangerRemain', /var sec = Math\.max\(0, dangerRemain\);/.test(RSRC), true);
 eq('倒计时toFixed(1)+s', /sec\.toFixed\(1\) \+ 's'/.test(RSRC), true);
-eq('越线大字26px(放大)', /ctx\.font = 'bold 26px system-ui, sans-serif';[\s\S]*?ctx\.fillText\('堆高越线'/.test(RSRC), true);
-eq('倒计时字号34px(放大)', /ctx\.font = 'bold 34px system-ui, sans-serif';[\s\S]*?sec\.toFixed\(1\) \+ 's'/.test(RSRC), true);
+eq('越线合并提示30px', /ctx\.font = 'bold 30px system-ui, sans-serif';[\s\S]*?ctx\.fillText\('堆高越线 '/.test(RSRC), true); // v333：合并为一条
+eq('旧34px独立倒计时已移除', (function () { // v333：并入同一行（全局另有他处 34px，只在 drawDangerText 段内断言）
+  var i0 = RSRC.indexOf('function drawDangerText()'), i1 = RSRC.indexOf('function drawHUD()');
+  var seg = i0 >= 0 && i1 > i0 ? RSRC.slice(i0, i1) : '';
+  return i0 >= 0 && i1 > i0 && seg.indexOf('bold 34px') < 0;
+})(), true);
 // ---- v320 待投虚影生命感（用户："水滴没有坠落时，可以加一个合适的效果吗?目前看水滴是虚的而且看起来呆呆的"）----
 // ghostBob 单一相位源驱动整组预览：虚影球纵向漂浮 + 滴体同色系光晕呼吸，指示线顶与名称
 // 标签跟随同浮不断连；横向严格钉 aimX 不误导瞄准（幅度上限 4.2px=3+1.2，标签与球顶间距恒 5px）
@@ -619,8 +632,8 @@ f2 += fail;
 // ===== ⑨ v329：死亡缓冲倒计时1Hz + 提示分色(v331 改制 7 类) + 大宝箱提示跟随宝箱 + 宝箱不开未解锁道具 + 涌泉修复 + 漩涡风暴重绘 =====
 pass = 0; fail = 0;
 // ① 死亡缓冲倒计时 1Hz 缓闪（用户"闪的太快了，可以1s闪一次"）——新增独立 ca(alpha)，不再随警示文字 1.2~1.8Hz
-eq('倒计时1Hz同相呼吸', /var ca = 0\.55 \+ 0\.45 \* pulse;/.test(RSRC), true); // v332：与警示文字共用 pulse
-eq('倒计时用独立alpha(ca)', /ctx\.fillStyle = 'rgba\(255,86,40,' \+ ca \+ '\)';/.test(RSRC), true);
+eq('警示1Hz呼吸保持', /var wa = Math\.min\(1, 0\.55 \+ dangerAlert \* 0\.45\) \* \(0\.7 \+ 0\.3 \* pulse\);/.test(RSRC), true); // v332/v333：共用 pulse 同相呼吸
+eq('越线提示单行合并(v333)', /ctx\.fillText\('堆高越线 ' \+ sec\.toFixed\(1\) \+ 's'/.test(RSRC), true);
 // ② 提示分色（用户"不同的提示类型要区分一下；红色的提示太多了"）：渲染端 PCOLMAP 五类 + 按 p.kind 取色
 eq('提示分色表PCOLMAP七类', /var PCOLMAP = \{[\s\S]*?gain:[\s\S]*?burst:[\s\S]*?world:[\s\S]*?reward:[\s\S]*?todo:[\s\S]*?miss:[\s\S]*?neutral:/.test(RSRC), true); // v331：5类→7类
 eq('弹字按p.kind取色', /ctx\.fillStyle = PCOLMAP\[p\.kind\] \|\| PCOLMAP\.neutral;/.test(RSRC), true);

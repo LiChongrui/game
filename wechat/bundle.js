@@ -6556,34 +6556,24 @@ MG.layout.build();
     // （用户："有些提示信息会叠在水滴下面导致字体被挡（比如死亡倒计时提示）"）。
   }
 
-  // 越线判负警示文字（v326 从 drawDangerLine 内移出，改在实体层之后绘制——
+  // 越线判负提示（v326 从 drawDangerLine 内移出独立函数并改在实体层之后绘制——
   // 堆高时水滴就盘踞在文字一带，画在 bodies 之前必被盖住）
   function drawDangerText() {
     if (dangerAlert <= 0.12) return;
     ctx.textAlign = 'center';
-    // v332：警示文字与倒计时统一 1Hz 同相呼吸（用户"堆高越线闪的有问题，太快了，
-    // 以及和倒计时读秒的关系"）——原 pow(sin,3) 尖峰波形在 1.2~1.8Hz 下读感是急促频闪，
-    // 且与倒计时 1Hz 各闪各的、互相打架。现共用一个 pulse：两者每秒同步呼吸一次、
-    // 永不熄灭（警示文字最低不透明度 ~0.4，倒计时 ~0.55）；危险度只抬高底部，不再提频率。
-    var pulse = 0.5 + 0.5 * Math.sin(time * 2 * Math.PI); // 1Hz 呼吸（警示文字与倒计时同相同步）
-    var wa = Math.min(1, 0.55 + dangerAlert * 0.45) * (0.7 + 0.3 * pulse); // 警示文字：0.39~1.0，危险越高越实
-    var ca = 0.55 + 0.45 * pulse;                          // 倒计时：0.55~1.0，与警示文字同拍
+    // v333：合并为一条提示「堆高越线 2.3s」（用户"堆高越线和倒计时合并为一个提示"）——
+    // 原 26px 大字 + 34px 秒数两行拆着读，现一行 30px 同色同 alpha；1Hz 同相呼吸保持
+    // （共用 pulse，永不熄灭：最低不透明度 ~0.39，危险度只抬高亮度下限）。
+    var pulse = 0.5 + 0.5 * Math.sin(time * 2 * Math.PI); // 1Hz 呼吸
+    var wa = Math.min(1, 0.55 + dangerAlert * 0.45) * (0.7 + 0.3 * pulse);
+    var sec = Math.max(0, dangerRemain);
     ctx.lineJoin = 'round';
-    // 大字「堆高越线」
-    ctx.font = 'bold 26px system-ui, sans-serif';
+    ctx.font = 'bold 30px system-ui, sans-serif';
     ctx.strokeStyle = 'rgba(255,255,255,' + wa + ')';
     ctx.lineWidth = 5;
-    ctx.strokeText('堆高越线', C.W / 2, C.dangerY - 42);
+    ctx.strokeText('堆高越线 ' + sec.toFixed(1) + 's', C.W / 2, C.dangerY - 26);
     ctx.fillStyle = 'rgba(196,48,42,' + wa + ')';
-    ctx.fillText('堆高越线', C.W / 2, C.dangerY - 42);
-    // 死亡缓冲倒计时（与警示文字同相 1Hz 呼吸，两者合为一个整体警示）
-    var sec = Math.max(0, dangerRemain);
-    ctx.font = 'bold 34px system-ui, sans-serif';
-    ctx.strokeStyle = 'rgba(255,255,255,' + ca + ')';
-    ctx.lineWidth = 6;
-    ctx.strokeText(sec.toFixed(1) + 's', C.W / 2, C.dangerY - 4);
-    ctx.fillStyle = 'rgba(255,86,40,' + ca + ')';
-    ctx.fillText(sec.toFixed(1) + 's', C.W / 2, C.dangerY - 4);
+    ctx.fillText('堆高越线 ' + sec.toFixed(1) + 's', C.W / 2, C.dangerY - 26);
   }
 
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
@@ -8211,7 +8201,8 @@ MG.layout.build();
     } // 开始界面：背景之上画菜单 + 设置入口 + 设置弹窗 + 成就殿堂面板
 
     drawContainer();
-    drawDangerLine();
+    // v333：drawDangerLine 调用点移到实体层之后（用户"警戒线，越界提示等要叠在水滴上面"）——
+    // 原在水/实体层之前，堆高时线与警示渐晕被水滴盖住；现随 drawDangerText 同层后画。
     drawWaterBack();
     // v310：指示线在实体层之前绘制（坠落中的水滴盖在线上，线在"水滴后面"）
     if (state === 'play' && !evapMode && !flowMode && !rippleMode && !confirmOpen) {
@@ -8325,6 +8316,7 @@ MG.layout.build();
     drawChalChip();                 // v273：深渊潜航/每日挑战局信息芯片（挑战中显示目标与进度）
     if (hudInset > 0) ctx.restore();
     drawTideBanner(); // v188：涨潮横幅锚堆叠空间中心（非 HUD 元素，不吃 hudInset 平移）
+    drawDangerLine(); // v333：警戒线（含警示渐晕/光带）叠在水滴之上——原在实体层之前被堆体盖住
     drawDangerText(); // v326：越线警示文字改在实体层之后绘制（原在 drawDangerLine 内，堆高越线时被水滴盖住）
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
     drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）
