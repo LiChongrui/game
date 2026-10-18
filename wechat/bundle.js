@@ -2868,17 +2868,13 @@ MG.layout.build();
       var top = b.y - b.r;
       if (top >= C.dangerY) { b.dangerT = 0; continue; } // 线下，重置
       var fuse = tideOn ? C.dangerTime * 2 : C.dangerTime * (top < C.containerTop ? 0.55 : 1);
-      if (!runBuffered) fuse = Math.max(fuse, C.dangerTime * 3); // 首死缓冲：更长引信（倒计时即缓冲，无单独提示）
+      if (!runBuffered) fuse = Math.max(fuse, C.dangerTime * 3); // 首次越线引信延长至 3s（缓冲），复活后不再延长
       b.dangerT += dt;
       var remain = fuse - b.dangerT;
-      if (remain <= 0) {
-        if (!runBuffered) { // 每局一次首死宽限：清空全体计时再续（即"缓冲"），不弹字（用户："原来的缓冲提示是不需要的"）
-          runBuffered = true;
-          for (var j = 0; j < bs.length; j++) { bs[j].dangerT = 0; bs[j].grace = 0; }
-          // v330：worst/minRemain 给非零值——倒计时从 3s 无缝接到常规引信 1.1s，不再"归零闪没一帧又跳回"
-          worst = 0.999; minRemain = C.dangerTime; break;
-        } else { dangerAlert = 0; dangerRemain = 0; gameOver(); return; }
-      }
+      // v336：倒计时只走一次（用户"堆高越线会倒计时两次！"）——原两段式（首段 3s 走完
+      // 重置全体计时、再按常规引信 1.1s 倒数第二遍才结算）观感即"倒计时两次"。现引信到点
+      // 直接结算：首次越线 3s、复活后 1.1s（doRevive 已置 runBuffered），倒计时只出现一轮。
+      if (remain <= 0) { dangerAlert = 0; dangerRemain = 0; gameOver(); return; }
       var w = b.dangerT / fuse;
       if (w > worst) worst = w;
       if (remain < minRemain) minRemain = remain;

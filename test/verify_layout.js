@@ -672,8 +672,10 @@ eq('复活清场-安全线70', /var keep = C\.dangerY \+ 70;/.test(SRC), true);
 eq('复活清场-排除铁礁宝箱', /if \(!bs\[i\]\.iron && !bs\[i\]\.chest\) drops\.push\(bs\[i\]\);/.test(SRC), true);
 eq('复活清场-气泡消散特效', /parts\.push\(\{ type: 'ring', x: d\.x, y: d\.y, r: d\.r \* 0\.6, life: 0\.5, max: 0\.5, color: '#BFE3F7' \}\);/.test(SRC), true);
 eq('复活清场-清走计数弹字', /'复活！清走 ' \+ removed \+ ' 滴 · 继续深潜'/.test(SRC), true);
-// ② 缓冲倒计时无缝续接：缓冲分支不再 worst=0（倒计时归零闪没一帧又跳回）
-eq('缓冲倒计时无缝续接', /worst = 0\.999; minRemain = C\.dangerTime; break;/.test(SRC), true);
+// ② v336：倒计时单次——两段式缓冲分支已移除（原首段 3s 走完重置、再 1.1s 倒数第二遍），
+//    引信到点直接结算；首次越线 3s / 复活后 1.1s（doRevive 置 runBuffered）
+eq('倒计时单次-到点直接结算', /if \(remain <= 0\) \{ dangerAlert = 0; dangerRemain = 0; gameOver\(\); return; \}/.test(SRC), true);
+eq('两段式缓冲分支已移除', /worst = 0\.999; minRemain = C\.dangerTime; break;/.test(SRC), false);
 // ③ 提示分色梳理：v331 起 5 类并 7 类（词缀 world、宝箱/符文教程 todo）
 eq('词缀公告显式world', /affix\.name \+ '」', true, 0, 0, 'world'\);/.test(SRC), true);
 eq('符文教程显式todo', /'带符文的水滴：合成即可为技能充能', false, 0, 2\.0, 'todo'\);/.test(SRC), true);
