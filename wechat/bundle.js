@@ -2783,8 +2783,15 @@ MG.layout.build();
   // ---------- 失败判定 ----------
   function checkDanger(dt) {
     // 潮汐期间照常判负：浮起越线同样致命（v322 线性潮位，热泉裂谷以深满潮可没过警戒线，
-    // 水滴会被浮力推越线，潮汐本身即威胁）。但浮力会把整堆水滴像筏子一样整体抬起（堆顶常越过
-    // 容器口），非玩家堆高——判负引信放宽 5 倍且不叠加容器口减半，给足反应时间（配合每局一次深流缓冲）。
+    // 水滴会被浮力推越线，潮汐本身即威胁）。浮力会把整堆水滴像筏子一样整体抬起（堆顶常越过
+    // 容器口），非玩家堆高——引信取静态值 2 倍并保留每局一次深流缓冲，给足反应时间。
+    // ★ v323：潮汐判负两条修正（用户："涨潮引起的越线好像很难死亡，是判定不对吗？"；
+    //   test/sim_danger.js 仿真定位）——① 引信 ×5→×2：漂浮滴均速仅 45~53px/s，却因
+    //   初升时一次性 ~7px 回落出线清零、约 3.5s 后才稳定越线，×5 引信最早 ~9s 才攒满，
+    //   超过涨潮全长 8s——"一次涨潮内永远攒不满、潮退滴落计时清零"是越线很难死亡的主因；
+    //   ② 潮汐期间越线即计时、不看速度：速度门只堵死 10~13% 采样，却把"持续漂浮"与
+    //   "被合成反冲弹飞的瞬时横穿"混为一谈——漂浮持续、横穿 <0.5s，2.2s 引信天然区分
+    //   （回落出线即清零）。非潮汐路径（速度门 + 扰动衰减）原样保留，行为不变。
     var tideOn = tide.progress > 0.15;
     var bs = phys.bodies;
     var worst = 0;
@@ -2797,8 +2804,8 @@ MG.layout.build();
       if (top >= C.dangerY) { b.dangerT = 0; continue; } // 线下，重置
       // 越线即计时，不再要求"有支撑"——高压堆里球体持续微颤导致支撑/速度判定
       // 反复失败、计时永远攒不满，是此前"明显越线却迟迟不判负"的根因。
-      var fuse = tideOn ? C.dangerTime * 5 : C.dangerTime * (top < C.containerTop ? 0.55 : 1);
-      if (sp < C.dangerSpeed * 1.5) {
+      var fuse = tideOn ? C.dangerTime * 2 : C.dangerTime * (top < C.containerTop ? 0.55 : 1);
+      if (tideOn || sp < C.dangerSpeed * 1.5) {
         b.dangerT += dt;
         if (b.dangerT > fuse) {
           // 每局一次「深流缓冲」：首次判负改为全局 3 秒宽限，缓解前期暴毙挫败感
@@ -2812,7 +2819,7 @@ MG.layout.build();
         // 被明显扰动（弹飞/合成反冲）：计时缓慢消退而非清零
         b.dangerT = Math.max(0, b.dangerT - dt * 2);
       }
-      worst = Math.max(worst, b.dangerT / C.dangerTime);
+      worst = Math.max(worst, b.dangerT / fuse); // 按各体实际引信归一：潮汐 2.2s 警示条与判负同步满
     }
     dangerAlert = Math.min(1, worst); // 0..1，供警戒线渲染加强警示
   }
@@ -2838,7 +2845,8 @@ MG.layout.build();
     var bs = [], i;
     for (i = 0; i < phys.bodies.length; i++) {
       b = phys.bodies[i];
-      bs.push({ x: Math.round(b.x), y: Math.round(b.y), r: Math.round(b.r), tier: b.tier, iron: !!b.iron, chest: !!b.chest, special: b.special || null });
+      bs.push({ x: Math.round(b.x), y: Math.round(b.y), r: Math.round(b.r), tier: b.tier, iron: !!b.iron, chest: !!b.chest, special: b.special || null,
+                vx: Math.round(b.vx), vy: Math.round(b.vy), dangerT: Math.round((b.dangerT || 0) * 100) / 100, grace: Math.round((b.grace || 0) * 100) / 100 });
     }
     var ui = { book: { cx: bookBtn.cx, cy: bookBtn.cy }, restart: { cx: restartBtn.cx, cy: restartBtn.cy }, skills: [] };
     for (i = 0; i < SKILL_BTNS.length; i++) ui.skills.push({ key: SKILL_BTNS[i].key, cx: SKILL_BTNS[i].cx, cy: SKILL_BTNS[i].cy });
