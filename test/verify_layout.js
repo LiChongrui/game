@@ -1,4 +1,4 @@
-// 布局几何验证（v317）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗（含第4行清空存档+二级确认面板）/设置图标静态核查
+// 布局几何验证（v318）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗（含第4行清空存档+二级确认面板，v318 文案精简）/设置图标静态核查
 // 纯 node 计算（vm 加载 config + layout，无浏览器/无 canvas）。
 // ★ v183 新定位语义（覆盖 v175~v182 的 EXTRA 分配方案；用户：
 //   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少！"）：
@@ -414,6 +414,9 @@ console.log('⑥ v195六钮真源+HUD卡度量+v196第一排+v197设置+v199/v20
 f2 += fail;
 
 // ---- v317 设置弹窗第 4 行「清空存档」（用户："设置增加一个独立的功能：清空存档。用来重置游戏至初始状态。"）----
+// v318：解释文本精简——确认面板由三行逐项列清（最高分/海域进度/图鉴…）缩为两行
+// （"将清空全部存档，游戏恢复初始状态。"+"此操作无法撤销。"），设置行说明缩为"重置游戏至初始状态"
+// （用户："解释文本太多了"；旧文案 13px 下 22/21 字≈286/273px 超面板内宽 252px 溢出）
 // 二级确认面板 panel.setClear（块内居中，取消/确认清空两横钮）；确认 = 删全部 mg_* 存档键 +
 // MG.platform.reload()（wx 走 wx.restartMiniProgram）——运行时状态均为加载时初始化的模块级
 // 变量，只删存储会让内存与存档不一致，必须整页重载才回到初始状态
@@ -431,9 +434,13 @@ eq('drawSetClear定义', /function drawSetClear\(\) \{/.test(RSRC), true);
 eq('setIconTrash定义', /function setIconTrash\(ctx\) \{/.test(RSRC), true);
 eq('清档面板两处渲染', (RSRC.match(/drawPanelFx\('setclr'/g) || []).length, 2);
 eq('清空存档行文案', /ctx\.fillText\('清空存档', clr\.x \+ 18, clr\.y \+ 24\);/.test(RSRC), true);
-eq('清空存档行说明', /ctx\.fillText\('重置全部进度，游戏恢复初始状态', clr\.x \+ 18, clr\.y \+ 42\);/.test(RSRC), true);
+eq('清空存档行说明', /ctx\.fillText\('重置游戏至初始状态', clr\.x \+ 18, clr\.y \+ 42\);/.test(RSRC), true);
 eq('确认清空按钮', /'确认清空'/.test(RSRC), true);
 eq('清档无法撤销警示', /此操作无法撤销/.test(RSRC), true);
+// v318：说明文本精简为两行（原三行逐项列清超面板宽 252px 溢出，且用户"解释文本太多了"）——
+// 行宽锁死：13px 中文每字≈13px，两行 17/8 字≈221/104px，右缘余量≥31px
+eq('清档说明两行精简', /ctx\.fillText\('将清空全部存档，游戏恢复初始状态。', cr\.x \+ 24, cr\.y \+ 64\);[\s\S]*?ctx\.fillText\('此操作无法撤销。', cr\.x \+ 24, cr\.y \+ 84\);/.test(RSRC), true);
+eq('清档说明无逐项列清', /最高分、海域进度/.test(RSRC), false);
 eq('平台remove定义', /remove: function \(k\) \{/.test(PLATSRC), true);
 eq('平台reload定义', /reload: function \(\) \{/.test(PLATSRC), true);
 eq('wx清档走restartMiniProgram', /wx\.restartMiniProgram/.test(PLATSRC), true);
@@ -441,6 +448,6 @@ eq('setClear面板真源', /setClear: \{ w: 300, h: 180, btnH: 42, btnGap: 12, b
 eq('setClearRect定义', /setClearRect: function \(\) \{/.test(LSRC2), true);
 eq('setClearBtnRect定义', /setClearBtnRect: function \(i\) \{/.test(LSRC2), true);
 eq('setClearCloseRect定义', /setClearCloseRect: function \(\) \{/.test(LSRC2), true);
-console.log('⑦ v317 清空存档断言: ' + pass + ' pass, ' + fail + ' fail');
+console.log('⑦ v317 清空存档断言（v318 文案精简）: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 process.exit(f2 ? 1 : 0);

@@ -6613,7 +6613,7 @@ MG.layout.build();
     ctx.fillText('清空存档', clr.x + 18, clr.y + 24);
     ctx.fillStyle = '#96736B';
     ctx.font = '12px system-ui, sans-serif';
-    ctx.fillText('重置全部进度，游戏恢复初始状态', clr.x + 18, clr.y + 42);
+    ctx.fillText('重置游戏至初始状态', clr.x + 18, clr.y + 42);
     // 右侧红色小钮「清空」（64×30，与滑块开关同一垂直中线）
     var bx = clr.x + clr.w - 18 - 64, by = clr.y + 13;
     var bgc = ctx.createLinearGradient(0, by, 0, by + 30);
@@ -6635,14 +6635,13 @@ MG.layout.build();
     drawPanelHeader('清空存档', cr, MG.layout.setClearCloseRect(), function () {
       ctx.save(); ctx.scale(0.667, 0.667); setIconTrash(ctx); ctx.restore();
     }, '#B0584A');
-    // 影响范围（三行左对齐小字，逐项列清，避免"到底清什么"的疑虑）
+    // 说明（两行左对齐小字：清空结果 + 无法撤销警示）
     ctx.textAlign = 'left';
     ctx.fillStyle = '#4A7FA0';
     ctx.font = '13px system-ui, sans-serif';
-    ctx.fillText('将清空全部存档：最高分、海域进度、图鉴收集、', cr.x + 24, cr.y + 64);
-    ctx.fillText('成就、每日任务与挑战、符文解锁等全部重置，', cr.x + 24, cr.y + 84);
+    ctx.fillText('将清空全部存档，游戏恢复初始状态。', cr.x + 24, cr.y + 64);
     ctx.fillStyle = '#B0584A';
-    ctx.fillText('游戏恢复初始状态。此操作无法撤销。', cr.x + 24, cr.y + 104);
+    ctx.fillText('此操作无法撤销。', cr.x + 24, cr.y + 84);
     // 两钮横排：取消（白底蓝描边，轻）/ 确认清空（红渐变，主）
     var labels = ['取消', '确认清空'];
     ctx.font = 'bold 16px system-ui, sans-serif';
