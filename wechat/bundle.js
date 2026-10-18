@@ -6561,14 +6561,13 @@ MG.layout.build();
   function drawDangerText() {
     if (dangerAlert <= 0.12) return;
     ctx.textAlign = 'center';
-    // v328：越线提示放大（用户"越线提示要大一些"）+ 死亡缓冲倒计时（用户"要包含缓冲倒计时"）；
-    // 方波 1.2~1.8Hz 平缓（v327 降闪）
-    var dHz = 1.2 + dangerAlert * 0.6;            // 警示文字脉动（保持危险感，不变）
-    var dsq = Math.pow(0.5 + 0.5 * Math.sin(time * dHz * 2 * Math.PI), 3);
-    var wa = Math.min(1, 0.5 + dangerAlert * 0.6) * (0.45 + 0.55 * dsq);
-    // 死亡缓冲倒计时：1Hz 缓闪（用户 v329：原随警示文字 1.2~1.8Hz 太快）
-    var csq = Math.pow(0.5 + 0.5 * Math.sin(time * 1.0 * 2 * Math.PI), 2);
-    var ca = 0.55 + 0.45 * csq;
+    // v332：警示文字与倒计时统一 1Hz 同相呼吸（用户"堆高越线闪的有问题，太快了，
+    // 以及和倒计时读秒的关系"）——原 pow(sin,3) 尖峰波形在 1.2~1.8Hz 下读感是急促频闪，
+    // 且与倒计时 1Hz 各闪各的、互相打架。现共用一个 pulse：两者每秒同步呼吸一次、
+    // 永不熄灭（警示文字最低不透明度 ~0.4，倒计时 ~0.55）；危险度只抬高底部，不再提频率。
+    var pulse = 0.5 + 0.5 * Math.sin(time * 2 * Math.PI); // 1Hz 呼吸（警示文字与倒计时同相同步）
+    var wa = Math.min(1, 0.55 + dangerAlert * 0.45) * (0.7 + 0.3 * pulse); // 警示文字：0.39~1.0，危险越高越实
+    var ca = 0.55 + 0.45 * pulse;                          // 倒计时：0.55~1.0，与警示文字同拍
     ctx.lineJoin = 'round';
     // 大字「堆高越线」
     ctx.font = 'bold 26px system-ui, sans-serif';
@@ -6577,7 +6576,7 @@ MG.layout.build();
     ctx.strokeText('堆高越线', C.W / 2, C.dangerY - 42);
     ctx.fillStyle = 'rgba(196,48,42,' + wa + ')';
     ctx.fillText('堆高越线', C.W / 2, C.dangerY - 42);
-    // 死亡缓冲倒计时（1Hz 缓闪，单独 alpha，不随警示文字快闪）
+    // 死亡缓冲倒计时（与警示文字同相 1Hz 呼吸，两者合为一个整体警示）
     var sec = Math.max(0, dangerRemain);
     ctx.font = 'bold 34px system-ui, sans-serif';
     ctx.strokeStyle = 'rgba(255,255,255,' + ca + ')';

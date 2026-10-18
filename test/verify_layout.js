@@ -593,7 +593,8 @@ pass = 0; fail = 0;
 eq('漩涡拽拉置豁免标记', /o\.vortexGrace = 0\.2;/.test(SRC), true);
 eq('漩涡豁免堆高判负', /if \(b\.vortexGrace > 0\) \{ b\.vortexGrace -= dt; b\.dangerT = 0; continue; \}/.test(SRC), true);
 eq('special豁免堆高判负', /if \(b\.special\) continue;/.test(SRC), true);
-eq('警示文字降闪(1.2~1.8Hz)', /var dHz = 1\.2 \+ dangerAlert \* 0\.6;/.test(RSRC), true);
+eq('警示文字与倒计时同步1Hz呼吸', /var pulse = 0\.5 \+ 0\.5 \* Math\.sin\(time \* 2 \* Math\.PI\);/.test(RSRC), true); // v332：pow 尖峰频闪已移除，同相呼吸
+eq('旧1.2~1.8Hz独立闪已移除', /var dHz = 1\.2 \+ dangerAlert \* 0\.6;/.test(RSRC), false);
 eq('深海涨潮持续随海域拉长', /tide\.timer = C\.tide\.duration \+ \(C\.tide\.durationMax - C\.tide\.duration\) \* seaStage\(\) \/ \(C\.seaStages\.length - 1\);/.test(SRC), true);
 // 广告全链路移除回归（v327 起，v328 仍保持——复活无广告门控）
 eq('广告门控已移除', /ads\.show\(/.test(SRC), false); // 调用形态（注释"无 ads.show 门控"不计）；复活无广告门控
@@ -618,7 +619,7 @@ f2 += fail;
 // ===== ⑨ v329：死亡缓冲倒计时1Hz + 提示分色(v331 改制 7 类) + 大宝箱提示跟随宝箱 + 宝箱不开未解锁道具 + 涌泉修复 + 漩涡风暴重绘 =====
 pass = 0; fail = 0;
 // ① 死亡缓冲倒计时 1Hz 缓闪（用户"闪的太快了，可以1s闪一次"）——新增独立 ca(alpha)，不再随警示文字 1.2~1.8Hz
-eq('倒计时1Hz缓闪', /var csq = Math\.pow\(0\.5 \+ 0\.5 \* Math\.sin\(time \* 1\.0 \* 2 \* Math\.PI\), 2\);/.test(RSRC), true);
+eq('倒计时1Hz同相呼吸', /var ca = 0\.55 \+ 0\.45 \* pulse;/.test(RSRC), true); // v332：与警示文字共用 pulse
 eq('倒计时用独立alpha(ca)', /ctx\.fillStyle = 'rgba\(255,86,40,' \+ ca \+ '\)';/.test(RSRC), true);
 // ② 提示分色（用户"不同的提示类型要区分一下；红色的提示太多了"）：渲染端 PCOLMAP 五类 + 按 p.kind 取色
 eq('提示分色表PCOLMAP七类', /var PCOLMAP = \{[\s\S]*?gain:[\s\S]*?burst:[\s\S]*?world:[\s\S]*?reward:[\s\S]*?todo:[\s\S]*?miss:[\s\S]*?neutral:/.test(RSRC), true); // v331：5类→7类
