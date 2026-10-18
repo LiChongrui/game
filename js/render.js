@@ -1550,17 +1550,27 @@
   function drawDangerText() {
     if (dangerAlert <= 0.12) return;
     ctx.textAlign = 'center';
-    ctx.font = 'bold 15px system-ui, sans-serif';
-    // 越线判负提示：与警戒线同语言、平缓方波（v327 降闪：原 2.5~4Hz 过快，用户"文本闪太快"）→ 1.2~1.8Hz，并提高最低不透明度保证可读
+    // v328：越线提示放大（用户"越线提示要大一些"）+ 死亡缓冲倒计时（用户"要包含缓冲倒计时"）；
+    // 方波 1.2~1.8Hz 平缓（v327 降闪）
     var dHz = 1.2 + dangerAlert * 0.6;
     var dsq = Math.pow(0.5 + 0.5 * Math.sin(time * dHz * 2 * Math.PI), 3);
     var wa = Math.min(1, 0.5 + dangerAlert * 0.6) * (0.45 + 0.55 * dsq);
     ctx.lineJoin = 'round';
+    // 大字「堆高越线」
+    ctx.font = 'bold 26px system-ui, sans-serif';
     ctx.strokeStyle = 'rgba(255,255,255,' + wa + ')';
-    ctx.lineWidth = 3;
-    ctx.strokeText('堆高越线', C.W / 2, C.dangerY - 14);
+    ctx.lineWidth = 5;
+    ctx.strokeText('堆高越线', C.W / 2, C.dangerY - 42);
     ctx.fillStyle = 'rgba(196,48,42,' + wa + ')';
-    ctx.fillText('堆高越线', C.W / 2, C.dangerY - 14);
+    ctx.fillText('堆高越线', C.W / 2, C.dangerY - 42);
+    // 死亡缓冲倒计时（危险越高闪得越明显）
+    var sec = Math.max(0, dangerRemain);
+    ctx.font = 'bold 34px system-ui, sans-serif';
+    ctx.strokeStyle = 'rgba(255,255,255,' + wa + ')';
+    ctx.lineWidth = 6;
+    ctx.strokeText(sec.toFixed(1) + 's', C.W / 2, C.dangerY - 4);
+    ctx.fillStyle = 'rgba(255,86,40,' + wa + ')';
+    ctx.fillText(sec.toFixed(1) + 's', C.W / 2, C.dangerY - 4);
   }
 
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
@@ -1575,6 +1585,7 @@
     for (var fi = C.seaStages.length - 1; fi >= 0; fi--) {
       if (careerPeak >= C.seaStages[fi].at) { farIdx = fi; break; }
     }
+    farIdx = Math.max(farIdx, seaStage()); // v328：实时——当前海域更深则即时显示（用户："游戏时当前海域超过统计结果也不更新"）
     // 统计最佳结果：沿用原样式（14px/原描边/原色/超宽自适应缩字号），与成就殿堂按钮垂直居中对齐（cy36 → baseline41）
     ctx.font = '14px system-ui, sans-serif';
     ctx.lineWidth = 3;

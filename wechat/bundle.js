@@ -176,7 +176,7 @@ MG.config = {
   ng: {
     unlockScore: 50000,                 // 解锁门槛（= 月光环礁深处，需多局积累）
     affixes: [
-      { id: 'heavy', name: '重压深潜', desc: '重力 +60%',        grav: 1.6 },    // v285：词缀再加重（用户：难度还是太低）；v281 去得分倍率
+      { id: 'heavy', name: '重压深潜', desc: '重力 +80%',        grav: 1.8 },    // v285：词缀再加重（用户：难度还是太低）；v328：+60%→+80%（用户："重压深潜（重力 +80%）"）
       { id: 'storm', name: '疾风骤雨', desc: '潮汐间隔 -65%',    tideInt: 0.35 },
       { id: 'reef',  name: '暗礁密布', desc: '珊瑚礁概率 ×4',    ironX: 4 },
       { id: 'frost', name: '寒冰速冻', desc: '水滴 35% 落水即冻', ice: 0.35 }
@@ -282,13 +282,13 @@ MG.config = {
                         // sea×tier 用例实测"判负: 无"，全部被缓冲+退潮救走（虚晃一枪）。拉长至 9s 后
                         // 引信链在退潮前兑现，深海潮汐首个周期即可判负
     buoyancy: 2900,      // 浮力加速度（v308：2300→2900——深水滴净上托 1400，配合抬高后的水位足以浮起高堆叠）
-    // v322：满潮水面相对警戒线的偏移（px，负=线下）随海域线性增高——sea0=overMin 安全期
-    // （水面 574，潮汐只重排不越线）→ 最后一个海域=overMax 最高（水面 280 = 警戒线上方
-    // 35px，仍在出生点 260 下方 20px，虚影不被淹）。取代 v321 逐海域表（sea2 凸节后 sea4
-    // 起每海仅 10px 走平）——用户："涨潮的高度不合理，按理说应当线性增高，最后一个海域达到最高"
-    // v327：仅调整涨潮"持续"随海域拉长（见 durationMax 与 updateTide），水位曲线保持 v322 线性。
-    overMin: -259,
-    overMax: 35,
+    // v328：潮位规格（用户："潮汐最低是警戒线至底部的 1/4，最高值是 3/4！完全是不超过警戒线的"）
+    // ——满潮水面 = 警戒线→底部(=floorY-dangerY=450px)的"填充比例"：浅海最低填 1/4、深海最高填 3/4，
+    // 整条曲线线性、且恒在警戒线下方（最满 fill=3/4 时水面 = floorY-450×0.75 = 427.5，仍比警戒线 315 低 112.5px）。
+    // fill(sea) = lowFrac + (highFrac-lowFrac)×sea/(海域数-1)；满潮水面 y = floorY - (floorY-dangerY)×fill。
+    // 取代 v322 的 overMin/overMax（原会让深海满潮没过警戒线上 35px，违反"不超过警戒线"）。
+    lowFrac: 0.25,       // 最低潮位填充比例（浅海；水面 = floorY-450×0.25 = 652.5，最靠近底部）
+    highFrac: 0.75,      // 最高潮位填充比例（深海；水面 = floorY-450×0.75 = 427.5，最靠近警戒线但仍在线下 112.5px）
     warnTime: 3          // 涨潮前预警秒数
   },
 
@@ -1143,7 +1143,8 @@ MG.layout.build();
   var aiming = false;
   var cooldown = 0;
   var combo = 0, comboTimer = 0, maxCombo = 0;
-  var doubled = false; // 结算双倍（v161 起去广告门，直接双倍；v327 移除看广告复活）
+  var doubled = false; // 结算双倍（v161 起去广告门，直接双倍）
+  var reviveCount = 0; // 本局复活次数（v328 恢复：直接复活，无广告；先不做广告）
   var runBuffered = false; // 每局一次「深流缓冲」是否已用
   var popups = [], parts = [];
   var rippleQueue = []; // 待发的涟漪次波 { t, x, y }
@@ -1151,6 +1152,7 @@ MG.layout.build();
   var overButtons = [];
   var shakeT = 0, shakeAmp = 0;
   var dangerAlert = 0; // 越线判定进度 0..1（checkDanger 每帧写入，警戒线渲染读取）
+  var dangerRemain = 0; // 越线死亡缓冲剩余秒数（drawDangerText 倒计时用，v328）
 
   var skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
   // 大宝箱（无尽模式）：定期沉入一只，限时点击开启随机奖励
@@ -1404,11 +1406,11 @@ MG.layout.build();
   // 复用「深渊潜航」词缀管线（重力/潮汐/暗礁/冰冻/倍率全部已实现），另配两条更凶的每日专属词缀；
   // 完成状态持久化（mg_dchal），连续完成天数递增奖励；进行中的挑战局不持久化（刷新即丢，可重试）
   var DCHAL_AFFIXES = [
-    { id: 'heavy',   name: '重压深潜', desc: '重力 +60%',              grav: 1.6 },   // v285：词缀再加重（用户：难度还是太低）；v281 去得分倍率
+    { id: 'heavy',   name: '重压深潜', desc: '重力 +80%',              grav: 1.8 },   // v285：词缀再加重（用户：难度还是太低）；v328：+60%→+80%（用户："重压深潜（重力 +80%）"）
     { id: 'storm',   name: '疾风骤雨', desc: '潮汐间隔 -65%',          tideInt: 0.35 },
     { id: 'reef',    name: '暗礁密布', desc: '珊瑚礁概率 ×4',          ironX: 4 },
     { id: 'frost',   name: '寒冰速冻', desc: '水滴 35% 落水即冻',      ice: 0.35 },
-    { id: 'abyss',   name: '深渊试炼', desc: '重力 +80% 且潮汐 -65%',  grav: 1.8, tideInt: 0.35 },  // v286：复合词缀数值不再复用单一词缀（用户："都有两个一样的重力+60%"），逐项加码形成梯度
+    { id: 'abyss',   name: '深渊试炼', desc: '重力 +40% 且潮汐 -65%',  grav: 1.4, tideInt: 0.35 },  // v328：用户"深渊试炼（重力 +40% 且潮汐 -65%）"——grav 1.8→1.4（+40%），tideInt 0.35 保持（潮汐 -65%）
     { id: 'icereef', name: '冰礁交错', desc: '暗礁 ×5 且 45% 落水即冻', ironX: 5, ice: 0.45 }
   ];
   var dchal = (function () {
@@ -2558,16 +2560,15 @@ MG.layout.build();
   }
 
   // ---------- 潮汐 ----------
-  // 潮位设计（v322）：满潮水面相对警戒线的偏移随海域线性增高——config.tide.overMin（sea0
-  // 安全期，水面 574，只重排不越线）→ overMax（最后一个海域最高，水面 280 = 警戒线上 35px），
-  // 每个海域等量抬升 (overMax-overMin)/(海域数-1) = 42px。
-  // 沿革：v308 封顶"警戒线下 40px"永不过线；v319 移除封顶但挂在渐变端点被稀释（仿真实测
-  // sea5 前全档位越不了线）；v321 逐海域显式曲线又 sea2 凸节、sea4 后走平——用户：
-  // "涨潮的高度不合理，按理说应当线性增高，最后一个海域达到最高" ⇒ v322 纯线性
+  // 潮位设计（v328）：满潮水面 = 警戒线→底部(450px)的"填充比例"——浅海最低填 1/4、深海最高填 3/4，
+  // 线性、且恒在警戒线下方。fill(sea)=lowFrac+(highFrac-lowFrac)×sea/(n-1)；
+  // 满潮水面 y = floorY - zone×fill（zone=floorY-dangerY）。最满 fill=0.75 时水面=427.5，仍在线下 112.5px。
+  // 取代 v322 的 overMin/overMax（原深海满潮没过警戒线，违反"不超过警戒线"）。
   function tideWaterMax() {
     var H = FLOORY - C.containerTop;
-    var over = C.tide.overMin + (C.tide.overMax - C.tide.overMin) * (seaStage() / (C.seaStages.length - 1));
-    return (FLOORY - C.dangerY + over) / H;
+    var zone = FLOORY - C.dangerY;
+    var fill = C.tide.lowFrac + (C.tide.highFrac - C.tide.lowFrac) * (seaStage() / (C.seaStages.length - 1));
+    return (zone * fill) / H; // 满潮水面 = FLOORY - H×tideWaterMax = FLOORY - zone×fill（恒 ≥ 警戒线）
   }
   function tideY() {
     return FLOORY - tide.progress * (FLOORY - C.containerTop) * tideWaterMax();
@@ -2594,7 +2595,7 @@ MG.layout.build();
         // v327：涨潮持续随海域线性拉长（sea0=duration → 深渊王座=durationMax），让深海引信链在退潮前兑现（原写死 duration，深海首潮永不致死）
         tide.timer = C.tide.duration + (C.tide.durationMax - C.tide.duration) * seaStage() / (C.seaStages.length - 1);
         tide.banner = 2.4;
-        if (!tideKillHint) { tideKillHint = true; addPopup(C.W / 2, 250, '潮位渐深 · 浮起越线同样危险', true, 0); }
+        if (!tideKillHint) { tideKillHint = true; addPopup(C.W / 2, 250, '潮位渐深 · 水下浮力增强', true, 0); }
         audio.tide();
       }
     } else {
@@ -2802,9 +2803,12 @@ MG.layout.build();
 
   // ---------- 失败判定 ----------
   function checkDanger(dt) {
-    // 潮汐期间照常判负：浮起越线同样致命（v322 线性潮位，热泉裂谷以深满潮可没过警戒线，
-    // 水滴会被浮力推越线，潮汐本身即威胁）。浮力会把整堆水滴像筏子一样整体抬起（堆顶常越过
-    // 容器口），非玩家堆高——引信取静态值 2 倍并保留每局一次深流缓冲，给足反应时间。
+    // 失败判定：越线即计时、不看速度（v323/v326）。堆叠/微颤柱"明显越线却迟迟不判负"的根因是
+    // 速度门把"持续越线"与"瞬时横穿"混为一谈，而后者由三重机制区分（出生宽限 0.6s、引信 1.1s、
+    // 出线即清零），故越线滴一律计时。v328 起潮汐水面恒在警戒线下方（见 tideWaterMax），潮汐只做
+    // 水下浮力重排、不再把水滴推越线；潮汐期间引信仍 ×2（水下游动更慢，给足反应）。
+    // 三条豁免：冻结滴(b.frozen)、漩涡拽拉/甩飞(b.vortexGrace)、全部瞬态特殊滴(b.special)不计堆高。
+    // 死亡缓冲：越线即显示"死亡缓冲"倒计时(dangerRemain)，每局一次首死延长引信即为缓冲（弹字已移除）。
     // ★ v323：潮汐判负两条修正（用户："涨潮引起的越线好像很难死亡，是判定不对吗？"；
     //   test/sim_danger.js 仿真定位）——① 引信 ×5→×2：漂浮滴均速仅 45~53px/s，却因
     //   初升时一次性 ~7px 回落出线清零、约 3.5s 后才稳定越线，×5 引信最早 ~9s 才攒满，
@@ -2823,29 +2827,32 @@ MG.layout.build();
     //   ② 引信 1.1s >> 穿线时长 0.2~0.4s；③ 出线（top≥dangerY）即清零。
     var tideOn = tide.progress > 0.15;
     var bs = phys.bodies;
-    var worst = 0;
+    var worst = 0, minRemain = 99;
     for (var i = 0; i < bs.length; i++) {
       var b = bs[i];
-      if (b.frozen > 0) continue; // 冻结滴视为"封存"，不判负
+      if (b.frozen > 0) continue;                 // 冻结滴"封存"，不判负
+      if (b.special) continue;                     // v328：瞬态特殊滴（漩涡/雨云/冰晶/磁吸/熔岩/间歇泉/虚空/极光/彩虹/雷霆/珍珠/甘霖…）不计堆高
       if (b.grace > 0) { b.dangerT = 0; continue; }
-      if (b.vortexGrace > 0) { b.vortexGrace -= dt; b.dangerT = 0; continue; } // v327：漩涡拽拉/甩飞的水滴豁免堆高判负
+      if (b.vortexGrace > 0) { b.vortexGrace -= dt; b.dangerT = 0; continue; } // v327：漩涡拽拉/甩飞豁免堆高判负
       var top = b.y - b.r;
       if (top >= C.dangerY) { b.dangerT = 0; continue; } // 线下，重置
-      // 越线即计时，不再要求"有支撑"——高压堆里球体持续微颤导致支撑/速度判定
-      // 反复失败、计时永远攒不满，是此前"明显越线却迟迟不判负"的根因。
       var fuse = tideOn ? C.dangerTime * 2 : C.dangerTime * (top < C.containerTop ? 0.55 : 1);
+      if (!runBuffered) fuse = Math.max(fuse, C.dangerTime * 3); // 首死缓冲：更长引信（倒计时即缓冲，无单独提示）
       b.dangerT += dt;
-      if (b.dangerT > fuse) {
-        // 每局一次「深流缓冲」：首次判负改为全局 3 秒宽限，缓解前期暴毙挫败感
-        if (!runBuffered) {
+      var remain = fuse - b.dangerT;
+      if (remain <= 0) {
+        if (!runBuffered) { // 每局一次首死宽限：清空全体计时再续（即"缓冲"），不弹字（用户："原来的缓冲提示是不需要的"）
           runBuffered = true;
-          for (var j = 0; j < bs.length; j++) { bs[j].dangerT = 0; bs[j].grace = 3; }
-          addPopup(C.W / 2, 248, '深流缓冲 · 宽限 3 秒', true, 0);
-        } else { dangerAlert = 0; gameOver(); return; }
+          for (var j = 0; j < bs.length; j++) { bs[j].dangerT = 0; bs[j].grace = 0; }
+          worst = 0; minRemain = C.dangerTime * 3; break;
+        } else { dangerAlert = 0; dangerRemain = 0; gameOver(); return; }
       }
-      worst = Math.max(worst, b.dangerT / fuse); // 按各体实际引信归一：潮汐 2.2s 警示条与判负同步满
+      var w = b.dangerT / fuse;
+      if (w > worst) worst = w;
+      if (remain < minRemain) minRemain = remain;
     }
-    dangerAlert = Math.min(1, worst); // 0..1，供警戒线渲染加强警示
+    dangerAlert = Math.min(1, worst);                  // 0..1，供警戒线渲染加强警示
+    dangerRemain = worst > 0 ? Math.max(0, minRemain) : 0; // 死亡缓冲剩余秒（倒计时）
   }
   function gameOver() {
     state = 'over';
@@ -3070,19 +3077,20 @@ MG.layout.build();
           color: 'rgba(220,244,255,0.8)' });
       }
     } else if (seaEvent.type === 'storm') {
-      // v307：卷力 260→620、切向分量 0.7→0.9、作用半径 300→320——原力只有重力的 1/6，
-      // 漩涡几乎看不出卷动；并按水滴当前速度做阻尼（>700px/s 递减），保证"卷得动但不失控"
-      // v308：卷力回调 620→430、切向 0.9→0.8（v307 过猛）；速度阻尼保留防失控
+      // v328：卷力大幅增强（原 430 远小于重力 1500，卷不动水滴；用户"漩涡风暴卷不起水滴"）
+      // ——向心吸力 + 切向旋流双分量，核心区力 > 重力，真正把水滴卷入中心、卷起重排
+      var R = 360;
       for (i = 0; i < bs.length; i++) {
         b = bs[i];
-        if (b.iron) continue;
+        if (b.iron) continue; // 礁石沉底，不被卷动
         var dx = seaEvent.x - b.x, dy = seaEvent.y - b.y, d = Math.sqrt(dx * dx + dy * dy);
-        if (d > 8 && d < 320) {
+        if (d > 6 && d < R) {
+          var ux = dx / d, uy = dy / d;                 // 指向中心的单位向量（向心）
           var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-          var damp = sp > 700 ? Math.max(0.25, 1 - (sp - 700) / 600) : 1;
-          var f = 430 * (1 - d / 320) * damp;
-          b.vx += ((dx / d) * f - (dy / d) * f * 0.8) * dt;
-          b.vy += ((dy / d) * f + (dx / d) * f * 0.8) * dt;
+          var damp = sp > 900 ? Math.max(0.3, 1 - (sp - 900) / 700) : 1;
+          var f = 2400 * Math.pow(1 - d / R, 1.4) * damp; // 核心强(>重力)、边缘弱，平滑衰减
+          b.vx += (ux * f - uy * f * 1.15) * dt;          // 向心吸力 + 切向旋流（螺旋卷入）
+          b.vy += (uy * f + ux * f * 1.15) * dt;
         }
       }
     }
@@ -3110,52 +3118,57 @@ MG.layout.build();
       // 首尾各 0.8s 淡入淡出，避免漩涡凭空出现/消失
       var fadeK = Math.min(1, (seaEvent.t0 - seaEvent.t) / 0.8, seaEvent.t / 0.8);
       if (fadeK <= 0) return;
-      var pulse = 1 + 0.07 * Math.sin(time * 3);
       ctx.save();
       ctx.globalAlpha = fadeK;
       ctx.translate(seaEvent.x, seaEvent.y);
-      ctx.scale(pulse, pulse * 0.55); // 椭圆压扁：透视俯视感
-      // 柔光漩涡盘（径向渐变，静置营造深度）
-      ctx.fillStyle = grad('stormDisc', function () {
-        var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 110);
-        gg.addColorStop(0, 'rgba(94,110,208,0.30)');
-        gg.addColorStop(0.6, 'rgba(94,110,208,0.13)');
-        gg.addColorStop(1, 'rgba(94,110,208,0)');
+      var R = 160;
+      // 外发光漩涡盘（v328 重绘：海洋青蓝配色）
+      ctx.fillStyle = grad('stormGlow', function () {
+        var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, R + 10);
+        gg.addColorStop(0, 'rgba(74,162,210,0.22)');
+        gg.addColorStop(0.55, 'rgba(70,140,200,0.10)');
+        gg.addColorStop(1, 'rgba(70,140,200,0)');
         return gg;
       });
-      ctx.beginPath(); ctx.arc(0, 0, 110, 0, Math.PI * 2); ctx.fill();
-      // 三条螺旋臂：整臂单路径连续描边 + 沿臂渐隐（与漩涡滴同款手法，无接缝无硬线）
-      ctx.rotate(time * 2.0);
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      for (var k = 0; k < 3; k++) {
-        var a0 = k * Math.PI * 2 / 3;
-        var endA = a0 + Math.PI * 1.9;
-        (function (a0, endA, k) {
-          // 渐变与臂均从核心内部（4px）起：中心与旋臂连成一体，不再分离
-          var gx0 = Math.cos(a0) * 4, gy0 = Math.sin(a0) * 4;
-          var gx1 = Math.cos(endA) * 104, gy1 = Math.sin(endA) * 104;
+      ctx.beginPath(); ctx.arc(0, 0, R + 10, 0, Math.PI * 2); ctx.fill();
+      // 5 条螺旋臂（对数螺旋，渐隐）——整臂单路径连续描边，俯视漩涡感（v328 重绘）
+      ctx.rotate(time * 1.6);
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      for (var k = 0; k < 5; k++) {
+        var a0 = k * Math.PI * 2 / 5;
+        (function (a0, k) {
           ctx.strokeStyle = grad('stormArm' + k, function () {
-            var gg = ctx.createLinearGradient(gx0, gy0, gx1, gy1);
-            gg.addColorStop(0, 'rgba(152,166,240,0.62)');
-            gg.addColorStop(1, 'rgba(112,128,222,0.07)');
+            var gg = ctx.createLinearGradient(0, 0, Math.cos(a0) * R, Math.sin(a0) * R);
+            gg.addColorStop(0, 'rgba(200,232,252,0.6)');
+            gg.addColorStop(1, 'rgba(86,150,212,0.05)');
             return gg;
           });
-        })(a0, endA, k);
-        ctx.lineWidth = 7;
+          ctx.lineWidth = 6;
+          ctx.beginPath();
+          for (var i2 = 0; i2 <= 48; i2++) {
+            var tt = i2 / 48;
+            var aa = a0 + tt * Math.PI * 2.3;      // 每条臂绕 ~1.15 圈
+            var rr = 8 + (R - 8) * tt;             // 从核心向外展开
+            var x2 = Math.cos(aa) * rr, y2 = Math.sin(aa) * rr;
+            if (i2 === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
+          }
+          ctx.stroke();
+        })(a0, k);
+      }
+      // 同心旋转虚线环（2 圈，增强漩涡动感）
+      ctx.setLineDash([10, 12]);
+      for (var r = 0; r < 2; r++) {
+        var rad = 55 + r * 48;
+        ctx.strokeStyle = 'rgba(165,212,242,' + (0.38 - r * 0.14) + ')';
+        ctx.lineWidth = 3;
         ctx.beginPath();
-        for (var i2 = 0; i2 <= 40; i2++) {
-          var tt = i2 / 40;
-          var aa = a0 + tt * Math.PI * 1.9;
-          var rr = 4 + 100 * tt;                       // 从核心内部起旋，臂与中心相接
-          var x2 = Math.cos(aa) * rr, y2 = Math.sin(aa) * rr;
-          if (i2 === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
-        }
+        ctx.arc(0, 0, rad, time * (2.2 - r * 0.6), time * (2.2 - r * 0.6) + Math.PI * 1.6);
         ctx.stroke();
       }
-      // 中心亮核（被吸入的光，轻微呼吸）——核略放大并被旋臂根部穿过，与臂连成一体
-      ctx.fillStyle = 'rgba(222,228,255,' + (0.55 + 0.2 * Math.sin(time * 4)).toFixed(2) + ')';
-      ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.setLineDash([]);
+      // 中心亮核（呼吸）
+      ctx.fillStyle = 'rgba(228,242,255,' + (0.6 + 0.2 * Math.sin(time * 4)).toFixed(2) + ')';
+      ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     } else if (seaEvent.type === 'surge') {
       var g = grad('surge' + Math.round(FLOORY), function () {
@@ -3176,6 +3189,16 @@ MG.layout.build();
     doubled = true;
     score *= 2;
     if (score > best) { best = score; saveNum('mg_best', best); }
+  }
+  // 直接复活（v328 恢复：用户"是不要广告，复活动能还在，要直接复活"）——清空越线判负状态、
+  // 保留当前局面与得分，给全体短暂宽限让玩家抢救；先不做广告，故无 ads.show 门控。
+  function doRevive() {
+    state = 'play';
+    dangerAlert = 0; dangerRemain = 0; runBuffered = true; // 直接回到对局；本局缓冲已用（避免再吃一次首死宽限）
+    for (var i = 0; i < phys.bodies.length; i++) { phys.bodies[i].dangerT = 0; phys.bodies[i].grace = 1.5; } // 全体 1.5s 抢救宽限
+    reviveCount++;
+    addPopup(C.W / 2, 300, '复活！继续深潜', true, 0);
+    audio.blip(660, 0.22, 'sine', 0.12, 1.2);
   }
   // 返回主页（v234 重开确认新增）：局面数据不动（主页「开始游戏」会走 restart() 全量重置），仅切态+收起瞄准；
   // v237：带水域扫屏过渡动画（menuTrans，渲染层消费）
@@ -3211,6 +3234,7 @@ MG.layout.build();
     }
     combo = 0; comboTimer = 0; cooldown = 0; maxCombo = 0;
     doubled = false;
+    reviveCount = 0; // 新局重置复活次数（v328）
     runBuffered = false; // 新局重置深流缓冲
     skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
     seaCount = 0; scoreMult = 1;
@@ -3243,13 +3267,15 @@ MG.layout.build();
     // （面板几何走 MG.layout.overRect()，渲染 drawOver 与命中此处同源）
     var ovr = MG.layout.overRect();
     var areaTop = ovr.y + 190, areaBottom = ovr.y + ovr.h - 26;
-    var n = (doubled ? 0 : 1) + 2; // 双倍/分享/重开（v327：复活按钮移除——先不做广告）
+    var n = (doubled ? 0 : 1) + 1 + 2; // 双倍/复活/分享/重开（v328：复活按钮恢复——直接复活，无广告）
     var groupH = n * bh + (n - 1) * gap;
     var y = areaTop + (areaBottom - areaTop - groupH) / 2;
     if (!doubled) {
       overButtons.push({ x: x, y: y, w: bw, h: bh, label: '结算双倍', action: doDouble });
       y += bh + gap;
     }
+    overButtons.push({ x: x, y: y, w: bw, h: bh, label: '复活继续', action: doRevive });
+    y += bh + gap;
     overButtons.push({ x: x, y: y, w: bw, h: bh, label: '分享战报', action: openShare });
     y += bh + gap;
     // v274：深渊潜航入口撤出结算页（用户："结算页要删除深渊潜航相关的按钮"）
@@ -6453,17 +6479,27 @@ MG.layout.build();
   function drawDangerText() {
     if (dangerAlert <= 0.12) return;
     ctx.textAlign = 'center';
-    ctx.font = 'bold 15px system-ui, sans-serif';
-    // 越线判负提示：与警戒线同语言、平缓方波（v327 降闪：原 2.5~4Hz 过快，用户"文本闪太快"）→ 1.2~1.8Hz，并提高最低不透明度保证可读
+    // v328：越线提示放大（用户"越线提示要大一些"）+ 死亡缓冲倒计时（用户"要包含缓冲倒计时"）；
+    // 方波 1.2~1.8Hz 平缓（v327 降闪）
     var dHz = 1.2 + dangerAlert * 0.6;
     var dsq = Math.pow(0.5 + 0.5 * Math.sin(time * dHz * 2 * Math.PI), 3);
     var wa = Math.min(1, 0.5 + dangerAlert * 0.6) * (0.45 + 0.55 * dsq);
     ctx.lineJoin = 'round';
+    // 大字「堆高越线」
+    ctx.font = 'bold 26px system-ui, sans-serif';
     ctx.strokeStyle = 'rgba(255,255,255,' + wa + ')';
-    ctx.lineWidth = 3;
-    ctx.strokeText('堆高越线', C.W / 2, C.dangerY - 14);
+    ctx.lineWidth = 5;
+    ctx.strokeText('堆高越线', C.W / 2, C.dangerY - 42);
     ctx.fillStyle = 'rgba(196,48,42,' + wa + ')';
-    ctx.fillText('堆高越线', C.W / 2, C.dangerY - 14);
+    ctx.fillText('堆高越线', C.W / 2, C.dangerY - 42);
+    // 死亡缓冲倒计时（危险越高闪得越明显）
+    var sec = Math.max(0, dangerRemain);
+    ctx.font = 'bold 34px system-ui, sans-serif';
+    ctx.strokeStyle = 'rgba(255,255,255,' + wa + ')';
+    ctx.lineWidth = 6;
+    ctx.strokeText(sec.toFixed(1) + 's', C.W / 2, C.dangerY - 4);
+    ctx.fillStyle = 'rgba(255,86,40,' + wa + ')';
+    ctx.fillText(sec.toFixed(1) + 's', C.W / 2, C.dangerY - 4);
   }
 
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
@@ -6478,6 +6514,7 @@ MG.layout.build();
     for (var fi = C.seaStages.length - 1; fi >= 0; fi--) {
       if (careerPeak >= C.seaStages[fi].at) { farIdx = fi; break; }
     }
+    farIdx = Math.max(farIdx, seaStage()); // v328：实时——当前海域更深则即时显示（用户："游戏时当前海域超过统计结果也不更新"）
     // 统计最佳结果：沿用原样式（14px/原描边/原色/超宽自适应缩字号），与成就殿堂按钮垂直居中对齐（cy36 → baseline41）
     ctx.font = '14px system-ui, sans-serif';
     ctx.lineWidth = 3;

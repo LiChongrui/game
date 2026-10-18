@@ -1,4 +1,4 @@
-// 布局几何验证（v326）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗（含第4行清空存档+二级确认面板，v318 文案精简）+潮汐满潮水面随海域线性增高（v322）+潮汐判负提速（v323）+深海涌泉抬升减半（v324）+公告弹字时长（v325）+叠罗汉越线判负去速度门/弹字禁入底部道具带/警示文字移出实体层之前（v326）+待投虚影生命感（v320）/设置图标静态核查
+// 布局几何验证（v328）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗（含第4行清空存档+二级确认面板）+潮汐水位=警戒线→底部1/4~3/4填充且恒在线下（v328，取代 v322 overMin/overMax）+潮汐判负提速（v323）+深海涌泉抬升减半（v324）+公告弹字时长（v325）+叠罗汉越线判负去速度门/弹字禁入底部道具带/警示文字移出实体层之前（v326）+待投虚影生命感（v320）+特殊滴豁免堆高/死亡缓冲倒计时放大/复活恢复无广告/词缀加重（v328）/设置图标静态核查
 // 纯 node 计算（vm 加载 config + layout，无浏览器/无 canvas）。
 // ★ v183 新定位语义（覆盖 v175~v182 的 EXTRA 分配方案；用户：
 //   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少！"）：
@@ -338,46 +338,51 @@ eq('潮汐计时器定义', /function drawTideTimer\(\) \{/.test(RSRC), true);
 eq('旧drawTidePill已移除', /function drawTidePill/.test(RSRC), false);
 eq('潮汐卡几何引layout右锚定', /var tp = MG\.layout\.hud\.tidePill;[\s\S]*?var tx = \(tp\.side === 'right'\) \? \(C\.W - tp\.margin - cw\) : tp\.margin;/.test(RSRC), true);
 eq('潮汐倒计时固定位文本', /var ns = Math\.ceil\(tide\.timer\) \+ 's';/.test(RSRC), true);
-// ---- v322 潮汐满潮水面随海域线性增高（用户："涨潮的高度不合理，按理说应当线性增高，最后一个海域达到最高"）----
-// 沿革：v308 封顶永不过线 → v319 移除封顶但挂渐变端点被稀释（sea5 前全档位越不了线）→
-// v321 逐海域表又 sea2 凸节、sea4 后走平。v322 定为 overMin→overMax 纯线性：每个海域
-// 等量抬升 42px，sea0 安全期（574）→ 最后一个海域最高（280 = 警戒线上 35px）
-eq('overMin配置', C.tide.overMin, -259);
-eq('overMax配置', C.tide.overMax, 35);
+// ---- v328 潮汐满潮水面 = 警戒线→底部(=zone=floorY-dangerY=450px)的"填充比例"线性逼近 ----
+// （用户："潮汐最低是警戒线至底部的 1/4，最高值是 3/4！完全是不超过警戒线的"）。取代 v322
+// 的 overMin/overMax（原深海满潮没过警戒线上 35px，违反"不超过警戒线"）。fill(sea)=
+// lowFrac+(highFrac-lowFrac)×sea/(海域数-1)；满潮水面 y=floorY-zone×fill：浅海填 1/4→
+// 水面 652.5（最靠底）、深海填 3/4→水面 427.5（最靠线，仍在线下 112.5px）。整条曲线线性、
+// 且恒在警戒线下方——潮汐只做浮力重排，不再把水滴推越线（v323 的"越线难判负"根因即旧
+// 水位越线，v328 从根本上消除：潮汐期间引信仍 ×2 给足反应）
+eq('lowFrac配置', C.tide.lowFrac, 0.25);
+eq('highFrac配置', C.tide.highFrac, 0.75);
+eq('旧overMin已移除', /overMin:\s*-?\d/.test(src('js/config.js')), false);
+eq('旧overMax已移除', /overMax:\s*-?\d/.test(src('js/config.js')), false);
 eq('旧overByStage表已移除', /overByStage/.test(src('js/config.js')), false);
 eq('旧overLine字段已移除', /overLine:\s*\d/.test(src('js/config.js')), false);
 eq('旧40px封顶已移除', /C\.dangerY - 40\) \/ H/.test(SRC), false);
-eq('潮汐满潮线性公式', /var over = C\.tide\.overMin \+ \(C\.tide\.overMax - C\.tide\.overMin\) \* \(seaStage\(\) \/ \(C\.seaStages\.length - 1\)\);/.test(SRC), true);
-eq('满潮水面线性等距42px', (function () { // 锁定整条水位曲线：sea0..7 = 574/532/490/448/406/364/322/280
-  var H = L.body.floorY - L.body.containerTop;
+eq('潮汐满潮填充公式', /var fill = C\.tide\.lowFrac \+ \(C\.tide\.highFrac - C\.tide\.lowFrac\) \* \(seaStage\(\) \/ \(C\.seaStages\.length - 1\)\);/.test(SRC), true);
+eq('满潮水面=zone×fill', /return \(zone \* fill\) \/ H;/.test(SRC), true);
+eq('满潮水面随海域线性升高', (function () { // 锁定整条水位曲线：sea0..7 = 652.5/620.4/588.2/556.1/523.9/491.8/459.6/427.5（等量升高 32.14px）
+  var zone = L.body.floorY - L.body.dangerY;
+  var step = zone * (C.tide.highFrac - C.tide.lowFrac) / (C.seaStages.length - 1);
   var wys = [], prev = null, linear = true;
   for (var s = 0; s < C.seaStages.length; s++) {
-    var over = C.tide.overMin + (C.tide.overMax - C.tide.overMin) * (s / (C.seaStages.length - 1));
-    var wy = Math.round(L.body.floorY - H * ((L.body.floorY - L.body.dangerY + over) / H));
+    var fill = C.tide.lowFrac + (C.tide.highFrac - C.tide.lowFrac) * (s / (C.seaStages.length - 1));
+    var wy = L.body.floorY - zone * fill;
     wys.push(wy);
-    if (prev != null && prev - wy !== 42) linear = false; // 每个海域等量抬升 42px
+    if (prev != null && Math.abs((prev - wy) - step) > 1e-6) linear = false;
     prev = wy;
   }
-  return JSON.stringify(wys) === JSON.stringify([574, 532, 490, 448, 406, 364, 322, 280]) && linear;
+  return linear && Math.abs(wys[0] - 652.5) < 1e-6 && Math.abs(wys[wys.length - 1] - 427.5) < 1e-6;
 })(), true);
-eq('sea0满潮仍在警戒线下方', (function () { // 安全期曲线不变：首海域潮峰仍够不到线
-  var H = L.body.floorY - L.body.containerTop;
-  var over = C.tide.overMin;
-  return L.body.floorY - H * ((L.body.floorY - L.body.dangerY + over) / H) > L.body.dangerY;
+eq('最低潮位最靠底部(1/4)', (function () { // 浅海 fill=0.25：水面 652.5（最贴底）
+  var zone = L.body.floorY - L.body.dangerY;
+  return Math.abs((L.body.floorY - zone * C.tide.lowFrac) - 652.5) < 1e-6;
 })(), true);
-eq('末海域满潮水面最高且在警戒线上方', (function () { // 线性终点=最高：水面 280 < 315，且恒在出生点下方 ≥15px（虚影不被淹）
-  var H = L.body.floorY - L.body.containerTop;
-  var over = C.tide.overMax;
-  var wy = L.body.floorY - H * ((L.body.floorY - L.body.dangerY + over) / H);
-  return wy < L.body.dangerY && wy - L.body.spawnY >= 15;
+eq('最高潮位最靠线仍在线下(3/4)', (function () { // 最满 fill=0.75：水面 427.5 > 警戒线 315（在线下 112.5px），永不越线
+  var zone = L.body.floorY - L.body.dangerY;
+  var wy = L.body.floorY - zone * C.tide.highFrac;
+  return wy > L.body.dangerY;
 })(), true);
-eq('sea6起全档位静平衡越线', (function () { // 雾泡(r=15)静平衡顶部 = wy-2r(1-g/buoyancy) < dangerY
-  var H = L.body.floorY - L.body.containerTop;
-  var s = C.seaStages.length - 2; // 倒数第二海域（热泉裂谷，水面 322）
-  var over = C.tide.overMin + (C.tide.overMax - C.tide.overMin) * (s / (C.seaStages.length - 1));
-  var wy = L.body.floorY - H * ((L.body.floorY - L.body.dangerY + over) / H);
-  var top = wy - 2 * 15 * (1 - C.gravity / C.tide.buoyancy);
-  return top < L.body.dangerY;
+eq('满潮水面恒不超过警戒线', (function () { // 全海域水面都在警戒线下方（y 更大）；潮汐不再把水滴推越线
+  var zone = L.body.floorY - L.body.dangerY;
+  for (var s = 0; s < C.seaStages.length; s++) {
+    var fill = C.tide.lowFrac + (C.tide.highFrac - C.tide.lowFrac) * (s / (C.seaStages.length - 1));
+    if (L.body.floorY - zone * fill <= L.body.dangerY) return false;
+  }
+  return true;
 })(), true);
 // ---- v323 潮汐判负提速（用户："涨潮引起的越线好像很难死亡，是判定不对吗？"）----
 // 仿真定位（test/sim_danger.js）：漂浮滴均速仅 45~53px/s、速度门只堵死 10~13% 采样，
@@ -397,7 +402,7 @@ eq('越线即计时不分潮汐', /b\.dangerT \+= dt;/.test(SRC), true);
 eq('潮汐旧速度门条件已移除', /if \(tideOn \|\| sp < C\.dangerSpeed \* 1\.5\) \{/.test(SRC), false);
 eq('非潮汐速度门已移除', /sp < C\.dangerSpeed \* 1\.5/.test(SRC), false);
 eq('非潮汐扰动衰减已移除', /b\.dangerT = Math\.max\(0, b\.dangerT - dt \* 2\);/.test(SRC), false);
-eq('警示条按引信归一', /worst = Math\.max\(worst, b\.dangerT \/ fuse\);/.test(SRC), true);
+eq('警示条按引信归一', /var w = b\.dangerT \/ fuse;[\s\S]*?if \(w > worst\) worst = w;/.test(SRC), true);
 // ---- v326 弹字禁入底部道具带 + 警示文字移出实体层之前 ----
 // （用户："有些提示信息会叠在水滴下面导致字体被挡（比如死亡倒计时提示），有些则会
 //   出现在底部道具区域，这是不合理的，请优化一下。"）
@@ -420,6 +425,13 @@ eq('drawDangerLine不再画警示文字', (function () {
   var i0 = RSRC.indexOf('function drawDangerLine()'), i1 = RSRC.indexOf('function drawDangerText()');
   return i0 >= 0 && i1 > i0 && RSRC.slice(i0, i1).indexOf('堆高越线') < 0;
 })(), true);
+// ---- v328 死亡缓冲倒计时 + 越线提示放大（用户："堆高越线也是死亡缓冲提示，要包含缓冲倒计时。
+//   原来的缓冲提示是不需要的！越线提示要大一些！"）----
+eq('dangerRemain全局定义', /var dangerRemain = 0;/.test(SRC), true);
+eq('倒计时引dangerRemain', /var sec = Math\.max\(0, dangerRemain\);/.test(RSRC), true);
+eq('倒计时toFixed(1)+s', /sec\.toFixed\(1\) \+ 's'/.test(RSRC), true);
+eq('越线大字26px(放大)', /ctx\.font = 'bold 26px system-ui, sans-serif';[\s\S]*?ctx\.fillText\('堆高越线'/.test(RSRC), true);
+eq('倒计时字号34px(放大)', /ctx\.font = 'bold 34px system-ui, sans-serif';[\s\S]*?sec\.toFixed\(1\) \+ 's'/.test(RSRC), true);
 // ---- v320 待投虚影生命感（用户："水滴没有坠落时，可以加一个合适的效果吗?目前看水滴是虚的而且看起来呆呆的"）----
 // ghostBob 单一相位源驱动整组预览：虚影球纵向漂浮 + 滴体同色系光晕呼吸，指示线顶与名称
 // 标签跟随同浮不断连；横向严格钉 aimX 不误导瞄准（幅度上限 4.2px=3+1.2，标签与球顶间距恒 5px）
@@ -566,24 +578,39 @@ eq('setClearCloseRect定义', /setClearCloseRect: function \(\) \{/.test(LSRC2),
 console.log('⑦ v317 清空存档断言（v318 文案精简）: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
-// ===== ⑧ v327：漩涡拽拉水滴豁免堆高判负 + 警示文字降闪 + 涨潮持续随海域拉长 + 广告全链路移除 =====
-// 反馈 2：漩涡滴带飞的水滴不参与堆高判定（用户："漩涡滴带飞的水滴不参与堆高判定"）+ 
-// 「堆高越线」文字闪太快（v326 为 2.5~4Hz 方波，降为 1.2~1.8Hz 并提高最低不透明度）。
-// 反馈 1 修复：涨潮持续随海域线性拉长至 durationMax（深海首潮方能兑现引信链）。
-// 反馈 3：移除广告（ads 模块 / drawAdOverlay / 复活按钮 / 看广告文案），先不做广告。
+// ===== ⑧ v327/v328：漩涡拽拉豁免堆高 + 警示降闪 + 涨潮持续 + 广告全链路移除（v327）+
+//   瞬态特殊滴豁免堆高（v328）+ 死亡缓冲复活恢复（v328，无广告）+ 词缀加重（v328）=====
+// v327：漩涡滴带飞的水滴不参与堆高判定（用户）+「堆高越线」文字降闪（1.2~1.8Hz）+
+// 涨潮持续随海域线性拉长至 durationMax（深海首潮方能兑现引信链）+ 移除广告（先不做广告）。
+// v328：① 全部瞬态特殊滴（b.special）同样豁免堆高判定——除冰冻滴/漩涡拽拉滴外，其余特殊滴
+//   （雨云/冰晶/磁吸/熔岩/间歇泉/虚空/极光/彩虹/雷霆/珍珠/甘霖）均不参与堆高；
+//   ② 恢复"复活继续"按钮（v327 误删——用户只要去广告，复活功能保留，直接复活无广告）；
+//   ③ 死亡缓冲改为倒计时（dangerRemain），移除"深流缓冲·宽限"专用弹字；
+//   ④ 词缀加重：重压深潜 +80%（grav 1.8）、深渊试炼 重力 +40% 且潮汐 -65%（grav 1.4 + tideInt 0.35）。
 pass = 0; fail = 0;
 eq('漩涡拽拉置豁免标记', /o\.vortexGrace = 0\.2;/.test(SRC), true);
 eq('漩涡豁免堆高判负', /if \(b\.vortexGrace > 0\) \{ b\.vortexGrace -= dt; b\.dangerT = 0; continue; \}/.test(SRC), true);
+eq('special豁免堆高判负', /if \(b\.special\) continue;/.test(SRC), true);
 eq('警示文字降闪(1.2~1.8Hz)', /var dHz = 1\.2 \+ dangerAlert \* 0\.6;/.test(RSRC), true);
 eq('深海涨潮持续随海域拉长', /tide\.timer = C\.tide\.duration \+ \(C\.tide\.durationMax - C\.tide\.duration\) \* seaStage\(\) \/ \(C\.seaStages\.length - 1\);/.test(SRC), true);
-// 广告全链路移除回归
-eq('广告门控已移除', /ads\.show/.test(SRC), false);
-eq('复活按钮文案已移除', /复活继续/.test(SRC), false);
+// 广告全链路移除回归（v327 起，v328 仍保持——复活无广告门控）
+eq('广告门控已移除', /ads\.show\(/.test(SRC), false); // 调用形态（注释"无 ads.show 门控"不计）；复活无广告门控
 eq('广告模块已移除', /var ads = \{/.test(CSRC), false);
 eq('广告演示层已移除', /function drawAdOverlay\(/.test(RSRC), false);
 eq('结算双倍保留(非广告)', /不再看广告：直接双倍/.test(SRC), true);
 eq('越线冲走复活反馈已移除', /越线水滴被冲走/.test(SRC), false);
-console.log('⑧ v327 漩涡豁免+降闪+涨潮持续+广告移除断言: ' + pass + ' pass, ' + fail + ' fail');
+// ---- v328 复活恢复（直接复活，无广告门控）----
+eq('复活按钮已恢复', /复活继续/.test(SRC), true);
+eq('复活按钮接doRevive', /label: '复活继续', action: doRevive/.test(SRC), true);
+eq('doRevive直接复活', /function doRevive\(\) \{[\s\S]*?state = 'play';/.test(SRC), true);
+eq('doRevive清缓冲计时', /dangerAlert = 0; dangerRemain = 0; runBuffered = true;/.test(SRC), true);
+eq('深流缓冲弹字已移除', /addPopup\([^)]*深流缓冲/.test(SRC), false); // 用户"原来的缓冲提示是不需要的"——移除专用缓冲弹字（倒计时即缓冲）
+// ---- v328 词缀加重（config.ng.affixes + systems.DCHAL_AFFIXES 两处同步）----
+var CFG = src('js/config.js');
+eq('重压深潜+80%(config)', /id: 'heavy', name: '重压深潜', desc: '重力 \+80%',\s*grav: 1\.8/.test(CFG), true);
+eq('重压深潜+80%(DCHAL)', /id: 'heavy',\s*name: '重压深潜', desc: '重力 \+80%',\s*grav: 1\.8/.test(SRC), true);
+eq('深渊试炼+40%且潮汐-65%(DCHAL)', /id: 'abyss',\s*name: '深渊试炼',\s*desc: '重力 \+40% 且潮汐 -65%',\s*grav: 1\.4, tideInt: 0\.35/.test(SRC), true);
+console.log('⑧ v327/v328 漩涡/特殊滴豁免+降闪+涨潮持续+广告移除+复活恢复+词缀加重断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
 process.exit(f2 ? 1 : 0);
