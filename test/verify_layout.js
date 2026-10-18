@@ -266,7 +266,9 @@ eq('漩涡旧公式已移除', /seaEvent\.y = C\.containerTop/.test(SRC), false)
 // 两个杠杆都必须动——只砍作用区会让底部滴以更集中的出口速度（410→290px/s）撞上半堆，
 // 同档滴压紧合成、产物继承撞速+反冲上抛，混合堆堆顶反而 234→316px 变高（sim_surge.js
 // 实测）；同步降力（出口 204px/s）撞堆变缓才真正减半（单滴 252→117、混合堆 234→107）。
-eq('涌泉作用区160(v329)', /if \(b\.y \+ b\.r > FLOORY - 160\) b\.vy -= 2000 \* dt;/.test(SRC), true);
+eq('涌泉作用区125(v334)', /if \(b\.y \+ b\.r > FLOORY - 125\) b\.vy -= 1800 \* dt;/.test(SRC), true);
+eq('涌泉旧作用区160已移除', /FLOORY - 160\)/.test(SRC), false);
+eq('涌泉旧力2000已移除', /b\.vy -= 2000 \* dt;/.test(SRC), false);
 eq('涌泉旧作用区210已移除', /FLOORY - 210\)/.test(SRC), false);
 eq('涌泉旧力1900已移除', /b\.vy -= 1900 \* dt;/.test(SRC), false);
 eq('涌泉旧力1700已移除', /b\.vy -= 1700 \* dt;/.test(SRC), false);
@@ -649,8 +651,8 @@ eq('宝箱提示跟随宝箱', /addPopup\(b\.x, C\.dangerY \+ 10, '沉大宝箱�
 eq('宝箱移除全锁兜底充任意', /if \(!keys\.length\) keys = \['swap', 'ripple', 'evap', 'flow'\];/.test(SRC), false);
 eq('宝箱仅充已解锁技能', /var keys = \['swap', 'ripple', 'evap', 'flow'\]\.filter\(function \(k\) \{ return skillUnlocked\(k\); \}\);[\s\S]*?if \(keys\.length\)/.test(SRC), true);
 eq('宝箱彩虹滴需已发现', /if \(dexSpecial\['rainbow'\]\) \{[\s\S]*?nextSpecial = 'rainbow';/.test(SRC), true);
-// ⑥ 深海涌泉修复（用户"不能轻轻托起底部水滴"）：力 1700→2000、作用区 105→160（净上托 200→500，温和可见）
-eq('涌泉力2000', /if \(b\.y \+ b\.r > FLOORY - 160\) b\.vy -= 2000 \* dt;/.test(SRC), true);
+// ⑥ 深海涌泉回调（v334，用户"托起的太高了，不合理"）：力 2000→1800、作用区 160→125（高度 213→150px，温和可见档）
+eq('涌泉力1800(v334)', /if \(b\.y \+ b\.r > FLOORY - 125\) b\.vy -= 1800 \* dt;/.test(SRC), true);
 // ⑦ 漩涡风暴重绘（用户"依旧很丑，要好好设计，跟主题匹配，显得灵动"）：漏斗+双层反向螺旋+气泡，旧单盘发光移除
 eq('漩涡漏斗重绘', /grad\('stormFunnel'/.test(SRC), true);
 eq('漩涡双层反向螺旋', /for \(var layer = 0; layer < 2; layer\+\+\) \{[\s\S]*?var rot = time \* \(0\.85 \+ layer \* 0\.55\) \* dir;/.test(SRC), true);
