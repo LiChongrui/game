@@ -1,4 +1,4 @@
-// 布局几何验证（v318）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗（含第4行清空存档+二级确认面板，v318 文案精简）/设置图标静态核查
+// 布局几何验证（v319）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗（含第4行清空存档+二级确认面板，v318 文案精简）+潮汐满潮没入警戒线（v319）/设置图标静态核查
 // 纯 node 计算（vm 加载 config + layout，无浏览器/无 canvas）。
 // ★ v183 新定位语义（覆盖 v175~v182 的 EXTRA 分配方案；用户：
 //   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少！"）：
@@ -318,6 +318,21 @@ eq('潮汐计时器定义', /function drawTideTimer\(\) \{/.test(RSRC), true);
 eq('旧drawTidePill已移除', /function drawTidePill/.test(RSRC), false);
 eq('潮汐卡几何引layout右锚定', /var tp = MG\.layout\.hud\.tidePill;[\s\S]*?var tx = \(tp\.side === 'right'\) \? \(C\.W - tp\.margin - cw\) : tp\.margin;/.test(RSRC), true);
 eq('潮汐倒计时固定位文本', /var ns = Math\.ceil\(tide\.timer\) \+ 's';/.test(RSRC), true);
+// ---- v319 潮汐满潮可没过警戒线（用户："潮汐还是有最大值限制，水滴超不过警戒线，这个是不合理的逻辑"）----
+// 移除 v308"警戒线下 40px"封顶：满潮水面最高没入警戒线上方 overLine px，配合浮力把堆叠托越线
+eq('overLine配置20', C.tide.overLine, 20);
+eq('潮汐满潮没入警戒线公式', /var hi = \(FLOORY - C\.dangerY \+ C\.tide\.overLine\) \/ H;/.test(SRC), true);
+eq('旧40px封顶已移除', /C\.dangerY - 40\) \/ H/.test(SRC), false);
+eq('深海满潮水面在警戒线上方', (function () { // 满潮(progress=1)水面 y < dangerY ⟺ 没过线
+  var H = L.body.floorY - L.body.containerTop;
+  var lo = 1 / 4, hi = (L.body.floorY - L.body.dangerY + C.tide.overLine) / H;
+  var mx = lo + (hi - lo) * 1; // seaStage 取最深海域
+  return L.body.floorY - H * mx < L.body.dangerY;
+})(), true);
+eq('浅海(sea0)满潮仍在警戒线下方', (function () { // 渐变起点不变：早期海域潮峰仍够不到线
+  var H = L.body.floorY - L.body.containerTop;
+  return L.body.floorY - H * (1 / 4) > L.body.dangerY;
+})(), true);
 // 重开图标随钮放大（r15→20：弧半径 8→9）
 eq('重开图标半径9', /ctx\.arc\(rx0, ry0, 9, -Math\.PI \* 0\.35, Math\.PI \* 1\.25\); ctx\.stroke\(\);/.test(RSRC), true);
 // ---- v196 第一排圆钮：统一样式 + 半径真源 + 统计精简 ----
