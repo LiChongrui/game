@@ -279,7 +279,7 @@ eq('大字号公告默认2s', /var lf = life \|\| \(isBig \? 2\.0 : 1\.0\);/.tes
 eq('弹字生命引lf', /var p = \{ x: x, y: y, text: text, life: lf, max: lf, big: !!isBig, mult: mult \|\| 0, scale: 0\.4, kind: kind \|\| inferKind\(text\) \};/.test(SRC), true);
 eq('弹字压入p对象', /popups\.push\(p\);/.test(SRC), true);
 eq('甘霖下一滴预告1.6s', /'甘霖 · 下一滴是「' \+ T\[t\]\.name \+ '」', false, 0, 1\.6\);/.test(SRC), true);
-eq('符文教程提示2s', /'带符文的水滴：合成即可为技能充能', false, 0, 2\.0, 'event'\);/.test(SRC), true); // v330：显式归 event
+eq('符文教程提示2s', /'带符文的水滴：合成即可为技能充能', false, 0, 2\.0, 'todo'\);/.test(SRC), true); // v331：归 todo
 // v327：复活功能已移除（先不做广告），原"越线水滴被冲走 ×N"公告随 doRevive 一并删除；负向回归见 ⑧
 eq('任务已更新提示1.6s', /'任务已更新', false, 0, 1\.6\);/.test(SRC), true);
 eq('大宝箱错过提示1.6s', /'大宝箱沉入深渊…', false, 0, 1\.6\);/.test(SRC), true);
@@ -615,14 +615,14 @@ eq('深渊试炼+40%且潮汐-65%(DCHAL)', /id: 'abyss',\s*name: '深渊试炼',
 console.log('⑧ v327/v328 漩涡/特殊滴豁免+降闪+涨潮持续+广告移除+复活恢复+词缀加重断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
-// ===== ⑨ v329：死亡缓冲倒计时1Hz + 提示分色(5类) + 大宝箱提示跟随宝箱 + 宝箱不开未解锁道具 + 涌泉修复 + 漩涡风暴重绘 =====
+// ===== ⑨ v329：死亡缓冲倒计时1Hz + 提示分色(v331 改制 7 类) + 大宝箱提示跟随宝箱 + 宝箱不开未解锁道具 + 涌泉修复 + 漩涡风暴重绘 =====
 pass = 0; fail = 0;
 // ① 死亡缓冲倒计时 1Hz 缓闪（用户"闪的太快了，可以1s闪一次"）——新增独立 ca(alpha)，不再随警示文字 1.2~1.8Hz
 eq('倒计时1Hz缓闪', /var csq = Math\.pow\(0\.5 \+ 0\.5 \* Math\.sin\(time \* 1\.0 \* 2 \* Math\.PI\), 2\);/.test(RSRC), true);
 eq('倒计时用独立alpha(ca)', /ctx\.fillStyle = 'rgba\(255,86,40,' \+ ca \+ '\)';/.test(RSRC), true);
 // ② 提示分色（用户"不同的提示类型要区分一下；红色的提示太多了"）：渲染端 PCOLMAP 五类 + 按 p.kind 取色
-eq('提示分色表PCOLMAP', /var PCOLMAP = \{[\s\S]*?info:[\s\S]*?event:[\s\S]*?good:[\s\S]*?warn:[\s\S]*?bad:/.test(RSRC), true);
-eq('弹字按p.kind取色', /ctx\.fillStyle = PCOLMAP\[p\.kind\] \|\| PCOLMAP\.info;/.test(RSRC), true);
+eq('提示分色表PCOLMAP七类', /var PCOLMAP = \{[\s\S]*?gain:[\s\S]*?burst:[\s\S]*?world:[\s\S]*?reward:[\s\S]*?todo:[\s\S]*?miss:[\s\S]*?neutral:/.test(RSRC), true); // v331：5类→7类
+eq('弹字按p.kind取色', /ctx\.fillStyle = PCOLMAP\[p\.kind\] \|\| PCOLMAP\.neutral;/.test(RSRC), true);
 // ③ addPopup 支持 kind + attach + inferKind 自动归类（默认按文案关键词，调用方可显式覆盖）
 eq('addPopup支持kind+attach', /function addPopup\(x, y, text, isBig, mult, life, kind, attach\)/.test(SRC), true);
 eq('inferKind自动归类', /function inferKind\(t\) \{/.test(SRC), true);
@@ -630,7 +630,7 @@ eq('弹字记录attachOffset', /p\.attachOff = \{ x: x - attach\.x, y: y - attac
 eq('跟随实体每帧贴附', /p\.x = p\.attach\.x \+ p\.attachOff\.x;/.test(SRC), true);
 eq('实体移除弹字即删', /if \(phys\.bodies\.indexOf\(p\.attach\) < 0\) \{ popups\.splice\(i, 1\); continue; \}/.test(SRC), true);
 // ④ 大宝箱提示跟随宝箱（用户"宝箱降落、文本上升，一点也不和谐"）：spawn 弹字 attach=b
-eq('宝箱提示跟随宝箱', /addPopup\(b\.x, C\.dangerY \+ 10, '沉大宝箱！点它开启', true, 0, 0, 'warn', b\);/.test(SRC), true);
+eq('宝箱提示跟随宝箱', /addPopup\(b\.x, C\.dangerY \+ 10, '沉大宝箱！点它开启', true, 0, 0, 'todo', b\);/.test(SRC), true); // v331：warn→todo
 // ⑤ 宝箱不开未解锁道具（用户"宝箱不能开出未出现的道具，例如符文道具还没激活"）
 eq('宝箱移除全锁兜底充任意', /if \(!keys\.length\) keys = \['swap', 'ripple', 'evap', 'flow'\];/.test(SRC), false);
 eq('宝箱仅充已解锁技能', /var keys = \['swap', 'ripple', 'evap', 'flow'\]\.filter\(function \(k\) \{ return skillUnlocked\(k\); \}\);[\s\S]*?if \(keys\.length\)/.test(SRC), true);
@@ -656,12 +656,35 @@ eq('复活清场-气泡消散特效', /parts\.push\(\{ type: 'ring', x: d\.x, y:
 eq('复活清场-清走计数弹字', /'复活！清走 ' \+ removed \+ ' 滴 · 继续深潜'/.test(SRC), true);
 // ② 缓冲倒计时无缝续接：缓冲分支不再 worst=0（倒计时归零闪没一帧又跳回）
 eq('缓冲倒计时无缝续接', /worst = 0\.999; minRemain = C\.dangerTime; break;/.test(SRC), true);
-// ③ 提示分色梳理：词缀公告/符文教程显式 event；good 词表补"充满"
-eq('词缀公告显式event', /affix\.name \+ '」', true, 0, 0, 'event'\);/.test(SRC), true);
-eq('符文教程显式event', /'带符文的水滴：合成即可为技能充能', false, 0, 2\.0, 'event'\);/.test(SRC), true);
-eq('good词表含充满', /充能\|充满\|成就/.test(SRC), true);
-eq('分色仍为5类', (function () { var m = SRC.match(/return '(info|event|good|warn|bad)'/g) || []; return m.length >= 4; })(), true);
+// ③ 提示分色梳理：v331 起 5 类并 7 类（词缀 world、宝箱/符文教程 todo）
+eq('词缀公告显式world', /affix\.name \+ '」', true, 0, 0, 'world'\);/.test(SRC), true);
+eq('符文教程显式todo', /'带符文的水滴：合成即可为技能充能', false, 0, 2\.0, 'todo'\);/.test(SRC), true);
+eq('reward词表含充满', /充满\|符文\|富豪\|收益\|收集\|发现/.test(SRC), true);
+eq('分色为7类', (function () { var m = SRC.match(/return '(gain|burst|world|reward|todo|miss|neutral)'/g) || []; return m.length >= 7; })(), true);
 console.log('⑩ v330 复活清场+倒计时续接+分色梳理断言: ' + pass + ' pass, ' + fail + ' fail');
+f2 += fail;
+
+// ===== ⑪ v331：提示分色 5 类 → 7 类（用户确认方案，示例页 test/popup_kinds_demo.html）=====
+// gain 金 得分 / burst 紫 生效高光 / world 深青 海域推进 / reward 绿 奖励 / todo 琥珀 提醒 / miss 暗红 错失 / neutral 蓝灰 回执
+pass = 0; fail = 0;
+eq('PCOLMAP金色gain', /gain:\s+'#D4A017'/.test(RSRC), true);
+eq('PCOLMAP紫色burst', /burst:\s+'#8E5AC8'/.test(RSRC), true);
+eq('PCOLMAP深青world', /world:\s+'#0E7C9E'/.test(RSRC), true);
+eq('PCOLMAP绿reward', /reward:\s+'#1E9E6A'/.test(RSRC), true);
+eq('PCOLMAP琥珀todo', /todo:\s+'#C9821A'/.test(RSRC), true);
+eq('PCOLMAP暗红miss', /miss:\s+'#9E4B47'/.test(RSRC), true);
+eq('PCOLMAP蓝灰neutral', /neutral:\s+'#6B8AA5'/.test(RSRC), true);
+eq('旧五类键已移除', /(info|event|good|warn|bad):\s+'#/.test(RSRC), false);
+eq('连击后缀金色', /ctx\.fillStyle = PCOLMAP\.gain;/.test(RSRC), true);
+eq('inferKind-7分支miss', /return 'miss';/.test(SRC), true);
+eq('inferKind-7分支todo', /return 'todo';/.test(SRC), true);
+eq('inferKind-7分支neutral', /return 'neutral';/.test(SRC), true);
+eq('inferKind-7分支world', /return 'world';/.test(SRC), true);
+eq('inferKind-7分支burst', /return 'burst';/.test(SRC), true);
+eq('inferKind-7分支gain', /return 'gain';/.test(SRC), true);
+eq('inferKind-7分支reward', /return 'reward';/.test(SRC), true);
+eq('inferKind旧类返回已移除', /return '(info|event|good|warn|bad)';/.test(SRC), false);
+console.log('⑪ v331 提示分色7类断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
 process.exit(f2 ? 1 : 0);

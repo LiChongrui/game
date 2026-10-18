@@ -2561,13 +2561,15 @@
     ctx.globalAlpha = 1;
   }
 
-  // v329：提示分色表（语义类别 → 颜色）
+  // v331：提示分色表（语义类别 → 颜色，用户确认 7 类方案，交互示例 test/popup_kinds_demo.html）
   var PCOLMAP = {
-    info:  '#1C5F8C',   // 蓝 — 通用信息 / 中性反馈
-    event: '#0E7C9E',   // 青 — 深海事件 / 海域演进 / 机制提示
-    good:  '#1E9E6A',   // 绿 — 奖励 / 解锁 / 成就 / 合成
-    warn:  '#C9821A',   // 琥珀 — 待操作提醒（点宝箱 / 预告）
-    bad:   '#9E4B47'    // 暗红 — 错失 / 失败（降饱和，不再刺眼）
+    gain:    '#D4A017',   // 金 — 得分微反馈（+N / 连击后缀）
+    burst:   '#8E5AC8',   // 紫 — 效果生效高光（特殊滴 / 大招 / 稀有合成）
+    world:   '#0E7C9E',   // 深青 — 海域与潮汐推进（演进 / 渐深 / 深海事件 / 挑战开局）
+    reward:  '#1E9E6A',   // 绿 — 奖励与里程碑（图鉴 / 成就 / 任务 / 宝箱 / 复活）
+    todo:    '#C9821A',   // 琥珀 — 行动提醒（点宝箱 / 预告 / 教程）
+    miss:    '#9E4B47',   // 暗红 — 落空与错失（降饱和，不刺眼）
+    neutral: '#6B8AA5'    // 蓝灰 — 操作反馈回执（换滴 / 交换 / 充能不足）
   };
   // 浮动文字（最后绘制，保证不被 HUD 遮挡）
   function drawPopups() {
@@ -2580,7 +2582,7 @@
       ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.max * 1.5));
       ctx.translate(p.x, p.y);
       ctx.scale(p.scale, p.scale);
-      ctx.fillStyle = PCOLMAP[p.kind] || PCOLMAP.info;
+      ctx.fillStyle = PCOLMAP[p.kind] || PCOLMAP.neutral;
       ctx.font = (p.big ? 'bold 20px' : 'bold 17px') + ' system-ui, sans-serif';
       ctx.strokeStyle = 'rgba(255,255,255,0.85)';
       ctx.lineWidth = 3;
@@ -2588,7 +2590,7 @@
       ctx.fillText(p.text, 0, 0);
       if (p.mult > 1) {
         ctx.font = 'bold 18px system-ui, sans-serif';
-        ctx.fillStyle = PCOLMAP.good;
+        ctx.fillStyle = PCOLMAP.gain;
         ctx.strokeStyle = 'rgba(255,255,255,0.85)';
         ctx.lineWidth = 3;
         ctx.strokeText('连击 x' + p.mult, 0, -24);

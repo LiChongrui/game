@@ -176,7 +176,7 @@
     ng.active = affix;                 // restart 会清 active，重设
     ng.fromDaily = !!fromDaily;
     C.gravity = GRAV0 * (affix.grav || 1);
-    addPopup(C.W / 2, 300, (fromDaily ? '每日挑战 ·「' : '深渊潜航 ·「') + affix.name + '」', true, 0, 0, 'event'); // v330：挑战开局公告显式归 event（词缀名如"重压深潜"不含事件关键词，否则落到 info 蓝）
+    addPopup(C.W / 2, 300, (fromDaily ? '每日挑战 ·「' : '深渊潜航 ·「') + affix.name + '」', true, 0, 0, 'world'); // v331：挑战开局公告归 world（词缀名如"重压深潜"不含事件关键词）
     ngOpen = false;
   }
   function ngEndRun() {
@@ -666,18 +666,25 @@
   // 遗留 9:16 旧稿坐标（y=150 三处落进 HUD 信息条 hudBottom=165、环与文字分离），
   // 自此公告类特效一律经 annY 派生，禁止再写死旧坐标。
   function annY(y) { return MG.layout.body.mirrorCy + (y - 209); }
-  // v329：提示分色（按语义类别），默认按文案关键词推断，调用方可显式传 kind 覆盖：
-  //   event 青 — 深海事件 / 海域演进 / 机制提示 / 特殊滴触发
-  //   good  绿 — 奖励 / 解锁 / 成就 / 充能 / 合成 / 复活 / 收益
-  //   warn  琥珀 — 待操作提醒（点宝箱 / 预告）
-  //   bad   暗红 — 错失 / 失败 / 负面
-  //   info  蓝 — 通用信息 / 中性反馈（默认）
+  // v331：提示分色 7 类（用户确认方案，交互示例 test/popup_kinds_demo.html）：
+  //   gain    金   — 得分微反馈（+N / 连击后缀）
+  //   burst   紫   — 效果生效高光（特殊滴 / 大招 / 稀有合成）
+  //   world   深青 — 海域与潮汐推进（演进 / 渐深 / 深海事件 / 挑战开局）
+  //   reward  绿   — 奖励与里程碑（图鉴 / 成就 / 任务 / 宝箱 / 复活 / 充能）
+  //   todo    琥珀 — 行动提醒（点宝箱 / 预告 / 教程）
+  //   miss    暗红 — 落空与错失
+  //   neutral 蓝灰 — 操作反馈回执（默认兜底）
+  // 规则序已对全部调用点逐一核对（miss→todo→neutral→world→burst→gain→reward）；
+  // 调用方仍可显式传 kind 覆盖（宝箱/todo、词缀/world、符文教程/todo）。
   function inferKind(t) {
-    if (/沉大宝箱！点它开启|甘霖·下一滴/.test(t)) return 'warn';
-    if (/沉入深渊|落空|黯淡|空空如也|枯了|熄灭|复制失败|错过/.test(t)) return 'bad';
-    if (/开启|达成|解锁|充能|充满|成就|图鉴|奖励|恩泽|复活|收益|富豪|合成|祝福|吞噬|引合|发现|收集|全勤|任务完成|任务已更新|海神|汇入|×|\+/.test(t)) return 'good';
-    if (/漩涡|风暴|涌泉|甘霖降临|潮位|涨潮|高潮|海域|深渊潜航|渐深|演进|机制|江河|冰封|疾风|雷霆|极光|间歇泉|雨云|虚空|珍珠|彩虹|熔岩|珊瑚礁|海潮/.test(t)) return 'event';
-    return 'info';
+    if (/落空|黯淡|枯了|熄灭|空空如也|沉入深渊|复制失败/.test(t)) return 'miss';
+    if (/点它开启|甘霖 · 下一滴|需在潮汐中|带符文的水滴/.test(t)) return 'todo';
+    if (/^换滴$|水流交换|符文 \d|出现后解锁|已复制/.test(t)) return 'neutral';
+    if (/海域演进|海域渐深|潮位渐深|每日挑战 ·|深渊潜航 ·|深海涌泉|漩涡风暴|海神甘霖/.test(t)) return 'world';
+    if (/彩虹合成|雷霆引合|珍珠祝福|虚空吞噬|熔岩灼烧|极光庇护|海神恩泽|汇入海域|海潮高潮|珊瑚礁相消|疾风|雨云化雨|甘霖降临|冰封|间歇泉/.test(t)) return 'burst';
+    if (/^\+|珊瑚礁移除/.test(t)) return 'gain';
+    if (/图鉴|成就|任务|全勤|挑战达成|大宝箱开启|复活|离线|解锁|充能|充满|符文|富豪|收益|收集|发现/.test(t)) return 'reward';
+    return 'neutral';
   }
   function addPopup(x, y, text, isBig, mult, life, kind, attach) {
     // 公告带（居中 + 设计稿 y 180~320）锚定堆叠区镜像位（v190 用户："弹出提示（如涨潮等），
@@ -1900,7 +1907,7 @@
     b.r = 17; b.m = b.r * b.r * 6; // 比礁石轻，不会被砸得太凶
     chest = { b: b, t: 0, life: 14 }; // 14 秒内不点就沉走
     // v329：提示跟随宝箱实体（attach=b），宝箱降落时文字同步下移，不再"宝箱落、文本升"错位
-    addPopup(b.x, C.dangerY + 10, '沉大宝箱！点它开启', true, 0, 0, 'warn', b);
+    addPopup(b.x, C.dangerY + 10, '沉大宝箱！点它开启', true, 0, 0, 'todo', b);
     audio.blip(392, 0.25, 'triangle', 0.14, 1.5);
   }
   function expireChest() {
@@ -2360,7 +2367,7 @@
         discoverSpecial('rune');
         if (!runeHintShown) {
           runeHintShown = true;
-          addPopup(C.W / 2, 244, '带符文的水滴：合成即可为技能充能', false, 0, 2.0, 'event'); // v325：一次性教程提示，2.0s 读全；v330 显式归 event（文案含"合成/充能"否则误归 good）
+          addPopup(C.W / 2, 244, '带符文的水滴：合成即可为技能充能', false, 0, 2.0, 'todo'); // v325：一次性教程提示，2.0s 读全；v331 归 todo
         }
       }
       if (ng.active && ng.active.ice && Math.random() < ng.active.ice) nb.ngIce = true; // 二周目「冰封之海」
