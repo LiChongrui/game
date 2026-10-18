@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>body{margin:0;background:#ddd;font:12px sans-serif;}canvas{display:block;margin:10px auto;}p{text-align:center;margin:2px;color:#333;}</style>
+</head>
+<body>
+<canvas id="v1" width="1680" height="300" style="width:840px;height:150px;"></canvas>
+<p>A 单淡蓝内环（白边内加 1px 淡蓝，交界柔一步）</p>
+<canvas id="v2" width="1680" height="300" style="width:840px;height:150px;"></canvas>
+<p>B 描边纵向渐变（上纯白 → 下极淡蓝）</p>
+<canvas id="v3" width="1680" height="300" style="width:840px;height:150px;"></canvas>
+<p>C B + 顶部高光更强 + 字面饱和加深</p>
+<script>
+var TXT = '水滴合成深海';
+var ADV = 52, FS = 54;
+var CH = [
+  { s: 1.00, dy: 2,  rot: -0.05 },
+  { s: 0.92, dy: 6,  rot: 0.06 },
+  { s: 1.06, dy: -2, rot: -0.04 },
+  { s: 0.94, dy: 5,  rot: 0.05 },
+  { s: 1.02, dy: -1, rot: -0.06 },
+  { s: 0.96, dy: 4,  rot: 0.04 }
+];
+function sky(c, W, H) {
+  var g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#C9EAF9'); g.addColorStop(1, '#7FC0E6');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+}
+function drawVar(id, opt) {
+  var cv = document.getElementById(id), c = cv.getContext('2d');
+  c.scale(2, 2);
+  var W = 420, H = 150;
+  sky(c, W, H);
+  var ty = 92;
+  var x0 = W / 2 - ADV * (TXT.length - 1) / 2;
+  c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+  c.lineJoin = 'round'; c.miterLimit = 2;
+  for (var i = 0; i < TXT.length; i++) {
+    var ch = CH[i];
+    var cx = x0 + i * ADV;
+    var cy = ty + ch.dy;
+    c.save();
+    c.translate(cx, cy);
+    c.rotate(ch.rot);
+    c.scale(ch.s, ch.s);
+    c.font = '900 ' + FS + 'px system-ui, sans-serif';
+    // 1) 硬投影：实色深蓝，向下偏移
+    c.save();
+    c.translate(0, 4.5);
+    c.strokeStyle = opt.shadowC; c.lineWidth = 12;
+    c.strokeText(TXT[i], 0, 0);
+    c.fillStyle = opt.shadowC;
+    c.fillText(TXT[i], 0, 0);
+    c.restore();
+    // 2) 白描边（可纵向渐变）
+    if (opt.strokeGrad) {
+      var sg = c.createLinearGradient(0, -FS * 0.85, 0, 4);
+      sg.addColorStop(0, '#FFFFFF');
+      sg.addColorStop(1, opt.strokeGradBottom);
+      c.strokeStyle = sg;
+    } else {
+      c.strokeStyle = '#FFFFFF';
+    }
+    c.lineWidth = 12;
+    c.strokeText(TXT[i], 0, 0);
+    // 2.5) 单淡蓝内环（可选）
+    if (opt.innerRing) {
+      c.strokeStyle = opt.innerRing;
+      c.lineWidth = 10;
+      c.strokeText(TXT[i], 0, 0);
+    }
+    // 3) 字面
+    var fg = c.createLinearGradient(0, -FS * 0.78, 0, 4);
+    fg.addColorStop(0, opt.faceTop);
+    fg.addColorStop(0.55, opt.faceMid);
+    fg.addColorStop(1, opt.faceBot);
+    c.fillStyle = fg;
+    c.fillText(TXT[i], 0, 0);
+    // 4) 顶部高光带
+    c.save();
+    c.globalAlpha = opt.hl;
+    c.beginPath(); c.rect(-ADV / 2 - 6, -FS * 0.85, ADV + 12, FS * 0.28); c.clip();
+    c.fillStyle = '#FFFFFF';
+    c.fillText(TXT[i], 0, 0);
+    c.restore();
+    c.restore();
+  }
+}
+drawVar('v1', { shadowC: '#1E6FA8', innerRing: '#CFE9F8', faceTop: '#BDE9FF', faceMid: '#4FA8DC', faceBot: '#1E6FA8', hl: 0.28 });
+drawVar('v2', { shadowC: '#1E6FA8', strokeGrad: true, strokeGradBottom: '#E8F4FC', faceTop: '#BDE9FF', faceMid: '#4FA8DC', faceBot: '#1E6FA8', hl: 0.28 });
+drawVar('v3', { shadowC: '#1A5A8C', strokeGrad: true, strokeGradBottom: '#E8F4FC', faceTop: '#AEE2FF', faceMid: '#3E9BD4', faceBot: '#155E98', hl: 0.38 });
+</script>
+</body>
+</html>

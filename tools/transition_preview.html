@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>主页↔游戏 过渡动画方案对比</title>
+<style>
+  body { margin:0; background:#0a2138; color:#dceeff; font-family:system-ui,sans-serif; display:flex; flex-wrap:wrap; justify-content:center; gap:18px; padding:20px; }
+  .card { text-align:center; }
+  .card h3 { margin:10px 0 2px; font-size:16px; color:#fff; }
+  .card p { margin:0 0 8px; font-size:12px; color:#9cc4de; max-width:380px; }
+  canvas { border-radius:14px; box-shadow:0 6px 24px rgba(0,0,0,.45); display:block; }
+</style>
+</head>
+<body>
+<div class="card"><canvas id="cA" width="380" height="740"></canvas><h3>A · 水滴坠落</h3><p>一颗大水滴从开始钮落下 → 砸出涟漪与飞溅 → 水面从落点涨满全屏 → 涟漪揭幕游戏。最贴「水滴」主题。</p></div>
+<div class="card"><canvas id="cB" width="380" height="740"></canvas><h3>B · 涟漪揭幕</h3><p>点开始钮处荡开圆形涟漪，新场景从圆心以水波环边界扩散揭示，环带白泡沫光。经典简洁。</p></div>
+<div class="card"><canvas id="cC" width="380" height="740"></canvas><h3>C · 漩涡吸入</h3><p>主页绕漩涡中心旋转缩小被吸入 → 深蓝漩涡臂旋转 → 游戏画面从漩涡中旋出放大。华丽、方向感强。</p></div>
+<div class="card"><canvas id="cD" width="380" height="740"></canvas><h3>D · 深潜下坠</h3><p>镜头垂直下潜：光柱上掠、气泡下坠加速、渐入深蓝 → 深处亮起进入游戏。电影感最强。</p></div>
+<script>
+const CY = 3.6; // 单循环秒：0~0.6 主页停留 → 0.6~1.9 过渡 → 1.9~3.0 游戏停留 → 3.0~3.6 过渡返回
+function clamp(v,a,b){return v<a?a:v>b?b:v}
+function easeIO(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2}
+// 模拟主页画面
+function drawMenuMock(g,W,H){
+  const gr=g.createLinearGradient(0,0,0,H);gr.addColorStop(0,'#3D9BC9');gr.addColorStop(.5,'#2A7BAA');gr.addColorStop(1,'#1B5E8C');
+  g.fillStyle=gr;g.fillRect(0,0,W,H);
+  g.textAlign='center';g.fillStyle='rgba(6,28,52,.45)';g.font='bold 26px system-ui';g.fillText('水滴合成深海',W/2,64);
+  g.fillStyle='#fff';g.font='bold 26px system-ui';g.fillText('水滴合成深海',W/2,61);
+  for(const[t,_x]of[['L',52],['R',328]])for(let i=0;i<2;i++){g.fillStyle='rgba(46,134,180,.85)';g.beginPath();g.roundRect(t-32,120+i*86,64,64,14);g.fill();g.fillStyle='#eaf6ff';g.font='12px system-ui';g.fillText('磁贴',t,120+i*86+37);}
+  g.fillStyle='#8FD0F0';g.beginPath();g.arc(W/2,420,44,0,7);g.fill();g.fillStyle='#0a2138';g.font='13px system-ui';g.fillText('吉祥物',W/2,425);
+  g.fillStyle='#3B9BD0';g.beginPath();g.roundRect(W/2-105,560,210,58,29);g.fill();g.fillStyle='#fff';g.font='bold 20px system-ui';g.fillText('开始游戏',W/2,597);
+}
+// 模拟游戏画面
+function drawGameMock(g,W,H){
+  const gr=g.createLinearGradient(0,0,0,H);gr.addColorStop(0,'#2E86B4');gr.addColorStop(.6,'#1D6C9C');gr.addColorStop(1,'#12517E');
+  g.fillStyle=gr;g.fillRect(0,0,W,H);
+  g.fillStyle='rgba(255,255,255,.14)';g.fillRect(0,58,W,2);
+  g.fillStyle='#fff';g.font='bold 22px system-ui';g.textAlign='center';g.fillText('1,250',W/2,44);
+  g.strokeStyle='rgba(127,212,255,.55)';g.lineWidth=1.5;g.strokeRect(30,80,W-60,H-160);
+  g.fillStyle='rgba(255,255,255,.75)';g.font='12px system-ui';g.fillText('警戒线',W/2,150);
+  g.fillStyle='#BDE8FF';[[120,600,26],[210,560,20],[280,620,30],[190,500,16]].forEach(([x,y,r])=>{g.beginPath();g.arc(x,y,r,0,7);g.fill();});
+  g.fillStyle='#2E86B4';g.beginPath();g.roundRect(30,H-70,W-60,44,22);g.fill();
+  g.fillStyle='#fff';g.font='13px system-ui';g.fillText('道具 · 道具 · 道具 · 道具 · 道具',W/2,H-42);
+}
+function ctxOf(id){return document.getElementById(id).getContext('2d')}
+function setup(){for(const id of['cA','cB','cC','cD']){const g=ctxOf(id);g.W=380;g.H=740;}}
+
+// ---- A 水滴坠落 ----
+function drawA(g,k){ // k=0 主页, 0~0.42 坠落+涨水, 0.42~0.55 涟漪揭幕, 1 游戏
+  const W=g.W,H=g.H;
+  if(k<=0){drawMenuMock(g,W,H);return}
+  if(k>=1){drawGameMock(g,W,H);return}
+  // 背景：落点之上仍是主页的延续（被水覆盖前），水从落点向上下/四周扩散
+  drawMenuMock(g,W,H);
+  const dropT=clamp(k/0.30,0,1), dropY=590+dropT*dropT*(H-590+40); // 大水滴从按钮坠到底部
+  const fillT=clamp((k-0.10)/0.32,0,1);                            // 水位从落点上涨
+  const lvl=H- (easeIO(fillT))*(H+60)+30;                          // 水面 y
+  // 水体
+  const wg=g.createLinearGradient(0,lvl,0,H);wg.addColorStop(0,'rgba(120,200,240,.96)');wg.addColorStop(.4,'rgba(46,134,180,.97)');wg.addColorStop(1,'rgba(10,60,100,.98)');
+  g.beginPath();g.moveTo(-20,lvl);
+  for(let x=-20;x<=W+20;x+=10)g.lineTo(x,lvl+Math.sin(x*.035+k*9)*6);
+  g.lineTo(W+20,H+20);g.lineTo(-20,H+20);g.closePath();g.fillStyle=wg;g.fill();
+  g.beginPath();for(let x=-20;x<=W+20;x+=10){const y=lvl+Math.sin(x*.035+k*9)*6;x===-20?g.moveTo(x,y):g.lineTo(x,y)}g.strokeStyle='rgba(255,255,255,.85)';g.lineWidth=4;g.stroke();
+  // 大水滴
+  if(k<0.34){g.fillStyle='#BDE8FF';g.beginPath();g.moveTo(dropY*0+ W/2,dropY-34);g.quadraticCurveTo(W/2+16,dropY-8,W/2,dropY);g.quadraticCurveTo(W/2-16,dropY-8,W/2,dropY-34);g.fill();
+    g.strokeStyle='rgba(255,255,255,.8)';g.lineWidth=3;g.stroke();}
+  // 落点涟漪环（水下扩散）
+  const rp=clamp((k-0.30)/0.5,0,1);
+  if(rp>0&&rp<1)for(let r=0;r<2;r++){const rr=(rp-r*.18)*W*.9;if(rr>0){g.strokeStyle='rgba(255,255,255,'+(0.55*(1-rp)+0.1).toFixed(2)+')';g.lineWidth=3-r;g.beginPath();g.ellipse(W/2,H-120+ (1-fillT)*300,rr,rr*.22,0,0,7);g.stroke();}}
+  // 揭幕：圆形涟漪扩大露出游戏
+  const rev=clamp((k-0.55)/0.45,0,1);
+  if(rev>0){const R=easeIO(rev)*W*1.15;g.save();g.beginPath();g.arc(W/2,H*0.55,Math.max(R,1),0,7);g.clip();drawGameMock(g,W,H);g.restore();
+    if(rev<1){g.strokeStyle='rgba(255,255,255,'+(0.9*(1-rev)).toFixed(2)+')';g.lineWidth=6*(1-rev)+2;g.beginPath();g.arc(W/2,H*0.55,R,0,7);g.stroke();
+      g.strokeStyle='rgba(159,224,255,'+(0.5*(1-rev)).toFixed(2)+')';g.lineWidth=2;g.beginPath();g.arc(W/2,H*0.55,R*0.86,0,7);g.stroke();}}
+}
+// ---- B 涟漪揭幕 ----
+function drawB(g,k){
+  const W=g.W,H=g.H;
+  drawMenuMock(g,W,H);
+  if(k>=1){drawGameMock(g,W,H);return}
+  if(k<=0)return;
+  const rev=easeIO(clamp(k/0.85,0,1));
+  const R=rev*W*1.2;
+  g.save();g.beginPath();g.arc(W/2,560,Math.max(R,1),0,7);g.clip();drawGameMock(g,W,H);g.restore();
+  if(rev<1){
+    // 三重涟漪环 + 波缘
+    for(let r=0;r<3;r++){const rr=R-r*26;if(rr<=0)continue;const a=(1-rev)*0.9-r*0.22;if(a<=0)continue;
+      g.strokeStyle='rgba(255,255,255,'+a.toFixed(2)+')';g.lineWidth=(r===0?7:3.5)-r;
+      g.beginPath();for(let x=0;x<=64;x++){const th=x/64*7;const wob=1+Math.sin(th*6+k*14+r)*0.015;const px=W/2+Math.cos(th)*rr*wob,py=560+Math.sin(th)*rr*wob;x?g.lineTo(px,py):g.moveTo(px,py)}g.closePath();g.stroke();}
+    // 环外水雾
+    g.strokeStyle='rgba(120,200,240,'+(0.35*(1-rev)).toFixed(2)+')';g.lineWidth=14;g.beginPath();g.arc(W/2,560,R+10,0,7);g.stroke();}
+}
+// ---- C 漩涡吸入 ----
+function drawC(g,k){
+  const W=g.W,H=g.H;
+  drawGameMock(g,W,H); // 底
+  if(k<=0){g.clearRect(0,0,W,H);drawMenuMock(g,W,H);return}
+  if(k>=1)return;
+  const t=easeIO(clamp(k/0.8,0,1)); // 0主页 → 1游戏
+  // 漩涡臂
+  g.save();g.translate(W/2,H*0.5);
+  const swirl=g.createRadialGradient(0,0,10,0,0,W*.75);swirl.addColorStop(0,'rgba(10,50,90,.95)');swirl.addColorStop(.55,'rgba(21,90,138,.75)');swirl.addColorStop(1,'rgba(21,90,138,0)');
+  g.fillStyle=swirl;g.beginPath();g.arc(0,0,W*.75,0,7);g.fill();
+  for(let a=0;a<3;a++){g.strokeStyle='rgba(140,208,244,'+(0.5*Math.sin(3.14*t)).toFixed(2)+')';g.lineWidth=5;g.beginPath();
+    for(let s=0;s<=40;s++){const th=s/40*4.2+a*2.09+k*7;const rr=14+s/40*W*.62;const px=Math.cos(th)*rr,py=Math.sin(th)*rr*0.9;s?g.lineTo(px,py):g.moveTo(px,py)}g.stroke();}
+  // 旧场景旋入（前半），新场景旋出（后半）
+  if(t<0.5){const s=1-t*2;g.save();g.rotate(-t*5);g.scale(s,s);g.globalAlpha=1-t*2;g.translate(-W/2,-H*0.5);drawMenuMock(g,W,H);g.restore();}
+  else{const s=(t-0.5)*2;g.save();g.rotate((1-t)*4);g.scale(s,s);g.globalAlpha=(t-0.5)*2;g.translate(-W/2,-H*0.5);drawGameMock(g,W,H);g.restore();}
+  g.restore();
+}
+// ---- D 深潜下坠 ----
+function drawD(g,k){
+  const W=g.W,H=g.H;
+  if(k<=0){drawMenuMock(g,W,H);return}
+  if(k>=1){drawGameMock(g,W,H);return}
+  const t=easeIO(clamp(k/0.85,0,1));
+  // 深度渐变（主页色→深蓝→游戏色）
+  const mid=g.createLinearGradient(0,0,0,H);
+  mid.addColorStop(0,'#2A7BAA');mid.addColorStop(clamp(t*1.6,0,0.9),'#0d3457');mid.addColorStop(1,'#12517E');
+  g.fillStyle=t<0.6?'#2A7BAA':mid;g.fillRect(0,0,W,H);
+  g.fillStyle=mid;g.globalAlpha=t;g.fillRect(0,0,W,H);g.globalAlpha=1;
+  // 光柱加速上掠
+  g.strokeStyle='rgba(210,240,255,'+(0.30*(1-t)).toFixed(2)+')';g.lineWidth=26;
+  for(let i=0;i<4;i++){const rx=60+i*90;const off=((t*900+i*160)%560)-80;g.beginPath();g.moveTo(rx-off*.25,0);g.lineTo(rx+off*.6,H);g.stroke();}
+  // 气泡下坠加速（镜头下潜的相对运动）
+  for(let i=0;i<14;i++){const s=i*67;const bx=(s*7%W);const by=H-((t*t*1400+s*9)% (H+120));g.strokeStyle='rgba(255,255,255,'+(0.35*(1-t*0.7)).toFixed(2)+')';g.lineWidth=1.4;g.beginPath();g.arc(bx,by,2+(s%4),0,7);g.stroke();}
+  // 中点：白闪转场
+  if(t>0.45&&t<0.62){const fa=1-Math.abs(t-0.535)/0.085;g.fillStyle='rgba(220,244,255,'+(fa*0.85).toFixed(2)+')';g.fillRect(0,0,W,H);}
+  if(t>=0.62){g.globalAlpha=(t-0.62)/0.38;drawGameMock(g,W,H);g.globalAlpha=1;}
+}
+function phase(now){const m=now% (CY*1000);const s=m/1000;
+  if(s<0.6)return{k:0,dir:1};if(s<1.9)return{k:(s-0.6)/1.3,dir:1};
+  if(s<3.0)return{k:1,dir:-1};return{k:1-(s-3.0)/0.6,dir:-1};}
+setup();
+const drawers={cA:drawA,cB:drawB,cC:drawC,cD:drawD};
+function frame(now){
+  const{k,dir}=phase(now);
+  for(const id in drawers){const g=ctxOf(id);g.clearRect(0,0,g.W,g.H);
+    if(dir===1)drawers[id](g,k);else drawers[id](g,1-k);}
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

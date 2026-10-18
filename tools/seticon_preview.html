@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>设置图标候选预览 · 水滴合成深海</title>
+<style>
+  html,body{margin:0;height:100%;background:#0E3A5C;color:#EAF3F8;
+    font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;}
+  .wrap{max-width:880px;margin:0 auto;padding:24px 16px 48px;}
+  h1{font-size:20px;margin:0 0 4px;font-weight:700;}
+  .sub{color:#9FC2D8;font-size:13px;line-height:1.7;margin:0 0 18px;}
+  .card{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);
+    border-radius:14px;padding:16px;margin-bottom:18px;}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .cell{text-align:center;background:rgba(255,255,255,0.05);border-radius:12px;padding:14px 8px 10px;}
+  .cell canvas{display:block;margin:0 auto;}
+  .tag{margin-top:8px;font-size:13px;font-weight:600;}
+  .desc{margin-top:2px;font-size:11px;color:#9FC2D8;line-height:1.5;}
+  .mock{display:flex;align-items:center;gap:14px;}
+  .note{font-size:12px;color:#9FC2D8;margin-top:14px;line-height:1.7;}
+  b{color:#FFE08A;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>设置按钮图标 · 候选预览</h1>
+  <p class="sub">
+    旧版（v199B）把齿轮按 <b>r/13</b> 放大，齿顶顶到 17.3/18px 几乎贴边、发挤发虚，这是"丑"的主因。
+    本版固定半径留 6px 边距，并给出四种风格。下方为真实画布渲染（与游戏内同一套几何）。
+  </p>
+
+  <div class="card">
+    <div class="mock">
+      <canvas id="mock" width="360" height="120"></canvas>
+      <div class="note">
+        左：模拟游戏 HUD 左上角实际大小（r=18）。<br>
+        右：放大 3× 供看清细节。<br>
+        蓝圆 = #2E7DA8（与底部道具钮同一绘制语言）。
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="grid">
+      <div class="cell"><canvas id="A" width="170" height="150"></canvas>
+        <div class="tag">A · 实心齿轮</div><div class="desc">白齿蓝心孔<br>经典、稳重</div></div>
+      <div class="cell"><canvas id="B" width="170" height="150"></canvas>
+        <div class="tag">B · 线描齿轮</div><div class="desc">白线齿轮+中心点<br>轻盈、精致</div></div>
+      <div class="cell"><canvas id="C" width="170" height="150"></canvas>
+        <div class="tag">C · 滑块</div><div class="desc">三条滑块+旋钮<br>现代、清晰</div></div>
+      <div class="cell"><canvas id="D" width="170" height="150"></canvas>
+        <div class="tag">D · 表盘</div><div class="desc">外环+八刻度<br>极简、克制</div></div>
+    </div>
+    <div class="note">
+      每个大样下方都附了 <b>真实 18px</b> 小样（圆内白色图标），请重点看小样在真实尺寸下是否清晰。
+      选定后告诉我 A/B/C/D（或"混合"，如"齿轮+蓝心孔但用线描"），我即锁定并重建。
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- 与 render.js 完全一致的几何（v200）----
+function btn(ctx, r){
+  ctx.fillStyle='#2E7DA8';
+  ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.arc(0,0,r-1.5,0,Math.PI*2);ctx.stroke();
+}
+function cog(ctx, fill){
+  var tipR=12,rootR=7.5,teeth=8,step=Math.PI*2/teeth;
+  ctx.beginPath();
+  for(var i=0;i<teeth;i++){
+    var ac=i*step,a0=ac-step*0.30,a1=ac-step*0.16,a2=ac+step*0.16,a3=ac+step*0.30;
+    var pts=[[a0,rootR],[a1,tipR],[a2,tipR],[a3,rootR]];
+    for(var k=0;k<4;k++){
+      var x=Math.cos(pts[k][0])*pts[k][1],y=Math.sin(pts[k][0])*pts[k][1];
+      if(i===0&&k===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    }
+  }
+  ctx.closePath();
+  if(fill){ctx.fillStyle='#FFFFFF';ctx.fill();
+    ctx.fillStyle='#2E7DA8';ctx.beginPath();ctx.arc(0,0,4.2,0,Math.PI*2);ctx.fill();}
+  else{ctx.strokeStyle='#FFFFFF';ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.stroke();
+    ctx.fillStyle='#FFFFFF';ctx.beginPath();ctx.arc(0,0,2,0,Math.PI*2);ctx.fill();}
+}
+function sliders(ctx){
+  ctx.strokeStyle='#FFFFFF';ctx.lineWidth=2.5;ctx.lineCap='round';
+  var ys=[-7,0,7],xs=[-4,5,-3];
+  for(var i=0;i<3;i++){
+    ctx.beginPath();ctx.moveTo(-10,ys[i]);ctx.lineTo(10,ys[i]);ctx.stroke();
+    ctx.fillStyle='#FFFFFF';ctx.beginPath();ctx.arc(xs[i],ys[i],3,0,Math.PI*2);ctx.fill();
+  }
+  ctx.lineCap='butt';
+}
+function dial(ctx){
+  ctx.strokeStyle='#FFFFFF';ctx.lineWidth=2.2;ctx.lineCap='round';
+  ctx.beginPath();ctx.arc(0,0,8.5,0,Math.PI*2);ctx.stroke();
+  for(var i=0;i<8;i++){var a=i*Math.PI/4;
+    ctx.beginPath();ctx.moveTo(Math.cos(a)*8.8,Math.sin(a)*8.8);
+    ctx.lineTo(Math.cos(a)*11.5,Math.sin(a)*11.5);ctx.stroke();}
+  ctx.fillStyle='#FFFFFF';ctx.beginPath();ctx.arc(0,0,2,0,Math.PI*2);ctx.fill();
+  ctx.lineCap='butt';
+}
+function draw(canvas, iconFn, big, small){
+  var ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(big){ // 放大样：居中画大圆
+    ctx.save();ctx.translate(canvas.width/2,canvas.height/2-10);
+    var R=54;btn(ctx,R);ctx.scale(R/18,R/18);iconFn(ctx);ctx.restore();
+    if(small){ // 真实小样
+      ctx.save();ctx.translate(canvas.width/2,canvas.height-26);
+      btn(ctx,18);iconFn(ctx);ctx.restore();
+    }
+  }
+}
+
+// 大样 + 真实小样
+draw(document.getElementById('A'),function(c){cog(c,true)},true,true);
+draw(document.getElementById('B'),function(c){cog(c,false)},true,true);
+draw(document.getElementById('C'),sliders,true,true);
+draw(document.getElementById('D'),dial,true,true);
+
+// HUD 模拟条
+(function(){
+  var cv=document.getElementById('mock'),ctx=cv.getContext('2d');
+  // 背景条（模拟 HUD 区域浅色）
+  var g=ctx.createLinearGradient(0,0,0,cv.height);
+  g.addColorStop(0,'rgba(255,255,255,0.10)');g.addColorStop(1,'rgba(255,255,255,0.02)');
+  ctx.fillStyle=g;ctx.fillRect(0,0,cv.width,cv.height);
+  // 实际大小设置钮（左）
+  ctx.save();ctx.translate(25+0,35);btn(ctx,18);cog(ctx,true);ctx.restore();
+  ctx.fillStyle='#EAF3F8';ctx.font='12px system-ui';ctx.textAlign='left';
+  ctx.fillText('设置',55,30);
+  ctx.fillStyle='#9FC2D8';ctx.font='11px system-ui';
+  ctx.fillText('（真实 r=18）',55,46);
+  // 放大 3× 对照（右）
+  ctx.save();ctx.translate(300,60);btn(ctx,54);ctx.scale(3,3);cog(ctx,true);ctx.restore();
+  ctx.fillStyle='#9FC2D8';ctx.font='11px system-ui';ctx.textAlign='center';
+  ctx.fillText('放大 3×',300,108);
+})();
+</script>
+</body>
+</html>

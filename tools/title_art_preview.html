@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>主页艺术字方案预览 · 水滴合成深海</title>
+<style>
+  body { margin:0; padding:24px; background:#28425A; font-family:system-ui,sans-serif; color:#EAF4FB; }
+  h1 { font-size:20px; margin:0 0 6px; }
+  p.tip { margin:0 0 20px; font-size:13px; color:#A8C6DA; }
+  .card { background:#F4FAFF; border-radius:14px; padding:14px 18px 16px; margin-bottom:18px;
+          box-shadow:0 6px 18px rgba(0,20,40,.35); }
+  .card h2 { margin:0 0 2px; font-size:15px; color:#155A8A; }
+  .card p { margin:0 0 10px; font-size:12px; color:#5A7A90; }
+  canvas { display:block; width:100%; max-width:440px; height:120px;
+           background:linear-gradient(#BFE3FA,#E8F7FF); border-radius:10px; }
+</style>
+</head>
+<body>
+<h1>主页艺术字方案预览（字形本身艺术化，纯 canvas 绘制 = 落地效果）</h1>
+<p class="tip">选定方案后原样落进游戏：水滴合成深海</p>
+
+<div class="card"><h2>方案 A · 海浪填充字</h2><p>笔画内部灌进海水：上层白色浪沫、下层深海底色，浪在字里流动；深蓝描边。</p><canvas id="cvA" width="440" height="120"></canvas></div>
+
+<div class="card"><h2>方案 B · 立体挤出字</h2><p>白色渐变字面 + 深蓝厚度层向下挤出，逐字波浪浮动，经典小游戏立体 logo。</p><canvas id="cvB" width="440" height="120"></canvas></div>
+
+<div class="card"><h2>方案 C · 滴落变形字</h2><p>字面海蓝渐变，笔画末端挂水珠：水珠逐渐拉长、坠落、循环（滴字挂滴，点题）。</p><canvas id="cvC" width="440" height="120"></canvas></div>
+
+<div class="card"><h2>方案 D · 泡泡胖圆字</h2><p>笔画加粗圆润如吹起的泡泡，双层描边（白外圈+海蓝内圈），字面亮白带高光点。</p><canvas id="cvD" width="440" height="120"></canvas></div>
+
+<script>
+'use strict';
+var TXT = '水滴合成深海';
+var FONT = 'bold 42px "Microsoft YaHei","PingFang SC",system-ui,sans-serif';
+var FS = 42, ADV = 42;
+
+function waveFill(g, x0, x1, yl, amp, k, sp, t, fill, yTop, yEnd) {
+  g.beginPath(); g.moveTo(x0, yTop);
+  for (var x = x0; x <= x1; x += 4) g.lineTo(x, yl + Math.sin(x * k + t * sp) * amp);
+  g.lineTo(x1, yEnd); g.closePath();
+  g.fillStyle = fill; g.fill();
+}
+
+// —— A 海浪填充字 ——
+function artA(c, W, H, t) {
+  var totalW = ADV * TXT.length, x0 = (W - totalW) / 2 + ADV / 2, base = 80;
+  c.textAlign = 'center'; c.font = FONT; c.lineJoin = 'round'; c.miterLimit = 2;
+  c.fillStyle = 'rgba(6,28,52,0.4)';
+  for (var i = 0; i < TXT.length; i++) c.fillText(TXT[i], x0 + i * ADV + 2, base + 3);
+  c.strokeStyle = '#1E6FA8'; c.lineWidth = 8;
+  for (i = 0; i < TXT.length; i++) c.strokeText(TXT[i], x0 + i * ADV, base);
+  var o = document.createElement('canvas'); o.width = W; o.height = H;
+  var g = o.getContext('2d'); g.textAlign = 'center'; g.font = FONT;
+  var gr = g.createLinearGradient(0, base - 40, 0, base + 10);
+  gr.addColorStop(0, '#F4FBFF'); gr.addColorStop(0.5, '#A6DCF6'); gr.addColorStop(1, '#4FA8DC');
+  g.fillStyle = gr;
+  for (i = 0; i < TXT.length; i++) g.fillText(TXT[i], x0 + i * ADV, base);
+  g.globalCompositeOperation = 'source-atop';
+  var sg = g.createLinearGradient(0, base - 30, 0, base + 12);
+  sg.addColorStop(0, '#5FB2E6'); sg.addColorStop(1, '#1E6FA8');
+  waveFill(g, 0, W, base - 42, 2.5, 0.09, 1.8, t, 'rgba(255,255,255,0.9)', base - 52, base - 40);
+  waveFill(g, 0, W, base - 26, 4, 0.07, 2.4, t, sg, base - 40, H);
+  g.fillStyle = 'rgba(255,255,255,0.35)';
+  for (i = 0; i < 5; i++) {
+    var bx = (i * 97 + t * 18) % totalW + (W - totalW) / 2;
+    var by = base - 18 - ((t * 12 + i * 30) % 26);
+    g.beginPath(); g.arc(bx, by, 1.6 + (i % 3), 0, Math.PI * 2); g.fill();
+  }
+  c.drawImage(o, 0, 0);
+}
+
+// —— B 立体挤出字 ——
+function artB(c, W, H, t) {
+  var totalW = ADV * TXT.length, x0 = (W - totalW) / 2 + ADV / 2, base = 74;
+  c.textAlign = 'center'; c.font = FONT; c.lineJoin = 'round'; c.miterLimit = 2;
+  for (var i = 0; i < TXT.length; i++) {
+    var x = x0 + i * ADV, bob = Math.sin(t * 2 + i * 0.85) * 3;
+    c.fillStyle = 'rgba(6,28,52,0.35)';
+    c.fillText(TXT[i], x + 3, base + bob + 5);
+    for (var d = 7; d >= 1; d--) {
+      var k = d / 7;
+      c.fillStyle = 'rgb(' + Math.round(30 - k * 15) + ',' + Math.round(95 - k * 40) + ',' + Math.round(150 - k * 60) + ')';
+      c.fillText(TXT[i], x, base + bob + d);
+    }
+    var tg = c.createLinearGradient(0, base + bob - 38, 0, base + bob + 8);
+    tg.addColorStop(0, '#FFFFFF'); tg.addColorStop(0.55, '#CFEBFF'); tg.addColorStop(1, '#8FC9EE');
+    c.strokeStyle = '#FFFFFF'; c.lineWidth = 6; c.strokeText(TXT[i], x, base + bob);
+    c.fillStyle = tg; c.fillText(TXT[i], x, base + bob);
+    c.save(); c.globalAlpha = 0.25;
+    c.beginPath(); c.rect(x - ADV / 2, base + bob - 38, ADV, 17); c.clip();
+    c.fillStyle = '#FFFFFF'; c.fillText(TXT[i], x, base + bob);
+    c.restore();
+  }
+}
+
+// —— C 滴落变形字 ——
+function artC(c, W, H, t) {
+  var totalW = ADV * TXT.length, x0 = (W - totalW) / 2 + ADV / 2, base = 76;
+  c.textAlign = 'center'; c.font = FONT; c.lineJoin = 'round'; c.miterLimit = 2;
+  c.fillStyle = 'rgba(6,28,52,0.4)';
+  for (var i = 0; i < TXT.length; i++) c.fillText(TXT[i], x0 + i * ADV + 2, base + 3);
+  c.strokeStyle = '#1E6FA8'; c.lineWidth = 8;
+  for (i = 0; i < TXT.length; i++) c.strokeText(TXT[i], x0 + i * ADV, base);
+  var tg = c.createLinearGradient(0, base - 40, 0, base + 8);
+  tg.addColorStop(0, '#FFFFFF'); tg.addColorStop(0.55, '#CFEBFF'); tg.addColorStop(1, '#8FC9EE');
+  c.fillStyle = tg;
+  for (i = 0; i < TXT.length; i++) c.fillText(TXT[i], x0 + i * ADV, base);
+  // 滴字(1)与海字(5)笔画末端挂水珠：拉长→坠落→循环
+  var spots = [1, 5];
+  for (var s = 0; s < spots.length; s++) {
+    var idx = spots[s], dx = x0 + idx * ADV + 10, dy = base + 6;
+    var p = (t * 0.45 + s * 0.5) % 1;
+    c.fillStyle = '#4FA8DC';
+    if (p < 0.5) {
+      var len = p * 2 * 14;
+      c.strokeStyle = '#4FA8DC'; c.lineWidth = 2.4; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(dx, dy); c.lineTo(dx, dy + len); c.stroke();
+      c.beginPath(); c.arc(dx, dy + len + 2.4, 3.2, 0, Math.PI * 2); c.fill();
+    } else {
+      var q = (p - 0.5) * 2;
+      c.globalAlpha = 1 - q;
+      c.beginPath(); c.arc(dx, dy + 16 + q * 34, 3.4 - q * 1, 0, Math.PI * 2); c.fill();
+      c.globalAlpha = 1;
+    }
+  }
+  // 浪沫弧线托底
+  c.strokeStyle = 'rgba(159,224,255,0.7)'; c.lineWidth = 3; c.lineCap = 'round';
+  c.beginPath();
+  for (var wx = 0; wx <= totalW + 20; wx += 5) {
+    var wy = base + 22 + Math.sin(wx * 0.06 + t * 2) * 3;
+    var ax = (W - totalW) / 2 - 10 + wx;
+    if (wx === 0) c.moveTo(ax, wy); else c.lineTo(ax, wy);
+  }
+  c.stroke(); c.lineCap = 'butt';
+}
+
+// —— D 泡泡胖圆字 ——
+function artD(c, W, H, t) {
+  var totalW = ADV * TXT.length, x0 = (W - totalW) / 2 + ADV / 2, base = 76;
+  c.textAlign = 'center'; c.font = FONT; c.lineJoin = 'round'; c.lineCap = 'round'; c.miterLimit = 2;
+  for (var i = 0; i < TXT.length; i++) {
+    var x = x0 + i * ADV, bob = Math.sin(t * 2 + i * 0.9) * 3.2;
+    c.fillStyle = 'rgba(6,28,52,0.35)';
+    c.fillText(TXT[i], x + 2, base + bob + 4);
+    c.strokeStyle = '#FFFFFF'; c.lineWidth = 22; c.strokeText(TXT[i], x, base + bob);
+    c.strokeStyle = '#2E86B4'; c.lineWidth = 13; c.strokeText(TXT[i], x, base + bob);
+    var tg = c.createLinearGradient(0, base + bob - 36, 0, base + bob + 8);
+    tg.addColorStop(0, '#FFFFFF'); tg.addColorStop(1, '#BFE3FA');
+    c.fillStyle = tg; c.fillText(TXT[i], x, base + bob);
+    c.fillStyle = 'rgba(255,255,255,0.85)';
+    c.beginPath(); c.arc(x - 12, base + bob - 24, 3.2, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(x - 3, base + bob - 30, 1.8, 0, Math.PI * 2); c.fill();
+  }
+  c.lineCap = 'butt';
+}
+
+var T0 = performance.now();
+function loop() {
+  var t = (performance.now() - T0) / 1000;
+  artA(document.getElementById('cvA').getContext('2d'), 440, 120, t);
+  artB(document.getElementById('cvB').getContext('2d'), 440, 120, t);
+  artC(document.getElementById('cvC').getContext('2d'), 440, 120, t);
+  artD(document.getElementById('cvD').getContext('2d'), 440, 120, t);
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>警戒线闪烁效果对比</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: linear-gradient(180deg, #0B2E4D 0%, #0A2440 55%, #081C33 100%);
+    min-height: 100vh;
+    font-family: system-ui, -apple-system, sans-serif;
+    color: #DCEAF5;
+    padding: 28px 18px 40px;
+  }
+  h1 { font-size: 20px; text-align: center; margin-bottom: 6px; color: #FFFFFF; }
+  .sub { text-align: center; font-size: 13px; color: #8FB4CE; margin-bottom: 24px; }
+  .grid {
+    display: flex; flex-wrap: wrap; gap: 18px;
+    max-width: 900px; margin: 0 auto; justify-content: center;
+  }
+  .card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px; padding: 12px 12px 10px;
+    width: 340px;
+  }
+  .card h2 { font-size: 15px; margin-bottom: 2px; color: #FFFFFF; }
+  .card p  { font-size: 12px; color: #8FB4CE; margin-bottom: 8px; min-height: 16px; }
+  canvas {
+    width: 100%; display: block;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #123B60 0%, #0E3050 60%, #0A2542 100%);
+  }
+  .tag {
+    display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 8px;
+    background: rgba(255,255,255,0.12); color: #CFE3F2; margin-left: 6px;
+  }
+  .foot { text-align: center; font-size: 12px; color: #6E93AE; margin-top: 22px; }
+</style>
+</head>
+<body>
+<h1>警戒线闪烁效果对比</h1>
+<div class="sub">以下均为<b>堆顶贴近警戒线</b>（near ≈ 0.85）同一时刻的动态效果 · 挑选后告诉我字母即可</div>
+<div class="grid" id="grid"></div>
+<div class="foot">所有方案共用同一套警戒线绘制（光带 + 流动刻度 + 端点光珠 + 暖色渐晕），只差「闪」的节奏曲线</div>
+
+<script>
+(function () {
+  // ---------- 各闪烁方案：输入 time(秒) 与 near(0~1 危险度)，输出 blink(0~1 明灭系数) ----------
+  var schemes = [
+    {
+      id: '当前', name: '当前 v221', desc: '≈2.3Hz 方波 · 亮短灭长 · 灭态留 12% 底光',
+      blink: function (t, near) {
+        var hz = 1.3 + near * 1.2;
+        var sq = Math.pow(0.5 + 0.5 * Math.sin(t * hz * 2 * Math.PI), 3.5);
+        return 0.12 + 0.88 * sq;
+      }
+    },
+    {
+      id: 'A', name: 'A · 经典双闪（救护灯）', desc: '闪两下 → 停一拍 · 亮如闪光灯 · 灭=全暗',
+      blink: function (t) {
+        var period = 1.15, ph = (t % period) / period;
+        function pulse(ph, s, d) {
+          if (ph < s || ph >= s + d) return 0;
+          return Math.sin(((ph - s) / d) * Math.PI); // 半正弦脉冲：快起快落像闪光灯
+        }
+        var b = Math.max(pulse(ph, 0.02, 0.11), pulse(ph, 0.20, 0.11));
+        return Math.pow(Math.max(0, b), 0.8);
+      }
+    },
+    {
+      id: 'B', name: 'B · 强对比硬闪', desc: '2Hz · 亮=打满 / 灭=近全暗 · 硬切无过渡',
+      blink: function (t) {
+        return ((t * 2.0) % 1) < 0.32 ? 1 : 0.03;
+      }
+    },
+    {
+      id: 'C', name: 'C · 呼吸红光', desc: '1.1Hz 大幅正弦 · 0.08↔1 全程流动 · 柔和但醒目',
+      blink: function (t) {
+        return 0.08 + 0.92 * (0.5 + 0.5 * Math.sin(t * 1.1 * 2 * Math.PI));
+      }
+    },
+    {
+      id: 'D', name: 'D · 快速频闪', desc: '4.2Hz 短亮脉冲 · 急促紧迫 · 持续催促感',
+      blink: function (t) {
+        return ((t * 4.2) % 1) < 0.25 ? 1 : 0.04;
+      }
+    },
+    {
+      id: 'E', name: 'E · 双闪+渐进急促', desc: 'A 的节奏，但频率随危险度 0.9→1.6Hz',
+      blink: function (t, near) {
+        var period = 1 / (0.9 + near * 0.7), ph = (t % period) / period;
+        function pulse(ph, s, d) {
+          if (ph < s || ph >= s + d) return 0;
+          return Math.sin(((ph - s) / d) * Math.PI);
+        }
+        var b = Math.max(pulse(ph, 0.02, 0.11), pulse(ph, 0.20, 0.11));
+        return Math.pow(Math.max(0, b), 0.8);
+      }
+    }
+  ];
+
+  var NEAR = 0.85;   // 演示用危险度：堆顶贴近警戒线
+  var DPR = Math.min(2, window.devicePixelRatio || 1);
+  var CW = 316, CH = 210, LINE_Y = 96;
+
+  // ---------- 与游戏 drawDangerLine 一致的绘制（参数化 near / blink） ----------
+  function drawScene(ctx, blink, time) {
+    var W = CW, H = CH, y = LINE_Y, near = NEAR;
+    ctx.clearRect(0, 0, W, H);
+
+    // 静止水滴堆（3 颗，顶滴贴近线）
+    function drop(x, cy, r) {
+      var g = ctx.createRadialGradient(x - r * 0.35, cy - r * 0.4, r * 0.15, x, cy, r);
+      g.addColorStop(0, 'rgba(190,230,255,0.95)');
+      g.addColorStop(0.55, 'rgba(110,190,235,0.9)');
+      g.addColorStop(1, 'rgba(60,140,200,0.85)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, cy, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    drop(W * 0.5, y + 42 + 26, 24);
+    drop(W * 0.5 - 22, y + 42 + 68, 22);
+    drop(W * 0.5 + 23, y + 42 + 70, 21);
+
+    // 危险渐晕
+    var dz = ctx.createLinearGradient(0, y, 0, y + 42);
+    dz.addColorStop(0, 'rgba(38,78,108,' + (0.12 + near * 0.06) + ')');
+    dz.addColorStop(1, 'rgba(38,78,108,0)');
+    ctx.fillStyle = dz; ctx.fillRect(0, y, W, 42);
+    if (near > 0.05) {
+      var wz = ctx.createLinearGradient(0, y, 0, y + 42);
+      wz.addColorStop(0, 'rgba(224,120,80,' + (near * 0.14 * blink) + ')');
+      wz.addColorStop(1, 'rgba(224,120,80,0)');
+      ctx.fillStyle = wz; ctx.fillRect(0, y, W, 42);
+    }
+
+    // 光带
+    var lr = Math.round(96 + near * 130), lgn = Math.round(150 - near * 60), lb = Math.round(196 - near * 122);
+    var cCore = 'rgba(' + lr + ',' + lgn + ',' + lb + ',';
+    var a = (0.3 + near * 0.6) * blink;
+    var lg = ctx.createLinearGradient(0, 0, W, 0);
+    lg.addColorStop(0, cCore + '0)');
+    lg.addColorStop(0.07, cCore + (a * 0.85) + ')');
+    lg.addColorStop(0.5, cCore + a + ')');
+    lg.addColorStop(0.93, cCore + (a * 0.85) + ')');
+    lg.addColorStop(1, cCore + '0)');
+    ctx.strokeStyle = lg;
+    ctx.lineWidth = 2 + near * 1.4;
+    ctx.beginPath(); ctx.moveTo(2, y); ctx.lineTo(W - 2, y); ctx.stroke();
+
+    // 流动刻度
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,' + ((0.35 + near * 0.5) * blink) + ')';
+    ctx.lineWidth = 1.6 + near;
+    ctx.setLineDash([3, 13]);
+    ctx.lineDashOffset = -time * 26;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(2, y); ctx.lineTo(W - 2, y); ctx.stroke();
+    ctx.restore();
+
+    // 端点光珠
+    if (near > 0.05) {
+      var pa = (0.35 + near * 0.55) * blink;
+      for (var side = 0; side < 2; side++) {
+        var ex = side ? W - 5 : 5;
+        ctx.fillStyle = cCore + (pa * 0.22) + ')';
+        ctx.beginPath(); ctx.arc(ex, y, 10 + near * 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = cCore + (pa * 0.4) + ')';
+        ctx.beginPath(); ctx.arc(ex, y, 5.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,' + (pa * 0.85) + ')';
+        ctx.beginPath(); ctx.arc(ex, y, 2.2 + near * 1.2, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+  }
+
+  // ---------- 构建卡片 ----------
+  var grid = document.getElementById('grid');
+  var canvases = [];
+  schemes.forEach(function (s) {
+    var card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = '<h2>' + s.name + '<span class="tag">' + s.id + '</span></h2><p>' + s.desc + '</p>';
+    var cv = document.createElement('canvas');
+    cv.width = CW * DPR; cv.height = CH * DPR;
+    card.appendChild(cv);
+    grid.appendChild(card);
+    canvases.push({ ctx: cv.getContext('2d'), scheme: s });
+  });
+
+  // ---------- 动画循环 ----------
+  var t0 = performance.now();
+  function frame(now) {
+    var t = (now - t0) / 1000;
+    canvases.forEach(function (c) {
+      c.ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      var blink = c.scheme.blink(t, NEAR);
+      drawScene(c.ctx, blink, t);
+    });
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

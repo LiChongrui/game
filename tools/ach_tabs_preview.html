@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>成就殿堂 · 页签内容改版预览（方案 A / B）</title>
+<style>
+  body { margin:0; padding:24px; background:#F2F5F8; font-family:system-ui,-apple-system,sans-serif; color:#1F3A50; }
+  h1 { font-size:20px; margin:0 0 6px; }
+  p.tip { font-size:13px; color:#5B7E96; margin:0 0 20px; }
+  h2 { font-size:16px; margin:28px 0 10px; color:#155A8A; border-left:4px solid #2E86B4; padding-left:8px; }
+  canvas { display:block; border-radius:10px; box-shadow:0 4px 14px rgba(10,46,78,0.18); }
+  .legend { font-size:12px; color:#8AA5B8; margin:4px 0 8px; }
+</style>
+</head>
+<body>
+<h1>成就殿堂 · 页签内容改版预览</h1>
+<p class="tip">每个页签给两套方案：左 = <b>方案 A「徽章卡」</b>（圆勋章 + 玻璃卡），右 = <b>方案 B「色带卡」</b>（顶部渐变色带 + 大进度）。可以整套选 A 或 B，也可以按页签混选（例如"成就A 任务B 挑战B 榜单A"），回复后我再落地进游戏。</p>
+
+<h2>① 成就（11 项）</h2>
+<div class="legend">A：难度色勋章 + 金色达成卡　|　B：难度色顶部色带，达成转金 + ✓</div>
+<canvas id="cAch" width="820" height="640"></canvas>
+
+<h2>② 每日任务（3 个）</h2>
+<div class="legend">A：左侧进度圆环 + 奖励胶囊　|　B：色带标题栏 + 粗进度条</div>
+<canvas id="cTask" width="820" height="640"></canvas>
+
+<h2>③ 每日挑战</h2>
+<div class="legend">A：紫色 Hero 大卡 + 金色按钮 + 连胜徽章行　|　B：色带长卡 + 超大目标分</div>
+<canvas id="cDchal" width="820" height="640"></canvas>
+
+<h2>④ 榜单</h2>
+<div class="legend">A：前三名领奖台 + 列表　|　B：金银铜渐变横幅行 + 列表</div>
+<canvas id="cRank" width="820" height="640"></canvas>
+
+<script>
+// ---------------- 公共小工具 ----------------
+function rr(c,x,y,w,h,r){r=Math.min(r,w/2,h/2);c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+function txt(c,s,x,y,font,color,align,baseline){c.font=font;c.fillStyle=color;c.textAlign=align||'left';c.textBaseline=baseline||'alphabetic';c.fillText(s,x,y);}
+function trunc(c,s,w){if(c.measureText(s).width<=w)return s;while(s.length>1&&c.measureText(s+'…').width>w)s=s.slice(0,-1);return s+'…';}
+function vgrad(c,x0,y0,x1,y1,stops){var g=c.createLinearGradient(x0,y0,x1,y1);for(var i=0;i<stops.length;i++)g.addColorStop(stops[i][0],stops[i][1]);return g;}
+function starPath(c,x,y,r){c.beginPath();for(var i=0;i<5;i++){var a=-Math.PI/2+i*2*Math.PI/5,a2=a+Math.PI/5;c.lineTo(x+Math.cos(a)*r,y+Math.sin(a)*r);c.lineTo(x+Math.cos(a2)*r*0.45,y+Math.sin(a2)*r*0.45);}c.closePath();}
+function check(c,x,y,s,color,lw){c.strokeStyle=color;c.lineWidth=lw||2.4;c.lineCap='round';c.lineJoin='round';c.beginPath();c.moveTo(x-s,y);c.lineTo(x-s*0.25,y+s*0.7);c.lineTo(x+s,y-s*0.6);c.stroke();c.lineCap='butt';}
+function crown(c,x,y,s,color){c.fillStyle=color;c.beginPath();c.moveTo(x-s,y+s*0.6);c.lineTo(x-s,y-s*0.3);c.lineTo(x-s*0.45,y+s*0.05);c.lineTo(x,y-s*0.75);c.lineTo(x+s*0.45,y+s*0.05);c.lineTo(x+s,y-s*0.3);c.lineTo(x+s,y+s*0.6);c.closePath();c.fill();}
+
+// 难度配色（与游戏现有色一致：蓝 / 金 / 紫，达成金）
+var DIFF_MEDAL = {1:'#5E9CC4',2:'#D9A93F',3:'#9B7FD0'}, DIFF_RIBBON={1:'#4A7F9E',2:'#9A7420',3:'#6A5AA8'}, DONE_C='#F5C542';
+var DIFF_BAND  = {1:[['0','#4A9CC8'],['1','#2E7DA8']],2:[['0','#D9A93F'],['1','#B8860B']],3:[['0','#9B7FD0'],['1','#6A5AB8']]};
+var DONE_BAND  = [['0','#F5C542'],['1','#D9A93F']];
+function bandGrad(c,x,y,w,h,stops){var g=c.createLinearGradient(x,y,x,y+h);for(var i=0;i<stops.length;i++)g.addColorStop(parseFloat(stops[i][0]),stops[i][1]);return g;}
+
+// 面板底（白玻璃 + 页头 + ✕，与游戏 drawPanelHeader/panel 同款）
+function chrome(c,px,py,title){
+  c.fillStyle='rgba(255,255,255,0.96)'; rr(c,px,py,380,600,14); c.fill();
+  c.strokeStyle='rgba(46,110,150,0.14)'; c.lineWidth=1; rr(c,px+0.5,py+0.5,379,599,13.5); c.stroke();
+  txt(c,title,px+18,py+30,'bold 19px system-ui','#155A8A');
+  var ccx=px+355,ccy=py+25;
+  c.fillStyle='rgba(46,134,180,0.12)'; c.beginPath(); c.arc(ccx,ccy,13,0,Math.PI*2); c.fill();
+  c.strokeStyle='#4A7FA0'; c.lineWidth=2; c.lineCap='round';
+  c.beginPath(); c.moveTo(ccx-4,ccy-4); c.lineTo(ccx+4,ccy+4); c.moveTo(ccx+4,ccy-4); c.lineTo(ccx-4,ccy+4); c.stroke(); c.lineCap='butt';
+}
+function canvasBg(c){
+  var g=vgrad(c,0,0,0,640,[[0,'#0E4C74'],[1,'#0A2E4E']]); c.fillStyle=g; c.fillRect(0,0,820,640);
+  c.fillStyle='rgba(255,255,255,0.05)';
+  var bs=[[60,120,14],[300,500,9],[760,90,11],[700,420,7],[420,610,6]];
+  for(var i=0;i<bs.length;i++){c.beginPath();c.arc(bs[i][0],bs[i][1],bs[i][2],0,Math.PI*2);c.fill();}
+}
+
+// ---------------- 模拟数据（与游戏一致）----------------
+var ACH=[
+ {name:'深海富豪',desc:'单局得分达到 30000',diff:1,perk:'永续 · 开局充能 +2',cur:18000,target:30000},
+ {name:'连浪六叠',desc:'达成 6 连击',diff:1,perk:'永续 · 连击窗 +0.3s',cur:6,target:6},
+ {name:'寻宝猎人',desc:'累计开启 10 只宝箱',diff:1,perk:'永续 · 宝箱奖励 +50%',cur:4,target:10},
+ {name:'弄潮儿',desc:'经历 25 次涨潮',diff:2,perk:'永续 · 潮期得分 +10%',cur:25,target:25},
+ {name:'礁石克星',desc:'累计消除 12 对礁石',diff:2,perk:'永续 · 礁石相消 ×2',cur:7,target:12},
+ {name:'虹光使者',desc:'触发 12 次彩虹合成',diff:2,perk:'永续 · 彩虹得分 +50%',cur:12,target:12},
+ {name:'任务大师',desc:'累计完成 30 个任务',diff:2,perk:'永续 · 任务奖励 +30%',cur:11,target:30},
+ {name:'沧海遗珠',desc:'合成出传说中的「沧海」',diff:2,perk:'永续 · 沧海汇入 +50%',cur:0,target:1},
+ {name:'沧海成群',desc:'累计合成 5 只「沧海」',diff:3,perk:'称号 · 沧海之主',cur:1,target:5},
+ {name:'惊涛十二叠',desc:'达成 12 连击',diff:3,perk:'称号 · 驭浪者',cur:6,target:12},
+ {name:'海渊传说',desc:'单局得分达到 100000',diff:3,perk:'称号 · 海渊传说',cur:30000,target:100000}
+];
+var TASKS=[
+ {text:'单局合成出 3 只水母',need:3,stars:2,prog:2},
+ {text:'单局得分达到 8000',need:8000,stars:1,prog:8000},
+ {text:'触发 5 次彩虹合成',need:5,stars:3,prog:1}
+];
+function taskReward(t){return Math.round(300*(1+(t.stars-1)*0.5));}
+var DCHAL={name:'疾风骤雨',desc:'潮汐间隔 -40%',goal:12000,streak:3,rewardMax:800};
+var RANK=[
+ {name:'深海摆烂人',score:52300},{name:'泡泡龙大师',score:41800},{name:'小海豚嘟嘟',score:35600},
+ {name:'我',score:31200,me:true},{name:'浪里白条',score:24500},{name:'章鱼哥',score:18900}
+];
+function fmt(n){return n>=10000?(Math.round(n/1000)/10)+'万':String(n);}
+
+// ================= ① 成就 =================
+// ---- A 徽章卡 ----
+function achA(c,px,py){
+  chrome(c,px,py,'成就');
+  var cw=172,ch=76;
+  for(var i=0;i<ACH.length;i++){
+    var a=ACH[i],done=a.cur>=a.target;
+    var x=px+14+(i%2)*(cw+8),y=py+86+Math.floor(i/2)*(ch+8);
+    // 卡底
+    if(done){c.fillStyle=vgrad(c,0,y,0,y+ch,[[0,'rgba(245,197,66,0.20)'],[1,'rgba(217,169,63,0.10)']]);}
+    else{c.fillStyle='rgba(255,255,255,0.8)';}
+    rr(c,x,y,cw,ch,9); c.fill();
+    c.strokeStyle=done?'rgba(217,169,63,0.45)':'rgba(46,110,150,0.14)'; c.lineWidth=1; rr(c,x+0.5,y+0.5,cw-1,ch-1,9); c.stroke();
+    // 勋章
+    var mx=x+24,my=y+26,mr=13;
+    c.fillStyle=done?DONE_C:DIFF_MEDAL[a.diff];
+    c.beginPath(); c.arc(mx,my,mr,0,Math.PI*2); c.fill();
+    c.strokeStyle='rgba(255,255,255,0.85)'; c.lineWidth=1.5; c.stroke();
+    c.fillStyle='rgba(255,255,255,0.25)'; c.beginPath(); c.arc(mx,my,mr,Math.PI*1.1,Math.PI*1.9); c.arc(mx,my,mr*0.55,Math.PI*1.9,Math.PI*1.1,true); c.fill();
+    starPath(c,mx,my+0.5,5); c.fillStyle='#FFFFFF'; c.fill();
+    // 绶带
+    c.fillStyle=done?'#C9922A':DIFF_RIBBON[a.diff];
+    c.beginPath(); c.moveTo(mx-6,my+10); c.lineTo(mx-3,my+20); c.lineTo(mx,my+11); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(mx+6,my+10); c.lineTo(mx+3,my+20); c.lineTo(mx,my+11); c.closePath(); c.fill();
+    // 文本
+    var tx=x+42,tw=120;
+    txt(c,trunc(c,a.name,tw),tx,y+20,'bold 14px system-ui',done?'#B8860B':'#155A8A');
+    c.font='10px system-ui';
+    txt(c,trunc(c,a.desc,tw),tx,y+35,'10px system-ui','#4A7FA0');
+    txt(c,trunc(c,a.perk,tw),tx,y+48,'9px system-ui',done?'#1E7A6F':'#9AB4C4');
+    // 进度条
+    var bw=90;
+    c.fillStyle='rgba(46,134,180,0.15)'; rr(c,tx,y+58,bw,6,3); c.fill();
+    var fr=Math.min(1,a.cur/a.target);
+    if(fr>0){c.fillStyle=done?DONE_C:'#2E86B4'; rr(c,tx,y+58,Math.max(6,bw*fr),6,3); c.fill();}
+    txt(c,done?'已达成':(a.cur>=10000?fmt(a.cur)+'/'+fmt(a.target):a.cur+'/'+a.target),x+cw-10,y+65,'bold 10px system-ui',done?'#B8860B':'#4A7FA0','right');
+  }
+}
+// ---- B 色带卡 ----
+function achB(c,px,py){
+  chrome(c,px,py,'成就');
+  var cw=172,ch=76;
+  for(var i=0;i<ACH.length;i++){
+    var a=ACH[i],done=a.cur>=a.target;
+    var x=px+14+(i%2)*(cw+8),y=py+86+Math.floor(i/2)*(ch+8);
+    c.fillStyle='rgba(255,255,255,0.85)'; rr(c,x,y,cw,ch,9); c.fill();
+    // 顶部色带（裁圆角）
+    c.save(); rr(c,x,y,cw,ch,9); c.clip();
+    c.fillStyle=bandGrad(c,x,y,cw,22,done?DONE_BAND:DIFF_BAND[a.diff]);
+    c.fillRect(x,y,cw,22);
+    c.fillStyle='rgba(255,255,255,0.18)'; c.fillRect(x,y+21,cw,1);
+    c.restore();
+    c.strokeStyle='rgba(46,110,150,0.14)'; c.lineWidth=1; rr(c,x+0.5,y+0.5,cw-1,ch-1,9); c.stroke();
+    // 色带文字
+    txt(c,trunc(c,a.name,cw-44),x+10,y+15,'bold 12px system-ui','#FFFFFF');
+    if(done){check(c,x+cw-16,y+11,4.5,'#FFFFFF',2.4);}
+    else{ // 难度星（白）
+      c.fillStyle='rgba(255,255,255,0.9)'; c.font='9px system-ui'; c.textAlign='right';
+      var st=''; for(var s=0;s<a.diff;s++)st+='★';
+      c.fillText(st,x+cw-8,y+15); c.textAlign='left';
+    }
+    // 内容
+    c.font='10.5px system-ui';
+    txt(c,trunc(c,a.desc,cw-20),x+10,y+38,'10.5px system-ui','#4A7FA0');
+    txt(c,trunc(c,a.perk,cw-20),x+10,y+52,'9px system-ui',done?'#1E7A6F':'#9AB4C4');
+    // 粗进度条
+    var bw=cw-56;
+    c.fillStyle='rgba(46,134,180,0.15)'; rr(c,x+10,y+61,bw,8,4); c.fill();
+    var fr=Math.min(1,a.cur/a.target);
+    if(fr>0){c.fillStyle=done?DONE_C:'#2E86B4'; rr(c,x+10,y+61,Math.max(8,bw*fr),8,4); c.fill();}
+    txt(c,done?'达成':Math.round(fr*100)+'%',x+cw-10,y+69,'bold 10px system-ui',done?'#B8860B':'#4A7FA0','right');
+  }
+}
+
+// ================= ② 每日任务 =================
+// ---- A 进度环 ----
+function taskA(c,px,py){
+  chrome(c,px,py,'每日任务');
+  txt(c,'每日 0 点刷新 · 完成可得分数奖励',px+190,py+64,'11px system-ui','#8AA5B8','center');
+  for(var i=0;i<TASKS.length;i++){
+    var t=TASKS[i],done=t.prog>=t.need,frac=Math.min(1,t.prog/t.need);
+    var x=px+14,y=py+80+i*146,w=352,h=112;
+    if(done){c.fillStyle=vgrad(c,0,y,0,y+h,[[0,'rgba(245,197,66,0.20)'],[1,'rgba(217,169,63,0.10)']]);}
+    else{c.fillStyle='rgba(255,255,255,0.8)';}
+    rr(c,x,y,w,h,12); c.fill();
+    c.strokeStyle=done?'rgba(217,169,63,0.45)':'rgba(46,110,150,0.14)'; c.lineWidth=1; rr(c,x+0.5,y+0.5,w-1,h-1,12); c.stroke();
+    // 进度圆环
+    var cx0=x+46,cy0=y+44,r0=21;
+    c.strokeStyle='rgba(46,134,180,0.15)'; c.lineWidth=5;
+    c.beginPath(); c.arc(cx0,cy0,r0,0,Math.PI*2); c.stroke();
+    c.strokeStyle=done?DONE_C:'#2E86B4'; c.lineCap='round';
+    if(frac>0){c.beginPath(); c.arc(cx0,cy0,r0,-Math.PI/2,-Math.PI/2+Math.PI*2*frac); c.stroke();}
+    c.lineCap='butt';
+    if(done){check(c,cx0,cy0+2,7,'#B8860B',3);}
+    else{txt(c,Math.round(frac*100)+'%',cx0,cy0+4,'bold 11px system-ui','#155A8A','center');}
+    // 标题 + 难度星
+    txt(c,t.text,x+82,y+30,'bold 15px system-ui',done?'#B8860B':'#155A8A');
+    var st=''; for(var s=0;s<t.stars;s++)st+='★';
+    txt(c,st,x+w-16,y+30,'13px system-ui',t.stars===3?'#9B7FD0':(t.stars===2?'#C99B3F':'#9AB4C4'),'right');
+    // 奖励胶囊
+    var rw=74,rx=x+w-16-rw,ry0=y+44;
+    c.fillStyle='rgba(245,197,66,0.18)'; rr(c,rx,ry0,rw,22,11); c.fill();
+    c.strokeStyle='rgba(217,169,63,0.55)'; c.lineWidth=1; rr(c,rx,ry0,rw,22,11); c.stroke();
+    txt(c,'+'+taskReward(t)+' 分',rx+rw/2,ry0+15,'bold 11px system-ui','#B8860B','center');
+    // 底部进度条
+    var bw=w-82-86;
+    c.fillStyle='rgba(46,134,180,0.15)'; rr(c,x+82,y+82,bw,8,4); c.fill();
+    if(frac>0){c.fillStyle=done?DONE_C:'#2E86B4'; rr(c,x+82,y+82,Math.max(8,bw*frac),8,4); c.fill();}
+    txt(c,done?'已完成':fmt(t.prog)+'/'+fmt(t.need),x+w-16,y+90,'bold 12px system-ui',done?'#B8860B':'#4A7FA0','right');
+  }
+}
+// ---- B 色带卡 ----
+function taskB(c,px,py){
+  chrome(c,px,py,'每日任务');
+  txt(c,'每日 0 点刷新 · 完成可得分数奖励',px+190,py+64,'11px system-ui','#8AA5B8','center');
+  for(var i=0;i<TASKS.length;i++){
+    var t=TASKS[i],done=t.prog>=t.need,frac=Math.min(1,t.prog/t.need);
+    var x=px+14,y=py+80+i*146,w=352,h=112;
+    c.fillStyle='rgba(255,255,255,0.85)'; rr(c,x,y,w,h,12); c.fill();
+    c.save(); rr(c,x,y,w,h,12); c.clip();
+    c.fillStyle=bandGrad(c,x,y,w,34,done?DONE_BAND:[['0','#4A9CC8'],['1','#2E7DA8']]);
+    c.fillRect(x,y,w,34);
+    // 色带装饰波纹
+    c.strokeStyle='rgba(255,255,255,0.18)'; c.lineWidth=2;
+    c.beginPath(); c.moveTo(x+w*0.55,34); c.quadraticCurveTo(x+w*0.7,20,x+w*0.85,34); c.stroke();
+    c.restore();
+    c.strokeStyle=done?'rgba(217,169,63,0.45)':'rgba(46,110,150,0.14)'; c.lineWidth=1; rr(c,x+0.5,y+0.5,w-1,h-1,12); c.stroke();
+    txt(c,trunc(c,t.text,w-130),x+14,y+22,'bold 14px system-ui','#FFFFFF');
+    if(done){check(c,x+w-24,y+17,5,'#FFFFFF',2.6);}
+    // 奖励 chip（色带右端）
+    var rw=70,rx=x+w-14-rw;
+    c.fillStyle='rgba(255,255,255,0.25)'; rr(c,rx,y+6,rw,22,11); c.fill();
+    txt(c,'+'+taskReward(t)+' 分',rx+rw/2,y+21,'bold 11px system-ui','#FFFFFF','center');
+    // 内容
+    var st=''; for(var s=0;s<t.stars;s++)st+='★';
+    txt(c,st+' 任务',x+14,y+58,'12px system-ui',t.stars===3?'#9B7FD0':(t.stars===2?'#C99B3F':'#9AB4C4'));
+    txt(c,done?'已完成':fmt(t.prog)+' / '+fmt(t.need),x+w-14,y+60,'bold 17px system-ui',done?'#B8860B':'#155A8A','right');
+    var bw=w-28;
+    c.fillStyle='rgba(46,134,180,0.15)'; rr(c,x+14,y+76,bw,12,6); c.fill();
+    if(frac>0){c.fillStyle=done?DONE_C:'#2E86B4'; rr(c,x+14,y+76,Math.max(12,bw*frac),12,6); c.fill();
+      c.fillStyle='rgba(255,255,255,0.35)'; rr(c,x+14,y+76,Math.max(12,bw*frac),5,3); c.fill();}
+  }
+}
+
+// ================= ③ 每日挑战 =================
+// ---- A Hero 卡 ----
+function dchalA(c,px,py){
+  chrome(c,px,py,'每日挑战');
+  var d=DCHAL;
+  // Hero 紫卡
+  var x=px+20,y=py+96,w=340,h=176;
+  c.fillStyle=vgrad(c,0,y,0,y+h,[[0,'#7B6FD0'],[1,'#5A4AA8']]);
+  rr(c,x,y,w,h,16); c.fill();
+  c.strokeStyle='rgba(255,255,255,0.28)'; c.lineWidth=1.2; rr(c,x+0.5,y+0.5,w-1,h-1,16); c.stroke();
+  // 装饰气泡
+  c.fillStyle='rgba(255,255,255,0.10)';
+  c.beginPath(); c.arc(x+w-34,y+30,22,0,Math.PI*2); c.fill();
+  c.beginPath(); c.arc(x+w-64,y+52,10,0,Math.PI*2); c.fill();
+  c.beginPath(); c.arc(x+30,y+h-20,16,0,Math.PI*2); c.fill();
+  // 头行
+  txt(c,'今日挑战 · 10月17日',x+16,y+28,'12px system-ui','rgba(255,255,255,0.72)');
+  // 奖杯勋章
+  var mx=x+40,my=y+72;
+  c.fillStyle='#FFD873'; c.beginPath(); c.arc(mx,my,17,0,Math.PI*2); c.fill();
+  c.strokeStyle='rgba(255,255,255,0.8)'; c.lineWidth=1.5; c.stroke();
+  crown(c,mx,my-1,8,'#8A5A18');
+  txt(c,trunc(c,d.name,w-130),x+70,y+66,'bold 22px system-ui','#FFFFFF');
+  txt(c,d.desc,x+70,y+88,'13px system-ui','rgba(255,255,255,0.85)');
+  // 分隔线
+  c.strokeStyle='rgba(255,255,255,0.22)'; c.lineWidth=1;
+  c.beginPath(); c.moveTo(x+16,y+110); c.lineTo(x+w-16,y+110); c.stroke();
+  txt(c,'目标 '+fmt(d.goal)+' 分 · 连续 '+d.streak+' 天 · 首通最高 +'+d.rewardMax+' 分',x+16,y+134,'12.5px system-ui','rgba(255,255,255,0.92)');
+  txt(c,'完成可得分数奖励与随机充能 +2',x+16,y+154,'11px system-ui','rgba(255,255,255,0.6)');
+  // 金色按钮
+  var bx=px+90,by=py+300,bw=200,bh=44;
+  c.fillStyle=vgrad(c,0,by,0,by+bh,[[0,'#F5C542'],[1,'#D9A93F']]);
+  rr(c,bx,by,bw,bh,22); c.fill();
+  c.strokeStyle='rgba(255,255,255,0.6)'; c.lineWidth=1; rr(c,bx+0.5,by+0.5,bw-1,bh-1,22); c.stroke();
+  txt(c,'开始挑战',bx+bw/2,by+28,'bold 16px system-ui','#FFFFFF','center');
+  // 连胜徽章行
+  txt(c,'本周连胜',px+190,py+378,'11px system-ui','#8AA5B8','center');
+  for(var i=0;i<7;i++){
+    var ccx=px+190-3*27+i*27,ccy=py+404;
+    if(i<d.streak){c.fillStyle=DONE_C;c.beginPath();c.arc(ccx,ccy,9,0,Math.PI*2);c.fill();
+      c.strokeStyle='rgba(217,169,63,0.6)';c.lineWidth=1;c.stroke();}
+    else{c.strokeStyle='#B9C9D4';c.lineWidth=1.4;c.setLineDash([3,2]);c.beginPath();c.arc(ccx,ccy,8,0,Math.PI*2);c.stroke();c.setLineDash([]);}
+  }
+  txt(c,'已连胜 '+d.streak+' 天 · 每日 0 点刷新',px+190,py+446,'12px system-ui','#8AA5B8','center');
+}
+// ---- B 色带长卡 ----
+function dchalB(c,px,py){
+  chrome(c,px,py,'每日挑战');
+  var d=DCHAL;
+  var x=px+14,y=py+76,w=352,h=252;
+  c.fillStyle='rgba(255,255,255,0.85)'; rr(c,x,y,w,h,14); c.fill();
+  c.save(); rr(c,x,y,w,h,14); c.clip();
+  c.fillStyle=bandGrad(c,x,y,w,58,[['0','#7B6FD0'],['1','#5A4AA8']]);
+  c.fillRect(x,y,w,58);
+  c.strokeStyle='rgba(255,255,255,0.2)'; c.lineWidth=2;
+  c.beginPath(); c.moveTo(x,44); c.quadraticCurveTo(x+60,26,x+120,44); c.quadraticCurveTo(x+180,62,x+240,44); c.stroke();
+  c.restore();
+  c.strokeStyle='rgba(46,110,150,0.14)'; c.lineWidth=1; rr(c,x+0.5,y+0.5,w-1,h-1,14); c.stroke();
+  txt(c,'今日挑战',x+16,y+26,'bold 16px system-ui','#FFFFFF');
+  txt(c,'10月17日 · 每日 0 点刷新',x+w-16,y+26,'11px system-ui','rgba(255,255,255,0.75)','right');
+  txt(c,trunc(c,d.name,w-32),x+16,y+48,'bold 18px system-ui','#FFFFFF');
+  // 内容
+  txt(c,'海况词缀 · '+d.desc,x+16,y+86,'13px system-ui','#4A7FA0');
+  txt(c,'今日目标',x+w/2,y+122,'12px system-ui','#8AA5B8','center');
+  txt(c,fmt(d.goal)+' 分',x+w/2,y+160,'bold 36px system-ui','#155A8A','center');
+  // 奖励行
+  var ry0=y+184;
+  c.fillStyle='rgba(245,197,66,0.16)'; rr(c,x+w/2-130,ry0,260,26,13); c.fill();
+  c.strokeStyle='rgba(217,169,63,0.5)'; c.lineWidth=1; rr(c,x+w/2-130,ry0,260,26,13); c.stroke();
+  txt(c,'首通最高 +'+d.rewardMax+' 分 & 随机充能 +2',x+w/2,ry0+17,'bold 12px system-ui','#B8860B','center');
+  txt(c,'连续挑战 '+d.streak+' 天',x+w/2,y+236,'12px system-ui','#8AA5B8','center');
+  // 按钮
+  var bx=px+90,by=py+352,bw=200,bh=44;
+  c.fillStyle=vgrad(c,0,by,0,by+bh,[[0,'#8B7FD0'],[1,'#6A5AB8']]);
+  rr(c,bx,by,bw,bh,22); c.fill();
+  txt(c,'开始挑战',bx+bw/2,by+28,'bold 16px system-ui','#FFFFFF','center');
+  txt(c,'对局中不可发起 · 完成挑战可得分数奖励与技能充能',px+190,py+560,'12px system-ui','#8AA5B8','center');
+}
+
+// ================= ④ 榜单 =================
+// ---- A 领奖台 ----
+function rankA(c,px,py){
+  chrome(c,px,py,'榜单');
+  txt(c,'本地好友榜 · 邀请好友一起冲榜',px+190,py+64,'11px system-ui','#8AA5B8','center');
+  var colW=108,gap=14,yBase=py+232;
+  var tops=[RANK[1],RANK[0],RANK[2]]; // 视觉顺序 2/1/3
+  var hts=[88,116,72], medals=['#C9D4DC','#F5C542','#E0B58A'];
+  var grads=[['#DDE6EC','#AEBEC9'],['#FFE08A','#D9A93F'],['#EFCAA2','#C29263']];
+  for(var i=0;i<3;i++){
+    var x=px+14+i*(colW+gap),h=hts[i],y=yBase-h;
+    c.fillStyle=vgrad(c,0,y,0,yBase,[[0,grads[i][0]],[1,grads[i][1]]]);
+    rr(c,x,y,colW,h,10); c.fill();
+    c.strokeStyle='rgba(255,255,255,0.7)'; c.lineWidth=1; rr(c,x+0.5,y+0.5,colW-1,yBase-y-1,10); c.stroke();
+    // 奖牌
+    var mx=x+colW/2,my=y+22;
+    c.fillStyle=medals[i]; c.beginPath(); c.arc(mx,my,13,0,Math.PI*2); c.fill();
+    c.strokeStyle='rgba(255,255,255,0.85)'; c.lineWidth=1.5; c.stroke();
+    if(i===1)crown(c,mx,my-16,6,'#B8860B');
+    txt(c,String(i+1),mx,my+5,'bold 13px system-ui','#FFFFFF','center');
+    // 名字 + 分数
+    c.font='12px system-ui';
+    var nm=trunc(c,tops[i].name,colW-12);
+    txt(c,nm,x+colW/2,y+48,'12px system-ui',i===1?'#7A5608':'#3E647E','center');
+    txt(c,fmt(tops[i].score),x+colW/2,y+68,'bold 14px system-ui',i===1?'#7A5608':'#155A8A','center');
+  }
+  // 台阶底座
+  c.fillStyle='rgba(46,134,180,0.10)'; rr(c,px+14,yBase,352,8,4); c.fill();
+  // 4 名以后列表
+  for(var i=3;i<RANK.length;i++){
+    var r=RANK[i],y=py+262+(i-3)*62;
+    c.fillStyle=r.me?'rgba(245,197,66,0.16)':'rgba(46,134,180,0.06)';
+    rr(c,px+14,y,352,50,9); c.fill();
+    c.strokeStyle=r.me?'rgba(217,169,63,0.5)':'rgba(46,110,150,0.10)'; c.lineWidth=1; rr(c,px+14.5,y+0.5,351,49,9); c.stroke();
+    txt(c,String(i+1),px+38,y+31,'bold 13px system-ui','#4A7FA0','center');
+    c.font=(r.me?'bold ':'')+'13px system-ui';
+    txt(c,r.me?r.name+'（你）':r.name,px+58,y+31,(r.me?'bold ':'')+'13px system-ui',r.me?'#B8860B':'#155A8A');
+    txt(c,fmt(r.score),px+350,y+31,'bold 13px system-ui',r.me?'#B8860B':'#3E6E90','right');
+  }
+}
+// ---- B 渐变横幅行 ----
+function rankB(c,px,py){
+  chrome(c,px,py,'榜单');
+  txt(c,'本地好友榜 · 邀请好友一起冲榜',px+190,py+64,'11px system-ui','#8AA5B8','center');
+  var topC=[['#FFE08A','#D9A93F'],['#DDE6EC','#AEBEC9'],['#EFCAA2','#C29263']];
+  var y=py+80;
+  for(var i=0;i<RANK.length;i++){
+    var r=RANK[i],top=i<3,h=top?64:46;
+    if(top){c.fillStyle=vgrad(c,0,y,0,y+h,[[0,topC[i][0]],[1,topC[i][1]]]);}
+    else if(r.me){c.fillStyle='rgba(245,197,66,0.16)';}
+    else{c.fillStyle=i%2?'rgba(46,134,180,0.05)':'rgba(46,134,180,0.09)';}
+    rr(c,px+14,y,352,h,top?14:9); c.fill();
+    c.strokeStyle=top?'rgba(255,255,255,0.7)':(r.me?'rgba(217,169,63,0.5)':'rgba(46,110,150,0.10)');
+    c.lineWidth=1; rr(c,px+14.5,y+0.5,351,h-1,top?14:9); c.stroke();
+    // 名次徽章
+    var bx=px+42,by=y+h/2;
+    if(top){c.fillStyle='rgba(255,255,255,0.9)'; c.beginPath(); c.arc(bx,by,14,0,Math.PI*2); c.fill();
+      if(i===0)crown(c,bx,by-18,6,'#7A5608');
+      txt(c,String(i+1),bx,by+5,'bold 14px system-ui',i===0?'#B8860B':'#3E647E','center');}
+    else{txt(c,String(i+1),bx,by+5,'bold 13px system-ui','#4A7FA0','center');}
+    var dark=i===0?'#7A5608':(top?'#3E647E':'#155A8A');
+    txt(c,r.me?r.name+'（你）':r.name,bx+26,y+h/2+6,(r.me?'bold ':'')+(top?'15px':'13px')+' system-ui',r.me?'#B8860B':dark);
+    txt(c,fmt(r.score)+(top?' 分':''),px+350,y+h/2+6,'bold '+(top?'17px':'13px')+' system-ui',r.me?'#B8860B':dark,'right');
+    y+=h+10;
+  }
+}
+
+// ---------------- 渲染 ----------------
+function drawPair(id,fa,fb,labelA,labelB){
+  var cv=document.getElementById(id),c=cv.getContext('2d');
+  canvasBg(c);
+  fa(c,10,30);
+  fb(c,430,30);
+  // 方案标签
+  c.fillStyle='#FFFFFF';
+  rr(c,20,6,120,20,10); c.fillStyle='rgba(255,255,255,0.18)'; c.fill();
+  txt(c,labelA,80,20,'bold 12px system-ui','#FFFFFF','center');
+  rr(c,440,6,120,20,10); c.fillStyle='rgba(255,255,255,0.18)'; c.fill();
+  txt(c,labelB,500,20,'bold 12px system-ui','#FFFFFF','center');
+}
+drawPair('cAch',achA,achB,'方案 A · 徽章卡','方案 B · 色带卡');
+drawPair('cTask',taskA,taskB,'方案 A · 进度环','方案 B · 色带卡');
+drawPair('cDchal',dchalA,dchalB,'方案 A · Hero 卡','方案 B · 色带长卡');
+drawPair('cRank',rankA,rankB,'方案 A · 领奖台','方案 B · 横幅行');
+</script>
+</body>
+</html>

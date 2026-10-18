@@ -77,8 +77,8 @@ MG.layout = {
       trophyCy: 35,            // 设置按钮圆心（+hudInset 避让胶囊）
       setCx: 25,               // v197：设置钮 x（占原奖杯位；右上角音量钮已移除）
       rowBtnR: 18,              // v196：第一排圆钮统一半径（设置钮，15→18 变大）
-      scoreY: 90,              // 当前得分 baseline（translate 锚点）
-      seaBar: { sx: 25, sy: 100, sw: W - 50, sh: 20 }, // 海域进度条（v151 定版 100~120）
+      scoreY: 85,              // 当前得分 baseline（translate 锚点；v234b：80→85，按设置钮底(53)~进度条顶(98)中点≈75 居中）
+      seaBar: { sx: 25, sy: 98, sw: W - 50, sh: 24 }, // 海域进度条（v151 定版 100~120；v223 高 20→24、上移 2 补偿：上让出分数行间隙、下仍留潮汐 ty=125 前 3px）
       // ★ v195 HUD 下探 + 任务元素重设计（用户："HUD信息区可以设置更大的范围（例如占用部分
       //   伸缩区），请重新调整这部分的样式，尤其是任务元素（太丑了，请重新设计）"）：
       //   hudBottom 165→190：占用"HUD底→出生点260"伸缩区 25，余 70 = 特殊滴虚影标签空间
@@ -86,7 +86,7 @@ MG.layout = {
       //   任务条 205×35 两行挤压 → 任务卡 285×60（靶心图标+标题+星级+金色进度条）；
       //   潮汐胶囊 90×35 → 潮汐卡 95×60（与任务卡同高同款白底，左右边距各 15、卡间 10）。
       quest: { qx: 15, qy: 125, qw: 285, qh: 60 },     // 任务卡（v195 重设计，15~300 × 125~185）
-      tidePill: { tx: W - 110, ty: 125, tw: 95, th: 60 }, // 潮汐卡（310~405 × 125~185，与任务卡同高）
+      tidePill: { side: 'right', margin: 25, ty: 135, th: 44 }, // v274：ty 142→135（用户"降到135"）；v273 曾 127→142 下移拉开与海域进度条(底122)的间距；右锚定紧凑液态计时器；未填充区透明（仅描边）；v208 压低高度 52→44；v213 卡宽固定（按 2 位数 '99s' 封顶），文字缩短只影响文本本身、不再改变卡宽/位置
       hudBottom: 190           // HUD 区底沿（v195：任务卡底+5）；容器顶=0（v184），HUD 直接浮在容器上
     };
 
@@ -105,7 +105,7 @@ MG.layout = {
       //   （旧 0.45 公式随 v184 容器顶=0 静默漂移到 344、盘顶压警戒线 31px，用户报
       //    "漩涡风暴每次都接近警戒线"；堆叠空间恒 450，中点距警戒线 225，永不再压线）
       stackCy: (C.dangerY + C.floorY) / 2,
-      tutY: 575 + dy                    // 首局引导胶囊锚点（容器中部，随底部锚定链平移）
+      tutY: 535 + dy                    // 首局引导胶囊锚点（v231：575→535 上移 40，堆叠区中部；随底部锚定链平移）
     };
 
     // ---- ③ 底部带（floorY~H：高度恒 75 贴块底，内部钉 floorY 相对位，绝不打散）----
@@ -141,7 +141,7 @@ MG.layout = {
       focusCy: 465 + dy,              // 游戏区焦点中心（9:18 定版 465：结算海报 py230/h470 与分享卡 py255/h420 的共同中心）
       over: { w: 320, h: 470 },       // 结算海报（v161 排版放松定版；py = focusCy - 235 = 230+dy）
       share: { w: 300, h: 420 },      // 战报分享卡（py = focusCy - 210 = 255+dy）
-      confirm: { w: W - 120, h: 170, dy: 395 + dy, btnDy: 105 }, // 重开确认（py395+dy；按钮 py+105）
+      confirm: { w: 300, h: 224, btnH: 42, btnGap: 12, btnTop: 54 }, // v299 曾去标题行，v300 按用户要求恢复（页头标题+✕）；按钮维持放大后 42 高不变
       ng: { w: 330, h: 350 },         // 深渊潜航词缀三选一（底部锚定，y = 245+dy）
       dex: { x: 20, w: 380, h: 600 }, // 图鉴/成就（局内 y 由 dexY 派生；菜单态按全屏 VH 居中）
       dexY: 120 + dy,                 // 图鉴局内 y（9:18 定版 120 = (840-600)/2，随底部锚定链平移）
@@ -149,16 +149,27 @@ MG.layout = {
       //   设置音效、音乐和震动"）：300×260 块内居中（x=(W-300)/2=60，y=(840-260)/2+dy=290+dy），
       //   随底部锚定链平移；底部按用户要求不放说明文本，故高度收矮到 260（三行排满仅余 12）。
       //   行区 260×56：rowDy=60（标题区）/ rowGap=66（行距，56+10）/ rowW=260（左右各留 20）。
-      set: { w: 300, h: 260, rowDy: 60, rowGap: 66, rowH: 56, rowW: 260 }
+      set: { w: 300, h: 260, rowDy: 50, rowGap: 66, rowH: 56, rowW: 260 } // v200：rowDy 60→50 让三行让出通用页头（标题 y+30）
     };
 
-    // ---- 菜单（开始界面：底部锚定，= 9:18 定版基准 + dy）----
+    // ---- 菜单（开始界面：顶部艺术字标题、左右功能磁贴列、中央水滴吉祥物、深海蓝胶囊开始钮；
+    //      v237 撤：海域牌/历史最佳牌/底部玩法一句话；全部 = 定版基准 + dy）----
     this.menu = {
-      titleY: 310 + dy, titleShadowY: 315 + dy, subY: 345 + dy, bestY: 385 + dy,
-      offlineY: 410 + dy, offlineW: 300, offlineH: 60,
-      startY: 490 + dy, startW: 220, startH: 60,
-      footDy: 55                       // 底部玩法一句话：距块底（VH-55，随块底自动）
+      titleY: 130 + dy, subY: 148 + dy,  // v287 下移 20（用户"有点靠上"）→ v289 回上 10（用户：主页标题上移 10）
+      tileW: 64, tileH: 64,            // 功能磁贴（深海玻璃牌：图标+标签收在块内，不外溢遮挡）
+      tileLX: 55, tileRX: 365,         // 左右列中心 x（左右缘距 25）
+      tileTop: 246 + dy, tileGap: 78,  // 行 y = tileTop + i*tileGap（246/324，块底 388 不压吉祥物 430）
+      mascotCy: 430 + dy,              // 中央水滴吉祥物（两列之间）
+      offlineY: 565 + dy, offlineW: 300, offlineH: 80, // v288：60→80（三行文字原挤在 60 内、末行贴底溢出）
+      startY: 690 + dy, startW: 260, startH: 65   // 深海蓝大胶囊（圆角全半径）
     };
+  },
+
+  // ---- 菜单功能磁贴矩形（渲染与命中共用）：side 'L'/'R'，行号 i ----
+  menuTileRect: function (side, i) {
+    var m = this.menu;
+    var cx = side === 'L' ? m.tileLX : m.tileRX;
+    return { x: cx - m.tileW / 2, y: m.tileTop + i * m.tileGap, w: m.tileW, h: m.tileH };
   },
 
   // ---- 面板矩形（渲染与命中共用，一处定义）----
@@ -171,8 +182,19 @@ MG.layout = {
     return { x: (W - p.w) / 2, y: this.panel.focusCy - p.h / 2, w: p.w, h: p.h };
   },
   confirmRect: function () {
+    // v234：重开确认与设置弹窗同款居中——面板块内垂直居中（此前 dy:395 偏上不居中）
     var p = this.panel.confirm, W = MG.config.W;
-    return { x: (W - p.w) / 2, y: p.dy, w: p.w, h: p.h };
+    return { x: (W - p.w) / 2, y: (840 - p.h) / 2 + this.dy, w: p.w, h: p.h };
+  },
+  // v234 重开确认三按钮矩形（渲染与命中共用）：0=返回主页 1=重新开始 2=返回游戏
+  confirmBtnRect: function (i) {
+    var r = this.confirmRect(), p = this.panel.confirm;
+    return { x: r.x + 24, y: r.y + p.btnTop + i * (p.btnH + p.btnGap), w: r.w - 48, h: p.btnH };
+  },
+  // v236 重开确认右上 ✕（同 setCloseBtn/dexCloseBtn 惯例：右内缩 40、顶 8、30×30）
+  confirmCloseRect: function () {
+    var r = this.confirmRect();
+    return { x: r.x + r.w - 40, y: r.y + 8, w: 30, h: 30 };
   },
   // v197 设置弹窗矩形（渲染与命中共用）：面板块内居中，随 dy 平移
   setRect: function () {
@@ -185,7 +207,7 @@ MG.layout = {
   },
   setCloseRect: function () {
     var r = this.setRect();
-    return { x: r.x + r.w - 42, y: r.y + 15, w: 30, h: 30 }; // ✕ 热区 30×30（右上角）
+    return { x: r.x + r.w - 40, y: r.y + 8, w: 30, h: 30 }; // ✕ 热区 30×30（右上角，与图鉴 dexCloseBtn 同款）
   },
   ngRect: function () {
     var p = this.panel.ng, W = MG.config.W;

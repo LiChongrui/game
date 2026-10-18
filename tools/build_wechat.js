@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const FILES = ['platform', 'config', 'layout', 'physics', 'core', 'systems', 'panels', 'render', 'main'];
+const FILES = ['platform', 'titlefont', 'config', 'layout', 'physics', 'core', 'systems', 'panels', 'render', 'main'];
 
 const parts = FILES.map(name => {
   const p = path.join(ROOT, 'js', name + '.js');

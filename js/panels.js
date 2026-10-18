@@ -19,50 +19,111 @@
       : Math.max(10, Math.round(MG.layout.panel.dexY));
     dexCloseBtn.y = DEX_PANEL.y + 8;
   }
-  // 成就页分段页签：成就 / 每日 / 榜单（与图鉴分节同款分段控件样式）
-  function achTabRect(i) {
-    var segW = Math.floor((DEX_PANEL.w - 30) / 3);
-    return { x: DEX_PANEL.x + 15 + i * segW, y: DEX_PANEL.y + 40, w: segW, h: 28 };
+  // 设置面板（v197：音效/音乐/震动三开关；v200 起复用本游戏通用面板——页头/关闭走
+  // drawPanelHeader，与图鉴/成就同一套视觉，不再单独写一套页头与 ✕）
+  var SET_PANEL = { x: 0, y: 0, w: 0, h: 0 };
+  var setCloseBtn = { x: 0, y: 0, w: 30, h: 30 }; // 右上 × 关闭（与图鉴同款：圆底 #4A7FA0）
+  function layoutSetPanel() {
+    var r = MG.layout.setRect();
+    SET_PANEL.x = r.x; SET_PANEL.y = r.y; SET_PANEL.w = r.w; SET_PANEL.h = r.h;
+    setCloseBtn.x = r.x + r.w - 40; setCloseBtn.y = r.y + 8; // 同 dexCloseBtn 惯例
   }
   var shareCopyBtn = { x: 0, y: 0, w: 150, h: 42 }; // 分享卡片：复制文案按钮（打开时定位）
   function spSlotRect(stg, s) {
     // 海域演进行右侧的特殊滴槽位（s=0/1），宝箱也占一个槽位；与 stageRowRect 同基
     var r = stageRowRect(stg);
-    return { x: r.x + r.w - 196 + s * 98, y: r.y + 7, w: 92, h: 32 }; // v194：行高 40→46，槽位 32 随行高居中（(46-32)/2）
+    return { x: r.x + r.w - 196 + s * 98, y: r.y + 6, w: 92, h: 32 }; // v279：随行高 44 居中（(44-32)/2）
   }
   function tierCellRect(t) {
-    // 合成链分节：3 列 × 3 行（9 档），格高 136 填满说明区以上空间（v194：面板 560→600；
-    // 横距 118→120 令三列左右边距各 14 对称——原 108/118 右边距被挤到 22）
-    return { x: DEX_PANEL.x + 14 + (t % 3) * 120, y: DEX_PANEL.y + 76 + Math.floor(t / 3) * 144, w: 112, h: 136 };
+    // 合成链分节：3 列 × 3 行（9 档）——v279：水平/垂直均匀分布（面板 w380：左右边距 14=列间距，
+    // v289：格高 118→112、行距 136→126——末排底 y+488，与底部说明区（y+518）间距 4→30
+    //（用户："最后一排水滴块与底部的水滴说明之间的间距要增大"）；格内三元素间距统一 5px
+    return { x: DEX_PANEL.x + 14 + (t % 3) * 122, y: DEX_PANEL.y + 124 + Math.floor(t / 3) * 126, w: 108, h: 112 };
   }
   function stageRowRect(g) {
-    // 海域演进分节：8 行纵向列表（由浅入深），行高 46 / 行距 54 填满说明区以上空间
-    // （v194：面板 560→600，行高 40→46、行距 48→54——用户"海域演进紧凑，放宽松和谐"）
-    return { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 80 + g * 54, w: DEX_PANEL.w - 28, h: 46 };
+    // 海域演进分节：8 行纵向列表（由浅入深）——v279：随收集度行下移，内容区 y+126 起、
+    // 行距 48 / 行高 44，末行底 y+506，与说明区间距 8（上下留白对称）
+    return { x: DEX_PANEL.x + 14, y: DEX_PANEL.y + 126 + g * 48, w: DEX_PANEL.w - 28, h: 44 };
   }
   function dexSecRect(i) {
     // 分节切换：通栏分段控件（合成链 / 海域演进——特殊滴已并入海域行），样式与顶部页签区分
+    // v279：收集度行放大下移后页签 y+64→y+84（与收集度行留 8px，与内容区留 6px）
     var segW = Math.floor((DEX_PANEL.w - 30) / 2);
-    return { x: DEX_PANEL.x + 15 + i * segW, y: DEX_PANEL.y + 40, w: segW, h: 28 };
+    return { x: DEX_PANEL.x + 15 + i * segW, y: DEX_PANEL.y + 84, w: segW, h: 34 };
   }
   function dchalBtnRect() {
-    // 每日页签挑战卡右侧「开始挑战」按钮（systems 点击判定与绘制共用）
-    return { x: DEX_PANEL.x + DEX_PANEL.w - 118, y: DEX_PANEL.y + 74 + 26, w: 96, h: 34 };
+    // 每日挑战「开始挑战」按钮（v245：宽度随文本自适应、高 36，水平居中于面板；合并进今日 Hero 卡内）
+    ctx.font = 'bold 15px system-ui, sans-serif';
+    var tw = Math.round(ctx.measureText('开始挑战').width);
+    var w = tw + 56, h = 36;
+    return { x: DEX_PANEL.x + Math.round((DEX_PANEL.w - w) / 2), y: DEX_PANEL.y + 152, w: w, h: h };
   }
 
+  // ---------- 成就视图滚动几何（v243：徽章卡单列，超出面板可拖拽/滚轮滚动）----------
+  var ACH_ROW_H = 64, ACH_ROW_GAP = 8;
+  function achViewport() {
+    // 内容可视区：页头下 52 到面板底上 16
+    return { x: DEX_PANEL.x + 10, y: DEX_PANEL.y + 52, w: DEX_PANEL.w - 20, h: DEX_PANEL.h - 68 };
+  }
+  function achContentH() { return ACH_DEFS.length * (ACH_ROW_H + ACH_ROW_GAP) - ACH_ROW_GAP; }
+  function achMaxScroll() { return Math.max(0, achContentH() - (DEX_PANEL.h - 68)); }
+
   // ---------- 面板绘制 ----------
-  // 通用页头：左侧标题 + 右上 × 关闭（图鉴/成就共用；标题为空则不画，避免与页签重名）
-  function drawPanelHeader(title) {
+  // 通用页头：左侧标题 + 右上 × 关闭（图鉴/成就/设置共用；rect+closeBtn 由调用方传入，
+  // 使各面板不必各自写一套页头，统一视觉语言；标题为空则不画，避免与页签重名）
+  // 通用页头（v275）：可选图标 + 标题 + ✕，三者同一水平中线
+  // （中线 = ✕ 按钮几何中心，命中与视觉同源；title 基线改 middle 对准中线，消除错位）
+  // v276：icon 支持字符串（emoji）或函数（自定义白字形，画在 accent 圆内、原点=圆心）；
+  // noBg=true 时 emoji 直接裸画（不加圆环底），四成就页签用（用户："只要主图标，圆环形背景不需要"）
+  function drawPanelHeader(title, rect, closeBtn, icon, accent, noBg) {
+    var cy = closeBtn ? closeBtn.y + closeBtn.h / 2 : rect.y + 30;
     ctx.textAlign = 'left';
+    var tx = rect.x + 18;
+    if (icon) {
+      var icx = rect.x + 30;
+      if (typeof icon === 'function') {
+        // v279：图标圆与来源按钮（drawCircleBtn）同一绘制语言——渐变 accent 底 + 白细内环 + 左上高光弧
+        var ac = accent || '#2E86B4';
+        var ig = ctx.createLinearGradient(0, cy - 12, 0, cy + 12);
+        ig.addColorStop(0, ac);
+        ig.addColorStop(1, shade(ac, -0.25));
+        ctx.fillStyle = ig;
+        ctx.beginPath(); ctx.arc(icx, cy, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(icx, cy, 11.25, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(icx, cy, 8, Math.PI * 1.1, Math.PI * 1.5); ctx.stroke();
+        ctx.save(); ctx.translate(icx, cy); icon(); ctx.restore();
+      } else if (noBg) {
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = '19px system-ui, sans-serif';
+        ctx.fillText(icon, icx, cy + 1);
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      } else {
+        ctx.fillStyle = accent || '#2E86B4';
+        ctx.beginPath(); ctx.arc(icx, cy, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(icx, cy, 9.5, 0, Math.PI * 2); ctx.stroke();
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = '14px system-ui, sans-serif';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(icon, icx, cy + 1);
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      }
+      tx = rect.x + 50;
+    }
     if (title) {
       ctx.fillStyle = '#155A8A';
       ctx.font = 'bold 19px system-ui, sans-serif';
-      ctx.fillText(title, DEX_PANEL.x + 18, DEX_PANEL.y + 30);
+      ctx.textBaseline = 'middle';
+      ctx.fillText(title, tx, cy + 1);
+      ctx.textBaseline = 'alphabetic';
     }
+    if (!closeBtn) return;
     ctx.fillStyle = 'rgba(46,134,180,0.12)';
-    ctx.beginPath(); ctx.arc(dexCloseBtn.x + dexCloseBtn.w / 2, dexCloseBtn.y + dexCloseBtn.h / 2, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(closeBtn.x + closeBtn.w / 2, closeBtn.y + closeBtn.h / 2, 13, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#4A7FA0'; ctx.lineWidth = 2; ctx.lineCap = 'round';
-    var ccx = dexCloseBtn.x + dexCloseBtn.w / 2, ccy = dexCloseBtn.y + dexCloseBtn.h / 2;
+    var ccx = closeBtn.x + closeBtn.w / 2, ccy = closeBtn.y + closeBtn.h / 2;
     ctx.beginPath();
     ctx.moveTo(ccx - 4, ccy - 4); ctx.lineTo(ccx + 4, ccy + 4);
     ctx.moveTo(ccx + 4, ccy - 4); ctx.lineTo(ccx - 4, ccy + 4);
@@ -111,14 +172,18 @@
   // 图鉴页头收集度徽条：进度条 + 四个里程碑刻度（25/50/75/100%），已达成的点亮金色圆点
   // 纯展示无交互；数据来自 systems 的 colProgress/COL_MILESTONES（运行期全局解析）
   function drawColBadge() {
+    // v279：独立行再下移放大（用户：上下间距太挤、太小）——行中线 y+64（页头下留 24px 空隙、
+    // 与子页签 y+84 上留 8px），标签 14px 粗体 + 进度条 12px 高 + 计数 15px 粗体
     var cp = colProgress();
     var pct = cp.n / cp.total;
     var full = pct >= 1;
-    var bx = DEX_PANEL.x + 112, bw = 162, by = DEX_PANEL.y + 19, bh = 8;
+    var rowCy = DEX_PANEL.y + 64;
+    var bx = DEX_PANEL.x + 70, bw = DEX_PANEL.w - 136, by = rowCy - 6, bh = 12;
     ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
     ctx.fillStyle = '#4A7FA0';
-    ctx.font = '12px system-ui, sans-serif';
-    ctx.fillText('收集度', DEX_PANEL.x + 66, DEX_PANEL.y + 28);
+    ctx.font = 'bold 14px system-ui, sans-serif';
+    ctx.fillText('收集度', DEX_PANEL.x + 15, rowCy);
     ctx.fillStyle = 'rgba(21,90,138,0.12)';
     roundRect(bx, by, bw, bh, bh / 2); ctx.fill();
     if (pct > 0) {
@@ -130,26 +195,35 @@
       var mx = bx + bw * m.pct;
       if (colClaimed[m.id]) {
         ctx.fillStyle = '#F5C542';
-        ctx.beginPath(); ctx.arc(mx, by + bh / 2, 3.2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(mx, by + bh / 2, 3.8, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1; ctx.stroke();
       } else {
         ctx.fillStyle = 'rgba(255,255,255,0.85)';
-        ctx.fillRect(mx - 1, by + 1.5, 2, bh - 3);
+        ctx.fillRect(mx - 1, by + 2, 2, bh - 4);
       }
     }
     ctx.textAlign = 'right';
     ctx.fillStyle = '#155A8A';
-    ctx.font = 'bold 13px system-ui, sans-serif';
-    ctx.fillText(cp.n + '/' + cp.total, DEX_PANEL.x + DEX_PANEL.w - 56, DEX_PANEL.y + 29);
+    ctx.font = 'bold 15px system-ui, sans-serif';
+    ctx.fillText(cp.n + '/' + cp.total, DEX_PANEL.x + DEX_PANEL.w - 15, rowCy);
+    ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'center';
   }
 
   function drawDex() {
     layoutDexPanel();
-    ctx.fillStyle = 'rgba(10,40,70,0.6)';
-    ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
+    // 压暗背景已上移 drawPanelFx 统一绘制（v275）
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
-    drawPanelHeader('图鉴');
+    // v279：图标 = 图鉴按钮（技能栏书本钮）同款矢量书本——逐笔同代码（16×12 描边框+中缝、线宽1.8）；
+    // v283：整体等比缩 0.6——图标圆 r12 = 按钮 r20 的 0.6，缩放后图标/圆的比例与按钮完全一致
+    //（用户："内部形状太大了，与原图标比例不一样"）
+    drawPanelHeader('图鉴', DEX_PANEL, dexCloseBtn, function () {
+      ctx.save(); ctx.scale(0.6, 0.6);
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.8;
+      ctx.strokeRect(-8, -6, 16, 12);
+      ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(0, 6); ctx.stroke();
+      ctx.restore();
+    }, '#4A7FA0');
     drawColBadge();
 
     // —— 分节切换：通栏分段控件（特殊滴槽位已并入海域演进，不再单列）——
@@ -170,22 +244,29 @@
           ctx.strokeStyle = '#2E86B4'; ctx.lineWidth = 1.5;
           roundRect(tRect.x + 0.5, tRect.y + 0.5, tRect.w - 1, tRect.h - 1, 10); ctx.stroke();
         }
-        var bx = tRect.x + tRect.w / 2, by = tRect.y + 48;
+        // v291：格内三元素「分散对齐」到格子（用户："不要都往格子中心挤"）——整组按
+        // 等间距铺满格高：上边距 = 元素间距 = 下边距 ≈ 10（格高 112 − 三元素总高 ~73 = 39，四段各 ~10）；
+        // v289 的 5px 间距是"挤在中心"的观感来源。名称/分值仍用 middle 基线对准各自字面中心
+        var bx = tRect.x + tRect.w / 2, by = tRect.y + 32;
         if (unlocked) {
-          drawBall({ x: bx, y: by, r: 24, tier: t, vx: 0, vy: 0 }, 1);
+          drawBall({ x: bx, y: by, r: 22, tier: t, vx: 0, vy: 0 }, 1);
         } else {
           ctx.fillStyle = '#B8CBD8';
-          ctx.beginPath(); ctx.arc(bx, by, 24, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(bx, by, 22, 0, Math.PI * 2); ctx.fill();
           ctx.fillStyle = '#8AA5B8';
           ctx.font = 'bold 20px system-ui, sans-serif';
-          ctx.fillText('?', bx, by + 6);
+          ctx.textBaseline = 'middle';
+          ctx.fillText('?', bx, by + 1);
+          ctx.textBaseline = 'alphabetic';
         }
+        ctx.textBaseline = 'middle';
         ctx.fillStyle = unlocked ? '#155A8A' : '#8AA5B8';
         ctx.font = 'bold 16px system-ui, sans-serif';
-        ctx.fillText(unlocked ? T[t].name : '？？？', bx, tRect.y + 96);
+        ctx.fillText(unlocked ? T[t].name : '？？？', bx, tRect.y + 72);
         ctx.font = '13px system-ui, sans-serif';
         ctx.fillStyle = '#4A7FA0';
-        ctx.fillText(unlocked ? ('分值 ' + T[t].score + ' · ×' + (dexCounts[t] || 0)) : '未解锁', bx, tRect.y + 118);
+        ctx.fillText(unlocked ? ('分值 ' + T[t].score + ' · ×' + (dexCounts[t] || 0)) : '未解锁', bx, tRect.y + 96);
+        ctx.textBaseline = 'alphabetic';
       }
     } else if (dexSec === 1) {
 
@@ -224,18 +305,29 @@
           ctx.beginPath(); ctx.arc(dotX, dotY, 12.5 + Math.sin(time * 4) * 1.2, 0, Math.PI * 2); ctx.stroke();
         }
         if (isCur || reached || isNext) drawSeaBadge(stg, dotX, dotY, reached || isCur);
+        var nameTxt = isCur || reached || isNext ? ss.name : '？？？';
+        var gateTxt = isCur ? '当前海域' : (isNext ? '下一海域 · 累计' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + '分' : '累计 ' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + ' 分解锁');
+        // v289：两行文本整块按字形像素框（actualBoundingBox）居中于行中线——不再用"下移 3px"凑
+        //（用户："请用居中来处理"）。块高 = 首行 asc + 行距 + 末行 desc，块心对齐 rowCy
+        // v300：测量改恒等变换（微信端 measureText 受 CTM 影响会把度量放大）
+        var mN = measureInk('bold 15px system-ui, sans-serif', nameTxt);
+        var mG = measureInk('11px system-ui, sans-serif', gateTxt);
+        var aN = mN.has ? mN.a : 11;
+        var dG = mG.has ? mG.d : 2.5;
+        var LINE_GAP = 14;                                  // 两行基线间距
+        var yN = rowCy - (aN + LINE_GAP + dG) / 2 + aN;     // 首行基线：块顶 = rowCy - 块高/2
+        var yG = yN + LINE_GAP;                             // 第二行基线
         ctx.fillStyle = isCur ? '#FFFFFF' : (reached ? '#155A8A' : '#8AA5B8');
         ctx.font = 'bold 15px system-ui, sans-serif';
         if (isCur) {
           ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,50,80,0.35)';
-          ctx.strokeText(isCur || reached || isNext ? ss.name : '？？？', dotX + 15, rowCy - 3);
+          ctx.strokeText(nameTxt, dotX + 20, yN);
         }
-        ctx.fillText(isCur || reached || isNext ? ss.name : '？？？', dotX + 15, rowCy - 3);
+        ctx.fillText(nameTxt, dotX + 20, yN);
         ctx.font = '11px system-ui, sans-serif';
         ctx.fillStyle = isCur ? 'rgba(255,255,255,0.92)' : (reached ? '#1E7A6F' : (isNext ? '#7A98AC' : '#B0584A'));
-        var gateTxt = isCur ? '当前海域' : (isNext ? '下一海域 · 累计' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + '分' : '累计 ' + (ss.at >= 10000 ? (ss.at / 10000) + '万' : ss.at) + ' 分解锁');
-        if (isCur) ctx.strokeText(gateTxt, dotX + 15, rowCy + 11);
-        ctx.fillText(gateTxt, dotX + 15, rowCy + 11);
+        if (isCur) ctx.strokeText(gateTxt, dotX + 20, yG);
+        ctx.fillText(gateTxt, dotX + 20, yG);
         // 右侧：该海域的 2 个特殊滴槽位（点击查看说明）
         var slots2 = STAGE_SP_SLOTS[stg] || STAGE_SP_SLOTS[0];
         for (var sl = 0; sl < 2; sl++) {
@@ -250,7 +342,15 @@
             ctx.strokeStyle = '#2E86B4'; ctx.lineWidth = 1.2;
             roundRect(slotR.x + 0.5, slotR.y + 0.5, slotR.w - 1, slotR.h - 1, 8); ctx.stroke();
           }
-          var cx2 = slotR.x + 14, cy2 = rowCy;
+          // v291：图标-文本只要"有点间距"（净距 8→4，用户："搞那么大干什么"）；文本仍在
+          // 恒定文本列内居中，图标固定成列不漂移（v290 定版）
+          var cx2 = slotR.x + 15, cy2 = rowCy;
+          var spName2 = found2 ? (isChest2 ? '宝箱' : spDef2.name) : '？？？';
+          var m2 = measureInk('13px system-ui, sans-serif', spName2); // v300：恒等变换下测量
+          var tw2 = m2.w;
+          var TXT_COL = 57;                                    // 文本列宽（恒定，跨行同宽）
+          var tx2 = slotR.x + 30 + Math.max(0, (TXT_COL - tw2) / 2); // 列内居中（列左缘 = 图标右缘 +4）
+          var y2 = cy2 + ((m2.has ? m2.a : 9.5) - (m2.has ? m2.d : 2.5)) / 2;
           if ((hiddenStg || isNext) && !reached) { // 生涯未抵达：虚线空位 + "？？？"（特殊滴内容不剧透，海域名/解锁积分仍可见）
             ctx.save();
             ctx.setLineDash([3, 3]);
@@ -259,13 +359,20 @@
             ctx.setLineDash([]);
             ctx.fillStyle = '#A8BCCB';
             ctx.font = '13px system-ui, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('？？？', slotR.x + slotR.w / 2, cy2 + 4);
+            ctx.textAlign = 'center';                          // 空位内整组居中
+            ctx.fillText('？？？', slotR.x + slotR.w / 2, y2);
             ctx.textAlign = 'left';
             ctx.restore();
             continue;
           }
           if (found2) {
+            // v292：统一玻璃底圆（r12）——每格图标共用同一可见包络。礁石/宝箱是深色实体、
+            // 多数水滴是浅色球，浅色球的淡边缘在浅底上"看着"比深色图标窄（用户报礁石/漩涡滴
+            // 不对齐，实测两者实体左缘同为 242 像素级重合）；有了同尺寸底圆后列对齐一目了然
+            ctx.fillStyle = 'rgba(255,255,255,0.30)';
+            ctx.beginPath(); ctx.arc(cx2, cy2, 12, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1;
+            ctx.stroke();
             drawSpForm(spIdx2, cx2, cy2);
           } else {
             // 未发现：实底浅灰圆 + 虚线圈 + 深色问号（够醒目）
@@ -278,12 +385,21 @@
             ctx.fillStyle = '#3E647E';
             ctx.font = 'bold 14px system-ui, sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('?', cx2, cy2 + 4);
+            var mq = measureInk('bold 14px system-ui, sans-serif', '?'); // v300：恒等变换下测量
+            var yq = cy2 + ((mq.has ? mq.a : 10) - (mq.has ? mq.d : 2)) / 2;
+            ctx.fillText('?', cx2, yq);
             ctx.textAlign = 'left';
           }
-          ctx.fillStyle = found2 ? '#155A8A' : '#4E6E86';
-          ctx.font = '13px system-ui, sans-serif';
-          ctx.fillText(found2 ? (isChest2 ? '宝箱' : spDef2.name) : '？？？', slotR.x + 33, cy2 + 4);
+          // 文本：当前海域行用与海域名同款白字+描边（行底是深海渐变，原深蓝 #155A8A 看不清）；
+          // 其余行维持深蓝。v289：基线改像素框居中值 y2（与图标共用行中线 cy2）
+          if (isCur) {
+            ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,50,80,0.35)';
+            ctx.strokeText(spName2, tx2, y2);
+            ctx.fillStyle = '#FFFFFF';
+          } else {
+            ctx.fillStyle = found2 ? '#155A8A' : '#4E6E86';
+          }
+          ctx.fillText(spName2, tx2, y2);
         }
       }
       ctx.textAlign = 'center';
@@ -327,17 +443,18 @@
     ctx.textAlign = 'center';
   }
 
-  // 成就页（独立入口，与图鉴拆分）：成就 / 每日 / 榜单
+  // 成就殿堂四视图（v241 拆分）：主页四磁贴各自直达——成就 / 每日任务 / 每日挑战 / 榜单；
+  // 原三合一页签条已拆分移除，页头标题随视图变化
   function drawAchPanel() {
     layoutDexPanel();
-    ctx.fillStyle = 'rgba(10,40,70,0.6)';
-    ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
+    // 压暗背景已上移 drawPanelFx 统一绘制（v275）
     panel(DEX_PANEL.x, DEX_PANEL.y, DEX_PANEL.w, DEX_PANEL.h, 14, 0.96);
-    drawPanelHeader('成就殿堂'); // 固定页头标题，不随页签变化
-    var dailyDot = !(daily.done[0] && daily.done[1] && daily.done[2]) ? 1 : -1;
-    drawSegTabs([achTabRect(0), achTabRect(1), achTabRect(2)], ['成就', '每日', '榜单'], dexTab, dailyDot, 'achtabs');
-    if (dexTab === 1) drawDailyTab();
-    else if (dexTab === 2) drawRankTab();
+    var titles = ['成就', '每日任务', '每日挑战', '榜单'];
+    // 图标与来源主页磁贴同款；v276：裸 emoji（不加圆环底，用户要求）
+    drawPanelHeader(titles[dexTab] || '成就', DEX_PANEL, dexCloseBtn, ['🏆', '📋', '🎯', '🥇'][dexTab] || '🏆', null, true);
+    if (dexTab === 1) drawDailyTasksTab();
+    else if (dexTab === 2) drawDchalCard();
+    else if (dexTab === 3) drawRankTab();
     else drawAchTab();
   }
 
@@ -427,10 +544,11 @@
     { c: '#B85C3A', g: 'vent' },    // 热泉裂谷：热泉火苗（暗锈橙=热泉褐岩色）
     { c: '#8A5FB4', g: 'crown' }    // 深渊王座：王冠
   ];
-  function drawSeaBadge(stg, x, y, reached, opaque) {
+  function drawSeaBadge(stg, x, y, reached, opaque, r) {
     var ic = SEA_BADGES[stg] || SEA_BADGES[0];
     ctx.save();
     ctx.translate(x, y);
+    if (r && r !== 10) ctx.scale(r / 10, r / 10); // v284：可选半径（进度条端点 r15），圆/内纹整体等比缩放
     ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2);
     if (reached) {
       ctx.fillStyle = ic.c; ctx.fill();
@@ -487,69 +605,118 @@
 
   // 图鉴内特殊滴的实际形态（小尺寸）：礁石=岩石 / 符文滴=水滴+符文牌 / 宝箱=迷你木箱 / 其余=水滴+专属标记
   function drawSpForm(spIdx, x, y) {
-    if (spIdx === SP_DEFS.length) { drawChestIcon(x, y, 0.55); return; }
+    // v292：宝箱 0.55→0.76——实体箱身 15.8→22 逻辑px，与水滴直径（r11×2）同宽，
+    // 左右实体缘与各排水滴严格对齐（用户截图实测：水滴实体 380..412、宝箱实体 384..407，
+    // 居中绘制导致箱身左缘内缩 3.2px，看起来"宝箱比雨云滴靠右"）
+    if (spIdx === SP_DEFS.length) { drawChestIcon(x, y, 0.76); return; }
     var key = SP_DEFS[spIdx].key;
     if (key === 'iron') { drawIronBall({ x: x, y: y, r: 11, vx: 0, vy: 0 }, 1); return; }
     if (key === 'rune') { drawBall({ x: x, y: y, r: 11, tier: 1, vx: 0, vy: 0, rune: 'ripple' }, 1); return; }
     drawBall({ x: x, y: y, r: 11, tier: 1, vx: 0, vy: 0, special: key, frozen: key === 'ice' ? 1 : 0 }, 1);
   }
 
-  // 成就页签：常驻目标列表（跨局累计，达成给分与充能奖励）
+  // 成就页签（v243 方案 A 徽章卡）：单列勋章卡 + 拖拽/滚轮滚动；勋章颜色表难度（达成转金）
   function drawAchTab() {
-    ctx.textAlign = 'center';
-    // 双列布局（12 项成就）：难度看星数、奖励看卡片内一行，页首不再放说明行
-    // （v194：卡 178→172 令双列左右边距各 14 对称——原总宽 364>可用 352、右边距被挤到 2；
-    //   卡高 70→76、行距 78→84，随面板 560→600 放宽）
-    var cw = 172, ch = 76, gap = 8;
+    var vp = achViewport();
+    achScroll = Math.max(0, Math.min(achScroll, achMaxScroll()));
+    ctx.save();
+    roundRect(vp.x, vp.y, vp.w, vp.h, 10); ctx.clip();
+    ctx.translate(0, -achScroll);
+    var w = DEX_PANEL.w - 28;
     for (var i = 0; i < ACH_DEFS.length; i++) {
-      var a = ACH_DEFS[i];
-      var cx0 = DEX_PANEL.x + 14 + (i % 2) * (cw + gap);
-      var ry = DEX_PANEL.y + 86 + Math.floor(i / 2) * (ch + gap);
-      var done = !!achDone[a.id];
+      var a = ACH_DEFS[i], done = !!achDone[a.id];
       var cur = Math.min(a.target, a.cur());
-      var d = a.diff || 1;
-      ctx.fillStyle = done ? 'rgba(245,197,66,0.14)' : (d === 3 ? 'rgba(150,110,220,0.08)' : 'rgba(46,134,180,0.07)');
-      roundRect(cx0, ry, cw, ch, 8); ctx.fill();
-      // 难度色左饰条（达成转金）
-      ctx.fillStyle = done ? '#F5C542' : (d === 3 ? '#9B7FD0' : (d === 2 ? '#C99B3F' : '#8FB4CC'));
-      roundRect(cx0, ry + 10, 3, ch - 20, 1.5); ctx.fill();
+      var done2 = done || cur >= a.target;
+      var x = DEX_PANEL.x + 14, y = DEX_PANEL.y + 52 + i * (ACH_ROW_H + ACH_ROW_GAP), h = ACH_ROW_H;
+      // 卡底：达成淡金渐变，未达成白玻璃
+      if (done2) {
+        var gg = ctx.createLinearGradient(0, y, 0, y + h);
+        gg.addColorStop(0, 'rgba(245,197,66,0.20)'); gg.addColorStop(1, 'rgba(217,169,63,0.10)');
+        ctx.fillStyle = gg;
+      } else {
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      }
+      roundRect(x, y, w, h, 9); ctx.fill();
+      ctx.strokeStyle = done2 ? 'rgba(217,169,63,0.45)' : 'rgba(46,110,150,0.14)';
+      ctx.lineWidth = 1;
+      roundRect(x + 0.5, y + 0.5, w - 1, h - 1, 9); ctx.stroke();
+      // —— 通用成就徽章：大圆勋章 + 双绶带（达成金、未达成灰锁）——
+      var mx = x + 30, my = y + 26;
+      ctx.fillStyle = done2 ? '#C9922A' : '#AEBEC9';
+      ctx.beginPath();
+      ctx.moveTo(mx - 7, my + 10); ctx.lineTo(mx - 11, my + 22); ctx.lineTo(mx - 3, my + 18); ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(mx + 7, my + 10); ctx.lineTo(mx + 11, my + 22); ctx.lineTo(mx + 3, my + 18); ctx.closePath(); ctx.fill();
+      var mg2 = ctx.createLinearGradient(0, my - 16, 0, my + 16);
+      if (done2) { mg2.addColorStop(0, '#FFDE7A'); mg2.addColorStop(1, '#D9A93F'); }
+      else { mg2.addColorStop(0, '#D5DFE6'); mg2.addColorStop(1, '#A9BAC6'); }
+      ctx.fillStyle = mg2;
+      ctx.beginPath(); ctx.arc(mx, my, 16, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.strokeStyle = done2 ? 'rgba(138,90,24,0.35)' : 'rgba(90,110,125,0.30)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(mx, my, 12.5, 0, Math.PI * 2); ctx.stroke();
+      if (done2) {
+        // 金星
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        for (var sp = 0; sp < 5; sp++) {
+          var sa = -Math.PI / 2 + sp * 2 * Math.PI / 5, sa2 = sa + Math.PI / 5;
+          ctx.lineTo(mx + Math.cos(sa) * 7, my + 0.5 + Math.sin(sa) * 7);
+          ctx.lineTo(mx + Math.cos(sa2) * 3, my + 0.5 + Math.sin(sa2) * 3);
+        }
+        ctx.closePath(); ctx.fill();
+      } else {
+        // 灰锁（锁梁 + 锁体）
+        ctx.strokeStyle = '#7E93A2'; ctx.lineWidth = 1.8;
+        ctx.beginPath(); ctx.arc(mx, my - 2, 3.2, Math.PI, 0); ctx.stroke();
+        ctx.fillStyle = '#7E93A2';
+        roundRect(mx - 5, my - 2, 10, 8, 2); ctx.fill();
+      }
+      // —— 文本（名称 / 描述）+ 右上奖励 ——
+      var tx = x + 58, tw = w - 58 - 96;
       ctx.textAlign = 'left';
-      // 名称 + 难度星（达成金色，未达成灰蓝）
-      ctx.fillStyle = done ? '#B8860B' : (d === 3 ? '#6B5AA8' : '#155A8A');
-      ctx.font = 'bold 15px system-ui, sans-serif';
-      ctx.fillText((done ? '✓ ' : '') + a.name, cx0 + 10, ry + 18);
+      ctx.font = 'bold 14px system-ui, sans-serif';
+      ctx.fillStyle = done2 ? '#B8860B' : '#155A8A';
+      ctx.fillText(truncText(a.name, tw), tx, y + 21);
+      ctx.font = '10.5px system-ui, sans-serif';
+      ctx.fillStyle = done2 ? '#4A7FA0' : '#8AA5B8';
+      ctx.fillText(truncText(a.desc, tw), tx, y + 38);
       ctx.textAlign = 'right';
-      ctx.fillStyle = d === 3 ? '#9B7FD0' : (d === 2 ? '#C99B3F' : '#9AB4C4');
-      ctx.font = '11px system-ui, sans-serif';
-      var starTxt = '';
-      for (var st = 0; st < d; st++) starTxt += '★';
-      ctx.fillText(starTxt, cx0 + cw - 10, ry + 17);
-      ctx.textAlign = 'left';
-      // 描述（一行截断：双列较窄，超宽省略）
-      ctx.fillStyle = '#4A7FA0';
-      ctx.font = '11px system-ui, sans-serif';
-      var desc = a.desc;
-      while (ctx.measureText(desc).width > cw - 20 && desc.length > 4) desc = desc.slice(0, -2);
-      if (desc !== a.desc) desc += '…';
-      ctx.fillText(desc, cx0 + 10, ry + 33);
-      // 奖励说明
-      ctx.fillStyle = done ? '#1E7A6F' : '#9AB4C4';
-      ctx.font = '10px system-ui, sans-serif';
-      var perk = a.perk;
-      while (ctx.measureText(perk).width > cw - 20 && perk.length > 4) perk = perk.slice(0, -2);
-      if (perk !== a.perk) perk += '…';
-      ctx.fillText(perk, cx0 + 10, ry + 46);
-      // 进度条（左）+ 状态文字（右，同一行垂直居中，不再压在条上）
-      var barX = cx0 + 10, barW = cw - 64, barY = ry + 58;
+      ctx.font = '9.5px system-ui, sans-serif';
+      ctx.fillStyle = done2 ? '#1E7A6F' : '#9AB4C4';
+      ctx.fillText(truncText(a.perk, 90), x + w - 12, y + 21);
+      // —— 底部进度条 + 计数 ——
+      var barX = tx, barW = w - 58 - 14 - 52, barY = y + 48;
       ctx.fillStyle = 'rgba(46,134,180,0.15)';
-      roundRect(barX, barY, barW, 9, 4.5); ctx.fill();
-      ctx.fillStyle = done ? '#F5C542' : '#2E86B4';
-      if (cur > 0) { roundRect(barX, barY, Math.max(9, barW * cur / a.target), 9, 4.5); ctx.fill(); }
+      roundRect(barX, barY, barW, 6, 3); ctx.fill();
+      var fr = Math.min(1, cur / a.target);
+      if (fr > 0) {
+        ctx.fillStyle = done2 ? '#F5C542' : '#2E86B4';
+        roundRect(barX, barY, Math.max(6, barW * fr), 6, 3); ctx.fill();
+      }
       ctx.textAlign = 'right';
-      ctx.fillStyle = done ? '#B8860B' : '#4A7FA0';
       ctx.font = 'bold 11px system-ui, sans-serif';
-      ctx.fillText(done ? '已达成' : (cur + '/' + a.target), cx0 + cw - 10, barY + 8);
+      ctx.fillStyle = done2 ? '#B8860B' : '#4A7FA0';
+      ctx.fillText(done2 ? '已达成' : (a.target >= 10000 ? (Math.round(cur / 1000) / 10) + '万/' + (a.target / 10000) + '万' : cur + '/' + a.target), x + w - 12, y + 55);
     }
+    ctx.restore();
+    // 滚动条（超出可视区才显示）
+    var maxS = achMaxScroll();
+    if (maxS > 0) {
+      var trH = vp.h - 8, thH = Math.max(24, trH * (vp.h / achContentH()));
+      ctx.fillStyle = 'rgba(21,90,138,0.10)';
+      roundRect(DEX_PANEL.x + DEX_PANEL.w - 9, vp.y + 4, 3, trH, 1.5); ctx.fill();
+      ctx.fillStyle = 'rgba(21,90,138,0.28)';
+      roundRect(DEX_PANEL.x + DEX_PANEL.w - 9, vp.y + 4 + (trH - thH) * (achScroll / maxS), 3, thH, 1.5); ctx.fill();
+    }
+    ctx.textAlign = 'center';
+  }
+  // 文本超宽截断（成就卡单列用；measureText 需已设字体，故先设 font 再调）
+  function truncText(s, maxW) {
+    if (ctx.measureText(s).width <= maxW) return s;
+    while (s.length > 1 && ctx.measureText(s + '…').width > maxW) s = s.slice(0, -1);
+    return s + '…';
   }
 
   // 每日页签：3 个按日期生成的任务（独立说明行已删，卡片上移放大）
@@ -559,6 +726,7 @@
     if (state !== 'menu' || !offlineGain) return;
     var mu = MG.layout.menu;
     var w = mu.offlineW, h = mu.offlineH, x = (C.W - w) / 2, y = mu.offlineY;
+    ctx.textBaseline = 'alphabetic'; // v299：显式固定——上游（标题艺术字）可能遗留 middle 基线
     var og = ctx.createLinearGradient(0, y, 0, y + h);
     og.addColorStop(0, 'rgba(245,197,66,0.16)');
     og.addColorStop(1, 'rgba(217,169,63,0.08)');
@@ -567,123 +735,393 @@
     ctx.strokeStyle = 'rgba(245,197,66,0.55)'; ctx.lineWidth = 1.2;
     roundRect(x, y, w, h, 10); ctx.stroke();
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#F5C542';
-    ctx.font = 'bold 15px system-ui, sans-serif';
-    ctx.fillText('宝箱 · 离线收益', C.W / 2, y + 22);
+    // v288：卡高 60→80 重排三行（原末行基线 57 贴底边溢出），白字换深金棕（原近白文字
+    // 压在浅金底上对比度不足，用户："离线奖励样式异常"）
     var om = offlineGain.mins;
-    ctx.fillStyle = 'rgba(240,250,255,0.92)';
-    ctx.font = '13px system-ui, sans-serif';
-    ctx.fillText('离开 ' + (om >= 60 ? Math.floor(om / 60) + ' 时 ' + (om % 60) + ' 分' : om + ' 分钟') + ' · 深海攒下 ' + offlineGain.gain + ' 分', C.W / 2, y + 43);
-    ctx.fillStyle = 'rgba(200,225,245,0.55)';
-    ctx.font = '11px system-ui, sans-serif';
-    ctx.fillText('开始游戏后自动入账', C.W / 2, y + 57);
+    // v288：卡高 60→80 重排三行（原末行基线 57 贴底边溢出），白字换深金棕（原近白文字
+    // 压在浅金底上对比度不足，用户："离线奖励样式异常"）
+    // v289：三行按字形像素框垂直居中 + 均匀分散（用户："内部文字请使用垂直居中，均匀分散对齐"）——
+    // 段间距 =（卡高 − 三行字面总高）/4，首末与卡上下边留同宽，行间留同宽
+    var lines = [
+      { t: '宝箱 · 离线收益', f: 'bold 15px system-ui, sans-serif', c: '#8A6508' },
+      { t: '离开 ' + (om >= 60 ? Math.floor(om / 60) + ' 时 ' + (om % 60) + ' 分' : om + ' 分钟') + ' · 深海攒下 ' + offlineGain.gain + ' 分', f: '13px system-ui, sans-serif', c: 'rgba(90,66,20,0.88)' },
+      { t: '开始游戏后自动入账', f: '11px system-ui, sans-serif', c: 'rgba(125,100,40,0.62)' }
+    ];
+    var box = [], tot = 0, li;
+    for (li = 0; li < lines.length; li++) {
+      var mm = measureInk(lines[li].f, lines[li].t); // v300：恒等变换下测量
+      var fp = parseFloat(lines[li].f.replace(/[^0-9.]/g, '').replace(/^[^0-9]*/, ''));
+      box.push({
+        a: mm.has ? mm.a : fp * 0.86,
+        d: mm.has ? mm.d : fp * 0.16
+      });
+      tot += box[li].a + box[li].d;
+    }
+    var lgap = Math.max(3, (h - tot) / (lines.length + 1));
+    var yy = y + lgap;
+    for (li = 0; li < lines.length; li++) {
+      ctx.font = lines[li].f;
+      ctx.fillStyle = lines[li].c;
+      yy += box[li].a;                       // 基线 = 段起点 + 该行字面 ascent
+      ctx.fillText(lines[li].t, C.W / 2, yy);
+      yy += box[li].d + lgap;                // 下一行段起点 = 本行字面底 + 段间距
+    }
     ctx.textAlign = 'center'; // 恢复菜单流的 center——曾误设 left 泄漏给开始按钮，导致小程序文字右移溢出
   }
 
+  // 每日挑战视图（v244 改版）：顶部今日大卡（合并「开始挑战」按钮），下方列出今日未开放的词缀
   function drawDchalCard() {
     var ci = dchalInfo();
-    var cx = DEX_PANEL.x + 14, cy = DEX_PANEL.y + 74, cw = DEX_PANEL.w - 28, chh = 96;
-    ctx.fillStyle = ci.done ? 'rgba(245,197,66,0.14)' : 'rgba(123,111,208,0.10)';
-    roundRect(cx, cy, cw, chh, 10); ctx.fill();
-    if (ci.done) { ctx.fillStyle = '#F5C542'; roundRect(cx, cy + 10, 3, chh - 20, 1.5); ctx.fill(); }
+    // —— 今日 Hero 大卡（紫色渐变，按钮合并进卡内）——
+    var x = DEX_PANEL.x + 14, y = DEX_PANEL.y + 54, w = DEX_PANEL.w - 28, h = 150;
+    var hg = ctx.createLinearGradient(0, y, 0, y + h);
+    hg.addColorStop(0, '#7B6FD0'); hg.addColorStop(1, '#5A4AA8');
+    ctx.fillStyle = hg;
+    roundRect(x, y, w, h, 16); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)'; ctx.lineWidth = 1.2;
+    roundRect(x + 0.5, y + 0.5, w - 1, h - 1, 16); ctx.stroke();
+    // 装饰气泡
+    ctx.fillStyle = 'rgba(255,255,255,0.10)';
+    ctx.beginPath(); ctx.arc(x + w - 24, y + 20, 16, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + w - 46, y + 38, 7, 0, Math.PI * 2); ctx.fill();
+    // 金色奖杯勋章
+    var mx = x + 34, my = y + 58;
+    ctx.fillStyle = '#FFD873';
+    ctx.beginPath(); ctx.arc(mx, my, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.5; ctx.stroke();
+    // 小皇冠
+    ctx.fillStyle = '#8A5A18';
+    ctx.beginPath();
+    ctx.moveTo(mx - 7, my + 4); ctx.lineTo(mx - 7, my - 2); ctx.lineTo(mx - 3.2, my + 0.5);
+    ctx.lineTo(mx, my - 5.5); ctx.lineTo(mx + 3.2, my + 0.5); ctx.lineTo(mx + 7, my - 2);
+    ctx.lineTo(mx + 7, my + 4); ctx.closePath(); ctx.fill();
+    // 文案（左列：标题 / 名称 / 描述）
     ctx.textAlign = 'left';
-    ctx.fillStyle = ci.done ? '#B8860B' : '#6A5AB8';
-    ctx.font = 'bold 16px system-ui, sans-serif';
-    ctx.fillText((ci.done ? '✓ ' : '') + '今日挑战 · ' + ci.name, cx + 12, cy + 24);
-    ctx.fillStyle = '#4A7FA0';
-    ctx.font = '13px system-ui, sans-serif';
-    ctx.fillText(ci.desc, cx + 12, cy + 46);
-    ctx.fillText('目标 ' + ci.goal + ' 分 · 连续 ' + ci.streak + ' 天', cx + 12, cy + 68);
-    ctx.fillText('首通奖励最高 +' + C.dailyChal.rewardMax + ' 分 & 随机充能 +2', cx + 12, cy + 88);
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    ctx.fillText('今日挑战 · 连续 ' + ci.streak + ' 天', x + 58, y + 26);
+    ctx.font = 'bold 18px system-ui, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(ci.name, x + 58, y + 50);
+    ctx.font = '11.5px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillText(ci.desc, x + 58, y + 72);
+    // 右侧目标（已完成转金勾）；v277：目标与挑战芯片同语义——到达最深的海洋
+    ctx.textAlign = 'right';
+    ctx.font = '10px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.fillText('目标', x + w - 14, y + 36);
+    if (ci.done) {
+      ctx.font = 'bold 16px system-ui, sans-serif';
+      ctx.fillStyle = '#FFD873';
+      ctx.fillText('✓ 已完成', x + w - 14, y + 58);
+    } else {
+      ctx.font = 'bold 14px system-ui, sans-serif';
+      ctx.fillStyle = '#FFD873';
+      ctx.fillText('到达最深海洋', x + w - 14, y + 57);
+    }
+    // 合并进卡内的「开始挑战」按钮（金色胶囊，对局中置灰）
     var br = dchalBtnRect();
     var bg = ctx.createLinearGradient(0, br.y, 0, br.y + br.h);
     if (!ci.canStart) { bg.addColorStop(0, '#B9C9D4'); bg.addColorStop(1, '#9DB2C0'); }
-    else if (ci.done) { bg.addColorStop(0, '#F5C542'); bg.addColorStop(1, '#D9A93F'); }
-    else { bg.addColorStop(0, '#8B7FD0'); bg.addColorStop(1, '#6A5AB8'); }
+    else { bg.addColorStop(0, '#F5C542'); bg.addColorStop(1, '#D9A93F'); }
     ctx.fillStyle = bg;
     roundRect(br.x, br.y, br.w, br.h, br.h / 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1;
+    roundRect(br.x + 0.5, br.y + 0.5, br.w - 1, br.h - 1, br.h / 2 - 0.5); ctx.stroke();
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 14px system-ui, sans-serif';
-    ctx.fillText(ci.done ? '再玩一局' : '开始挑战', br.x + br.w / 2, br.y + 22);
+    ctx.font = 'bold 15px system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ci.done ? '再玩一局' : '开始挑战', br.x + br.w / 2, br.y + br.h / 2 + 1);
+    ctx.textBaseline = 'alphabetic';
+    // —— 下方：深渊潜航今日未开放的词缀列表 ——
+    // 分节标题条（v245 美化）：左侧色饰条 + 加粗标题 + 延伸细线 + 右对齐刷新说明
+    var labelY = y + h + 26, hy = labelY - 5;
+    ctx.fillStyle = '#2E86B4';
+    roundRect(x, hy - 6, 3.5, 13, 1.75); ctx.fill();
     ctx.textAlign = 'left';
-    ctx.fillStyle = '#8AA5B8';
-    ctx.font = '12px system-ui, sans-serif';
-    if (!ci.canStart) ctx.fillText('对局中不可发起', br.x - 6, br.y + 52);
-  }
-  function drawDailyTab() {
-    drawDchalCard();
-    for (var i = 0; i < daily.tasks.length; i++) {
-      var t = daily.tasks[i], done = daily.done[i];
-      var ry = DEX_PANEL.y + 184 + i * 138;
-      ctx.fillStyle = done ? 'rgba(245,197,66,0.14)' : 'rgba(46,134,180,0.07)';
-      roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 108, 10); ctx.fill();
-      // 达成金饰条
-      if (done) { ctx.fillStyle = '#F5C542'; roundRect(DEX_PANEL.x + 14, ry + 12, 3, 84, 1.5); ctx.fill(); }
+    ctx.font = 'bold 12.5px system-ui, sans-serif';
+    ctx.fillStyle = '#155A8A';
+    ctx.fillText('深渊潜航 · 今日未开放', x + 10, labelY);
+    var lineX = x + 10 + Math.round(ctx.measureText('深渊潜航 · 今日未开放').width) + 10;
+    var lineR = x + w - 100;
+    ctx.fillStyle = 'rgba(46,110,150,0.16)';
+    ctx.fillRect(lineX, hy, Math.max(0, lineR - lineX), 1);
+    ctx.textAlign = 'right';
+    ctx.font = '10px system-ui, sans-serif';
+    ctx.fillStyle = '#A8BCCB';
+    ctx.fillText('每天轮换 · 0 点刷新', x + w, labelY);
+    var listY = labelY + 12, rowH = 40, rowGap = 6;
+    var shown = 0;
+    for (var i = 0; i < ci.list.length; i++) {
+      var a = ci.list[i];
+      if (a.today) continue; // 今日词缀已在上方大卡展示
+      var ry = listY + shown * (rowH + rowGap);
+      ctx.fillStyle = 'rgba(255,255,255,0.62)';
+      roundRect(x, ry, w, rowH, 10); ctx.fill();
+      ctx.strokeStyle = 'rgba(46,110,150,0.10)'; ctx.lineWidth = 1;
+      roundRect(x + 0.5, ry + 0.5, w - 1, rowH - 1, 10); ctx.stroke();
+      // 灰色锁形徽章
+      var bx = x + 24, by = ry + rowH / 2;
+      ctx.fillStyle = '#D5DFE6';
+      ctx.beginPath(); ctx.arc(bx, by, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#A8BCCB'; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.fillStyle = '#8AA5B8';
+      roundRect(bx - 4, by - 1, 8, 6.5, 1.5); ctx.fill();
+      ctx.strokeStyle = '#8AA5B8'; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.arc(bx, by - 1.5, 2.6, Math.PI, 0); ctx.stroke();
+      // 名称 + 描述（灰）
       ctx.textAlign = 'left';
-      ctx.fillStyle = done ? '#B8860B' : '#155A8A';
-      ctx.font = 'bold 16px system-ui, sans-serif';
-      ctx.fillText((done ? '✓ ' : '') + t.text, DEX_PANEL.x + 26, ry + 32);
-      // 难度星级（右侧）+ 分级奖励
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      ctx.fillStyle = '#8AA5B8';
+      ctx.fillText(a.name, x + 44, ry + 18);
+      ctx.font = '10.5px system-ui, sans-serif';
+      ctx.fillStyle = '#A8BCCB';
+      ctx.fillText(a.desc + (a.mult ? ' · 得分 ×' + a.mult : ''), x + 44, ry + 33);
+      // 右侧状态：v278 不再写"未开放"，改显示该词缀历史完成次数（有完成记录转金）
       ctx.textAlign = 'right';
-      ctx.fillStyle = (t.stars || 1) === 3 ? '#9B7FD0' : ((t.stars || 1) === 2 ? '#C99B3F' : '#9AB4C4');
-      ctx.font = '13px system-ui, sans-serif';
-      var dstar = '';
-      for (var ds = 0; ds < (t.stars || 1); ds++) dstar += '★';
-      ctx.fillText(dstar, DEX_PANEL.x + DEX_PANEL.w - 26, ry + 30);
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#4A7FA0';
-      ctx.font = '14px system-ui, sans-serif';
-      ctx.fillText('奖励 +' + Math.round(C.daily.rewardScore * (1 + ((t.stars || 1) - 1) * 0.5)) + ' 分', DEX_PANEL.x + 26, ry + 60);
-      // 进度条
-      var barX = DEX_PANEL.x + 26, barW = DEX_PANEL.w - 120, barY = ry + 78;
-      ctx.fillStyle = 'rgba(46,134,180,0.15)';
-      roundRect(barX, barY, barW, 9, 4.5); ctx.fill();
-      if (daily.prog[i] > 0) {
-        ctx.fillStyle = done ? '#F5C542' : '#2E86B4';
-        roundRect(barX, barY, Math.max(6, barW * daily.prog[i] / t.need), 9, 4.5); ctx.fill();
-      }
-      ctx.textAlign = 'center';
-      ctx.fillStyle = done ? '#B8860B' : '#4A7FA0';
-      ctx.font = '13px system-ui, sans-serif';
-      ctx.fillText(done ? '已完成' : (daily.prog[i] + '/' + t.need), barX + barW + 34, barY + 9);
-      ctx.textAlign = 'left';
+      ctx.font = 'bold 11px system-ui, sans-serif';
+      ctx.fillStyle = a.count > 0 ? '#D9A93F' : '#B9C9D4';
+      ctx.fillText('已完成 ' + (a.count || 0) + ' 次', x + w - 12, ry + rowH / 2 + 4);
+      shown++;
     }
   }
 
-  // 榜单页签：本地好友榜（预留微信排行榜接口位）
+  // 每日任务视图（v247）：顶部全勤横幅卡（海洋渐变+火焰徽章）+ 5 个类型配色图标任务行
+  function drawDailyTasksTab() {
+    var doneCnt = 0;
+    for (var di0 = 0; di0 < daily.tasks.length; di0++) if (daily.done[di0]) doneCnt++;
+    var x = DEX_PANEL.x + 14, w = DEX_PANEL.w - 28;
+    // —— 顶部全勤卡（全勤转金，日常为海洋蓝渐变）——
+    var fy = DEX_PANEL.y + 54, fh = 80;
+    var hgr = ctx.createLinearGradient(0, fy, 0, fy + fh);
+    if (daily.allDone) { hgr.addColorStop(0, '#F7CE5B'); hgr.addColorStop(1, '#DFA23C'); }
+    else { hgr.addColorStop(0, '#3B97C9'); hgr.addColorStop(1, '#1E6B9E'); }
+    ctx.fillStyle = hgr;
+    roundRect(x, fy, w, fh, 14); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.2;
+    roundRect(x + 0.5, fy + 0.5, w - 1, fh - 1, 14); ctx.stroke();
+    // 装饰气泡
+    ctx.fillStyle = 'rgba(255,255,255,0.10)';
+    ctx.beginPath(); ctx.arc(x + w - 30, fy + 20, 18, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + w - 58, fy + 52, 8, 0, Math.PI * 2); ctx.fill();
+    // 火焰连击徽章
+    var mx = x + 36, my = fy + 40;
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    ctx.beginPath(); ctx.arc(mx, my, 21, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.font = '20px system-ui, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText('🔥', mx, my + 7);
+    // 文案
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 15px system-ui, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText('今日全勤奖励', x + 66, fy + 30);
+    ctx.font = '10.5px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.78)';
+    ctx.fillText('已连续 ' + (daily.streak || 0) + ' 天 · 全勤可得分数与充能加成', x + 66, fy + 50);
+    ctx.fillText('任务每日 0 点刷新 · 难度随连续天数提升', x + 66, fy + 66);
+    // 右侧完成数 + 进度点
+    ctx.textAlign = 'right';
+    ctx.font = 'bold 20px system-ui, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(doneCnt + '/' + daily.tasks.length, x + w - 16, fy + 34);
+    var dotGap = 14, dotR = 4, dotX0 = x + w - 16 - (daily.tasks.length - 1) * dotGap;
+    for (var di = 0; di < daily.tasks.length; di++) {
+      ctx.fillStyle = daily.done[di] ? '#FFD873' : 'rgba(255,255,255,0.28)';
+      ctx.beginPath(); ctx.arc(dotX0 + di * dotGap, fy + 56, dotR, 0, Math.PI * 2); ctx.fill();
+      if (daily.done[di]) { ctx.strokeStyle = 'rgba(138,90,24,0.4)'; ctx.lineWidth = 1; ctx.stroke(); }
+    }
+    // —— 5 个任务行（v249 单色极简：统一灰蓝圆形图标块 + 白色简笔图形）——
+    var ACCENT = '#8FA9BA', TINT = 'rgba(143,169,186,0.10)';
+    var base = fy + fh + 12, rowH = 62, step = 72;
+    for (var i = 0; i < daily.tasks.length; i++) {
+      var t = daily.tasks[i], done = daily.done[i];
+      var frac = Math.min(1, (daily.prog[i] || 0) / t.need);
+      var ty0 = base + i * step;
+      if (done) {
+        var og = ctx.createLinearGradient(0, ty0, 0, ty0 + rowH);
+        og.addColorStop(0, 'rgba(245,197,66,0.20)'); og.addColorStop(1, 'rgba(217,169,63,0.10)');
+        ctx.fillStyle = og;
+      } else {
+        ctx.fillStyle = TINT;
+      }
+      roundRect(x, ty0, w, rowH, 12); ctx.fill();
+      ctx.strokeStyle = done ? 'rgba(217,169,63,0.45)' : 'rgba(46,110,150,0.12)';
+      ctx.lineWidth = 1;
+      roundRect(x + 0.5, ty0 + 0.5, w - 1, rowH - 1, 12); ctx.stroke();
+      // 圆形图标底 + 游戏本体现有图标（水滴/技能/宝箱/海域徽章/礁石，不自绘）
+      var ix = x + 12, iy = ty0 + (rowH - 40) / 2, icx = ix + 20, icy = iy + 20;
+      ctx.fillStyle = done ? 'rgba(217,169,63,0.16)' : 'rgba(143,169,186,0.16)';
+      ctx.beginPath(); ctx.arc(icx, icy, 20, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = done ? 'rgba(217,169,63,0.40)' : 'rgba(46,110,150,0.16)';
+      ctx.lineWidth = 1; ctx.stroke();
+      ctx.save();
+      ctx.translate(icx, icy);
+      ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.clip();
+      if (done) {
+        ctx.strokeStyle = '#C9922A'; ctx.lineWidth = 2.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-7, 0.5); ctx.lineTo(-2, 5.5); ctx.lineTo(7, -5);
+        ctx.stroke();
+        ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+      } else if (t.type === 'merge') {
+        drawBall({ x: 0, y: 0, r: 14, tier: t.tier, vx: 0, vy: 0 }, 1); // 任务指定的那颗水滴
+      } else if (t.type === 'combo') {
+        ctx.scale(1.6, 1.6);
+        drawSkillIcon('ripple', 0, 0, '#2FA8A0'); // 连锁波纹（技能图标）
+      } else if (t.type === 'chest') {
+        drawChestIcon(0, 1, 0.62); // 场上宝箱同款
+      } else if (t.type === 'tide') {
+        ctx.scale(1.5, 1.5);
+        drawSeaBadge(seaStage(), 0, 0, true); // 当前海域徽章
+      } else {
+        drawIronBall({ x: 0, y: 0, r: 13, vx: 0, vy: 0 }, 1); // 礁石球
+      }
+      ctx.restore();
+      // 标题 + 右上难度星与奖励
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 13.5px system-ui, sans-serif';
+      ctx.fillStyle = done ? '#B8860B' : '#155A8A';
+      ctx.fillText(truncText(t.text, w - 58 - 118), x + 62, ty0 + 25);
+      ctx.textAlign = 'right';
+      var rst = '';
+      for (var ds = 0; ds < (t.stars || 1); ds++) rst += '★';
+      var rv = Math.round(C.daily.rewardScore * (1 + ((t.stars || 1) - 1) * 0.5));
+      ctx.font = 'bold 11px system-ui, sans-serif';
+      ctx.fillStyle = done ? '#B8860B' : '#C99B3F';
+      ctx.fillText(rst + ' +' + rv + ' 分', x + w - 12, ty0 + 25);
+      // 底部进度条（颜色随任务类型）+ 右侧计数
+      var barX = x + 62, barW = w - 62 - 14 - 64;
+      ctx.fillStyle = 'rgba(46,134,180,0.15)';
+      roundRect(barX, ty0 + 42, barW, 6, 3); ctx.fill();
+      if (frac > 0) {
+        ctx.fillStyle = done ? '#F5C542' : ACCENT;
+        roundRect(barX, ty0 + 42, Math.max(6, barW * frac), 6, 3); ctx.fill();
+      }
+      ctx.textAlign = 'right';
+      ctx.font = 'bold 10.5px system-ui, sans-serif';
+      ctx.fillStyle = done ? '#B8860B' : '#4A7FA0';
+      var needTxt = t.need >= 10000 ? (Math.round(t.need / 1000) / 10) + '万' : t.need;
+      var progTxt = (daily.prog[i] || 0) >= 10000 ? (Math.round((daily.prog[i] || 0) / 1000) / 10) + '万' : (daily.prog[i] || 0);
+      ctx.fillText(done ? '已完成' : (progTxt + '/' + needTxt), x + w - 12, ty0 + 50);
+    }
+    ctx.textAlign = 'center';
+  }
+
+  // 榜单页签（v251）：顶部「我的排名」横幅 + 前三名领奖台 + 名次列表
   function drawRankTab() {
     var rows = friendBoard();
-    for (var i = 0; i < rows.length; i++) {
-      var r = rows[i];
-      var ry = DEX_PANEL.y + 86 + i * 72;
-      ctx.fillStyle = r.me ? 'rgba(245,197,66,0.16)' : (i % 2 ? 'rgba(46,134,180,0.05)' : 'rgba(46,134,180,0.09)');
-      roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 58, 9); ctx.fill();
-      // 名次徽章（序号必须显式居中：上一轮循环末尾的 textAlign 会污染到这里）
-      var badge = ['#F5C542', '#B9C4CC', '#D2955B'][i] || 'rgba(46,134,180,0.35)';
-      ctx.fillStyle = badge;
-      ctx.beginPath(); ctx.arc(DEX_PANEL.x + 38, ry + 29, 12, 0, Math.PI * 2); ctx.fill();
+    // —— 顶部我的排名横幅（海洋渐变）——
+    var meIdx = 0;
+    for (var m = 0; m < rows.length; m++) if (rows[m].me) { meIdx = m; break; }
+    var bx = DEX_PANEL.x + 14, by = DEX_PANEL.y + 54, bw = DEX_PANEL.w - 28, bh = 60;
+    var bgd = ctx.createLinearGradient(0, by, 0, by + bh);
+    bgd.addColorStop(0, '#3B97C9'); bgd.addColorStop(1, '#1E6B9E');
+    ctx.fillStyle = bgd;
+    roundRect(bx, by, bw, bh, 12); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.2;
+    roundRect(bx + 0.5, by + 0.5, bw - 1, bh - 1, 12); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.10)';
+    ctx.beginPath(); ctx.arc(bx + bw - 24, by + 16, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(bx + bw - 46, by + 44, 6, 0, Math.PI * 2); ctx.fill();
+    // 左侧名次章
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    ctx.beginPath(); ctx.arc(bx + 30, by + 30, 18, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 15px system-ui, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText('#' + (meIdx + 1), bx + 30, by + 35);
+    // 中间文案
+    ctx.textAlign = 'left';
+    ctx.font = '10.5px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.fillText('我的最佳成绩', bx + 58, by + 25);
+    ctx.font = 'bold 18px system-ui, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(fmtScore(rows[meIdx].score), bx + 58, by + 47);
+    // 右侧超越数
+    ctx.textAlign = 'right';
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillText('超越 ' + (rows.length - 1 - meIdx) + ' 位好友', bx + bw - 16, by + 35);
+    // —— 前三名领奖台（视觉顺序 2/1/3，第一名更高 + 小皇冠）——
+    // v281：整体加高（76/100/64→84/108/72）+ 奖牌上移、名称/分数下移——修复名次章与用户名重叠
+    var colW = 108, gap = 14, yBase = DEX_PANEL.y + 236;
+    var tops = [rows[1], rows[0], rows[2]];
+    var hts = [84, 108, 72], medals = ['#C9D4DC', '#F5C542', '#E0B58A'];
+    var grads = [['#DDE6EC', '#AEBEC9'], ['#FFE08A', '#D9A93F'], ['#EFCAA2', '#C29263']];
+    for (var p = 0; p < 3; p++) {
+      var px0 = DEX_PANEL.x + 14 + p * (colW + gap), ph = hts[p], py0 = yBase - ph;
+      var pg = ctx.createLinearGradient(0, py0, 0, yBase);
+      pg.addColorStop(0, grads[p][0]); pg.addColorStop(1, grads[p][1]);
+      ctx.fillStyle = pg;
+      roundRect(px0, py0, colW, ph, 10); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1;
+      roundRect(px0 + 0.5, py0 + 0.5, colW - 1, yBase - py0 - 1, 10); ctx.stroke();
+      // 奖牌（第一名戴小皇冠；v281：my=py0+20、王冠收小——冠顶 py0+2 在台面内，不再越出领奖台）
+      var mx = px0 + colW / 2, my = py0 + 20;
+      ctx.fillStyle = medals[p];
+      ctx.beginPath(); ctx.arc(mx, my, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.5; ctx.stroke();
+      if (p === 1) {
+        ctx.fillStyle = '#B8860B';
+        ctx.beginPath();
+        ctx.moveTo(mx - 5, my - 12); ctx.lineTo(mx - 5, my - 16); ctx.lineTo(mx - 2.2, my - 14);
+        ctx.lineTo(mx, my - 18); ctx.lineTo(mx + 2.2, my - 14); ctx.lineTo(mx + 5, my - 16);
+        ctx.lineTo(mx + 5, my - 12); ctx.closePath(); ctx.fill();
+      }
       ctx.textAlign = 'center';
-      ctx.fillStyle = i < 3 ? '#FFFFFF' : '#3E6E90';
-      ctx.font = 'bold 14px system-ui, sans-serif';
-      ctx.fillText(String(i + 1), DEX_PANEL.x + 38, ry + 34);
-      ctx.textAlign = 'left';
-      ctx.fillStyle = r.me ? '#B8860B' : '#155A8A';
-      ctx.font = (r.me ? 'bold ' : '') + '16px system-ui, sans-serif';
-      ctx.fillText(r.me ? r.name + '（你）' : r.name, DEX_PANEL.x + 60, ry + 34);
-      ctx.textAlign = 'right';
-      ctx.fillStyle = r.me ? '#B8860B' : '#3E6E90';
-      ctx.font = 'bold 16px system-ui, sans-serif';
-      ctx.fillText(String(r.score), DEX_PANEL.x + DEX_PANEL.w - 26, ry + 34);
-      ctx.textAlign = 'left';
+      ctx.font = 'bold 12px system-ui, sans-serif';
+      ctx.fillStyle = '#FFFFFF';
+      // v283：名次章标注真实名次 [2,1,3]（左二/中一/右三）——此前按台位顺序误标 1/2/3
+      ctx.fillText(String([2, 1, 3][p]), mx, my + 4.5);
+      ctx.font = '11.5px system-ui, sans-serif';
+      ctx.fillStyle = p === 1 ? '#7A5608' : '#3E647E';
+      ctx.fillText(truncText(tops[p].name, colW - 12), mx, py0 + 48);
+      ctx.font = 'bold 13.5px system-ui, sans-serif';
+      ctx.fillStyle = p === 1 ? '#7A5608' : '#155A8A';
+      ctx.fillText(fmtScore(tops[p].score), mx, py0 + 66);
     }
+    // 台阶底座
+    ctx.fillStyle = 'rgba(46,134,180,0.10)';
+    roundRect(DEX_PANEL.x + 14, yBase, DEX_PANEL.w - 28, 8, 4); ctx.fill();
+    // —— 第 4 名起列表 ——
+    for (var i = 3; i < rows.length; i++) {
+      var r = rows[i], ry = DEX_PANEL.y + 262 + (i - 3) * 70;
+      ctx.fillStyle = r.me ? 'rgba(245,197,66,0.16)' : 'rgba(46,134,180,0.06)';
+      roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 54, 9); ctx.fill();
+      ctx.strokeStyle = r.me ? 'rgba(217,169,63,0.5)' : 'rgba(46,110,150,0.10)';
+      ctx.lineWidth = 1;
+      roundRect(DEX_PANEL.x + 14.5, ry + 0.5, DEX_PANEL.w - 29, 53, 9); ctx.stroke();
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      ctx.fillStyle = '#4A7FA0';
+      ctx.fillText(String(i + 1), DEX_PANEL.x + 38, ry + 33);
+      ctx.textAlign = 'left';
+      ctx.font = (r.me ? 'bold ' : '') + '13px system-ui, sans-serif';
+      ctx.fillStyle = r.me ? '#B8860B' : '#155A8A';
+      ctx.fillText(r.me ? r.name + '（你）' : r.name, DEX_PANEL.x + 58, ry + 33);
+      ctx.textAlign = 'right';
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      ctx.fillStyle = r.me ? '#B8860B' : '#3E6E90';
+      ctx.fillText(fmtScore(r.score), DEX_PANEL.x + DEX_PANEL.w - 26, ry + 33);
+    }
+    ctx.textAlign = 'center';
+  }
+  // 分数千分位省略显示（榜单/挑战用）：≥1 万显示"x.x万"
+  function fmtScore(n) {
+    if (n >= 10000) return (Math.round(n / 1000) / 10) + '万';
+    return String(n);
   }
 
   // 战报分享卡片（结算页"分享战报"打开；上线后接 wx.shareAppMessage）
   function drawShare() {
-    if (!shareOpen) return;
-    ctx.fillStyle = 'rgba(10,40,70,0.6)';
-    ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
+    // 压暗背景已上移 drawPanelFx 统一绘制（v275）
     var sr = MG.layout.shareRect(); // 锚定游戏区焦点（v161 定版中心），块高变化不漂流
     var pw = sr.w, ph = sr.h, px = sr.x, py = sr.y;
     panel(px, py, pw, ph, 16, 0.97);
@@ -696,6 +1134,15 @@
     roundRect(px, py + 80, pw, 16, 8); ctx.fill();
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 25px system-ui, sans-serif';
+    // v275：页头图标（📤 与分享按钮同款）+ 标题同一水平中线
+    var shTw = ctx.measureText('水滴合成深海 · 深海战报').width;
+    var shIcX = C.W / 2 - shTw / 2 - 26, shIcY = py + 33;
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    ctx.beginPath(); ctx.arc(shIcX, shIcY, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.font = '16px system-ui, sans-serif';
+    ctx.fillText('📤', shIcX, shIcY + 6);
     ctx.font = 'bold 25px system-ui, sans-serif';
     ctx.fillText('水滴合成深海 · 深海战报', C.W / 2, py + 40);
     ctx.font = '14px system-ui, sans-serif';

@@ -55,8 +55,15 @@
     vibrate: function (ms) {
       try {
         ms = ms || 20;
-        if (ms >= 40) wx.vibrateLong();
-        else wx.vibrateShort({ type: ms >= 20 ? 'medium' : 'light' });
+        if (ms >= 40) {
+          wx.vibrateLong({ fail: function () { try { wx.vibrateShort(); } catch (e2) {} } });
+        } else {
+          // v287：部分基础库/机型不支持 type 参数会静默 fail——回退无参短震，保证马达一定响应
+          wx.vibrateShort({
+            type: ms >= 20 ? 'medium' : 'light',
+            fail: function () { try { wx.vibrateShort(); } catch (e2) {} }
+          });
+        }
       } catch (e) {}
     }
   };

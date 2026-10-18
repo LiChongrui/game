@@ -24,7 +24,14 @@
   // 其余一切按底部定位（layout.body/band/panel/menu = 9:18 定版基准 + dy，随块底平移），
   // 中间水域随窗口高度自适应；画布 CSS 高度恒等于窗口高度，CSS 宽度=游戏区宽度（两侧为页面深海背景）
   var canvas = document.getElementById('game');
-  var ctx = canvas.getContext('2d');
+  // v295：诊断开关 —— URL 带 ?cpu=1 时强制 CPU（软件光栅）画布：
+  // Chrome/Edge/Electron 下 willReadFrequently:true 会让该 canvas 完全走 CPU 光栅、不再分配
+  // GPU 表面，可彻底排除"GPU 表面损坏导致的花屏"。用来确认花屏是否来自宿主 GPU 合成层。
+  var _qs = '';
+  try { _qs = (window.location && window.location.search) || ''; } catch (e) { _qs = ''; }
+  var forceCpu = /(\?|&)cpu=1(\b|&)/.test(_qs);
+  var ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: forceCpu }); // v294：不透明画布——背景全程自绘不透明，
+                                                       // 杜绝"表面清空后透出宿主棋盘噪声"的花屏形态
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
   var VH = C.H;           // 当前逻辑高度（全屏：h/view.s，≥C.H）
   var LW = C.W;           // 当前逻辑宽度（≥ C.W，宽窗口下两侧为延伸海水）
@@ -63,8 +70,12 @@
     // 容器区（layout.body 单一真源）：容器底/容器顶/警戒线/出生点按底部锚定
     // （floorY = H-75，随块底整体平移）
     FLOORY = MG.layout.body.floorY;        // 765+dy（9:18=765；dy=C.H-840）
-    canvas.width = Math.round(w * dpr);    // 画布铺满整个窗口（背景全程由游戏自绘）
-    canvas.height = Math.round(h * dpr);
+    // v294：仅尺寸真变化才重设——对 canvas.width/height 赋值（即使值相同）也会清空画布并
+    // 重新分配显存表面；窗口拖拽/预览容器连续缩放时 fit() 高频触发，表面反复重建在部分
+    // GPU/合成器上呈现花屏（用户截图：全屏 1px 棋盘噪声、内容半透明）
+    var nw = Math.round(w * dpr), nh = Math.round(h * dpr);
+    if (canvas.width !== nw) canvas.width = nw;
+    if (canvas.height !== nh) canvas.height = nh;
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
     // 按钮恒贴在容器底下方（cy=layout.band.btnCy=FLOORY+28，与容器底恒距 28，v163 定版）——

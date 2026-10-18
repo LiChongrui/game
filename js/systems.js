@@ -7,7 +7,27 @@
   // ---------- 状态 ----------
   var phys = new MG.Physics();
   var state = 'menu'; // 开机先停在开始界面（主流小游戏设计：标题 + 开始按钮）
-  var menuStartBtn = { x: C.W / 2 - 110, y: MG.layout.menu.startY, w: MG.layout.menu.startW, h: MG.layout.menu.startH }; // 「开始游戏」主按钮
+  var menuStartBtn = { x: C.W / 2 - MG.layout.menu.startW / 2, y: MG.layout.menu.startY, w: MG.layout.menu.startW, h: MG.layout.menu.startH }; // 「开始游戏」主按钮（x 随 startW 居中）
+  // v237 主页↔游戏水域扫屏过渡：dir 'in'=入局 / 'out'=回主页，t0 起始时刻（performance.now 时钟，与 segAnims 同策略），
+  // dur 时长；渲染层 drawRippleReveal 消费（涟漪揭幕：圆外旧画面快照、圆内新场景），过渡期内输入屏蔽。
+  // sx/sy = 涟漪起点（内容层逻辑坐标，渲染层统一 +BX/+renderOy 转屏幕），由触发点传入。
+  var menuTrans = { dir: null, t0: -9, dur: 1.1, sx: 0, sy: 0, snap: null };
+  // 统一入口：dir 'in'=主页→游戏 / 'out'=游戏→主页；cx/cy = 涟漪圆心（内容层坐标）
+  function startTransition(dir, cx, cy) {
+    menuTrans.dir = dir;
+    menuTrans.t0 = performance.now() / 1000;
+    menuTrans.sx = cx; menuTrans.sy = cy;
+    menuTrans.snap = null; // 渲染层首帧开头截取旧画面
+  }
+  // 主页功能磁贴（v234b：左二右二）——成就殿堂各项独立成钮（页签 0成就/1每日/2榜单 直达）。
+  // 图鉴/分享磁贴按用户要求暂撤；命中几何唯一真源 layout.menuTileRect，图标/标签由渲染层画。
+  var menuTiles = [
+    { side: 'L', i: 0, icon: '📋', label: '每日任务', act: function () { achOpen = true; dexOpen = false; dexTab = 1; } },
+    { side: 'L', i: 1, icon: '🎯', label: '每日挑战', act: function () { achOpen = true; dexOpen = false; dexTab = 2; } },
+    { side: 'R', i: 0, icon: '🏆', label: '成就', act: function () { achOpen = true; dexOpen = false; dexTab = 0; achScroll = 0; } },
+    { side: 'R', i: 1, icon: '🥇', label: '榜单', act: function () { achOpen = true; dexOpen = false; dexTab = 3; } }
+  ];
+  for (var mti = 0; mti < menuTiles.length; mti++) menuTiles[mti].pressT = 0;
   var score = 0, displayScore = 0, scoreBump = 0;
   var best = 0; // 刷新页面即重新计，不跨刷新保留
   var nextTier = rollTier();
@@ -45,7 +65,9 @@
   // 生涯最高累计分（跨刷新持久）：图鉴"已抵达"按它判定——发现过的收集永不回退；
   // 本局玩法（背景海域/特殊滴池/潮位）仍按会话内 totalScore 重新潜入，两者各司其职
   var careerPeak = parseFloat(MG.platform.get('mg_peak')) || 0;
-  var dexTab = 0;                  // 图鉴页签：0=图鉴 1=成就 2=每日 3=榜单
+  var dexTab = 0;                  // 成就殿堂视图（v241 拆分）：0=成就 1=每日任务 2=每日挑战 3=榜单
+  var achScroll = 0;               // v243 成就列表滚动量（单列超出一屏，拖拽/滚轮滚动）
+  var achDrag = null;              // 成就列表拖拽中 { y, s0 }
   var dexSelSp = -1;               // 图鉴页当前选中的特殊滴说明（-1=未选）
   var dexSec = 0;                  // 图鉴主页分节：0=合成链 1=海域演进（特殊滴槽位并入海域行）
   var dexSelTier = -1;             // 选中的合成链档位（-1 未选）
@@ -117,8 +139,8 @@
   function perkOn(id) { return !!achDone[id]; }
   function perkMult() { return (achDone.tide12 && tide.progress > 0.2) ? 1.1 : 1; }
   // 数值封顶：所有乘区叠乘后总倍率不超过 C.multCap（防成就/海域加成叠乘导致分数膨胀）
-  // 二周目词缀的得分倍率并入乘区；词缀局上限额外 +3（高危要有高收益）
-  function cm(m) { return Math.min(m * (ng.active ? ng.active.mult : 1), C.multCap + (ng.active ? 3 : 0)); }
+  // v281：词缀不再提供得分倍率收益（用户：倍率太高），只保留难度增益
+  function cm(m) { return Math.min(m, C.multCap); }
 
   // 技能渐进解锁：按累计得分逐个点亮（换滴开局即有，涟漪/蒸发/水流递进）
   function skillUnlocked(key) { return totalScore() >= (C.skillUnlock[key] || 0); }
@@ -136,7 +158,7 @@
     ng.active = affix;                 // restart 会清 active，重设
     ng.fromDaily = !!fromDaily;
     C.gravity = GRAV0 * (affix.grav || 1);
-    addPopup(C.W / 2, 300, (fromDaily ? '每日挑战 ·「' : '深渊潜航 ·「') + affix.name + '」' + (fromDaily ? '' : '×' + affix.mult), true, 0);
+    addPopup(C.W / 2, 300, (fromDaily ? '每日挑战 ·「' : '深渊潜航 ·「') + affix.name + '」', true, 0);
     ngOpen = false;
   }
   function ngEndRun() {
@@ -198,29 +220,39 @@
   function saveDaily() { MG.platform.setJSON('mg_daily', daily); }
   function buildDailyTasks(date, rnd, streakNow) {
     // 难度随连续天数递进（1x → 3x），星数标记难度，奖励同步分级
+    // v246：任务 3 → 5（合成 / 连击 + 宝箱 / 涨潮 / 礁石三项全给，附加项随机排序）
+    // v285：再次整体上调（用户："难度还是太低了，要进一步提高"）——合成 11~17→16~22、
+    // 连击 5~8→7~11、宝箱/礁石 2→3（封顶 4）、涨潮 3→4
     var f = 1 + Math.min(2, (streakNow || 0) * 0.34);
     var stars = f < 1.5 ? 1 : (f < 2.5 ? 2 : 3);
     var mn = function (v) { return Math.max(1, Math.round(v * f)); };
-    var t1 = { type: 'merge', tier: 1 + Math.floor(rnd() * 3), need: mn(6 + Math.floor(rnd() * 5)), stars: stars };
+    var t1 = { type: 'merge', tier: 1 + Math.floor(rnd() * 3), need: mn(16 + Math.floor(rnd() * 7)), stars: stars };
     t1.text = '合成 ' + t1.need + ' 个「' + T[t1.tier].name + '」';
-    var t2 = { type: 'combo', need: mn(3 + Math.floor(rnd() * 3)), stars: stars };
+    var t2 = { type: 'combo', need: mn(7 + Math.floor(rnd() * 5)), stars: stars };
     t2.text = '达成 ' + t2.need + ' 连击';
     var extras = [
-      { type: 'chest', need: Math.min(3, mn(1)), text: '开启宝箱' },
-      { type: 'tide',  need: mn(2), text: '经历涨潮' },
-      { type: 'iron',  need: Math.min(3, mn(1)), text: '消除礁石' }
+      { type: 'chest', need: Math.min(4, mn(3)), text: '开启宝箱' },
+      { type: 'tide',  need: mn(4), text: '经历涨潮' },
+      { type: 'iron',  need: Math.min(4, mn(3)), text: '消除礁石' }
     ];
-    var ex = extras[Math.floor(rnd() * extras.length)];
-    var t3 = { type: ex.type, need: ex.need, stars: stars };
-    t3.text = ex.text + ' ×' + t3.need;
-    return [t1, t2, t3];
+    for (var i = extras.length - 1; i > 0; i--) { // 洗牌
+      var j = Math.floor(rnd() * (i + 1)), tmp = extras[i]; extras[i] = extras[j]; extras[j] = tmp;
+    }
+    var tasks = [t1, t2];
+    for (var e = 0; e < extras.length; e++) {
+      var t = { type: extras[e].type, need: extras[e].need, stars: stars };
+      t.text = extras[e].text + ' ×' + t.need;
+      tasks.push(t);
+    }
+    return tasks;
   }
   var daily = (function () {
     var d = loadDaily(), today = todayStr();
-    if (!d || d.date !== today) {
+    // ver 不符（任务数量/结构/数值变更）也强制重建当日任务——v285 任务数值再上调，ver 3→4
+    if (!d || d.ver !== 4 || d.date !== today) {
       var streak = (d && d.date === yesterdayStr()) ? (d.streak || 0) : 0; // 断签清零
       var rnd = mulberry(dateSeed(today));
-      var fresh = { date: today, streak: streak, streakToday: false, tasks: buildDailyTasks(today, rnd, streak), prog: [0, 0, 0], done: [false, false, false], allDone: false };
+      var fresh = { ver: 4, date: today, streak: streak, streakToday: false, tasks: buildDailyTasks(today, rnd, streak), prog: [0, 0, 0, 0, 0], done: [false, false, false, false, false], allDone: false };
       saveDailyFresh(fresh);
       return fresh;
     }
@@ -244,8 +276,10 @@
         audio.quest();
       }
     }
-    // 三项全完成 → 连续天数 +1（每天只涨一次）+ 天数奖励
-    if (!daily.allDone && daily.done[0] && daily.done[1] && daily.done[2]) {
+    // 全部完成 → 连续天数 +1（每天只涨一次）+ 天数奖励（v246：随任务数量泛化，不再写死三项）
+    var allOk = daily.tasks.length > 0;
+    for (var ai = 0; ai < daily.tasks.length; ai++) if (!daily.done[ai]) { allOk = false; break; }
+    if (!daily.allDone && allOk) {
       daily.allDone = true;
       if (!daily.streakToday) { daily.streakToday = true; daily.streak++; }
       var bonus = C.daily.streakBase + daily.streak * C.daily.streakStep;
@@ -265,41 +299,60 @@
   // 复用「深渊潜航」词缀管线（重力/潮汐/暗礁/冰冻/倍率全部已实现），另配两条更凶的每日专属词缀；
   // 完成状态持久化（mg_dchal），连续完成天数递增奖励；进行中的挑战局不持久化（刷新即丢，可重试）
   var DCHAL_AFFIXES = [
-    { id: 'heavy',   name: '重压之海', desc: '重力 +25%',              grav: 1.25, mult: 1.5 },
-    { id: 'storm',   name: '疾风骤雨', desc: '潮汐间隔 -40%',          tideInt: 0.6, mult: 1.6 },
-    { id: 'reef',    name: '暗礁密布', desc: '礁石概率 ×2',            ironX: 2, mult: 1.5 },
-    { id: 'frost',   name: '冰封之海', desc: '水滴 15% 落水即冻',      ice: 0.15, mult: 1.4 },
-    { id: 'abyss',   name: '深渊试炼', desc: '重力 +25% 且潮汐 -40%',  grav: 1.25, tideInt: 0.6, mult: 1.9 },
-    { id: 'icereef', name: '冰礁之海', desc: '暗礁 ×2 且 15% 落水即冻', ironX: 2, ice: 0.15, mult: 1.9 }
+    { id: 'heavy',   name: '重压深潜', desc: '重力 +60%',              grav: 1.6 },   // v285：词缀再加重（用户：难度还是太低）；v281 去得分倍率
+    { id: 'storm',   name: '疾风骤雨', desc: '潮汐间隔 -65%',          tideInt: 0.35 },
+    { id: 'reef',    name: '暗礁密布', desc: '礁石概率 ×4',            ironX: 4 },
+    { id: 'frost',   name: '寒冰速冻', desc: '水滴 35% 落水即冻',      ice: 0.35 },
+    { id: 'abyss',   name: '深渊试炼', desc: '重力 +80% 且潮汐 -65%',  grav: 1.8, tideInt: 0.35 },  // v286：复合词缀数值不再复用单一词缀（用户："都有两个一样的重力+60%"），逐项加码形成梯度
+    { id: 'icereef', name: '冰礁交错', desc: '暗礁 ×5 且 45% 落水即冻', ironX: 5, ice: 0.45 }
   ];
   var dchal = (function () {
     var d = MG.platform.getJSON('mg_dchal', null) || {};
-    if (d.date !== todayStr()) d = { date: todayStr(), done: false, streak: d.streak || 0, lastDate: d.lastDate || null };
+    // v278：counts = 各词缀历史完成次数（跨天保留）
+    if (d.date !== todayStr()) d = { date: todayStr(), done: false, streak: d.streak || 0, lastDate: d.lastDate || null, counts: d.counts || {} };
+    if (!d.counts) d.counts = {};
     return d;
   })();
   function saveChal() { MG.platform.setJSON('mg_dchal', dchal); }
   var dchalRun = null; // 本局挑战参数 { goal }（仅运行期）
+  function dayChalIdx() {
+    // v243 深渊潜航每日轮换：按本地日期序号轮转，每天开放一个词缀（不再随机抽取）
+    var d = new Date();
+    return Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 864e5) % DCHAL_AFFIXES.length;
+  }
   function dchalRoll() {
-    var rnd = mulberry(dateSeed('chal-' + todayStr()));
-    var affix = DCHAL_AFFIXES[Math.floor(rnd() * DCHAL_AFFIXES.length)];
+    var affix = DCHAL_AFFIXES[dayChalIdx()];
     var goal = Math.max(C.dailyChal.goalMin, Math.ceil((lifeStats.best || 3000) * C.dailyChal.goalBestRatio / 100) * 100);
-    return { affix: affix, goal: goal };
+    return { affix: affix, goal: goal, idx: dayChalIdx() };
   }
   function dchalStart() {
     if (state !== 'menu' && state !== 'over') return; // 对局中不可发起（防误触清空当前局面）
     var roll = dchalRoll();
-    dchalRun = { goal: roll.goal };
+    dchalRun = { goal: roll.goal, affixId: roll.affix.id }; // v278：记录词缀 id，完成后累加 counts
     ngStartRun(roll.affix, true);
     achOpen = false;
+    // v245：与主页「开始游戏」同款涟漪揭幕（圆心 = 开始挑战按钮中心）
+    var br = dchalBtnRect();
+    startTransition('in', br.x + br.w / 2, br.y + br.h / 2);
   }
   // 面板/HUD 读取的挑战态（panels/render 经全局解析调用）
+  // v243：list = 深渊潜航全部词缀（每天轮换开放一个），todayIdx = 今日开放的下标
   function dchalInfo() {
-    var roll = dchalRoll();
+    var roll = dchalRoll(), list = [];
+    for (var i = 0; i < DCHAL_AFFIXES.length; i++) {
+      list.push({
+        id: DCHAL_AFFIXES[i].id,
+        name: DCHAL_AFFIXES[i].name, desc: DCHAL_AFFIXES[i].desc,
+        count: (dchal.counts && dchal.counts[DCHAL_AFFIXES[i].id]) || 0, // v278：历史完成次数
+        today: i === roll.idx, done: i === roll.idx && dchal.done
+      });
+    }
     return {
       name: roll.affix.name, desc: roll.affix.desc, goal: roll.goal,
       done: dchal.done, streak: dchal.streak || 0,
       canStart: state === 'menu' || state === 'over',
-      running: !!(ng.active && ng.fromDaily && dchalRun)
+      running: !!(ng.active && ng.fromDaily && dchalRun),
+      list: list, todayIdx: roll.idx
     };
   }
   // dchalHud() 已移除（v196）：HUD 统计精简为"最高/最远海域"后无调用方（原仅 drawHUD 用）
@@ -311,6 +364,8 @@
     dchal.done = true;
     dchal.streak = (dchal.lastDate === yesterdayStr()) ? (dchal.streak || 0) + 1 : 1;
     dchal.lastDate = todayStr();
+    // v278：该词缀历史完成次数 +1（挑战页签列表展示"已完成 N 次"）
+    dchal.counts[dchalRun.affixId] = (dchal.counts[dchalRun.affixId] || 0) + 1;
     var gain = Math.round(Math.min(C.dailyChal.rewardMax, C.dailyChal.rewardBase + (dchal.streak - 1) * C.dailyChal.rewardStep) * cm(scoreMult));
     score += gain;
     scoreBump = 0.5;
@@ -663,6 +718,7 @@
     if (scoreBump > 0) scoreBump -= dt;
     // 按钮按压反馈计时
     if (bookBtn.pressT > 0) bookBtn.pressT -= dt;
+    for (var mi = 0; mi < menuTiles.length; mi++) if (menuTiles[mi].pressT > 0) menuTiles[mi].pressT -= dt; // v233 主页磁贴按压回弹
     if (setBtn.pressT > 0) setBtn.pressT -= dt; // v197：设置钮（原奖杯×2/静音三处已移除）
     if (restartBtn.pressT > 0) restartBtn.pressT -= dt;
     for (i = 0; i < SKILL_BTNS.length; i++) if (SKILL_BTNS[i].pressT > 0) SKILL_BTNS[i].pressT -= dt;
@@ -697,17 +753,18 @@
   // ---------- 成就（常驻目标，跨局累计；达成后永久生效的加成见 perk） ----------
   // 成就难度分级：diff 1=★入门 2=★★进阶 3=★★★传说，奖励按难度递增
   var ACH_DEFS = [
-    { id: 'score2k',  name: '深海富豪', desc: '单局得分达到 30000',        target: 30000, diff: 1, perk: '永续 · 开局充能 +2', cur: function () { return Math.max(score, best, lifeStats.best || 0); } },
-    { id: 'combo6',   name: '连浪六叠', desc: '达成 6 连击',               target: 6,     diff: 1, perk: '永续 · 连击窗 +0.3s', cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
-    { id: 'chest5',   name: '寻宝猎人', desc: '累计开启 10 只宝箱',    target: 10,    diff: 1, perk: '永续 · 宝箱奖励 +50%', cur: function () { return lifeStats.chest || 0; } },
-    { id: 'tide12',   name: '弄潮儿',   desc: '经历 25 次涨潮',            target: 25,    diff: 2, perk: '永续 · 潮期得分 +10%', cur: function () { return lifeStats.tide || 0; } },
-    { id: 'iron5',    name: '礁石克星', desc: '累计消除 12 对礁石',        target: 12,    diff: 2, perk: '永续 · 礁石相消 ×2', cur: function () { return lifeStats.ironPair || 0; } },
-    { id: 'rainbow5', name: '虹光使者', desc: '触发 12 次彩虹合成',        target: 12,    diff: 2, perk: '永续 · 彩虹得分 +50%', cur: function () { return lifeStats.rainbow || 0; } },
-    { id: 'quest12',  name: '任务大师', desc: '累计完成 30 个任务',        target: 30,    diff: 2, perk: '永续 · 任务奖励 +30%', cur: function () { return lifeStats.quest || 0; } },
-    { id: 'canghai',  name: '沧海遗珠', desc: '合成出传说中的「沧海」',    target: 1,     diff: 2, perk: '永续 · 沧海汇入 +50%', cur: function () { return dexCounts[8] || 0; } },
-    { id: 'canghai5', name: '沧海成群', desc: '累计合成 5 只「沧海」',     target: 5,     diff: 3, perk: '称号 · 沧海之主', cur: function () { return dexCounts[8] || 0; } },
-    { id: 'combo12',  name: '惊涛十二叠', desc: '达成 12 连击',            target: 12,    diff: 3, perk: '称号 · 驭浪者', cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
-    { id: 'score10w', name: '海渊传说', desc: '单局得分达到 100000',       target: 100000, diff: 3, perk: '称号 · 海渊传说', cur: function () { return Math.max(score, best, lifeStats.best || 0); } }
+    // v285：目标再上调一档（用户："难度还是太低了"）；desc 与 target 保持一致（已达成的成就保留不撤）
+    { id: 'score2k',  name: '深海富豪', desc: '单局得分达到 65000',        target: 65000,  diff: 1, perk: '永续 · 开局充能 +2', cur: function () { return Math.max(score, best, lifeStats.best || 0); } },
+    { id: 'combo6',   name: '连浪十叠', desc: '达成 10 连击',              target: 10,     diff: 1, perk: '永续 · 连击窗 +0.3s', cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
+    { id: 'chest5',   name: '寻宝猎人', desc: '累计开启 25 只宝箱',    target: 25,     diff: 1, perk: '永续 · 宝箱奖励 +50%', cur: function () { return lifeStats.chest || 0; } },
+    { id: 'tide12',   name: '弄潮儿',   desc: '经历 55 次涨潮',            target: 55,     diff: 2, perk: '永续 · 潮期得分 +10%', cur: function () { return lifeStats.tide || 0; } },
+    { id: 'iron5',    name: '礁石克星', desc: '累计消除 28 对礁石',        target: 28,     diff: 2, perk: '永续 · 礁石相消 ×2', cur: function () { return lifeStats.ironPair || 0; } },
+    { id: 'rainbow5', name: '虹光使者', desc: '触发 28 次彩虹合成',        target: 28,     diff: 2, perk: '永续 · 彩虹得分 +50%', cur: function () { return lifeStats.rainbow || 0; } },
+    { id: 'quest12',  name: '任务大师', desc: '累计完成 60 个任务',        target: 60,     diff: 2, perk: '永续 · 任务奖励 +30%', cur: function () { return lifeStats.quest || 0; } },
+    { id: 'canghai',  name: '沧海遗珠', desc: '合成出传说中的「沧海」',    target: 1,      diff: 2, perk: '永续 · 沧海汇入 +50%', cur: function () { return dexCounts[8] || 0; } },
+    { id: 'canghai5', name: '沧海成群', desc: '累计合成 10 只「沧海」',    target: 10,     diff: 3, perk: '称号 · 沧海之主', cur: function () { return dexCounts[8] || 0; } },
+    { id: 'combo12',  name: '惊涛十八叠', desc: '达成 18 连击',            target: 18,     diff: 3, perk: '称号 · 驭浪者', cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
+    { id: 'score10w', name: '海渊传说', desc: '单局得分达到 200000',       target: 200000, diff: 3, perk: '称号 · 海渊传说', cur: function () { return Math.max(score, best, lifeStats.best || 0); } }
   ];
   function checkAchievements() {
     lifeStats.best = Math.max(lifeStats.best || 0, best, score);
@@ -1959,11 +2016,29 @@
     score *= 2;
     if (score > best) { best = score; saveNum('mg_best', best); }
   }
+  // 返回主页（v234 重开确认新增）：局面数据不动（主页「开始游戏」会走 restart() 全量重置），仅切态+收起瞄准；
+  // v237：带水域扫屏过渡动画（menuTrans，渲染层消费）
+  function goHome() {
+    state = 'menu';
+    aiming = false;
+    confirmOpen = false; // v273：返回主页顺带收起确认弹窗（防跨态残留）
+    // v297 整体核查：弹层标志一并收起——局内开着图鉴/三选一/分享面板时返回主页，
+    // 若不清理，menu 态会画出 ach 面板、再次开局会带着旧面板（跨态残留）
+    dexOpen = false; achOpen = false; ngOpen = false; shareOpen = false;
+    // 涟漪从「返回主页」按钮中心荡开（内容层坐标）
+    var br = MG.layout.confirmBtnRect(0);
+    startTransition('out', C.W / 2, br.y + br.h / 2);
+  }
+
   function restart() {
     ngEndRun(); // 二周目词缀只在单局内生效（普通重开回到常态）
     phys.bodies.length = 0;
+    chest = null; // v297 整体核查：清场后宝箱实体必须一并清——否则新局前 14s 显示幽灵宝箱（可白捡奖励）
     confirmOpen = false;
     setOpen = false; // v197：新局关闭设置弹窗（防跨局残留）
+    // v297 整体核查：图鉴/成就/三选一/分享面板同样跨局清空——局内开着图鉴点重开，
+    // 旧面板会原样带进新对局；三选一残留还会让 ngStartRun 用过期词缀开第二局
+    dexOpen = false; achOpen = false; ngOpen = false; shareOpen = false;
     score = 0; displayScore = 0; scoreBump = 0;
     if (offlineGain) { // 离线收益：开局自动入账
       score += offlineGain.gain; displayScore = score;
@@ -2002,12 +2077,14 @@
 
   function buildOverButtons() {
     overButtons = [];
-    var bw = 240, bh = 40, gap = 10, x = (C.W - bw) / 2;
+    // v299：按钮重设计（用户："按钮大小、间距等重新设计，不要太紧凑"）——
+    // 264×48（原 240×40）、间距 14（原 10）；v300 恢复标题行后按钮区从 py+190 起（统计行 py+184 之下）
+    var bw = 264, bh = 48, gap = 14, x = (C.W - bw) / 2;
     // 可用区：统计文字之下 → 面板底部留白；按钮组在该区内垂直居中
     // （面板几何走 MG.layout.overRect()，渲染 drawOver 与命中此处同源）
     var ovr = MG.layout.overRect();
-    var areaTop = ovr.y + 185, areaBottom = ovr.y + ovr.h - 25;
-    var n = 1 + (doubled ? 0 : 1) + 3; // 复活(无限)/双倍/分享/深渊潜航/重开
+    var areaTop = ovr.y + 190, areaBottom = ovr.y + ovr.h - 26;
+    var n = 1 + (doubled ? 0 : 1) + 2; // 复活(无限)/双倍/分享/重开（v274：深渊潜航入口撤出结算页）
     var groupH = n * bh + (n - 1) * gap;
     var y = areaTop + (areaBottom - areaTop - groupH) / 2;
     {
@@ -2020,13 +2097,7 @@
     }
     overButtons.push({ x: x, y: y, w: bw, h: bh, label: '分享战报', action: openShare });
     y += bh + gap;
-    // 深渊潜航：结算页模式入口（主流 NG+ 设计——局末选择下一局模式）
-    if (ng.unlocked) {
-      overButtons.push({ x: x, y: y, w: bw, h: bh, label: ng.active ? '深渊潜航 · 换词缀再战' : '深渊潜航 · 词缀无尽局', action: openNgPick, variant: 'ng' });
-    } else {
-      overButtons.push({ x: x, y: y, w: bw, h: bh, label: '深渊潜航 · 累计5万解锁', action: function () { addPopup(C.W / 2, 620, '深渊潜航：累计 5万 分解锁', false, 0); }, variant: 'locked' });
-    }
-    y += bh + gap;
+    // v274：深渊潜航入口撤出结算页（用户："结算页要删除深渊潜航相关的按钮"）
     overButtons.push({ x: x, y: y, w: bw, h: bh, label: '重新开始', action: restart });
   }
 
@@ -2051,10 +2122,8 @@
   ];
   fit(); // 首次适配（按钮已定义，底部元素可同步贴底）
 
-  // 重开确认弹窗（几何走 layout.confirmRect，渲染/命中共用）
+  // 重开确认弹窗（v234 三按钮：返回主页/重新开始/返回游戏）——命中几何唯一真源 layout.confirmBtnRect，不再另存按钮坐标
   var confirmOpen = false;
-  var confirmYes = { x: C.W / 2 - 105, y: MG.layout.confirmRect().y + MG.layout.panel.confirm.btnDy, w: 95, h: 40 };
-  var confirmNo = { x: C.W / 2 + 15, y: MG.layout.confirmRect().y + MG.layout.panel.confirm.btnDy, w: 95, h: 40 };
 
   // ---------- 设置弹窗（v197：音效/音乐/震动三开关） ----------
   // 旧静音入口（MUTE 钮 + mg_mute 单键）拆除，改为三开关：音效复用旧键 mg_mute（1=静音，
@@ -2140,10 +2209,13 @@
     var p = toLocal(e);
     lastPointer = p;
     if (adOverlay) return;
+    if (menuTrans.dir && performance.now() / 1000 - menuTrans.t0 < menuTrans.dur) return; // v237：过渡动画期间屏蔽输入
     if (confirmOpen) {
-      // 重开确认弹窗：点两个按钮之一，点面板外也视为取消
-      if (inRect(p, confirmYes)) { confirmOpen = false; restart(); }
-      else if (inRect(p, confirmNo)) confirmOpen = false;
+      // 重开确认弹窗（v300 恢复标题栏）：右上 ✕ 关闭；三按钮 返回主页/重新开始/返回游戏；点面板外也视为返回游戏
+      if (inRect(p, MG.layout.confirmCloseRect())) { confirmOpen = false; return; }
+      if (inRect(p, MG.layout.confirmBtnRect(0))) { confirmOpen = false; goHome(); return; }
+      if (inRect(p, MG.layout.confirmBtnRect(1))) { confirmOpen = false; restart(); return; }
+      confirmOpen = false;
       return;
     }
     if (setOpen) {
@@ -2168,12 +2240,24 @@
     // BGM 在菜单就播放，菜单必须有音频入口，否则只剩开始按钮）；
     // 面板打开时放行到下方 dexOpen/achOpen 分支，否则面板内点击会被这里提前吞掉
     if (state === 'menu' && !achOpen && !dexOpen && !setOpen) {
+      // 主页功能磁贴（v233）：每日任务/每日挑战/成就/榜单/图鉴/分享
+      for (var mtk = 0; mtk < menuTiles.length; mtk++) {
+        var mt = menuTiles[mtk];
+        if (inRect(p, MG.layout.menuTileRect(mt.side, mt.i))) {
+          mt.pressT = 0.16;
+          audio.blip(600, 0.1, 'sine', 0.08, 0.5);
+          mt.act();
+          return;
+        }
+      }
       // 设置入口（未开局即可调音效/音乐/震动）；命中区与绘制一致 +hudInset
       if (inCircle(p, { cx: setBtn.cx, cy: setBtn.cy + hudInset, r: setBtn.r })) { setBtn.pressT = 0.16; setOpen = true; return; }
       if (inRect(p, menuStartBtn)) {
         menuStartBtn.pressT = 0.2;
         audio.blip(660, 0.12, 'sine', 0.1, 0.4);
         restart();
+        // 涟漪从开始按钮中心荡开（内容层坐标）
+        startTransition('in', C.W / 2, menuStartBtn.y + menuStartBtn.h / 2);
       }
       return;
     }
@@ -2211,11 +2295,11 @@
       return;
     }
     if (achOpen) {
-      if (inRect(p, dexCloseBtn) || !inRect(p, DEX_PANEL)) { achOpen = false; return; }
-      for (var at = 0; at < 3; at++) {
-        if (inRect(p, achTabRect(at))) { dexTab = at; audio.blip(520 + at * 80, 0.08, 'sine', 0.06, 0.3); return; }
-      }
-      if (dexTab === 1 && inRect(p, dchalBtnRect())) { audio.blip(660, 0.1, 'triangle', 0.1, 1.4); dchalStart(); return; }
+      if (inRect(p, dexCloseBtn) || !inRect(p, DEX_PANEL)) { achOpen = false; achDrag = null; return; }
+      // v241 拆分：页签条已移除，四视图由主页磁贴直达；仅「每日挑战」视图有开始按钮
+      if (dexTab === 2 && inRect(p, dchalBtnRect())) { audio.blip(660, 0.1, 'triangle', 0.1, 1.4); dchalStart(); return; }
+      // v243 成就视图：单列列表拖拽滚动（成就卡无点击交互，面板内按下即开始拖拽）
+      if (dexTab === 0) achDrag = { y: p.y, s0: achScroll };
       return;
     }
     // v197：左上角设置钮（音效/音乐/震动弹窗；原静音/奖杯位）——命中区 +hudInset 与 HUD 平移一致
@@ -2281,16 +2365,29 @@
   canvas.addEventListener('pointermove', function (e) {
     var p = toLocal(e);
     lastPointer = p;
-    if (state !== 'play' || adOverlay || dexOpen || evapMode || flowMode || confirmOpen || setOpen) return;
+    // v243 成就列表拖拽滚动：优先于瞄准逻辑（面板打开时瞄准本就被门禁挡住）
+    if (achDrag && achOpen && dexTab === 0) {
+      achScroll = Math.max(0, Math.min(achDrag.s0 + (achDrag.y - p.y), achMaxScroll()));
+      return;
+    }
+    if (state !== 'play' || adOverlay || dexOpen || achOpen || setOpen || ngOpen || shareOpen || confirmOpen || evapMode || flowMode) return;
     aimX = clampAim(p.x);
   });
   canvas.addEventListener('pointerup', function (e) {
-    if (!aiming || state !== 'play' || adOverlay || dexOpen || evapMode || flowMode || rippleMode || confirmOpen || setOpen) { aiming = false; return; }
+    achDrag = null; // v243 成就列表拖拽结束
+    if (!aiming || state !== 'play' || adOverlay || dexOpen || achOpen || setOpen || ngOpen || shareOpen || confirmOpen || evapMode || flowMode || rippleMode) { aiming = false; return; }
     aiming = false;
     aimX = clampAim(toLocal(e).x);
     tryDrop();
   });
-  canvas.addEventListener('pointercancel', function () { aiming = false; });
+  canvas.addEventListener('pointercancel', function () { aiming = false; achDrag = null; });
+  // v243 成就列表滚轮滚动（桌面调试用，手机走拖拽）
+  canvas.addEventListener('wheel', function (e) {
+    if (achOpen && dexTab === 0) {
+      e.preventDefault();
+      achScroll = Math.max(0, Math.min(achScroll + e.deltaY, achMaxScroll()));
+    }
+  }, { passive: false });
 
   // ---------- 更新 ----------
   function update(dt) {
@@ -2304,7 +2401,14 @@
       updateFx(dt);
       return;
     }
-    if (dexOpen || achOpen) { updateFx(dt); return; }
+    // 弹层暂停（v240）：图鉴/成就殿堂/设置/二周目选择/分享卡/重开确认任一打开时游戏冻结——
+    // 潮汐计时、冷却、物理、判负计时全部停走；time 继续推进（水波/气泡等环境动画保持流动），
+    // 关闭弹层后自动恢复。menu 态已被上方分支提前返回，主页面板不受影响。
+    if (dexOpen || achOpen || setOpen || ngOpen || shareOpen || confirmOpen) {
+      time += dt;
+      updateFx(dt);
+      return;
+    }
     if (state !== 'play') { time += dt; updateFx(dt); return; } // 结算页：背景保持流动（仅物理冻结）
 
     time += dt;

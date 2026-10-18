@@ -36,6 +36,7 @@ MG.config = {
   dangerTime: 1.1,     // 越线静止持续多久判负
   dangerSpeed: 80,     // 低于此速度视为"静止"
   graceTime: 0.6,      // 新球出生宽限（不参与危险判定）
+  dangerWarnH: 120,    // 警戒线「开始闪烁」的触发高度：水滴顶距警戒线 ≤ 此值（从下方逼近）才进入闪烁警示；更远时线条安静（v215 用户要求）
 
   // 连击
   comboWindow: 1.1,    // 连击窗口（秒）
@@ -57,10 +58,10 @@ MG.config = {
   ng: {
     unlockScore: 50000,                 // 解锁门槛（= 月光环礁深处，需多局积累）
     affixes: [
-      { id: 'heavy', name: '重压之海', desc: '重力 +25%',        grav: 1.25, mult: 1.5 },
-      { id: 'storm', name: '疾风骤雨', desc: '潮汐间隔 -40%',    tideInt: 0.6, mult: 1.6 },
-      { id: 'reef',  name: '暗礁密布', desc: '礁石概率 ×2',      ironX: 2,   mult: 1.5 },
-      { id: 'frost', name: '冰封之海', desc: '水滴 15% 落水即冻', ice: 0.15,  mult: 1.4 }
+      { id: 'heavy', name: '重压深潜', desc: '重力 +60%',        grav: 1.6 },    // v285：词缀再加重（用户：难度还是太低）；v281 去得分倍率
+      { id: 'storm', name: '疾风骤雨', desc: '潮汐间隔 -65%',    tideInt: 0.35 },
+      { id: 'reef',  name: '暗礁密布', desc: '礁石概率 ×4',      ironX: 4 },
+      { id: 'frost', name: '寒冰速冻', desc: '水滴 35% 落水即冻', ice: 0.35 }
     ]
   },
 
