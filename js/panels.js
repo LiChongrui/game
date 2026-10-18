@@ -352,7 +352,7 @@
           // v291：图标-文本只要"有点间距"（净距 8→4，用户："搞那么大干什么"）；文本仍在
           // 恒定文本列内居中，图标固定成列不漂移（v290 定版）
           var cx2 = slotR.x + 15, cy2 = rowCy;
-          var spName2 = found2 ? (isChest2 ? '宝箱' : spDef2.name) : '？？？';
+          var spName2 = found2 ? (isChest2 ? '大宝箱' : spDef2.name) : '？？？';
           var m2 = measureInk('13px system-ui, sans-serif', spName2); // v300：恒等变换下测量
           var tw2 = m2.w;
           var TXT_COL = 57;                                    // 文本列宽（恒定，跨行同宽）
@@ -426,9 +426,9 @@
       title = stgReached || stgCur ? stgS.name : '？？？';
       // v316：与行内三态词汇统一（当前海域 / 已抵达 / 下一海域 / 累计分解锁）
       sub = stgCur ? '当前海域' : (stgReached ? '已抵达' : (dexSelStage === nextIdx ? '下一海域 · 累计' + (stgS.at >= 10000 ? (stgS.at / 10000) + '万' : stgS.at) + '分' : '累计 ' + (stgS.at >= 10000 ? (stgS.at / 10000) + '万' : stgS.at) + ' 分解锁'));
-      body = '越深水色越暗：潮汐更频、礁石更多。';
+      body = '越深水色越暗：潮汐更频、珊瑚礁更多。';
     } else {
-      var CHEST_INFO = { key: 'chest', name: '宝箱', desc: '沉底木箱，沉走前点开：得分或充能。' };
+      var CHEST_INFO = { key: 'chest', name: '大宝箱', desc: '沉底木箱，沉走前点开：得分或充能。' };
       var isChestSel = dexSelSp === SP_DEFS.length;
       var dsc = isChestSel ? CHEST_INFO : (SP_DEFS[dexSelSp] || SP_DEFS[0]);
       known = !!dexSpecial[isChestSel ? 'chest' : dsc.key];
@@ -751,7 +751,7 @@
     // v289：三行按字形像素框垂直居中 + 均匀分散（用户："内部文字请使用垂直居中，均匀分散对齐"）——
     // 段间距 =（卡高 − 三行字面总高）/4，首末与卡上下边留同宽，行间留同宽
     var lines = [
-      { t: '宝箱 · 离线收益', f: 'bold 15px system-ui, sans-serif', c: '#8A6508' },
+      { t: '大宝箱 · 离线收益', f: 'bold 15px system-ui, sans-serif', c: '#8A6508' },
       { t: '离开 ' + (om >= 60 ? Math.floor(om / 60) + ' 时 ' + (om % 60) + ' 分' : om + ' 分钟') + ' · 深海攒下 ' + offlineGain.gain + ' 分', f: '13px system-ui, sans-serif', c: 'rgba(90,66,20,0.88)' },
       { t: '开始游戏后自动入账', f: '11px system-ui, sans-serif', c: 'rgba(125,100,40,0.62)' }
     ];

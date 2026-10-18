@@ -23,6 +23,18 @@ MG.platform = {
     } catch (e) { return fallback; }
   },
   setJSON: function (k, v) { this.set(k, JSON.stringify(v)); },
+  // 删除单键（清空存档用）：[wx] 替换为 wx.removeStorageSync（wx-shim 的 localStorage 已桥接）
+  remove: function (k) {
+    try { localStorage.removeItem(k); } catch (e) {}
+  },
+  // 重载进程（清空存档后重置游戏至初始状态用）：Web 直接刷新页面；
+  // [wx] 小游戏无 location.reload，改走 wx.restartMiniProgram（重开小游戏=全新启动）
+  reload: function () {
+    try {
+      if (this.isWx && typeof wx !== 'undefined' && wx.restartMiniProgram) { wx.restartMiniProgram(); return; }
+    } catch (e) {}
+    try { location.reload(); } catch (e2) {}
+  },
 
   // ---------- 音频 ----------
   // [wx] WebAudio 在低端安卓可能不稳，替换为 wx.createInnerAudioContext 体系

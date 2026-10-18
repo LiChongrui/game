@@ -30,7 +30,7 @@
   for (var mti = 0; mti < menuTiles.length; mti++) menuTiles[mti].pressT = 0;
   // ---------- 道具解锁（v316）：对应「符文」首次出现即永久解锁 ----------
   // 解锁条件 = 该技能的符文滴在预览里出现过一次（rollRune 滚出即记录，mg_rune 跨刷新持久）；
-  // 未出现前道具保持锁定：底部钮显示挂锁，点击仅提示。充能（符文合成 / 宝箱 / 图鉴里程碑）
+  // 未出现前道具保持锁定：底部钮显示挂锁，点击仅提示。充能（符文合成 / 大宝箱 / 图鉴里程碑）
   // 不受锁影响——解锁前照常累积，解锁后即可用。替换旧版"累计分解锁"（C.skillUnlock 已删）。
   // ★ 本块必须在下方首次 rollRune()（next-drop 初始化）之前求值——seeRune 要写 runeSeen。
   var runeSeen = (function () {
@@ -64,7 +64,7 @@
   var dangerAlert = 0; // 越线判定进度 0..1（checkDanger 每帧写入，警戒线渲染读取）
 
   var skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
-  // 宝箱（无尽模式）：定期沉入一只，限时点击开启随机奖励
+  // 大宝箱（无尽模式）：定期沉入一只，限时点击开启随机奖励
   var chest = null;
   var chestTimer = 26 + Math.random() * 20;
   var questStaleT = 4; // 滞留任务检查计时
@@ -87,7 +87,7 @@
   var dexSec = 0;                  // 图鉴主页分节：0=合成链 1=海域演进（特殊滴槽位并入海域行）
   var dexSelTier = -1;             // 选中的合成链档位（-1 未选）
   var dexSelStage = -1;            // 选中的海域阶段（-1 未选）
-  // 跨局终身统计（成就进度用）：宝箱/涨潮/礁石对/彩虹合成/任务/连击/单局最高分
+  // 跨局终身统计（成就进度用）：大宝箱/涨潮/珊瑚礁对/彩虹合成/任务/连击/单局最高分
   var lifeStats = (function () {
     var d = { chest: 0, tide: 0, ironPair: 0, rainbow: 0, quest: 0, combo: 0, best: 0 };
     var s = dexLoaded.stats || {};
@@ -236,9 +236,9 @@
   function saveDaily() { MG.platform.setJSON('mg_daily', daily); }
   function buildDailyTasks(date, rnd, streakNow) {
     // 难度随连续天数递进（1x → 3x），星数标记难度，奖励同步分级
-    // v246：任务 3 → 5（合成 / 连击 + 宝箱 / 涨潮 / 礁石三项全给，附加项随机排序）
+    // v246：任务 3 → 5（合成 / 连击 + 大宝箱 / 涨潮 / 珊瑚礁三项全给，附加项随机排序）
     // v285：再次整体上调（用户："难度还是太低了，要进一步提高"）——合成 11~17→16~22、
-    // 连击 5~8→7~11、宝箱/礁石 2→3（封顶 4）、涨潮 3→4
+    // 连击 5~8→7~11、大宝箱/珊瑚礁 2→3（封顶 4）、涨潮 3→4
     var f = 1 + Math.min(2, (streakNow || 0) * 0.34);
     var stars = f < 1.5 ? 1 : (f < 2.5 ? 2 : 3);
     var mn = function (v) { return Math.max(1, Math.round(v * f)); };
@@ -247,9 +247,9 @@
     var t2 = { type: 'combo', need: mn(7 + Math.floor(rnd() * 5)), stars: stars };
     t2.text = '达成 ' + t2.need + ' 连击';
     var extras = [
-      { type: 'chest', need: Math.min(4, mn(3)), text: '开启宝箱' },
+      { type: 'chest', need: Math.min(4, mn(3)), text: '开启大宝箱' },
       { type: 'tide',  need: mn(4), text: '经历涨潮' },
-      { type: 'iron',  need: Math.min(4, mn(3)), text: '消除礁石' }
+      { type: 'iron',  need: Math.min(4, mn(3)), text: '消除珊瑚礁' }
     ];
     for (var i = extras.length - 1; i > 0; i--) { // 洗牌
       var j = Math.floor(rnd() * (i + 1)), tmp = extras[i]; extras[i] = extras[j]; extras[j] = tmp;
@@ -317,7 +317,7 @@
   var DCHAL_AFFIXES = [
     { id: 'heavy',   name: '重压深潜', desc: '重力 +60%',              grav: 1.6 },   // v285：词缀再加重（用户：难度还是太低）；v281 去得分倍率
     { id: 'storm',   name: '疾风骤雨', desc: '潮汐间隔 -65%',          tideInt: 0.35 },
-    { id: 'reef',    name: '暗礁密布', desc: '礁石概率 ×4',            ironX: 4 },
+    { id: 'reef',    name: '暗礁密布', desc: '珊瑚礁概率 ×4',          ironX: 4 },
     { id: 'frost',   name: '寒冰速冻', desc: '水滴 35% 落水即冻',      ice: 0.35 },
     { id: 'abyss',   name: '深渊试炼', desc: '重力 +80% 且潮汐 -65%',  grav: 1.8, tideInt: 0.35 },  // v286：复合词缀数值不再复用单一词缀（用户："都有两个一样的重力+60%"），逐项加码形成梯度
     { id: 'icereef', name: '冰礁交错', desc: '暗礁 ×5 且 45% 落水即冻', ironX: 5, ice: 0.45 }
@@ -552,7 +552,7 @@
     return keys[keys.length - 1];
   }
   function rollIron() {
-    if (seaStage() < ((C.specialStage && C.specialStage.iron != null) ? C.specialStage.iron : 0)) return false; // 潮汐池起就落礁石（注意 0 是合法门槛，不能写 || 兜底）
+    if (seaStage() < ((C.specialStage && C.specialStage.iron != null) ? C.specialStage.iron : 0)) return false; // 珊瑚浅海起才落珊瑚礁（注意 0 是合法门槛，不能写 || 兜底）
     if (seaEvent && seaEvent.type === 'storm') return false; // 保底：风暴期间不再落礁石，避免双重失控
     if (ironCount() >= C.iron.maxActive) return false; // 场上已满员：预览不再出礁石，避免落下时被迫转成水滴
     var ch = C.iron.chance + (C.ramp.ironChanceMax - C.iron.chance) * endlessRamp();
@@ -784,9 +784,9 @@
     // v285：目标再上调一档（用户："难度还是太低了"）；desc 与 target 保持一致（已达成的成就保留不撤）
     { id: 'score2k',  name: '深海富豪', desc: '单局得分达到 65000',        target: 65000,  diff: 1, perk: '永续 · 开局充能 +2', cur: function () { return Math.max(score, best, lifeStats.best || 0); } },
     { id: 'combo6',   name: '连浪十叠', desc: '达成 10 连击',              target: 10,     diff: 1, perk: '永续 · 连击窗 +0.3s', cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
-    { id: 'chest5',   name: '寻宝猎人', desc: '累计开启 25 只宝箱',    target: 25,     diff: 1, perk: '永续 · 宝箱奖励 +50%', cur: function () { return lifeStats.chest || 0; } },
+    { id: 'chest5',   name: '寻宝猎人', desc: '累计开启 25 只大宝箱',  target: 25,     diff: 1, perk: '永续 · 大宝箱奖励 +50%', cur: function () { return lifeStats.chest || 0; } },
     { id: 'tide12',   name: '弄潮儿',   desc: '经历 55 次涨潮',            target: 55,     diff: 2, perk: '永续 · 潮期得分 +10%', cur: function () { return lifeStats.tide || 0; } },
-    { id: 'iron5',    name: '礁石克星', desc: '累计消除 28 对礁石',        target: 28,     diff: 2, perk: '永续 · 礁石相消 ×2', cur: function () { return lifeStats.ironPair || 0; } },
+    { id: 'iron5',    name: '珊瑚礁克星', desc: '累计消除 28 对珊瑚礁',  target: 28,     diff: 2, perk: '永续 · 珊瑚礁相消 ×2', cur: function () { return lifeStats.ironPair || 0; } },
     { id: 'rainbow5', name: '虹光使者', desc: '触发 28 次彩虹合成',        target: 28,     diff: 2, perk: '永续 · 彩虹得分 +50%', cur: function () { return lifeStats.rainbow || 0; } },
     { id: 'quest12',  name: '任务大师', desc: '累计完成 60 个任务',        target: 60,     diff: 2, perk: '永续 · 任务奖励 +30%', cur: function () { return lifeStats.quest || 0; } },
     { id: 'canghai',  name: '沧海遗珠', desc: '合成出传说中的「沧海」',    target: 1,      diff: 2, perk: '永续 · 沧海汇入 +50%', cur: function () { return dexCounts[8] || 0; } },
@@ -818,20 +818,21 @@
   }
 
   // ---------- 特殊水滴图鉴（发现即点亮；与海域绑定：stage=解锁海域） ----------
-  // 每片海域相对上一片恰好新增 2 种（潮汐池=礁石+宝箱，宝箱在图鉴中单列）
+  // 每片海域相对上一片恰好新增 2 种（潮汐池=符文滴+大宝箱，大宝箱在图鉴中单列）
+  // v317 用户定版：符文滴→潮汐池、珊瑚礁(iron)→珊瑚浅海、漩涡滴→蔚蓝深海
   var SP_DEFS = [
-    { key: 'vortex',  stage: 1, name: '漩涡滴', color: '#7B6FD0', desc: '吸附周围水滴后消散，聚拢散滴。' },
+    { key: 'vortex',  stage: 2, name: '漩涡滴', color: '#7B6FD0', desc: '吸附周围水滴后消散，聚拢散滴。' },
     { key: 'cloud',   stage: 1, name: '雨云滴', color: '#8FA8BC', desc: '分裂成两颗雾泡，补充低级滴。' },
-    { key: 'iron',    stage: 0, name: '礁石',   color: '#6E7B88', desc: '沉重障碍，两两相消或蒸发移除。' },
+    { key: 'iron',    stage: 1, name: '珊瑚礁', color: '#6E7B88', desc: '沉重障碍，两两相消或蒸发移除。' },
     { key: 'ice',     stage: 2, name: '冰晶滴', color: '#A8DFF2', desc: '冻结周围水滴，可当临时平台。' },
-    { key: 'rune',    stage: 2, name: '符文滴', color: '#B08FD0', desc: '合成时为对应技能 +1 充能。' },
+    { key: 'rune',    stage: 0, name: '符文滴', color: '#B08FD0', desc: '合成时为对应技能 +1 充能。' },
     { key: 'rainbow', stage: 3, name: '彩虹滴', color: '#E86FA8', desc: '使碰到的水滴跳 2 级，得分双倍。' },
     { key: 'gale',    stage: 3, name: '疾风滴', color: '#7FCDA4', desc: '刮起疾风吹开周围水滴。' },
     { key: 'magnet',  stage: 4, name: '磁石滴', color: '#6A8FD8', desc: '磁场漩涡聚拢大范围水滴。' },
     { key: 'spring',  stage: 4, name: '甘霖滴', color: '#8FD8B8', desc: '下一滴变成场上最多的档位。' },
     { key: 'thunder', stage: 5, name: '雷霆滴', color: '#F2C14E', desc: '引雷让一对同档水滴直接合成。' },
     { key: 'pearl',   stage: 5, name: '珍珠滴', color: '#F0E6D2', desc: '祝福最多的档位全体升 1 级。' },
-    { key: 'magma',   stage: 6, name: '熔岩滴', color: '#E2703A', desc: '烧毁周围礁石与最低两档。' },
+    { key: 'magma',   stage: 6, name: '熔岩滴', color: '#E2703A', desc: '烧毁周围珊瑚礁与最低两档。' },
     { key: 'geyser',  stage: 6, name: '间歇泉滴', color: '#5FC8D8', desc: '向上喷出水柱，冲开上方水滴。' },
     { key: 'void',    stage: 7, name: '虚空滴', color: '#4A3A6A', desc: '吞噬最低档水滴至多 5 颗。' },
     { key: 'aurora',  stage: 7, name: '极光滴', color: '#9BE8D8', desc: '极光庇护：下次合成得分 ×3。' }
@@ -840,7 +841,7 @@
     for (var i = 0; i < SP_DEFS.length; i++) if (SP_DEFS[i].key === key) return i;
     return -1;
   }
-  // 海域 → 图鉴两个槽位的 dexSelSp 索引（潮汐池槽 2 = 宝箱虚拟位 SP_DEFS.length）
+  // 海域 → 图鉴两个槽位的 dexSelSp 索引（潮汐池槽 2 = 大宝箱虚拟位 SP_DEFS.length）
   var STAGE_SP_SLOTS = {};
   (function () {
     var per = {}, i;
@@ -849,18 +850,18 @@
       (per[st] = per[st] || []).push(i);
     }
     for (var k in per) if (per.hasOwnProperty(k)) STAGE_SP_SLOTS[k] = [per[k][0], per[k][1]];
-    STAGE_SP_SLOTS[0] = [spIndexByKey('iron'), SP_DEFS.length];
+    STAGE_SP_SLOTS[0] = [spIndexByKey('rune'), SP_DEFS.length]; // v317：潮汐池 = 符文滴 + 大宝箱
   })();
   function discoverSpecial(sp) {
     if (dexSpecial[sp]) return;
     dexSpecial[sp] = 1;
     saveDex();
     var i = spIndexByKey(sp);
-    addPopup(C.W / 2, 240, '图鉴新发现 · ' + (i >= 0 ? SP_DEFS[i].name : '宝箱'), true, 0);
+    addPopup(C.W / 2, 240, '图鉴新发现 · ' + (i >= 0 ? SP_DEFS[i].name : '大宝箱'), true, 0);
     checkCollection();
   }
 
-  // ---------- 图鉴收集度（长线收集闭环：水滴 9 档 + 特殊形态 15 种 + 宝箱 = 25 格） ----------
+  // ---------- 图鉴收集度（长线收集闭环：水滴 9 档 + 特殊形态 15 种 + 大宝箱 = 25 格） ----------
   // 达成率跨过里程碑即自动发放奖励（对齐成就奖励体系：积分 + 技能充能 + 宝箱贺礼）；
   // 领取记录持久化（mg_dex.col），老存档的既有收集会在下一局开始后 1 秒内自动补发
   var COL_MILESTONES = [
@@ -906,7 +907,7 @@
       addPopup(C.W / 2, 240, '图鉴收集达成 · ' + m.name + ' +' + gain, true, 0);
       if (sub) addPopup(C.W / 2, 266, sub, false, 0);
       if (m.id === 'm100') addPopup(C.W / 2, 292, '成就称号 · 深海博物学家', false, 0);
-      if (m.chest && !chest && state === 'play') chestTimer = Math.min(chestTimer, 4); // 稍后沉一只宝箱贺礼
+      if (m.chest && !chest && state === 'play') chestTimer = Math.min(chestTimer, 4); // 稍后沉一只大宝箱贺礼
       parts.push({ type: 'ring', x: C.W / 2, y: annY(150), r: 26, life: 0.6, max: 0.6, color: '#F5C542' });
       audio.quest();
       saveDex();
@@ -1032,11 +1033,11 @@
   function ironPairMerge(a, b) {
     var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
     phys.remove(a); phys.remove(b);
-    var gain = Math.round(C.iron.pairScore * cm(scoreMult * (perkOn('iron5') ? 2 : 1))); // 成就加成：礁石克星翻倍；总倍率封顶
+    var gain = Math.round(C.iron.pairScore * cm(scoreMult * (perkOn('iron5') ? 2 : 1))); // 成就加成：珊瑚礁克星翻倍；总倍率封顶
     score += gain;
     scoreBump = 0.3;
     if (score > best) { best = score; saveNum('mg_best', best); }
-    addPopup(mx, my - b.r - 12, '礁石相消', true, 0);
+    addPopup(mx, my - b.r - 12, '珊瑚礁相消', true, 0);
     addPopup(mx, my - b.r + 10, '+' + gain, false, 0);
     burstIron(mx, my);
     burstIron(a.x, a.y);
@@ -1672,7 +1673,7 @@
     }
     score += gain;
     scoreBump = 0.25;
-    addPopup(b.x, b.y - b.r - 8, b.iron ? '礁石移除 +' + gain : '+' + gain, false, 0);
+    addPopup(b.x, b.y - b.r - 8, b.iron ? '珊瑚礁移除 +' + gain : '+' + gain, false, 0);
     phys.remove(b);
     skillCharge.evap = 0;
     evapMode = false;
@@ -1825,21 +1826,21 @@
     closeDex: function () { dexOpen = false; achOpen = false; }
   };
 
-  // ---------- 宝箱（探索要素） ----------
+  // ---------- 大宝箱（探索要素） ----------
   function spawnChest() {
     discoverSpecial('chest');
     var b = createIron(C.W * (0.2 + Math.random() * 0.6), C.dangerY + 52); // 警戒线下方开阔水域生成，不压坠落区虚影
     b.chest = true;
     b.r = 17; b.m = b.r * b.r * 6; // 比礁石轻，不会被砸得太凶
     chest = { b: b, t: 0, life: 14 }; // 14 秒内不点就沉走
-    addPopup(b.x, C.dangerY + 10, '沉宝箱！点它开启', true, 0);
+    addPopup(b.x, C.dangerY + 10, '沉大宝箱！点它开启', true, 0);
     audio.blip(392, 0.25, 'triangle', 0.14, 1.5);
   }
   function expireChest() {
     if (chest) {
       burstIron(chest.b.x, chest.b.y);
       phys.remove(chest.b);
-      addPopup(C.W / 2, FLOORY - 60, '宝箱沉入深渊…', false, 0);
+      addPopup(C.W / 2, FLOORY - 60, '大宝箱沉入深渊…', false, 0);
     }
     chest = null;
     chestTimer = 40 + Math.random() * 25;
@@ -1855,17 +1856,17 @@
       var gain = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
       score += gain; scoreBump = 0.4;
       if (score > best) { best = score; saveNum('mg_best', best); }
-      addPopup(x, y - 30, '宝箱开启 +' + gain, true, 0);
+      addPopup(x, y - 30, '大宝箱开启 +' + gain, true, 0);
     } else if (r < 0.75) {
       // v316：优先充已解锁技能；全锁时兜底充任意技能（充能预先累积，解锁即用；防 keys 空写 undefined）
       var keys = ['swap', 'ripple', 'evap', 'flow'].filter(function (k) { return skillUnlocked(k); });
       if (!keys.length) keys = ['swap', 'ripple', 'evap', 'flow'];
       var k = keys[(Math.random() * keys.length) | 0];
       skillCharge[k] += perkOn('chest5') ? 3 : 2;
-      addPopup(x, y - 30, '宝箱开启：' + runeName(k) + ' +2 充能', true, 0);
+      addPopup(x, y - 30, '大宝箱开启：' + runeName(k) + ' +2 充能', true, 0);
     } else {
       nextSpecial = 'rainbow'; nextIron = false; nextRune = null;
-      addPopup(x, y - 30, '宝箱开启：下一滴是彩虹滴！', true, 0);
+      addPopup(x, y - 30, '大宝箱开启：下一滴是彩虹滴！', true, 0);
     }
     for (var i = 0; i < 12; i++) {
       var ang = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 130;
@@ -2087,7 +2088,7 @@
     phys.bodies.length = 0;
     chest = null; // v297 整体核查：清场后宝箱实体必须一并清——否则新局前 14s 显示幽灵宝箱（可白捡奖励）
     confirmOpen = false;
-    setOpen = false; // v197：新局关闭设置弹窗（防跨局残留）
+    setOpen = false; setClearOpen = false; // v197/v317：新局关闭设置弹窗与清档确认（防跨局残留）
     // v297 整体核查：图鉴/成就/三选一/分享面板同样跨局清空——局内开着图鉴点重开，
     // 旧面板会原样带进新对局；三选一残留还会让 ngStartRun 用过期词缀开第二局
     dexOpen = false; achOpen = false; ngOpen = false; shareOpen = false;
@@ -2175,10 +2176,13 @@
   // 重开确认弹窗（v234 三按钮：返回主页/重新开始/返回游戏）——命中几何唯一真源 layout.confirmBtnRect，不再另存按钮坐标
   var confirmOpen = false;
 
-  // ---------- 设置弹窗（v197：音效/音乐/震动三开关） ----------
+  // ---------- 设置弹窗（v197：音效/音乐/震动三开关；v317：+清空存档） ----------
   // 旧静音入口（MUTE 钮 + mg_mute 单键）拆除，改为三开关：音效复用旧键 mg_mute（1=静音，
   // 向后兼容）、音乐 mg_music（缺失时继承旧 mute 反值）、震动 mg_vib（默认开）。
   var setOpen = false;
+  // v317 清空存档：设置面板第 4 行 → 二级确认（drawSetClear）→ clearSaveData。
+  // setClearOpen 只在 setOpen 为真时打开，所有按 setOpen 门禁的输入/更新天然覆盖它
+  var setClearOpen = false;
   function toggleSet(i) {
     if (i === 0) { audio.sfxOn = !audio.sfxOn; saveFlag('mg_mute', !audio.sfxOn); }
     else if (i === 1) {
@@ -2186,6 +2190,16 @@
       if (audio.musicOn) audio.bgm.start(); else audio.bgm.stop();
     } else { audio.vibOn = !audio.vibOn; saveFlag('mg_vib', audio.vibOn); if (audio.vibOn) hap(20); }
     audio.blip(660, 0.08, 'sine', 0.06, 0.3); // 开关反馈（音效刚开启时即听到，符合直觉）
+  }
+  // 全部存档键（与 core.js/systems.js 各保存点一一对应；mg_ver 一并清，重启时 migrateSave 重打）
+  var SAVE_KEYS = ['mg_rune', 'mg_peak', 'mg_seen', 'mg_best', 'mg_life', 'mg_dex', 'mg_ver',
+    'mg_mute', 'mg_music', 'mg_vib', 'mg_tut', 'mg_ng', 'mg_daily', 'mg_dchal', 'mg_friends'];
+  // 清空存档 = 重置游戏至初始状态：删键后必须整页重载——各模块的运行时状态（分数/图鉴/
+  // 生涯峰/任务…）都是加载时初始化的模块级变量，只删存储会让内存与存档不一致
+  function clearSaveData() {
+    for (var i = 0; i < SAVE_KEYS.length; i++) MG.platform.remove(SAVE_KEYS[i]);
+    setClearOpen = false; setOpen = false;
+    MG.platform.reload();
   }
 
   function inRect(p, r) {
@@ -2266,11 +2280,24 @@
       confirmOpen = false;
       return;
     }
+    // v317 清空存档二级确认（叠在设置面板之上，优先于 setOpen 分支）：
+    // ✕/取消 = 返回设置面板；确认清空 = 执行清档并重载；点面板外 = 取消
+    if (setClearOpen) {
+      if (inRect(p, MG.layout.setClearCloseRect())) { setClearOpen = false; return; }
+      if (inRect(p, MG.layout.setClearBtnRect(0))) { setClearOpen = false; return; }
+      if (inRect(p, MG.layout.setClearBtnRect(1))) { clearSaveData(); return; }
+      setClearOpen = false;
+      return;
+    }
     if (setOpen) {
-      // v197 设置弹窗：点三个开关行切换，点 ✕ 或面板外关闭（与重开确认同门禁）
+      // v197 设置弹窗：点三个开关行切换，点 ✕ 或面板外关闭（与重开确认同门禁）；
+      // v317 第 4 行「清空存档」点行开二级确认（setClearOpen），不直接执行
       if (inRect(p, MG.layout.setCloseRect())) { setOpen = false; return; }
-      for (var si = 0; si < 3; si++) {
-        if (inRect(p, MG.layout.setRowRect(si))) { toggleSet(si); return; }
+      for (var si = 0; si < 4; si++) {
+        if (inRect(p, MG.layout.setRowRect(si))) {
+          if (si === 3) { setClearOpen = true; audio.blip(520, 0.1, 'sine', 0.08, 0.7); return; }
+          toggleSet(si); return;
+        }
       }
       setOpen = false;
       return;
@@ -2533,7 +2560,7 @@
     // 无尽渐进加压计时 + 档位提示 + 高潮时刻
     endlessT += dt;
     var stgR = Math.floor(endlessRamp() * 4);
-    if (stgR > rampStage) { rampStage = stgR; addPopup(C.W / 2, 250, '海域渐深：潮汐更频 · 礁石更多', true, 0); }
+    if (stgR > rampStage) { rampStage = stgR; addPopup(C.W / 2, 250, '海域渐深：潮汐更频 · 珊瑚礁更多', true, 0); }
     if (score - climaxMark >= C.climaxEvery) doClimax();
     // 声音预警：危险→母线低通收紧；潮汐临近/进行→低频隆隆
     var dg = 0;

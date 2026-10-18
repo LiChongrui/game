@@ -1223,7 +1223,7 @@
   function drawGhostLabel() {
     if (state !== 'play' || adOverlay || evapMode || rippleMode || confirmOpen) return;
     var r = nextIron ? C.iron.r : T[nextTier].r;
-    var label = nextIron ? '礁石' : (nextSpecial ? specialLabel(nextSpecial) : (nextRune ? runeName(nextRune) + '符文' : null));
+    var label = nextIron ? '珊瑚礁' : (nextSpecial ? specialLabel(nextSpecial) : (nextRune ? runeName(nextRune) + '符文' : null));
     if (!label) return;
     var alpha = cooldown > 0 ? 0.35 : 0.9;
     ctx.save();
@@ -1650,6 +1650,20 @@
     ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.arc(0, 0, 2, 0, Math.PI * 2); ctx.fill();
     ctx.lineCap = 'butt';
   }
+  // v317 垃圾桶（清空存档语义）：盖沿+提手+上宽下窄箱身+两道竖筋，白色线描
+  function setIconTrash(ctx) {
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-7, -4); ctx.lineTo(7, -4); ctx.stroke();       // 盖沿
+    ctx.beginPath(); ctx.moveTo(-3, -6.5); ctx.lineTo(3, -6.5); ctx.stroke();   // 提手横梁
+    ctx.beginPath(); ctx.moveTo(-2, -6.5); ctx.lineTo(-2, -4); ctx.stroke();    // 提手左
+    ctx.beginPath(); ctx.moveTo(2, -6.5); ctx.lineTo(2, -4); ctx.stroke();      // 提手右
+    ctx.beginPath();                                                             // 箱身
+    ctx.moveTo(-5.5, -4); ctx.lineTo(-4.5, 7); ctx.lineTo(4.5, 7); ctx.lineTo(5.5, -4);
+    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-1.8, -1.5); ctx.lineTo(-1.4, 5); ctx.stroke(); // 竖筋左
+    ctx.beginPath(); ctx.moveTo(1.8, -1.5); ctx.lineTo(1.4, 5); ctx.stroke();   // 竖筋右
+    ctx.lineCap = 'butt';
+  }
   // 设置按钮（v197 新增；v200 图标可切换 A/B/C/D，默认 A）
   // v279：钮体统一为"白边+蓝底"——drawCircleBtn（渐变蓝底+白细内环+左上高光弧），
   // 与技能栏图鉴书本钮同一绘制语言（用户："如同图鉴图标那样"）
@@ -1665,8 +1679,8 @@
     else setIconDial(ctx);
     ctx.restore();
   }
-  // 设置弹窗（v197：音效/音乐/震动三开关；几何走 layout.setRect/setRowRect/setCloseRect）
-  // 用户要求底部不放说明文本，故面板 300×260：标题 + ✕ + 三行开关排满仅余 12
+  // 设置弹窗（v197：音效/音乐/震动三开关；v317：+清空存档一行。几何走 layout.setRect/setRowRect/setCloseRect）
+  // 用户要求底部不放说明文本；v317 面板 260→326 容纳第 4 行（行几何不变）
   function drawSettings() {
     layoutSetPanel();                 // 复用本游戏通用面板几何（与图鉴/成就同源）
     // 压暗背景已上移 drawPanelFx 统一绘制（v275）
@@ -1701,6 +1715,74 @@
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath(); ctx.arc(on ? sx + 52 - 15 : sx + 15, sy + 15, 11, 0, Math.PI * 2); ctx.fill();
     }
+    // v317 第 4 行：清空存档（独立功能；危险样式与三开关区分——红 accents + 右侧「清空」小钮）。
+    // 点整行即开二级确认（systems.js setClearOpen），不直接执行
+    var clr = MG.layout.setRowRect(3);
+    ctx.fillStyle = 'rgba(176,88,74,0.08)';
+    roundRect(clr.x, clr.y, clr.w, clr.h, 10); ctx.fill();
+    ctx.strokeStyle = 'rgba(176,88,74,0.35)'; ctx.lineWidth = 1;
+    roundRect(clr.x + 0.5, clr.y + 0.5, clr.w - 1, clr.h - 1, 10); ctx.stroke();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#B0584A';
+    ctx.font = 'bold 16px system-ui, sans-serif';
+    ctx.fillText('清空存档', clr.x + 18, clr.y + 24);
+    ctx.fillStyle = '#96736B';
+    ctx.font = '12px system-ui, sans-serif';
+    ctx.fillText('重置全部进度，游戏恢复初始状态', clr.x + 18, clr.y + 42);
+    // 右侧红色小钮「清空」（64×30，与滑块开关同一垂直中线）
+    var bx = clr.x + clr.w - 18 - 64, by = clr.y + 13;
+    var bgc = ctx.createLinearGradient(0, by, 0, by + 30);
+    bgc.addColorStop(0, '#D0685A'); bgc.addColorStop(1, '#A8443A');
+    ctx.fillStyle = bgc;
+    roundRect(bx, by, 64, 30, 15); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.5;
+    roundRect(bx + 0.5, by + 0.5, 63, 29, 14.5); ctx.stroke();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 13px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('清空', bx + 32, by + 16);
+    ctx.textBaseline = 'alphabetic';
+  }
+  // v317 清空存档二级确认（危险操作）：设置面板之上再叠一层，几何走 layout.setClearRect 系
+  function drawSetClear() {
+    var cr = MG.layout.setClearRect();
+    panel(cr.x, cr.y, cr.w, cr.h, 14, 0.97);
+    drawPanelHeader('清空存档', cr, MG.layout.setClearCloseRect(), function () {
+      ctx.save(); ctx.scale(0.667, 0.667); setIconTrash(ctx); ctx.restore();
+    }, '#B0584A');
+    // 影响范围（三行左对齐小字，逐项列清，避免"到底清什么"的疑虑）
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#4A7FA0';
+    ctx.font = '13px system-ui, sans-serif';
+    ctx.fillText('将清空全部存档：最高分、海域进度、图鉴收集、', cr.x + 24, cr.y + 64);
+    ctx.fillText('成就、每日任务与挑战、符文解锁等全部重置，', cr.x + 24, cr.y + 84);
+    ctx.fillStyle = '#B0584A';
+    ctx.fillText('游戏恢复初始状态。此操作无法撤销。', cr.x + 24, cr.y + 104);
+    // 两钮横排：取消（白底蓝描边，轻）/ 确认清空（红渐变，主）
+    var labels = ['取消', '确认清空'];
+    ctx.font = 'bold 16px system-ui, sans-serif';
+    for (var ci = 0; ci < 2; ci++) {
+      var br = MG.layout.setClearBtnRect(ci);
+      if (ci === 1) {
+        var rg = ctx.createLinearGradient(0, br.y, 0, br.y + br.h);
+        rg.addColorStop(0, '#D0685A'); rg.addColorStop(1, '#A8443A');
+        ctx.fillStyle = rg;
+        roundRect(br.x, br.y, br.w, br.h, br.h / 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.5;
+        roundRect(br.x + 0.5, br.y + 0.5, br.w - 1, br.h - 1, br.h / 2 - 0.5); ctx.stroke();
+        ctx.fillStyle = '#FFFFFF';
+      } else {
+        ctx.fillStyle = '#FFFFFF';
+        roundRect(br.x, br.y, br.w, br.h, br.h / 2); ctx.fill();
+        ctx.strokeStyle = '#2E86B4'; ctx.lineWidth = 1.5;
+        roundRect(br.x + 0.5, br.y + 0.5, br.w - 1, br.h - 1, br.h / 2 - 0.5); ctx.stroke();
+        ctx.fillStyle = '#2E86B4';
+      }
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(labels[ci], br.x + br.w / 2, br.y + br.h / 2 + 1);
+      ctx.textBaseline = 'alphabetic';
+    }
+    ctx.textAlign = 'center';
   }
   // 第一排圆钮统一样式（v196 建；★ v199 改：accent 实底 + 白细内环 + 白图标）
   // 用户："设置的图标太难看了，也不协调"——旧为白 0.85 底 + accent 2px 环，细彩线图标
@@ -3009,7 +3091,7 @@
   // 水滴吉祥物：大方的水滴角色（上尖下圆 + 高光 + 表情），轻轻浮动
   // 中央展示水滴（v287：弃自绘吉祥物水滴，改轮播游戏内水滴——每秒切换一颗：
   // 普通 1~8 档 → 12 种特殊滴（漩涡/雨云/彩虹/疾风/磁石/泉涌/雷霆/珍珠/熔岩/间歇泉/虚空/极光）
-  // → 礁石 → 宝箱，共 22 颗循环；切换时 easeOutBack 弹出，本体逐笔复用游戏渲染
+  // → 珊瑚礁 → 大宝箱，共 22 颗循环；切换时 easeOutBack 弹出，本体逐笔复用游戏渲染
   // drawBall/drawIronBall/drawChest，与局内完全同款（用户："更换为游戏水滴样式"）
   var MASCOT_SHOWS = null;
   function mascotShows() {
@@ -3104,6 +3186,8 @@
       // v274：弹层统一弹性出入场——flag 关闭后动画未完仍继续绘制，收拢完毕自动停
       // v275：dimA 只淡入淡出，弹性缩放仅作用于页签本体
       if (setOpen || panelFxAlive('set')) { var msR = MG.layout.setRect(); drawPanelFx('set', setOpen, msR.x + msR.w / 2, msR.y + msR.h / 2, 0.55, drawSettings); }
+      // v317：清空存档二级确认叠在设置面板之上（同层后画即在上）
+      if (setClearOpen || panelFxAlive('setclr')) { var mcR = MG.layout.setClearRect(); drawPanelFx('setclr', setClearOpen, mcR.x + mcR.w / 2, mcR.y + mcR.h / 2, 0.6, drawSetClear); }
       if (achOpen || panelFxAlive('ach')) drawPanelFx('ach', achOpen, DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + DEX_PANEL.h / 2, 0.6, drawAchPanel);
       ctx.restore(); return;
     } // 开始界面：背景之上画菜单 + 设置入口 + 设置弹窗 + 成就殿堂面板
@@ -3156,7 +3240,7 @@
         ctx.restore();
       }
       ctx.textAlign = 'center';
-      drawPropHint('蒸发模式：点击要移除的水滴或礁石（再点按钮取消）');
+      drawPropHint('蒸发模式：点击要移除的水滴或珊瑚礁（再点按钮取消）');
     }
 
     // 涟漪选位模式：显示波纹中心指示
@@ -3229,6 +3313,7 @@
     // v274：弹层统一弹性出入场（关闭后动画未完仍继续绘制至收拢完毕）
     if (confirmOpen || panelFxAlive('confirm')) { var pcR = MG.layout.confirmRect(); drawPanelFx('confirm', confirmOpen, pcR.x + pcR.w / 2, pcR.y + pcR.h / 2, 0.55, drawConfirm); }
     if (setOpen || panelFxAlive('set')) { var psR = MG.layout.setRect(); drawPanelFx('set', setOpen, psR.x + psR.w / 2, psR.y + psR.h / 2, 0.55, drawSettings); }
+    if (setClearOpen || panelFxAlive('setclr')) { var pc2R = MG.layout.setClearRect(); drawPanelFx('setclr', setClearOpen, pc2R.x + pc2R.w / 2, pc2R.y + pc2R.h / 2, 0.6, drawSetClear); }
 
     if (dexOpen || panelFxAlive('dex')) drawPanelFx('dex', dexOpen, DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + DEX_PANEL.h / 2, 0.6, drawDex);
     else if (achOpen || panelFxAlive('ach')) drawPanelFx('ach', achOpen, DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + DEX_PANEL.h / 2, 0.6, drawAchPanel);

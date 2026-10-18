@@ -59,7 +59,7 @@ MG.config = {
     affixes: [
       { id: 'heavy', name: '重压深潜', desc: '重力 +60%',        grav: 1.6 },    // v285：词缀再加重（用户：难度还是太低）；v281 去得分倍率
       { id: 'storm', name: '疾风骤雨', desc: '潮汐间隔 -65%',    tideInt: 0.35 },
-      { id: 'reef',  name: '暗礁密布', desc: '礁石概率 ×4',      ironX: 4 },
+      { id: 'reef',  name: '暗礁密布', desc: '珊瑚礁概率 ×4',    ironX: 4 },
       { id: 'frost', name: '寒冰速冻', desc: '水滴 35% 落水即冻', ice: 0.35 }
     ]
   },
@@ -130,9 +130,9 @@ MG.config = {
   spawnGate: [0, 0, 0, 800, 2500],
   // 特殊滴与海域绑定：抵达该海域后才会刷出（图鉴里未到达海域的特殊滴不显示）
   specialStage: {
-    iron: 0, chest: 0,            // 潮汐池
-    cloud: 1, vortex: 1,          // 珊瑚浅海
-    ice: 2, rune: 2,              // 蔚蓝深海
+    rune: 0, chest: 0,            // 潮汐池（v317：符文滴提前到潮汐池——技能解锁随首个符文出现，开局即可解锁）
+    iron: 1, cloud: 1,            // 珊瑚浅海（v317：珊瑚礁改到珊瑚浅海）
+    ice: 2, vortex: 2,            // 蔚蓝深海（v317：漩涡滴改到蔚蓝深海）
     rainbow: 3, gale: 3,          // 午夜深渊
     magnet: 4, spring: 4,         // 月光环礁
     thunder: 5, pearl: 5,         // 海沟之眼
