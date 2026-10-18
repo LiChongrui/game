@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>弹出提示分类方案 · 7 类 — 交互示例</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #F5F4F0; color: #2C2C2A; padding: 28px 16px 48px; max-width: 760px; margin: 0 auto;
+  }
+  h1 { font-size: 20px; font-weight: 500; }
+  .sub { font-size: 13px; color: #5F5E5A; margin-top: 6px; line-height: 1.6; }
+  .legend {
+    margin-top: 12px; font-size: 12px; color: #444441; background: #EDEBE4;
+    border: 0.5px solid rgba(0,0,0,.12); border-radius: 8px; padding: 8px 12px; line-height: 1.7;
+  }
+  .panel {
+    margin-top: 14px; background: #FFFFFF; border: 0.5px solid rgba(0,0,0,.14);
+    border-radius: 12px; padding: 12px 14px 14px;
+  }
+  .phead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .chip { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+  .pname { font-size: 14px; font-weight: 500; }
+  .pmeta { font-size: 12px; color: #888780; margin-left: auto; }
+  .pnote { font-size: 12px; color: #5F5E5A; margin-top: 6px; line-height: 1.6; }
+  .sea {
+    position: relative; margin-top: 10px; height: 150px; border-radius: 10px;
+    background: #0E3A5A; overflow: hidden; cursor: crosshair; user-select: none;
+  }
+  .sea .hint {
+    position: absolute; right: 10px; bottom: 8px; font-size: 11px; color: rgba(255,255,255,.35);
+    pointer-events: none;
+  }
+  .sea .waveline {
+    position: absolute; left: 0; right: 0; height: 0.5px; background: rgba(255,255,255,.08);
+    pointer-events: none;
+  }
+  .pop {
+    position: absolute; font-weight: bold; white-space: nowrap; pointer-events: none;
+    transform: translate(-50%, -50%);
+    -webkit-text-stroke: 5px rgba(255,255,255,.85);
+    paint-order: stroke fill;
+    text-shadow: 0 0 1px rgba(255,255,255,.5);
+    animation: popLife linear forwards;
+  }
+  .pop small { font-size: 18px; -webkit-text-stroke: 4px rgba(255,255,255,.85); }
+  @keyframes popLife {
+    0%   { transform: translate(-50%,-50%) scale(.4); opacity: 0; }
+    15%  { transform: translate(-50%,-50%) scale(1.08); opacity: 1; }
+    25%  { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+    66%  { opacity: 1; }
+    100% { transform: translate(-50%, calc(-50% - 36px)) scale(1); opacity: 0; }
+  }
+  .replay {
+    margin-top: 8px; font-size: 12px; padding: 4px 12px; border-radius: 6px;
+    border: 0.5px solid rgba(0,0,0,.25); background: #FFFFFF; color: #444441; cursor: pointer;
+  }
+  .replay:hover { background: #F0EEE8; }
+  footer {
+    margin-top: 20px; font-size: 12px; color: #888780; line-height: 1.7;
+    background: #EDEBE4; border-radius: 8px; padding: 10px 12px;
+  }
+  footer b { color: #444441; font-weight: 500; }
+</style>
+</head>
+<body>
+  <h1>弹出提示分类方案 · 7 类</h1>
+  <p class="sub">交互示例（<b>待确认稿</b>，未改游戏代码）：点击各「海面」任意位置，按该类<b>真实字号 / 颜色 / 白描边 / 显示时长</b>弹出一条示例动画，即游戏内实际效果。</p>
+  <div class="legend">
+    字号规则 —— 大字公告 <b>bold 20px · 显 2.0s</b>；小字微反馈 <b>bold 17px · 显 1.0s</b>（重要提示延长 1.6~2.0s）；连击后缀「连击 xN」<b>18px</b>。<br>
+    改动方式 —— PCOLMAP 扩为 7 色，57 处调用点逐一<b>显式标 kind</b>（inferKind 仅兜底），门禁与文档同步。
+  </div>
+  <main id="panels"></main>
+  <footer>
+    <b>与现方案（5 类）的差异</b>：good 绿 39 处大杂烩拆为 gain / burst / reward；青色拆为 burst（生效瞬间）与 world（世界推进）；关键词推断改为调用点显式标注。<br>
+    确认方式：直接回复「确认 7 类」，或指出调整点（如"汇入海域放到金色"、"紫色换一个"、"neutral 并入 XX"）。
+  </footer>
+
+<script>
+var KINDS = [
+  {
+    key: 'gain', tag: '① gain 金', zh: '得分微反馈', color: '#D4A017', dark: '#7A5A08',
+    meta: '6 处 · 全 17px 小字 · 1.0s',
+    note: '纯得分数字（合成 / 移除 / 宝箱积分的第二行）与连击后缀。最高频、不该抢戏 → 金色小字。',
+    big: [],
+    small: ['+15', '+28', '珊瑚礁移除 +20', '+120|连击 x3']
+  },
+  {
+    key: 'burst', tag: '② burst 紫', zh: '效果生效高光', color: '#8E5AC8', dark: '#4B2A78',
+    meta: '15 处 · 大字为主',
+    note: '特殊滴 / 大招 / 稀有合成的"生效瞬间"统一一族：紫 = 稀有高光，大小字随重要度。',
+    big: ['彩虹合成！「大海」', '雷霆引合！', '珍珠祝福！「江河」全体 +1', '海神恩泽！全场 +1 级', '汇入海域 ×3', '虚空吞噬 ×2 +45', '极光庇护！下次合成 ×3', '海潮高潮！水滴自发相聚', '熔岩灼烧 ×3 +36'],
+    small: ['疾风！', '雨云化雨', '甘霖降临！', '冰封！', '间歇泉！']
+  },
+  {
+    key: 'world', tag: '③ world 深青', zh: '海域与潮汐推进', color: '#0E7C9E', dark: '#085041',
+    meta: '5 处 · 全 20px 大字 · 2.0s',
+    note: '世界状态在变化（潜得更深 / 潮汐涨落 / 深海事件降临 / 挑战开局）→ 深海青大字。',
+    big: ['海域演进 · 潜入「午夜深渊」', '海域渐深：潮汐更频 · 珊瑚礁更多', '潮位渐深 · 水下浮力增强', '漩涡风暴', '每日挑战 ·「重压深潜」'],
+    small: []
+  },
+  {
+    key: 'reward', tag: '④ reward 绿', zh: '奖励与里程碑', color: '#1E9E6A', dark: '#27500A',
+    meta: '26 处 · 大字为主',
+    note: '拿到好处 / 解锁进度（原 39 处大杂烩的核心部分）→ 绿色。',
+    big: ['图鉴解锁 · 雨云 +30', '成就达成 · 百滴合一 +50', '任务完成 +40', '每日挑战达成！+80', '今日全勤！连续 3 天 +60', '大宝箱开启 +120', '大宝箱开启：「置换」+2 充能', '复活！清走 5 滴 · 继续深潜', '离线收益 · 离开 2 时 15 分，深海攒下 300 分', '解锁「深渊潜航」'],
+    small: ['「江河」充能 +2', '「潮汐」符文 +1', '「大海」已充满', '任务已更新', '全技能充能 +1']
+  },
+  {
+    key: 'todo', tag: '⑤ todo 琥珀', zh: '行动提醒 / 预告 / 教程', color: '#C9821A', dark: '#633806',
+    meta: '4 处 · 2 大 2 小',
+    note: '需要玩家"注意到并行动 / 记住"的信息 → 琥珀。大宝箱提示跟随宝箱移动。',
+    big: ['沉大宝箱！点它开启', '两枚「江河」需在潮汐中才能聚成「大海」'],
+    small: ['甘霖 · 下一滴是「大海」', '带符文的水滴：合成即可为技能充能']
+  },
+  {
+    key: 'miss', tag: '⑥ miss 暗红', zh: '落空与错失', color: '#9E4B47', dark: '#791F1F',
+    meta: '7 处 · 全 17px 小字',
+    note: '没成 / 错过了（特殊滴落空与宝箱错失并为一条语义线）→ 暗红降饱和，不刺眼。',
+    big: [],
+    small: ['雷落空了…', '珍珠黯淡了…', '泉眼枯了', '熔岩熄灭', '虚空空空如也', '大宝箱沉入深渊…', '复制失败：长按文案手动复制']
+  },
+  {
+    key: 'neutral', tag: '⑦ neutral 蓝灰', zh: '操作反馈回执', color: '#6B8AA5', dark: '#3E566B',
+    meta: '6 处 · 全 17px 小字 · 1.0s',
+    note: '玩家自己操作的确认回执，不承载情绪 → 低调蓝灰。',
+    big: [],
+    small: ['换滴', '水流交换！', '符文 1/3', '「置换符文」出现后解锁', '文案已复制，去粘贴给好友吧']
+  }
+];
+
+function el(tag, cls, style, text) {
+  var d = document.createElement(tag);
+  if (cls) d.className = cls;
+  if (style) d.setAttribute('style', style);
+  if (text != null) d.textContent = text;
+  return d;
+}
+
+function spawnPop(sea, color, text, isBig) {
+  var life = isBig ? 2.0 : 1.0;
+  var parts = text.split('|');
+  var p = el('div', 'pop');
+  p.style.color = color;
+  p.style.fontSize = (isBig ? 20 : 17) + 'px';
+  p.style.webkitTextStrokeWidth = (isBig ? 5 : 4) + 'px';
+  p.style.animationDuration = life + 's';
+  p.textContent = parts[0];
+  if (parts[1]) {
+    var s = el('small', null, null, ' ' + parts[1]);
+    p.appendChild(s);
+  }
+  var x = 70 + Math.random() * (sea.clientWidth - 140);
+  var y = 45 + Math.random() * (sea.clientHeight - 80);
+  p.style.left = x + 'px';
+  p.style.top = y + 'px';
+  sea.appendChild(p);
+  setTimeout(function () { if (p.parentNode) p.parentNode.removeChild(p); }, life * 1000 + 120);
+}
+
+function playKind(k, sea, all) {
+  var texts = [];
+  k.big.slice(0, all ? 3 : 2).forEach(function (t) { texts.push([t, true]); });
+  k.small.slice(0, all ? 3 : 2).forEach(function (t) { texts.push([t, false]); });
+  texts.sort(function () { return Math.random() - 0.5; });
+  texts.forEach(function (it, i) {
+    setTimeout(function () { spawnPop(sea, k.color, it[0], it[1]); }, i * 420);
+  });
+}
+
+var main = document.getElementById('panels');
+KINDS.forEach(function (k) {
+  var panel = el('div', 'panel');
+  var head = el('div', 'phead');
+  head.appendChild(el('span', 'chip', 'background:' + k.color));
+  head.appendChild(el('span', 'pname', 'color:' + k.dark, k.tag + ' · ' + k.zh));
+  head.appendChild(el('span', 'pmeta', null, k.meta));
+  panel.appendChild(head);
+  panel.appendChild(el('div', 'pnote', null, k.note));
+
+  var sea = el('div', 'sea');
+  sea.appendChild(el('span', 'hint', null, '点击海面任意位置试试'));
+  [38, 76, 114].forEach(function (yy) { sea.appendChild(el('i', 'waveline', 'top:' + yy + 'px')); });
+  sea.addEventListener('click', function (e) {
+    if (e.target !== sea && e.target.className !== 'waveline') return;
+    var pool = [];
+    k.big.forEach(function (t) { pool.push([t, true]); });
+    k.small.forEach(function (t) { pool.push([t, false]); });
+    if (!pool.length) return;
+    var it = pool[(Math.random() * pool.length) | 0];
+    var rect = sea.getBoundingClientRect();
+    var life = it[1] ? 2.0 : 1.0;
+    var parts = it[0].split('|');
+    var p = el('div', 'pop');
+    p.style.color = k.color;
+    p.style.fontSize = (it[1] ? 20 : 17) + 'px';
+    p.style.webkitTextStrokeWidth = (it[1] ? 5 : 4) + 'px';
+    p.style.animationDuration = life + 's';
+    p.style.left = (e.clientX - rect.left) + 'px';
+    p.style.top = (e.clientY - rect.top) + 'px';
+    p.textContent = parts[0];
+    if (parts[1]) p.appendChild(el('small', null, null, ' ' + parts[1]));
+    sea.appendChild(p);
+    setTimeout(function () { if (p.parentNode) p.parentNode.removeChild(p); }, life * 1000 + 120);
+  });
+  panel.appendChild(sea);
+
+  var btn = el('button', 'replay', null, '重播该类示例');
+  btn.addEventListener('click', function () { playKind(k, sea, true); });
+  panel.appendChild(btn);
+  main.appendChild(panel);
+  playKind(k, sea, false);
+});
+</script>
+</body>
+</html>
