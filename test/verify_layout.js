@@ -1,4 +1,4 @@
-// 布局几何验证（v320）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗（含第4行清空存档+二级确认面板，v318 文案精简）+潮汐满潮没入警戒线（v319）+待投虚影生命感（v320）/设置图标静态核查
+// 布局几何验证（v321）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗（含第4行清空存档+二级确认面板，v318 文案精简）+潮汐满潮逐海域没入警戒线（v321）+待投虚影生命感（v320）/设置图标静态核查
 // 纯 node 计算（vm 加载 config + layout，无浏览器/无 canvas）。
 // ★ v183 新定位语义（覆盖 v175~v182 的 EXTRA 分配方案；用户：
 //   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少！"）：
@@ -318,20 +318,40 @@ eq('潮汐计时器定义', /function drawTideTimer\(\) \{/.test(RSRC), true);
 eq('旧drawTidePill已移除', /function drawTidePill/.test(RSRC), false);
 eq('潮汐卡几何引layout右锚定', /var tp = MG\.layout\.hud\.tidePill;[\s\S]*?var tx = \(tp\.side === 'right'\) \? \(C\.W - tp\.margin - cw\) : tp\.margin;/.test(RSRC), true);
 eq('潮汐倒计时固定位文本', /var ns = Math\.ceil\(tide\.timer\) \+ 's';/.test(RSRC), true);
-// ---- v319 潮汐满潮可没过警戒线（用户："潮汐还是有最大值限制，水滴超不过警戒线，这个是不合理的逻辑"）----
-// 移除 v308"警戒线下 40px"封顶：满潮水面最高没入警戒线上方 overLine px，配合浮力把堆叠托越线
-eq('overLine配置20', C.tide.overLine, 20);
-eq('潮汐满潮没入警戒线公式', /var hi = \(FLOORY - C\.dangerY \+ C\.tide\.overLine\) \/ H;/.test(SRC), true);
+// ---- v321 潮汐满潮逐海域逼近/没入警戒线（用户："水滴还是无法浮起到警戒线上面，请认真测试一下"）----
+// 取代 v319 的 overLine 单端点 + lo→hi 线性渐变：仿真实测（test/sim_tide.js，headless 快进）
+// 该结构把越线量稀释到 sea5 之后才兑现——sea3 仅沧海勉强 +14px、sea0-2 全档位为负、
+// sea4 起堆顶才越线。v321 改逐海域显式曲线 overByStage（满潮水面相对警戒线 px，负=线下）：
+// sea0/1 安全期不变（574/534）→ sea2 大海/沧海越线 → sea3 浪花以上 → sea4 全档位 → 深海渐深
+eq('overByStage八海域表', JSON.stringify(C.tide.overByStage), JSON.stringify([-259, -219, -105, -45, -5, 15, 25, 35]));
+eq('overByStage与海域数同长', C.tide.overByStage.length, C.seaStages.length);
+eq('旧overLine字段已移除', /overLine:\s*\d/.test(src('js/config.js')), false);
 eq('旧40px封顶已移除', /C\.dangerY - 40\) \/ H/.test(SRC), false);
-eq('深海满潮水面在警戒线上方', (function () { // 满潮(progress=1)水面 y < dangerY ⟺ 没过线
+eq('潮汐满潮逐海域公式', /var ov = C\.tide\.overByStage;[\s\S]*?var over = ov\[Math\.min\(seaStage\(\), ov\.length - 1\)\];[\s\S]*?return \(FLOORY - C\.dangerY \+ over\) \/ H;/.test(SRC), true);
+eq('满潮水面逐海域值', (function () { // 锁定整条水位曲线：sea0..7 = 574/534/420/360/320/300/290/280
   var H = L.body.floorY - L.body.containerTop;
-  var lo = 1 / 4, hi = (L.body.floorY - L.body.dangerY + C.tide.overLine) / H;
-  var mx = lo + (hi - lo) * 1; // seaStage 取最深海域
-  return L.body.floorY - H * mx < L.body.dangerY;
+  var wys = C.tide.overByStage.map(function (over) {
+    return Math.round(L.body.floorY - H * ((L.body.floorY - L.body.dangerY + over) / H));
+  });
+  return JSON.stringify(wys) === JSON.stringify([574, 534, 420, 360, 320, 300, 290, 280]);
 })(), true);
-eq('浅海(sea0)满潮仍在警戒线下方', (function () { // 渐变起点不变：早期海域潮峰仍够不到线
+eq('sea0-1满潮仍在警戒线下方', (function () { // 安全期曲线不变：早期海域潮峰仍够不到线
   var H = L.body.floorY - L.body.containerTop;
-  return L.body.floorY - H * (1 / 4) > L.body.dangerY;
+  var wy = function (over) { return L.body.floorY - H * ((L.body.floorY - L.body.dangerY + over) / H); };
+  return wy(C.tide.overByStage[0]) > L.body.dangerY && wy(C.tide.overByStage[1]) > L.body.dangerY;
+})(), true);
+eq('sea7满潮水面在警戒线上方', (function () { // 最深海域满潮没过线，且水面恒在出生点下方 ≥15px（虚影不被淹）
+  var H = L.body.floorY - L.body.containerTop;
+  var over = C.tide.overByStage[C.tide.overByStage.length - 1];
+  var wy = L.body.floorY - H * ((L.body.floorY - L.body.dangerY + over) / H);
+  return wy < L.body.dangerY && wy - L.body.spawnY >= 15;
+})(), true);
+eq('sea4起全档位静平衡越线', (function () { // 雾泡(r=15)静平衡顶部 = wy-2r(1-g/buoyancy) < dangerY
+  var H = L.body.floorY - L.body.containerTop;
+  var over = C.tide.overByStage[4];
+  var wy = L.body.floorY - H * ((L.body.floorY - L.body.dangerY + over) / H);
+  var top = wy - 2 * 15 * (1 - C.gravity / C.tide.buoyancy);
+  return top < L.body.dangerY;
 })(), true);
 // ---- v320 待投虚影生命感（用户："水滴没有坠落时，可以加一个合适的效果吗?目前看水滴是虚的而且看起来呆呆的"）----
 // ghostBob 单一相位源驱动整组预览：虚影球纵向漂浮 + 滴体同色系光晕呼吸，指示线顶与名称

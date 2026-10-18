@@ -1450,16 +1450,17 @@
   }
 
   // ---------- 潮汐 ----------
-  // 潮位设计：满潮水面最矮距容器底 1/4 容器高，随海域推进线性加满；
-  // v308 曾封顶"警戒线下 40px"——水面永不过线，水滴因此永远越不过警戒线；
-  // v319 按用户要求移除该人为封顶（"潮汐还是有最大值限制，水滴超不过警戒线，这个是不
-  // 合理的逻辑"）：满潮水面最高可没入警戒线上方 C.tide.overLine px，配合浮力把堆叠托
-  // 越警戒线，形成真正的清场压力（v308 原话："涨潮可能会使水滴超过警戒线死亡"）
+  // 潮位设计：满潮水面逐海域逼近/没入警戒线（v321）——config.tide.overByStage 给出各海域
+  // 满潮水面相对警戒线的偏移（负=线下）：sea0/1 安全期（574/534，只重排不越线），sea2 起
+  // 大海/沧海被推越线，sea3 起浪花以上，sea4 起全档位，深海渐深形成清场压力。
+  // v319 曾把越线量（overLine=20）挂在 lo→hi 线性渐变的端点，被渐变稀释：仿真实测
+  // sea5 之前任何档位都浮不过警戒线（sea3 仅沧海 +14px，sea0-2 全负）——用户：
+  // "水滴还是无法浮起到警戒线上面，请认真测试一下" ⇒ 越线量改逐海域显式曲线
   function tideWaterMax() {
     var H = FLOORY - C.containerTop;
-    var lo = 1 / 4;
-    var hi = (FLOORY - C.dangerY + C.tide.overLine) / H;
-    return lo + (hi - lo) * (seaStage() / (C.seaStages.length - 1));
+    var ov = C.tide.overByStage;
+    var over = ov[Math.min(seaStage(), ov.length - 1)];
+    return (FLOORY - C.dangerY + over) / H;
   }
   function tideY() {
     return FLOORY - tide.progress * (FLOORY - C.containerTop) * tideWaterMax();
@@ -1693,8 +1694,8 @@
 
   // ---------- 失败判定 ----------
   function checkDanger(dt) {
-    // 潮汐期间照常判负：浮起越线同样致命（v319 起最深海域潮峰可没过警戒线，水滴会被
-    // 浮力推越线，潮汐本身即威胁）。但浮力会把整堆水滴像筏子一样整体抬起（堆顶常越过
+    // 潮汐期间照常判负：浮起越线同样致命（v321 起 sea4 以深满潮全档位可没过警戒线，
+    // 水滴会被浮力推越线，潮汐本身即威胁）。但浮力会把整堆水滴像筏子一样整体抬起（堆顶常越过
     // 容器口），非玩家堆高——判负引信放宽 5 倍且不叠加容器口减半，给足反应时间（配合每局一次深流缓冲）。
     var tideOn = tide.progress > 0.15;
     var bs = phys.bodies;
