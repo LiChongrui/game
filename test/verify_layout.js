@@ -1,4 +1,4 @@
-// 布局几何验证（v321）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗（含第4行清空存档+二级确认面板，v318 文案精简）+潮汐满潮逐海域没入警戒线（v321）+待投虚影生命感（v320）/设置图标静态核查
+// 布局几何验证（v322）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗（含第4行清空存档+二级确认面板，v318 文案精简）+潮汐满潮水面随海域线性增高（v322）+待投虚影生命感（v320）/设置图标静态核查
 // 纯 node 计算（vm 加载 config + layout，无浏览器/无 canvas）。
 // ★ v183 新定位语义（覆盖 v175~v182 的 EXTRA 分配方案；用户：
 //   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少！"）：
@@ -318,37 +318,43 @@ eq('潮汐计时器定义', /function drawTideTimer\(\) \{/.test(RSRC), true);
 eq('旧drawTidePill已移除', /function drawTidePill/.test(RSRC), false);
 eq('潮汐卡几何引layout右锚定', /var tp = MG\.layout\.hud\.tidePill;[\s\S]*?var tx = \(tp\.side === 'right'\) \? \(C\.W - tp\.margin - cw\) : tp\.margin;/.test(RSRC), true);
 eq('潮汐倒计时固定位文本', /var ns = Math\.ceil\(tide\.timer\) \+ 's';/.test(RSRC), true);
-// ---- v321 潮汐满潮逐海域逼近/没入警戒线（用户："水滴还是无法浮起到警戒线上面，请认真测试一下"）----
-// 取代 v319 的 overLine 单端点 + lo→hi 线性渐变：仿真实测（test/sim_tide.js，headless 快进）
-// 该结构把越线量稀释到 sea5 之后才兑现——sea3 仅沧海勉强 +14px、sea0-2 全档位为负、
-// sea4 起堆顶才越线。v321 改逐海域显式曲线 overByStage（满潮水面相对警戒线 px，负=线下）：
-// sea0/1 安全期不变（574/534）→ sea2 大海/沧海越线 → sea3 浪花以上 → sea4 全档位 → 深海渐深
-eq('overByStage八海域表', JSON.stringify(C.tide.overByStage), JSON.stringify([-259, -219, -105, -45, -5, 15, 25, 35]));
-eq('overByStage与海域数同长', C.tide.overByStage.length, C.seaStages.length);
+// ---- v322 潮汐满潮水面随海域线性增高（用户："涨潮的高度不合理，按理说应当线性增高，最后一个海域达到最高"）----
+// 沿革：v308 封顶永不过线 → v319 移除封顶但挂渐变端点被稀释（sea5 前全档位越不了线）→
+// v321 逐海域表又 sea2 凸节、sea4 后走平。v322 定为 overMin→overMax 纯线性：每个海域
+// 等量抬升 42px，sea0 安全期（574）→ 最后一个海域最高（280 = 警戒线上 35px）
+eq('overMin配置', C.tide.overMin, -259);
+eq('overMax配置', C.tide.overMax, 35);
+eq('旧overByStage表已移除', /overByStage/.test(src('js/config.js')), false);
 eq('旧overLine字段已移除', /overLine:\s*\d/.test(src('js/config.js')), false);
 eq('旧40px封顶已移除', /C\.dangerY - 40\) \/ H/.test(SRC), false);
-eq('潮汐满潮逐海域公式', /var ov = C\.tide\.overByStage;[\s\S]*?var over = ov\[Math\.min\(seaStage\(\), ov\.length - 1\)\];[\s\S]*?return \(FLOORY - C\.dangerY \+ over\) \/ H;/.test(SRC), true);
-eq('满潮水面逐海域值', (function () { // 锁定整条水位曲线：sea0..7 = 574/534/420/360/320/300/290/280
+eq('潮汐满潮线性公式', /var over = C\.tide\.overMin \+ \(C\.tide\.overMax - C\.tide\.overMin\) \* \(seaStage\(\) \/ \(C\.seaStages\.length - 1\)\);/.test(SRC), true);
+eq('满潮水面线性等距42px', (function () { // 锁定整条水位曲线：sea0..7 = 574/532/490/448/406/364/322/280
   var H = L.body.floorY - L.body.containerTop;
-  var wys = C.tide.overByStage.map(function (over) {
-    return Math.round(L.body.floorY - H * ((L.body.floorY - L.body.dangerY + over) / H));
-  });
-  return JSON.stringify(wys) === JSON.stringify([574, 534, 420, 360, 320, 300, 290, 280]);
+  var wys = [], prev = null, linear = true;
+  for (var s = 0; s < C.seaStages.length; s++) {
+    var over = C.tide.overMin + (C.tide.overMax - C.tide.overMin) * (s / (C.seaStages.length - 1));
+    var wy = Math.round(L.body.floorY - H * ((L.body.floorY - L.body.dangerY + over) / H));
+    wys.push(wy);
+    if (prev != null && prev - wy !== 42) linear = false; // 每个海域等量抬升 42px
+    prev = wy;
+  }
+  return JSON.stringify(wys) === JSON.stringify([574, 532, 490, 448, 406, 364, 322, 280]) && linear;
 })(), true);
-eq('sea0-1满潮仍在警戒线下方', (function () { // 安全期曲线不变：早期海域潮峰仍够不到线
+eq('sea0满潮仍在警戒线下方', (function () { // 安全期曲线不变：首海域潮峰仍够不到线
   var H = L.body.floorY - L.body.containerTop;
-  var wy = function (over) { return L.body.floorY - H * ((L.body.floorY - L.body.dangerY + over) / H); };
-  return wy(C.tide.overByStage[0]) > L.body.dangerY && wy(C.tide.overByStage[1]) > L.body.dangerY;
+  var over = C.tide.overMin;
+  return L.body.floorY - H * ((L.body.floorY - L.body.dangerY + over) / H) > L.body.dangerY;
 })(), true);
-eq('sea7满潮水面在警戒线上方', (function () { // 最深海域满潮没过线，且水面恒在出生点下方 ≥15px（虚影不被淹）
+eq('末海域满潮水面最高且在警戒线上方', (function () { // 线性终点=最高：水面 280 < 315，且恒在出生点下方 ≥15px（虚影不被淹）
   var H = L.body.floorY - L.body.containerTop;
-  var over = C.tide.overByStage[C.tide.overByStage.length - 1];
+  var over = C.tide.overMax;
   var wy = L.body.floorY - H * ((L.body.floorY - L.body.dangerY + over) / H);
   return wy < L.body.dangerY && wy - L.body.spawnY >= 15;
 })(), true);
-eq('sea4起全档位静平衡越线', (function () { // 雾泡(r=15)静平衡顶部 = wy-2r(1-g/buoyancy) < dangerY
+eq('sea6起全档位静平衡越线', (function () { // 雾泡(r=15)静平衡顶部 = wy-2r(1-g/buoyancy) < dangerY
   var H = L.body.floorY - L.body.containerTop;
-  var over = C.tide.overByStage[4];
+  var s = C.seaStages.length - 2; // 倒数第二海域（热泉裂谷，水面 322）
+  var over = C.tide.overMin + (C.tide.overMax - C.tide.overMin) * (s / (C.seaStages.length - 1));
   var wy = L.body.floorY - H * ((L.body.floorY - L.body.dangerY + over) / H);
   var top = wy - 2 * 15 * (1 - C.gravity / C.tide.buoyancy);
   return top < L.body.dangerY;
