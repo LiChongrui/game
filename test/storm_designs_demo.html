@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>漩涡风暴样式候选 · 5 选 1</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #F5F4F0; color: #2C2C2A; padding: 28px 16px 48px; max-width: 780px; margin: 0 auto;
+  }
+  h1 { font-size: 20px; font-weight: 500; }
+  .sub { font-size: 13px; color: #5F5E5A; margin-top: 6px; line-height: 1.7; }
+  .panel {
+    margin-top: 14px; background: #FFFFFF; border: 0.5px solid rgba(0,0,0,.14);
+    border-radius: 12px; padding: 12px 14px 14px;
+  }
+  .phead { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .pid { font-size: 15px; font-weight: 500; color: #0C447C; }
+  .pname { font-size: 13px; color: #444441; }
+  .ptag { font-size: 12px; color: #888780; margin-left: auto; }
+  .pnote { font-size: 12px; color: #5F5E5A; margin-top: 4px; line-height: 1.6; }
+  canvas { width: 100%; height: 230px; display: block; border-radius: 10px; background: #0E3A5A; margin-top: 8px; }
+  footer {
+    margin-top: 18px; font-size: 12px; color: #888780; line-height: 1.7;
+    background: #EDEBE4; border-radius: 8px; padding: 10px 12px;
+  }
+  footer b { color: #444441; font-weight: 500; }
+</style>
+</head>
+<body>
+  <h1>漩涡风暴样式候选 · 5 选 1</h1>
+  <p class="sub">五款深海主题动效（配色沿用游戏海洋青蓝系，深色海面模拟游戏内观感）。<b>回复编号即可</b>（如「用 C」，可附带微调意见），我照选型替换游戏内漩涡绘制——半径 / 时长 / 淡入淡出 / 卷力物理均不变。</p>
+  <div id="panels"></div>
+  <footer>
+    <b>选型参考</b>：B 水母巡游最「灵动 / 生物感」，C 海灵丝带最「优雅飘逸」，D 深海龙卷最有「威慑力 / 叙事感」，E 月环星涡最「克制 / 几何高级感」，A 为 v329 现状基线供对比。<br>
+    实施说明：仅替换 drawEventVfx 的 storm 绘制分支，漩涡位置（堆叠区中心）、半径 360、6s 时长、首尾 0.8s 淡入淡出、卷力 2400 物理全部不动；门禁断言同步更新。
+  </footer>
+
+<script>
+function sea(ctx, w, h) {
+  ctx.fillStyle = '#0E3A5A';
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = 'rgba(255,255,255,0.045)';
+  ctx.lineWidth = 1;
+  for (let y = 24; y < h; y += 42) {
+    ctx.beginPath();
+    for (let x = 0; x <= w; x += 10) {
+      const yy = y + Math.sin(x * 0.02 + y) * 3;
+      x === 0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy);
+    }
+    ctx.stroke();
+  }
+}
+function glowDot(ctx, x, y, r, rgb, a) {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, 'rgba(' + rgb + ',' + a + ')');
+  g.addColorStop(1, 'rgba(' + rgb + ',0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+}
+
+// A 漩涡眼 · 现状基线（v329）
+function drawA(ctx, w, h, t) {
+  sea(ctx, w, h);
+  const cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.38;
+  glowDot(ctx, cx, cy, R + 14, '74,162,210', 0.26);
+  ctx.lineCap = 'round';
+  for (let layer = 0; layer < 2; layer++) {
+    const dir = layer ? 1 : -1, rot = t * (0.9 + layer * 0.5) * dir;
+    for (let k = 0; k < 4; k++) {
+      const a0 = k * Math.PI / 2 + layer * 0.4;
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(168,221,245,' + (layer ? 0.45 : 0.7) + ')';
+      ctx.lineWidth = 3 - layer;
+      for (let i = 0; i <= 40; i++) {
+        const s = i / 40, aa = a0 + rot + s * 4.4, r = 8 + s * R;
+        const x = cx + Math.cos(aa) * r, y = cy + Math.sin(aa) * r * 0.9;
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.stroke();
+    }
+  }
+  for (let i = 0; i < 14; i++) {
+    const p = (t * 0.3 + i / 14) % 1, aa = p * 7 + i * 2.4, r = 8 + p * R;
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(207,234,249,' + (0.7 * (1 - p)) + ')';
+    ctx.arc(cx + Math.cos(aa) * r, cy + Math.sin(aa) * r * 0.9, 2.5, 0, 7); ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.fillStyle = 'rgba(232,244,255,' + (0.65 + 0.2 * Math.sin(t * 4)) + ')';
+  ctx.arc(cx, cy, 9, 0, 7); ctx.fill();
+}
+
+// B 水母巡游
+function drawB(ctx, w, h, t) {
+  sea(ctx, w, h);
+  const cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.38;
+  glowDot(ctx, cx, cy, 64, '180,225,250', 0.32 + 0.1 * Math.sin(t * 3));
+  const N = 7;
+  for (let i = 0; i < N; i++) {
+    const a = t * 0.55 + i * 2 * Math.PI / N;
+    const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R * 0.45 + Math.sin(t * 2 + i) * 5;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.cos(a) * 0.25);
+    const jr = 13;
+    const jg = ctx.createRadialGradient(0, -4, 1, 0, 0, jr + 3);
+    jg.addColorStop(0, 'rgba(214,240,255,0.92)');
+    jg.addColorStop(1, 'rgba(150,205,240,0.25)');
+    ctx.fillStyle = jg;
+    ctx.beginPath(); ctx.arc(0, 0, jr, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(190,232,250,0.55)'; ctx.lineWidth = 1.2;
+    for (let k = 0; k < 4; k++) {
+      const bx = -jr * 0.6 + k * jr * 0.4;
+      ctx.beginPath(); ctx.moveTo(bx, 2);
+      for (let s = 1; s <= 4; s++) ctx.lineTo(bx + Math.sin(t * 4 + k + i + s) * 2.6, 2 + s * 4.2);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // 尾迹微光
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(207,234,249,' + (0.25 + 0.2 * Math.sin(t * 5 + i)) + ')';
+    ctx.arc(cx + Math.cos(a - 0.25) * R, cy + Math.sin(a - 0.25) * R * 0.45, 2, 0, 7); ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.fillStyle = 'rgba(232,244,255,0.8)';
+  ctx.arc(cx, cy, 6 + Math.sin(t * 3) * 1.5, 0, 7); ctx.fill();
+}
+
+// C 海灵丝带
+function drawC(ctx, w, h, t) {
+  sea(ctx, w, h);
+  const cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.38;
+  glowDot(ctx, cx, cy, 42, '220,240,255', 0.45);
+  const ribbons = [
+    { c: '168,221,245', w: 5, ph: 0, sp: 1.0 },
+    { c: '126,195,232', w: 3.5, ph: 2.1, sp: 1.15 },
+    { c: '176,228,255', w: 2.5, ph: 4.2, sp: 0.9 }
+  ];
+  ctx.lineCap = 'round';
+  ribbons.forEach(function (rb) {
+    ctx.beginPath();
+    for (let i = 0; i <= 60; i++) {
+      const s = i / 60, aa = t * rb.sp * 1.2 + rb.ph + s * 3.8;
+      const r = 12 + s * R;
+      const x = cx + Math.cos(aa) * r;
+      const y = cy + Math.sin(aa) * r * 0.55 + Math.sin(s * 9 - t * 5 + rb.ph) * 6;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(' + rb.c + ',0.55)'; ctx.lineWidth = rb.w; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)'; ctx.lineWidth = rb.w * 0.4; ctx.stroke();
+  });
+  ctx.beginPath();
+  ctx.fillStyle = 'rgba(232,244,255,0.85)';
+  ctx.arc(cx, cy, 5 + Math.sin(t * 3), 0, 7); ctx.fill();
+}
+
+// D 深海龙卷
+function drawD(ctx, w, h, t) {
+  sea(ctx, w, h);
+  const baseY = h - 16, topY = 28;
+  const cx = w / 2 + Math.sin(t * 0.9) * 9;
+  const topR = 12, botR = Math.min(w, h) * 0.33;
+  glowDot(ctx, cx, topY, 48, '200,235,255', 0.45);
+  for (let k = 0; k < 3; k++) {
+    ctx.beginPath();
+    for (let i = 0; i <= 30; i++) {
+      const s = i / 30, y = baseY - (baseY - topY) * s;
+      const r = botR * (1 - s) + topR * s;
+      const x = cx + (k - 1) * r * 0.35 + Math.sin(t * 2 + s * 5 + k * 2.1) * 6 * s;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(168,221,245,0.4)'; ctx.lineWidth = 2; ctx.stroke();
+  }
+  for (let i = 0; i < 48; i++) {
+    const p = (t * 0.4 + i / 48) % 1;
+    const y = baseY - (baseY - topY) * p;
+    const r = botR * (1 - p) + topR * p;
+    const aa = p * 19 + i * 2.4;
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(207,234,249,' + (0.25 + 0.55 * Math.sin(p * Math.PI)) + ')';
+    ctx.arc(cx + Math.cos(aa) * r * 0.9, y, 1.5 + 2.2 * (1 - p), 0, 7); ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.fillStyle = 'rgba(232,244,255,0.8)';
+  ctx.arc(cx, topY, 5, 0, 7); ctx.fill();
+}
+
+// E 月环星涡
+function drawE(ctx, w, h, t) {
+  sea(ctx, w, h);
+  const cx = w / 2, cy = h / 2;
+  const rings = [
+    { r: 26, seg: 3, sp: 1.2, dir: 1, w: 3, c: '199,230,247' },
+    { r: 52, seg: 4, sp: 0.8, dir: -1, w: 2.5, c: '150,205,236' },
+    { r: 78, seg: 5, sp: 0.55, dir: 1, w: 2, c: '120,178,214' }
+  ];
+  rings.forEach(function (rg, j) {
+    const arcLen = 2 * Math.PI / rg.seg - 0.55;
+    for (let k = 0; k < rg.seg; k++) {
+      const a0 = t * rg.sp * rg.dir + k * 2 * Math.PI / rg.seg;
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(' + rg.c + ',0.7)'; ctx.lineWidth = rg.w;
+      ctx.arc(cx, cy, rg.r, a0, a0 + arcLen); ctx.stroke();
+    }
+    const da = t * rg.sp * rg.dir * 1.6 + j * 2;
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(232,244,255,0.85)';
+    ctx.arc(cx + Math.cos(da) * rg.r, cy + Math.sin(da) * rg.r, 3, 0, 7); ctx.fill();
+  });
+  ctx.setLineDash([4, 8]);
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(150,205,236,0.3)'; ctx.lineWidth = 1;
+  ctx.arc(cx, cy, 100, t * 0.3, t * 0.3 + 7); ctx.stroke();
+  ctx.setLineDash([]);
+  glowDot(ctx, cx, cy, 22, '220,240,255', 0.55 + 0.15 * Math.sin(t * 3));
+  ctx.beginPath();
+  ctx.fillStyle = 'rgba(240,250,255,0.9)';
+  ctx.arc(cx, cy, 4.5, 0, 7); ctx.fill();
+}
+
+const DESIGNS = [
+  { id: 'A', name: '漩涡眼 · 现状基线', tag: '供对比', note: 'v329 现样式：漏斗 + 双层反向螺旋流丝 + 螺旋气泡 + 呼吸亮核。', draw: drawA },
+  { id: 'B', name: '水母巡游', tag: '灵动 · 生物感', note: '柔光核为眼，七只半透明小水母沿椭圆轨道环游、尾须随波摆动。', draw: drawB },
+  { id: 'C', name: '海灵丝带', tag: '优雅 · 飘逸', note: '三条半透明丝绸长带绕核流转，白高光叠描，如海藻被涡流卷起。', draw: drawC },
+  { id: 'D', name: '深海龙卷', tag: '威慑 · 叙事感', note: '气泡螺旋柱自海底向上收拢、顶端柔光云，整体缓缓摇摆。', draw: drawD },
+  { id: 'E', name: '月环星涡', tag: '克制 · 几何高级感', note: '三圈断弧环反向旋转 + 环上流萤点，外圈虚线晕环。', draw: drawE }
+];
+
+const main = document.getElementById('panels');
+const items = [];
+DESIGNS.forEach(function (d) {
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+  panel.innerHTML =
+    '<div class="phead"><span class="pid">' + d.id + '</span>' +
+    '<span class="pname">' + d.name + '</span>' +
+    '<span class="ptag">' + d.tag + '</span></div>' +
+    '<div class="pnote">' + d.note + '</div>';
+  const cv = document.createElement('canvas');
+  panel.appendChild(cv);
+  main.appendChild(panel);
+  items.push({ cv: cv, draw: d.draw });
+});
+
+function frame(now) {
+  const t = now / 1000;
+  items.forEach(function (it) {
+    const dpr = window.devicePixelRatio || 1;
+    const cw = it.cv.clientWidth, ch = it.cv.clientHeight;
+    if (it.cv.width !== Math.round(cw * dpr)) {
+      it.cv.width = Math.round(cw * dpr);
+      it.cv.height = Math.round(ch * dpr);
+    }
+    const ctx = it.cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    it.draw(ctx, cw, ch, t);
+  });
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
