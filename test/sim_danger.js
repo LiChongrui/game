@@ -1,7 +1,7 @@
 // 潮汐越线判负诊断（headless 快进，无渲染）——用户："涨潮引起的越线好像很难死亡，是判定不对吗？"
 // 四案测量：
-//  A. sea7 单滴雾泡 满潮 15s：越线期间速度分布（速度门 sp<120 是否被浮力晃动永久堵死）、
-//     dangerT 峰值、深流缓冲消耗时点、最终是否判负
+//  A. sea7 单滴雾泡 满潮 15s：越线期间速度分布（高速采样占比，v326 起速度门已移除、
+//     此处仅存速度普查）、dangerT 峰值、深流缓冲消耗时点、最终是否判负
 //  B. sea7 12 滴混合堆 满潮 15s：同 A（筏子效应）
 //  C. sea6 单滴沧海（最大滴）满潮 15s：同 A（漂幅最大）
 //  D. 非潮汐高速坠落横穿警戒线（回归保护）：滴从线上方 120px 自由落体穿线，
@@ -173,7 +173,7 @@ const SEA_AT = [0, 3000, 10000, 25000, 50000, 100000, 180000, 300000];
       ('越线采样 ' + st.overN).padStart(12),
       ('均速 ' + Math.round(st.spAvg)).padStart(10),
       ('峰速 ' + Math.round(st.spMax)).padStart(10),
-      ('速度门堵死 ' + pct + '%').padStart(14),
+      ('高速采样 ' + pct + '%').padStart(14),
       ('dangerT峰值 ' + (Math.round(st.maxDangerT * 10) / 10) + 's').padStart(16),
       ('首越线 ' + (st.firstOverAt == null ? '未越线' : st.firstOverAt.toFixed(1) + 's')).padStart(14),
       ('缓冲 ' + (st.bufferedAt == null ? '未触发' : st.bufferedAt.toFixed(1) + 's')).padStart(12),
@@ -182,7 +182,8 @@ const SEA_AT = [0, 3000, 10000, 25000, 50000, 100000, 180000, 300000];
   }
 
   console.log('=== 潮汐越线判负诊断 ===');
-  console.log('引信：潮汐 dangerTime×2 = 2.2s 且越线即计时；非潮汐仍走速度门 sp<120 + 衰减');
+  console.log('引信：潮汐 dangerTime×2 = 2.2s；v326 起非潮汐同潮汐——越线即计时、不看速度');
+  console.log('（瞬时横穿由出生宽限 0.6s + 引信 1.1s + 出线即清零三重区分，见 sim_column.js J 案回归）');
   console.log('（A/B/C 钉住满潮 15s 测引信与缓冲时序；D 验非潮汐快速横穿不误伤；F 验自然潮周期）');
   console.log('');
   console.log(row('A sea7单滴雾泡', res.A));

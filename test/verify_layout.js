@@ -1,4 +1,4 @@
-// 布局几何验证（v325）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗（含第4行清空存档+二级确认面板，v318 文案精简）+潮汐满潮水面随海域线性增高（v322）+潮汐判负提速（v323）+深海涌泉抬升减半（v324）+公告弹字时长（v325）+待投虚影生命感（v320）/设置图标静态核查
+// 布局几何验证（v326）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗（含第4行清空存档+二级确认面板，v318 文案精简）+潮汐满潮水面随海域线性增高（v322）+潮汐判负提速（v323）+深海涌泉抬升减半（v324）+公告弹字时长（v325）+叠罗汉越线判负去速度门/弹字禁入底部道具带/警示文字移出实体层之前（v326）+待投虚影生命感（v320）/设置图标静态核查
 // 纯 node 计算（vm 加载 config + layout，无浏览器/无 canvas）。
 // ★ v183 新定位语义（覆盖 v175~v182 的 EXTRA 分配方案；用户：
 //   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少！"）：
@@ -384,13 +384,42 @@ eq('sea6起全档位静平衡越线', (function () { // 雾泡(r=15)静平衡顶
 // 真正死因是 ×5 引信——漂浮滴约 3.5s 后才稳定越线（初升一次性 ~7px 回落出线清零），
 // 最早 ~9s 才攒满 > 涨潮全长 8s，"一次涨潮内永远攒不满、潮退滴落计时清零"。
 // 修法：潮汐引信 ×5→×2（2.2s）+ 潮汐期间越线即计时不看速度（漂浮持续、弹飞横穿
-// <0.5s，引信天然区分）；非潮汐速度门与扰动衰减原样保留。
+// <0.5s，引信天然区分）。
+// ★ v326：非潮汐路径也去掉速度门（用户："开始游戏时直接叠罗汉超过警戒线也没有提示？"；
+//   test/sim_column.js 仿真：12 滴同 x 垂直细柱，位置 ±1px 稳定但堆内接触解算微颤不止，
+//   越线滴均速 162px/s > 速度门 120 ⇒ dangerT 被 100% 堵死 + 衰减清零，警示恒 0、
+//   无闪烁无文字无判负）。瞬时横穿由三重机制区分、不需要速度门：出生宽限 0.6s
+//   （> 任何容器内穿线时长 ~0.42s）+ 引信 1.1s（>> 穿线 0.2~0.4s）+ 出线即清零；
+//   回归保护见 sim_danger.js D 案 / sim_column.js J 案（峰速 572px/s 判负为无）。
 eq('潮汐引信×2', /var fuse = tideOn \? C\.dangerTime \* 2 : C\.dangerTime \* \(top < C\.containerTop \? 0\.55 : 1\);/.test(SRC), true);
 eq('旧潮汐引信×5已移除', /C\.dangerTime \* 5/.test(SRC), false);
-eq('潮汐期间越线即计时', /if \(tideOn \|\| sp < C\.dangerSpeed \* 1\.5\) \{/.test(SRC), true);
-eq('非潮汐速度门保留', /sp < C\.dangerSpeed \* 1\.5/.test(SRC), true);
-eq('非潮汐扰动衰减保留', /b\.dangerT = Math\.max\(0, b\.dangerT - dt \* 2\);/.test(SRC), true);
+eq('越线即计时不分潮汐', /b\.dangerT \+= dt;/.test(SRC), true);
+eq('潮汐旧速度门条件已移除', /if \(tideOn \|\| sp < C\.dangerSpeed \* 1\.5\) \{/.test(SRC), false);
+eq('非潮汐速度门已移除', /sp < C\.dangerSpeed \* 1\.5/.test(SRC), false);
+eq('非潮汐扰动衰减已移除', /b\.dangerT = Math\.max\(0, b\.dangerT - dt \* 2\);/.test(SRC), false);
 eq('警示条按引信归一', /worst = Math\.max\(worst, b\.dangerT \/ fuse\);/.test(SRC), true);
+// ---- v326 弹字禁入底部道具带 + 警示文字移出实体层之前 ----
+// （用户："有些提示信息会叠在水滴下面导致字体被挡（比如死亡倒计时提示），有些则会
+//   出现在底部道具区域，这是不合理的，请优化一下。"）
+// ① addPopup 防重叠原为"只向下顺移一行"：底部连发的微反馈（+分数/移除/合成）层层
+//   cascading 涌进六钮区（btnCy-btnR=floorY+10）。改为贴冲突方跳一行（下行越界改上行），
+//   上限 = 容器底 floorY（layout 真源派生）。
+eq('弹字上限引layout容器底', /var popMaxY = MG\.layout\.body\.floorY;/.test(SRC), true);
+eq('防重叠贴冲突方跳行', /if \(op\.y < y && op\.y \+ 30 <= popMaxY\) y = op\.y \+ 30;/.test(SRC), true);
+eq('防重叠下行越界改上行', /else y = op\.y - 30;/.test(SRC), true);
+eq('弹字锚点夹紧上限', /if \(y > popMaxY\) y = popMaxY;/.test(SRC), true);
+eq('旧只降不升顺移已移除', /while \(Math\.abs\(op\.y - y\) < 28\) y \+= 30;/.test(SRC), false);
+// ② 越线警示文字（死亡倒计时提示）原随 drawDangerLine 在实体层之前绘制，堆高越线时
+//   被水滴盖住。v326 移入独立 drawDangerText()，调用点改到 bodies 之后。
+eq('警示文字独立函数', /function drawDangerText\(\) \{/.test(RSRC), true);
+eq('警示文字在实体层之后', (function () {
+  return RSRC.indexOf('drawDangerText();') > RSRC.indexOf('for (i = 0; i < phys.bodies.length; i++) drawBall(phys.bodies[i], 1);');
+})(), true);
+eq('警示文字仅drawDangerText绘制', (RSRC.match(/fillText\('堆高越线'/g) || []).length, 1);
+eq('drawDangerLine不再画警示文字', (function () {
+  var i0 = RSRC.indexOf('function drawDangerLine()'), i1 = RSRC.indexOf('function drawDangerText()');
+  return i0 >= 0 && i1 > i0 && RSRC.slice(i0, i1).indexOf('堆高越线') < 0;
+})(), true);
 // ---- v320 待投虚影生命感（用户："水滴没有坠落时，可以加一个合适的效果吗?目前看水滴是虚的而且看起来呆呆的"）----
 // ghostBob 单一相位源驱动整组预览：虚影球纵向漂浮 + 滴体同色系光晕呼吸，指示线顶与名称
 // 标签跟随同浮不断连；横向严格钉 aimX 不误导瞄准（幅度上限 4.2px=3+1.2，标签与球顶间距恒 5px）
@@ -496,7 +525,7 @@ eq('齿轮线描格白粗线', /ctx\.strokeStyle = '#FFFFFF'; ctx\.lineWidth = 2
 eq('旧细短线齿已移除', /ctx\.moveTo\(0, -10\); ctx\.lineTo\(0, -6\.5\);/.test(RSRC), false);
 eq('旧齿圈r6.5已移除', /ctx\.arc\(0, 0, 6\.5, 0, Math\.PI \* 2\); ctx\.stroke\(\);/.test(RSRC), false);
 eq('齿轮旧蓝灰色已移除', /ctx\.strokeStyle = '#3E6E90';\n    ctx\.lineWidth = 1\.6;/.test(RSRC), false);
-console.log('⑥ v195六钮真源+HUD卡度量+v196第一排+v197设置+v199/v200/v279设置图标与弹窗断言: ' + pass + ' pass, ' + fail + ' fail');
+console.log('⑥ v195六钮真源+HUD卡度量+v196第一排+v197设置+v199/v200/v279设置图标与弹窗+v322/v323潮汐判负+v326叠罗汉判负/弹字禁入道具带/警示文字置顶断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
 // ---- v317 设置弹窗第 4 行「清空存档」（用户："设置增加一个独立的功能：清空存档。用来重置游戏至初始状态。"）----

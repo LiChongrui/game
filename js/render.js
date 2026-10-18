@@ -1540,21 +1540,27 @@
         ctx.beginPath(); ctx.arc(ex2, C.dangerY, 2.2 + glow * 1.2, 0, Math.PI * 2); ctx.fill();
       }
     }
-    // 判定进行中：线上方居中倒计时提示（玩家能看懂"为什么快输了"）
-    if (dangerAlert > 0.12) {
-      ctx.textAlign = 'center';
-      ctx.font = 'bold 15px system-ui, sans-serif';
-      // 越线判负提示：与警戒线同语言、更急促的方波（2.5~4Hz），并随判定进度加剧
-      var dHz = 2.5 + dangerAlert * 1.5;
-      var dsq = Math.pow(0.5 + 0.5 * Math.sin(time * dHz * 2 * Math.PI), 3);
-      var wa = Math.min(1, dangerAlert * 1.5) * (0.2 + 0.8 * dsq);
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = 'rgba(255,255,255,' + wa + ')';
-      ctx.lineWidth = 3;
-      ctx.strokeText('堆高越线', C.W / 2, C.dangerY - 14);
-      ctx.fillStyle = 'rgba(196,48,42,' + wa + ')';
-      ctx.fillText('堆高越线', C.W / 2, C.dangerY - 14);
-    }
+    // 判定进行中的警示文字 v326 起移出本函数（见 drawDangerText）：原随警戒线在实体层
+    // 之前绘制，堆高时水滴就盘踞在文字一带、把警示语盖住，玩家看不到任何提示
+    // （用户："有些提示信息会叠在水滴下面导致字体被挡（比如死亡倒计时提示）"）。
+  }
+
+  // 越线判负警示文字（v326 从 drawDangerLine 内移出，改在实体层之后绘制——
+  // 堆高时水滴就盘踞在文字一带，画在 bodies 之前必被盖住）
+  function drawDangerText() {
+    if (dangerAlert <= 0.12) return;
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 15px system-ui, sans-serif';
+    // 越线判负提示：与警戒线同语言、更急促的方波（2.5~4Hz），并随判定进度加剧
+    var dHz = 2.5 + dangerAlert * 1.5;
+    var dsq = Math.pow(0.5 + 0.5 * Math.sin(time * dHz * 2 * Math.PI), 3);
+    var wa = Math.min(1, dangerAlert * 1.5) * (0.2 + 0.8 * dsq);
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,' + wa + ')';
+    ctx.lineWidth = 3;
+    ctx.strokeText('堆高越线', C.W / 2, C.dangerY - 14);
+    ctx.fillStyle = 'rgba(196,48,42,' + wa + ')';
+    ctx.fillText('堆高越线', C.W / 2, C.dangerY - 14);
   }
 
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
@@ -3322,6 +3328,7 @@
     drawChalChip();                 // v273：深渊潜航/每日挑战局信息芯片（挑战中显示目标与进度）
     if (hudInset > 0) ctx.restore();
     drawTideBanner(); // v188：涨潮横幅锚堆叠空间中心（非 HUD 元素，不吃 hudInset 平移）
+    drawDangerText(); // v326：越线警示文字改在实体层之后绘制（原在 drawDangerLine 内，堆高越线时被水滴盖住）
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
     drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）
     drawSkillBar();

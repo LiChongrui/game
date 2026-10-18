@@ -670,13 +670,24 @@
     // layout.body.mirrorCy = dangerY + 出生通道（出生区相对警戒线镜像到警戒线下方），
     // 保留设计稿相对 209 的偏移让多条弹字错开
     if (x === C.W / 2 && y >= 180 && y <= 320) y = annY(y);
-    // 防重叠：与仍在显示中的弹字同带（横向接近）时向下顺移一行，多条同时弹出不再叠字
+    // 防重叠：与仍在显示中的弹字同带（横向接近）时顺移一行，多条同时弹出不再叠字。
+    // ★ v326：顺移不得进入底部道具带（用户："有些（提示）则会出现在底部道具区域，
+    //   这是不合理的"）——原逻辑只向下顺移，底部连发的微反馈（+分数/移除/合成）
+    //   会层层 cascading 涌进六钮区（btnCy-btnR=floorY+10）。改为"贴冲突方跳一行"：
+    //   冲突方在上且其下一行仍在容器底之上时下行，否则上行；一步到位收敛（不再
+    //   固定 +30 反复往返）。上限 = 容器底 floorY：弹字绘制在实体层之上，压滴不
+    //   挡字；底部道具带则一律不占。
+    var popMaxY = MG.layout.body.floorY;
     for (var i = 0; i < popups.length; i++) {
       var op = popups[i];
       if (op.life > 0.35 && Math.abs(op.x - x) < 220) {
-        while (Math.abs(op.y - y) < 28) y += 30;
+        while (Math.abs(op.y - y) < 28) {
+          if (op.y < y && op.y + 30 <= popMaxY) y = op.y + 30;
+          else y = op.y - 30;
+        }
       }
     }
+    if (y > popMaxY) y = popMaxY; // 双重保险：锚点本身落在道具带内也夹回带上
     // v325：弹字时长参数化——原一律 life=1.0s，而渲染 alpha=life/max×1.5 ⇒ 前 1/3
     // 时长（0.33s）后就开始淡出，海神恩泽/深海事件/成就等公告一闪而过看不清
     // （用户："有些提示信息出现的太短了，比如海神恩泽等，出现时间要稍微长一点！
@@ -1709,7 +1720,16 @@
     //   超过涨潮全长 8s——"一次涨潮内永远攒不满、潮退滴落计时清零"是越线很难死亡的主因；
     //   ② 潮汐期间越线即计时、不看速度：速度门只堵死 10~13% 采样，却把"持续漂浮"与
     //   "被合成反冲弹飞的瞬时横穿"混为一谈——漂浮持续、横穿 <0.5s，2.2s 引信天然区分
-    //   （回落出线即清零）。非潮汐路径（速度门 + 扰动衰减）原样保留，行为不变。
+    //   （回落出线即清零）。
+    // ★ v326：非潮汐路径同潮汐——越线即计时、不看速度（用户："开始游戏时直接叠罗汉
+    //   超过警戒线也没有提示？"；test/sim_column.js 仿真定位）。真因：垂直细柱（12 滴
+    //   同 x 叠罗汉）在本引擎里永不"静止"——位置稳定在 ±1px（边缘滴 8s 纹丝不动），
+    //   但堆内接触解算持续微颤，越线滴均速 162px/s（>速度门 120），dangerT 被速度门
+    //   100% 堵死、再被衰减清零 ⇒ 警示条恒 0：无闪烁、无"堆高越线"文字、无判负。
+    //   速度门把"持续越线（堆高/微颤柱）"与"瞬时横穿（掉落/反冲/技能推射）"混为一谈，
+    //   而后者由三重机制区分、不需要速度门：① 出生宽限 0.6s > 任何容器内穿线时长
+    //   （~0.42s，sim_danger.js D 案 / sim_column.js J 案回归：峰速 572px/s 仍判负为无）；
+    //   ② 引信 1.1s >> 穿线时长 0.2~0.4s；③ 出线（top≥dangerY）即清零。
     var tideOn = tide.progress > 0.15;
     var bs = phys.bodies;
     var worst = 0;
@@ -1717,25 +1737,19 @@
       var b = bs[i];
       if (b.frozen > 0) continue; // 冻结滴视为"封存"，不判负
       if (b.grace > 0) { b.dangerT = 0; continue; }
-      var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
       var top = b.y - b.r;
       if (top >= C.dangerY) { b.dangerT = 0; continue; } // 线下，重置
       // 越线即计时，不再要求"有支撑"——高压堆里球体持续微颤导致支撑/速度判定
       // 反复失败、计时永远攒不满，是此前"明显越线却迟迟不判负"的根因。
       var fuse = tideOn ? C.dangerTime * 2 : C.dangerTime * (top < C.containerTop ? 0.55 : 1);
-      if (tideOn || sp < C.dangerSpeed * 1.5) {
-        b.dangerT += dt;
-        if (b.dangerT > fuse) {
-          // 每局一次「深流缓冲」：首次判负改为全局 3 秒宽限，缓解前期暴毙挫败感
-          if (!runBuffered) {
-            runBuffered = true;
-            for (var j = 0; j < bs.length; j++) { bs[j].dangerT = 0; bs[j].grace = 3; }
-            addPopup(C.W / 2, 248, '深流缓冲 · 宽限 3 秒', true, 0);
-          } else { dangerAlert = 0; gameOver(); return; }
-        }
-      } else {
-        // 被明显扰动（弹飞/合成反冲）：计时缓慢消退而非清零
-        b.dangerT = Math.max(0, b.dangerT - dt * 2);
+      b.dangerT += dt;
+      if (b.dangerT > fuse) {
+        // 每局一次「深流缓冲」：首次判负改为全局 3 秒宽限，缓解前期暴毙挫败感
+        if (!runBuffered) {
+          runBuffered = true;
+          for (var j = 0; j < bs.length; j++) { bs[j].dangerT = 0; bs[j].grace = 3; }
+          addPopup(C.W / 2, 248, '深流缓冲 · 宽限 3 秒', true, 0);
+        } else { dangerAlert = 0; gameOver(); return; }
       }
       worst = Math.max(worst, b.dangerT / fuse); // 按各体实际引信归一：潮汐 2.2s 警示条与判负同步满
     }
