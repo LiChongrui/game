@@ -664,7 +664,7 @@
   // 遗留 9:16 旧稿坐标（y=150 三处落进 HUD 信息条 hudBottom=165、环与文字分离），
   // 自此公告类特效一律经 annY 派生，禁止再写死旧坐标。
   function annY(y) { return MG.layout.body.mirrorCy + (y - 209); }
-  function addPopup(x, y, text, isBig, mult) {
+  function addPopup(x, y, text, isBig, mult, life) {
     // 公告带（居中 + 设计稿 y 180~320）锚定堆叠区镜像位（v190 用户："弹出提示（如涨潮等），
     // 要默认出现在出生区相对于警戒线在堆叠区中的镜像对称位置"）：基准 =
     // layout.body.mirrorCy = dangerY + 出生通道（出生区相对警戒线镜像到警戒线下方），
@@ -677,7 +677,14 @@
         while (Math.abs(op.y - y) < 28) y += 30;
       }
     }
-    popups.push({ x: x, y: y, text: text, life: 1.0, max: 1.0, big: !!isBig, mult: mult || 0, scale: 0.4 });
+    // v325：弹字时长参数化——原一律 life=1.0s，而渲染 alpha=life/max×1.5 ⇒ 前 1/3
+    // 时长（0.33s）后就开始淡出，海神恩泽/深海事件/成就等公告一闪而过看不清
+    // （用户："有些提示信息出现的太短了，比如海神恩泽等，出现时间要稍微长一点！
+    // 请梳理一下类似的提示并做出优化！"）。大字号公告默认 2.0s（不透明段 1.33s，
+    // 4 倍于原可读时间）；+分数/技能短标签等微反馈仍 1.0s；个别重要小字提示
+    // （甘霖预告/符文教程/越线冲走/任务更新/宝箱错过）显式传 life 延长。
+    var lf = life || (isBig ? 2.0 : 1.0);
+    popups.push({ x: x, y: y, text: text, life: lf, max: lf, big: !!isBig, mult: mult || 0, scale: 0.4 });
   }
   function addShake(amp, dur) {
     shakeAmp = Math.max(shakeAmp, amp);
@@ -1142,7 +1149,7 @@
         nextTier = t;
         rainHint = 2.5;
         aimX = clampAim(aimX);
-        addPopup(C.W / 2, 240, '甘霖 · 下一滴是「' + T[t].name + '」', false, 0);
+        addPopup(C.W / 2, 240, '甘霖 · 下一滴是「' + T[t].name + '」', false, 0, 1.6); // v325：预告类信息，1.6s 够读完
       }
     }
   }
@@ -1850,7 +1857,7 @@
     if (chest) {
       burstIron(chest.b.x, chest.b.y);
       phys.remove(chest.b);
-      addPopup(C.W / 2, FLOORY - 60, '大宝箱沉入深渊…', false, 0);
+      addPopup(C.W / 2, FLOORY - 60, '大宝箱沉入深渊…', false, 0, 1.6); // v325：错过提示，1.6s
     }
     chest = null;
     chestTimer = 40 + Math.random() * 25;
@@ -1902,7 +1909,7 @@
       questStaleT = 4;
       if (quest && quest.bornMax != null && questMaxTier() - quest.bornMax >= 3) {
         makeQuest(questDepth);
-        addPopup(C.W / 2, 266, '任务已更新', false, 0);
+        addPopup(C.W / 2, 266, '任务已更新', false, 0, 1.6); // v325：任务切换提示，1.6s
       }
     }
   }
@@ -2077,7 +2084,7 @@
       // v193：设计稿 y 158→250——addPopup 的公告带映射区间为 180~320，158 不进
       // 映射、滞留 HUD 信息条（hudBottom=165，压任务条/潮汐胶囊）；250 与其余潮汐
       // 公告（渐深提示/高潮/海事件）同带，经 annY 落到弹字带 mirrorCy+41=411
-      if (removed > 0) addPopup(C.W / 2, 250, '越线水滴被冲走 ×' + removed, false, 0);
+      if (removed > 0) addPopup(C.W / 2, 250, '越线水滴被冲走 ×' + removed, false, 0, 1.6); // v325：复活反馈，1.6s
       state = 'play';
     });
   }
@@ -2262,7 +2269,7 @@
         discoverSpecial('rune');
         if (!runeHintShown) {
           runeHintShown = true;
-          addPopup(C.W / 2, 244, '带符文的水滴：合成即可为技能充能', false, 0);
+          addPopup(C.W / 2, 244, '带符文的水滴：合成即可为技能充能', false, 0, 2.0); // v325：一次性教程提示，2.0s 读全
         }
       }
       if (ng.active && ng.active.ice && Math.random() < ng.active.ice) nb.ngIce = true; // 二周目「冰封之海」

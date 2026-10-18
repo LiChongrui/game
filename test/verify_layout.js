@@ -1,4 +1,4 @@
-// 布局几何验证（v324）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗（含第4行清空存档+二级确认面板，v318 文案精简）+潮汐满潮水面随海域线性增高（v322）+潮汐判负提速（v323）+深海涌泉抬升减半（v324）+待投虚影生命感（v320）/设置图标静态核查
+// 布局几何验证（v325）：MG.layout 单一几何真源 + 公告类 ring 锚定 + 漩涡锚点/图鉴面板度量/HUD 卡与底部六钮/第一排圆钮/设置钮与设置弹窗（含第4行清空存档+二级确认面板，v318 文案精简）+潮汐满潮水面随海域线性增高（v322）+潮汐判负提速（v323）+深海涌泉抬升减半（v324）+公告弹字时长（v325）+待投虚影生命感（v320）/设置图标静态核查
 // 纯 node 计算（vm 加载 config + layout，无浏览器/无 canvas）。
 // ★ v183 新定位语义（覆盖 v175~v182 的 EXTRA 分配方案；用户：
 //   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少！"）：
@@ -270,7 +270,18 @@ eq('涌泉作用区105', /if \(b\.y \+ b\.r > FLOORY - 105\) b\.vy -= 1700 \* dt
 eq('涌泉旧作用区210已移除', /FLOORY - 210\)/.test(SRC), false);
 eq('涌泉旧力1900已移除', /b\.vy -= 1900 \* dt;/.test(SRC), false);
 eq('涌泉辉光带保持90', /ctx\.fillRect\(0, FLOORY - 90, C\.W, 90\);/.test(SRC), true);
-console.log('④ v192 公告ring锚定断言: ' + pass + ' pass, ' + fail + ' fail');
+// ---- v325 公告弹字时长（用户："有些提示信息出现的太短了，比如海神恩泽等，出现时间要稍微长一点！请梳理一下类似的提示并做出优化！"）----
+// 原一律 life=1.0s，渲染 alpha=life/max×1.5 ⇒ 前 1/3 时长（0.33s）后即淡出，公告一闪而过。
+// 改：addPopup 增 life 参数；大字号公告默认 2.0s（不透明段 1.33s，4 倍可读时间），微反馈仍 1.0s。
+eq('addPopup支持life参数', /function addPopup\(x, y, text, isBig, mult, life\) \{/.test(SRC), true);
+eq('大字号公告默认2s', /var lf = life \|\| \(isBig \? 2\.0 : 1\.0\);/.test(SRC), true);
+eq('弹字生命引lf', /popups\.push\(\{ x: x, y: y, text: text, life: lf, max: lf, big: !!isBig, mult: mult \|\| 0, scale: 0\.4 \}\);/.test(SRC), true);
+eq('甘霖下一滴预告1.6s', /'甘霖 · 下一滴是「' \+ T\[t\]\.name \+ '」', false, 0, 1\.6\);/.test(SRC), true);
+eq('符文教程提示2s', /'带符文的水滴：合成即可为技能充能', false, 0, 2\.0\);/.test(SRC), true);
+eq('越线冲走复活反馈1.6s', /'越线水滴被冲走 ×' \+ removed, false, 0, 1\.6\);/.test(SRC), true);
+eq('任务已更新提示1.6s', /'任务已更新', false, 0, 1\.6\);/.test(SRC), true);
+eq('大宝箱错过提示1.6s', /'大宝箱沉入深渊…', false, 0, 1\.6\);/.test(SRC), true);
+console.log('④ v192公告ring锚定+深海事件(v194/v324)+弹字时长(v325)断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
 // ===== ⑤ 图鉴/成就面板度量（panels.js 静态核查）=====
