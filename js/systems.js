@@ -2081,6 +2081,16 @@
     }
   }
   // 事件视觉（在游戏区坐标系内绘制）
+  // v335：荧光浮游粒子池（用户从候选 F-K 中选 F，交互示例 test/storm_designs_demo2.html）——
+  // 90 颗发光粒子模块级初始化一次；差速旋转（内快外慢）自然涌现漩涡，不画任何"线条漩涡"。
+  var STORM_PS = [];
+  for (var spi = 0; spi < 90; spi++) {
+    var sr = 0.12 + Math.pow(Math.random(), 0.75) * 0.88;
+    STORM_PS.push({ a0: Math.random() * Math.PI * 2, r: sr,
+      sp: (2.2 / (0.3 + sr)) * (0.8 + Math.random() * 0.4),
+      sz: 1.2 + Math.random() * 2.6, warm: Math.random() < 0.25 });
+  }
+
   function drawEventVfx() {
     if (seaEvent.type === 'storm') {
       // 首尾各 0.8s 淡入淡出，避免漩涡凭空出现/消失
@@ -2090,59 +2100,37 @@
       ctx.globalAlpha = fadeK;
       ctx.translate(seaEvent.x, seaEvent.y);
       var R = 170;
-      // ① 漩涡漏斗：中心深、外缘透——暗示吸卷下沉（深海洋流感）
-      ctx.fillStyle = grad('stormFunnel', function () {
-        var gg = ctx.createRadialGradient(0, 0, 4, 0, 0, R + 20);
-        gg.addColorStop(0, 'rgba(16,48,78,0.46)');
-        gg.addColorStop(0.5, 'rgba(38,104,156,0.16)');
-        gg.addColorStop(1, 'rgba(70,150,210,0)');
+      // ① 中央幽光（漩涡眼区域微亮）
+      ctx.fillStyle = grad('stormPlankton', function () {
+        var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 56);
+        gg.addColorStop(0, 'rgba(140,220,230,0.3)');
+        gg.addColorStop(1, 'rgba(140,220,230,0)');
         return gg;
       });
-      ctx.beginPath(); ctx.arc(0, 0, R + 20, 0, Math.PI * 2); ctx.fill();
-      // ② 双层反向缓旋的流丝（对数螺旋，渐隐渐细）——俯视漩涡的灵动水流
-      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      for (var layer = 0; layer < 2; layer++) {
-        var dir = layer === 0 ? 1 : -1;
-        var rot = time * (0.85 + layer * 0.55) * dir;
-        ctx.rotate(rot);
-        var arms = 4;
-        for (var k = 0; k < arms; k++) {
-          var a0 = k * Math.PI * 2 / arms;
-          (function (a0, layer) {
-            ctx.strokeStyle = grad('stormArm' + layer + '_' + k, function () {
-              var gg = ctx.createLinearGradient(0, 0, Math.cos(a0) * R, Math.sin(a0) * R);
-              gg.addColorStop(0, layer === 0 ? 'rgba(222,246,255,0.6)' : 'rgba(150,212,245,0.42)');
-              gg.addColorStop(1, 'rgba(70,150,210,0)');
-              return gg;
-            });
-            ctx.lineWidth = layer === 0 ? 5 : 3.4;
-            ctx.beginPath();
-            for (var i2 = 0; i2 <= 40; i2++) {
-              var tt = i2 / 40;
-              var aa = a0 + dir * tt * Math.PI * 2.2;       // 绕 ~1.1 圈
-              var rr = 6 + (R - 6) * Math.pow(tt, 0.82);    // 对数感展开
-              var x2 = Math.cos(aa) * rr, y2 = Math.sin(aa) * rr;
-              if (i2 === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
-            }
-            ctx.stroke();
-          })(a0, layer);
+      ctx.beginPath(); ctx.arc(0, 0, 56, 0, Math.PI * 2); ctx.fill();
+      // ② 荧光浮游：每颗粒子沿自身轨道差速旋转（内快外慢），带 5 影彗尾拖影——
+      //    粒子云整体涌现出漩涡形态，零机感线条，纯"活的深海发光水"
+      ctx.lineCap = 'round';
+      for (var pi = 0; pi < STORM_PS.length; pi++) {
+        var p = STORM_PS[pi];
+        var rr = p.r * R;
+        var aa = p.a0 + time * p.sp;
+        for (var k = 0; k < 5; k++) {
+          var ba = aa - k * 0.035;
+          var x2 = Math.cos(ba) * rr, y2 = Math.sin(ba) * rr * 0.82;
+          var pa = (1 - k / 5) * (0.35 + 0.45 * Math.sin(time * 2 + p.a0 * 3));
+          ctx.beginPath();
+          ctx.fillStyle = p.warm
+            ? 'rgba(190,240,250,' + Math.max(0, pa).toFixed(3) + ')'
+            : 'rgba(150,225,235,' + Math.max(0, pa).toFixed(3) + ')';
+          ctx.arc(x2, y2, p.sz * (1 - k * 0.15), 0, Math.PI * 2);
+          ctx.fill();
         }
-        ctx.rotate(-rot); // 复位，避免叠加旋转
       }
-      // ③ 螺旋上升的气泡（动点，增强灵动感）
-      for (var bI = 0; bI < 16; bI++) {
-        var bt = time * 0.6 + bI * 0.41;
-        var br2 = 16 + (R - 16) * ((bI * 0.137) % 1);
-        var ba = bt * (1 + (bI % 3) * 0.28);
-        var bx = Math.cos(ba) * br2, by = Math.sin(ba) * br2;
-        var bp = 0.55 + 0.45 * Math.sin(bt * 2 + bI);
-        ctx.fillStyle = 'rgba(226,246,255,' + (0.08 + 0.16 * bp).toFixed(3) + ')';
-        ctx.beginPath(); ctx.arc(bx, by, 1.3 + bp * 1.9, 0, Math.PI * 2); ctx.fill();
-      }
-      // ④ 呼吸亮核（柔光，漩涡眼）
-      var core = 0.5 + 0.28 * Math.sin(time * 3.2);
-      ctx.fillStyle = 'rgba(232,246,255,' + core.toFixed(3) + ')';
-      ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill();
+      // ③ 漩涡眼亮点（微脉动）
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(235,250,255,' + (0.5 + 0.15 * Math.sin(time * 2.5)).toFixed(2) + ')';
+      ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     } else if (seaEvent.type === 'surge') {
       var g = grad('surge' + Math.round(FLOORY), function () {

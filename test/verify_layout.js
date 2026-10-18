@@ -653,10 +653,12 @@ eq('宝箱仅充已解锁技能', /var keys = \['swap', 'ripple', 'evap', 'flow'
 eq('宝箱彩虹滴需已发现', /if \(dexSpecial\['rainbow'\]\) \{[\s\S]*?nextSpecial = 'rainbow';/.test(SRC), true);
 // ⑥ 深海涌泉回调（v334，用户"托起的太高了，不合理"）：力 2000→1800、作用区 160→125（高度 213→150px，温和可见档）
 eq('涌泉力1800(v334)', /if \(b\.y \+ b\.r > FLOORY - 125\) b\.vy -= 1800 \* dt;/.test(SRC), true);
-// ⑦ 漩涡风暴重绘（用户"依旧很丑，要好好设计，跟主题匹配，显得灵动"）：漏斗+双层反向螺旋+气泡，旧单盘发光移除
-eq('漩涡漏斗重绘', /grad\('stormFunnel'/.test(SRC), true);
-eq('漩涡双层反向螺旋', /for \(var layer = 0; layer < 2; layer\+\+\) \{[\s\S]*?var rot = time \* \(0\.85 \+ layer \* 0\.55\) \* dir;/.test(SRC), true);
+// ⑦ 漩涡风暴重绘（v335，用户从候选 F-K 选 F 荧光浮游）：90 粒子差速旋转+彗尾拖影，旧漏斗螺旋/发光盘移除
+eq('漩涡荧光浮游粒子池', /var STORM_PS = \[\];/.test(SRC), true);
+eq('漩涡差速旋转', /sp: \(2\.2 \/ \(0\.3 \+ sr\)\)/.test(SRC), true);
+eq('漩涡彗尾拖影', /var ba = aa - k \* 0\.035;/.test(SRC), true);
 eq('漩涡旧发光盘已移除', /grad\('stormGlow'/.test(SRC), false);
+eq('漩涡旧漏斗螺旋已移除', /grad\('stormFunnel'/.test(SRC), false);
 console.log('⑨ v329 倒计时1Hz+提示分色+宝箱跟随+宝箱不开未解锁+涌泉修复+漩涡重绘断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
