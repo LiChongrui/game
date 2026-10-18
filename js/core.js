@@ -368,10 +368,4 @@
     }
   };
 
-  // ---------- 广告占位（上线微信时替换为 wx.createRewardedVideoAd） ----------
-  var adOverlay = null;
-  var ads = {
-    show: function (label, onReward) {
-      adOverlay = { label: label, t: 1.0, cb: onReward };
-    }
-  };
+  // v327：广告占位（ads / adOverlay）已移除——先不做广告

@@ -54,7 +54,7 @@
   var aiming = false;
   var cooldown = 0;
   var combo = 0, comboTimer = 0, maxCombo = 0;
-  var reviveCount = 0, doubled = false; // 每局可无限复活（看广告）
+  var doubled = false; // 结算双倍（v161 起去广告门，直接双倍；v327 移除看广告复活）
   var runBuffered = false; // 每局一次「深流缓冲」是否已用
   var popups = [], parts = [];
   var rippleQueue = []; // 待发的涟漪次波 { t, x, y }
@@ -1275,6 +1275,7 @@
           var f = P.pullF * (1 - d / P.pullR);
           o.vx += dx / d * f * dt * 10;
           o.vy += dy / d * f * dt * 10;
+          o.vortexGrace = 0.2; // v327：被漩涡拽拉/甩飞的水滴免予堆高判负（用户："漩涡滴带飞的水滴不参与堆高判定"）
         }
       }
       if (Math.random() < 0.3) {
@@ -1501,7 +1502,8 @@
       tide.progress = Math.max(0, tide.progress - dt / 1.6);
       if (tide.timer <= 0) {
         tide.phase = 'active';
-        tide.timer = C.tide.duration;
+        // v327：涨潮持续随海域线性拉长（sea0=duration → 深渊王座=durationMax），让深海引信链在退潮前兑现（原写死 duration，深海首潮永不致死）
+        tide.timer = C.tide.duration + (C.tide.durationMax - C.tide.duration) * seaStage() / (C.seaStages.length - 1);
         tide.banner = 2.4;
         if (!tideKillHint) { tideKillHint = true; addPopup(C.W / 2, 250, '潮位渐深 · 浮起越线同样危险', true, 0); }
         audio.tide();
@@ -1737,6 +1739,7 @@
       var b = bs[i];
       if (b.frozen > 0) continue; // 冻结滴视为"封存"，不判负
       if (b.grace > 0) { b.dangerT = 0; continue; }
+      if (b.vortexGrace > 0) { b.vortexGrace -= dt; b.dangerT = 0; continue; } // v327：漩涡拽拉/甩飞的水滴豁免堆高判负
       var top = b.y - b.r;
       if (top >= C.dangerY) { b.dangerT = 0; continue; } // 线下，重置
       // 越线即计时，不再要求"有支撑"——高压堆里球体持续微颤导致支撑/速度判定
@@ -2077,31 +2080,8 @@
     }
   }
 
-  // ---------- 结算 / 复活 / 重开 ----------
-  // 复活：不清空水滴——只冲走已越线的那几滴（否则它们悬在线上会立刻再次判负），其余局面原样保留
-  function doRevive() {
-    ads.show('复活', function () {
-      reviveCount++;
-      var bs = phys.bodies.slice(), i, removed = 0;
-      for (i = 0; i < bs.length; i++) {
-        var b = bs[i];
-        if ((b.y - b.r) < C.dangerY) {
-          burst(b.x, b.y, Math.max(0, b.tier), false);
-          phys.remove(b);
-          removed++;
-        }
-      }
-      for (i = 0; i < phys.bodies.length; i++) {
-        phys.bodies[i].dangerT = 0;
-        phys.bodies[i].grace = 0.8; // 短宽限，稳定局面
-      }
-      // v193：设计稿 y 158→250——addPopup 的公告带映射区间为 180~320，158 不进
-      // 映射、滞留 HUD 信息条（hudBottom=165，压任务条/潮汐胶囊）；250 与其余潮汐
-      // 公告（渐深提示/高潮/海事件）同带，经 annY 落到弹字带 mirrorCy+41=411
-      if (removed > 0) addPopup(C.W / 2, 250, '越线水滴被冲走 ×' + removed, false, 0, 1.6); // v325：复活反馈，1.6s
-      state = 'play';
-    });
-  }
+  // ---------- 结算 / 重开 ----------
+  // v327：复活（原"看广告复活"）已移除——先不做广告（结算页仅保留双倍/分享/重开）
   function doDouble() {
     // 不再看广告：直接双倍（广告占位已按需求移除）
     doubled = true;
@@ -2141,7 +2121,7 @@
       offlineGain = null;
     }
     combo = 0; comboTimer = 0; cooldown = 0; maxCombo = 0;
-    reviveCount = 0; doubled = false;
+    doubled = false;
     runBuffered = false; // 新局重置深流缓冲
     skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
     seaCount = 0; scoreMult = 1;
@@ -2174,13 +2154,9 @@
     // （面板几何走 MG.layout.overRect()，渲染 drawOver 与命中此处同源）
     var ovr = MG.layout.overRect();
     var areaTop = ovr.y + 190, areaBottom = ovr.y + ovr.h - 26;
-    var n = 1 + (doubled ? 0 : 1) + 2; // 复活(无限)/双倍/分享/重开（v274：深渊潜航入口撤出结算页）
+    var n = (doubled ? 0 : 1) + 2; // 双倍/分享/重开（v327：复活按钮移除——先不做广告）
     var groupH = n * bh + (n - 1) * gap;
     var y = areaTop + (areaBottom - areaTop - groupH) / 2;
-    {
-      overButtons.push({ x: x, y: y, w: bw, h: bh, label: '复活继续' + (reviveCount > 0 ? '（已复活 ' + reviveCount + ' 次）' : ''), action: doRevive, primary: true });
-      y += bh + gap;
-    }
     if (!doubled) {
       overButtons.push({ x: x, y: y, w: bw, h: bh, label: '结算双倍', action: doDouble });
       y += bh + gap;
@@ -2309,7 +2285,6 @@
     audio.ensure();
     var p = toLocal(e);
     lastPointer = p;
-    if (adOverlay) return;
     if (menuTrans.dir && performance.now() / 1000 - menuTrans.t0 < menuTrans.dur) return; // v237：过渡动画期间屏蔽输入
     if (confirmOpen) {
       // 重开确认弹窗（v300 恢复标题栏）：右上 ✕ 关闭；三按钮 返回主页/重新开始/返回游戏；点面板外也视为返回游戏
@@ -2484,12 +2459,12 @@
       achScroll = Math.max(0, Math.min(achDrag.s0 + (achDrag.y - p.y), achMaxScroll()));
       return;
     }
-    if (state !== 'play' || adOverlay || dexOpen || achOpen || setOpen || ngOpen || shareOpen || confirmOpen || evapMode || flowMode) return;
+    if (state !== 'play' || dexOpen || achOpen || setOpen || ngOpen || shareOpen || confirmOpen || evapMode || flowMode) return;
     aimX = clampAim(p.x);
   });
   canvas.addEventListener('pointerup', function (e) {
     achDrag = null; // v243 成就列表拖拽结束
-    if (!aiming || state !== 'play' || adOverlay || dexOpen || achOpen || setOpen || ngOpen || shareOpen || confirmOpen || evapMode || flowMode || rippleMode) { aiming = false; return; }
+    if (!aiming || state !== 'play' || dexOpen || achOpen || setOpen || ngOpen || shareOpen || confirmOpen || evapMode || flowMode || rippleMode) { aiming = false; return; }
     aiming = false;
     aimX = clampAim(toLocal(e).x);
     tryDrop();
@@ -2508,13 +2483,7 @@
     // 海域换色渐变计时：任何状态都推进（面板/结算打开时背景过渡不冻结）
     if (seaFade) { seaFade.t += dt; if (seaFade.t >= seaFade.dur) seaFade = null; }
     if (state === 'menu') { time += dt; updateFx(dt); return; } // 开始界面：只跑视觉动画
-    if (adOverlay) {
-      time += dt; // 广告演示期间环境动画照常流动（原实现整屏静止 1 秒，观感像卡顿了一下）
-      adOverlay.t -= dt;
-      if (adOverlay.t <= 0) { var cb = adOverlay.cb; adOverlay = null; if (cb) cb(); }
-      updateFx(dt);
-      return;
-    }
+    // v327：广告占位整段移除（先不做广告）
     // 弹层暂停（v240）：图鉴/成就殿堂/设置/二周目选择/分享卡/重开确认任一打开时游戏冻结——
     // 潮汐计时、冷却、物理、判负计时全部停走；time 继续推进（水波/气泡等环境动画保持流动），
     // 关闭弹层后自动恢复。menu 态已被上方分支提前返回，主页面板不受影响。

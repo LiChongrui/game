@@ -275,12 +275,18 @@ MG.config = {
     tide: {
       // v315：首潮倒计时不再单独设值，直接用 cycleInterval（用户："首次涨潮倒计时也用潮汐间隔的时间"）
     cycleInterval: 42,   // 两次涨潮间隔（v313：32→42，用户"初始增加到 40 以上"；随海域推进线性压到 tideIntervalMin）
-    duration: 7,         // 涨潮持续
+    duration: 7,         // 涨潮持续（sea0 值；v327：随海域线性拉长至 durationMax——见 updateTide）
+    durationMax: 9,      // v327：最后一个海域的涨潮持续。实测（test/sim_tide_probe.js）：深海引信链
+                        // 2.2s(引信)+3s(深流缓冲)+2.2s(二段)=7.4s > 满潮保持 7s，退潮 1.6s 内水滴
+                        // 随水面落回线下，二段引信永远差 ~0.3~1s 攒不满 ⇒ sea5~7 首个潮汐周期 72 个
+                        // sea×tier 用例实测"判负: 无"，全部被缓冲+退潮救走（虚晃一枪）。拉长至 9s 后
+                        // 引信链在退潮前兑现，深海潮汐首个周期即可判负
     buoyancy: 2900,      // 浮力加速度（v308：2300→2900——深水滴净上托 1400，配合抬高后的水位足以浮起高堆叠）
     // v322：满潮水面相对警戒线的偏移（px，负=线下）随海域线性增高——sea0=overMin 安全期
     // （水面 574，潮汐只重排不越线）→ 最后一个海域=overMax 最高（水面 280 = 警戒线上方
     // 35px，仍在出生点 260 下方 20px，虚影不被淹）。取代 v321 逐海域表（sea2 凸节后 sea4
     // 起每海仅 10px 走平）——用户："涨潮的高度不合理，按理说应当线性增高，最后一个海域达到最高"
+    // v327：仅调整涨潮"持续"随海域拉长（见 durationMax 与 updateTide），水位曲线保持 v322 线性。
     overMin: -259,
     overMax: 35,
     warnTime: 3          // 涨潮前预警秒数
@@ -1077,13 +1083,7 @@ MG.layout.build();
     }
   };
 
-  // ---------- 广告占位（上线微信时替换为 wx.createRewardedVideoAd） ----------
-  var adOverlay = null;
-  var ads = {
-    show: function (label, onReward) {
-      adOverlay = { label: label, t: 1.0, cb: onReward };
-    }
-  };
+  // v327：广告占位（ads / adOverlay）已移除——先不做广告
 
 ;
 // ===== js/systems.js =====
@@ -1143,7 +1143,7 @@ MG.layout.build();
   var aiming = false;
   var cooldown = 0;
   var combo = 0, comboTimer = 0, maxCombo = 0;
-  var reviveCount = 0, doubled = false; // 每局可无限复活（看广告）
+  var doubled = false; // 结算双倍（v161 起去广告门，直接双倍；v327 移除看广告复活）
   var runBuffered = false; // 每局一次「深流缓冲」是否已用
   var popups = [], parts = [];
   var rippleQueue = []; // 待发的涟漪次波 { t, x, y }
@@ -2364,6 +2364,7 @@ MG.layout.build();
           var f = P.pullF * (1 - d / P.pullR);
           o.vx += dx / d * f * dt * 10;
           o.vy += dy / d * f * dt * 10;
+          o.vortexGrace = 0.2; // v327：被漩涡拽拉/甩飞的水滴免予堆高判负（用户："漩涡滴带飞的水滴不参与堆高判定"）
         }
       }
       if (Math.random() < 0.3) {
@@ -2590,7 +2591,8 @@ MG.layout.build();
       tide.progress = Math.max(0, tide.progress - dt / 1.6);
       if (tide.timer <= 0) {
         tide.phase = 'active';
-        tide.timer = C.tide.duration;
+        // v327：涨潮持续随海域线性拉长（sea0=duration → 深渊王座=durationMax），让深海引信链在退潮前兑现（原写死 duration，深海首潮永不致死）
+        tide.timer = C.tide.duration + (C.tide.durationMax - C.tide.duration) * seaStage() / (C.seaStages.length - 1);
         tide.banner = 2.4;
         if (!tideKillHint) { tideKillHint = true; addPopup(C.W / 2, 250, '潮位渐深 · 浮起越线同样危险', true, 0); }
         audio.tide();
@@ -2826,6 +2828,7 @@ MG.layout.build();
       var b = bs[i];
       if (b.frozen > 0) continue; // 冻结滴视为"封存"，不判负
       if (b.grace > 0) { b.dangerT = 0; continue; }
+      if (b.vortexGrace > 0) { b.vortexGrace -= dt; b.dangerT = 0; continue; } // v327：漩涡拽拉/甩飞的水滴豁免堆高判负
       var top = b.y - b.r;
       if (top >= C.dangerY) { b.dangerT = 0; continue; } // 线下，重置
       // 越线即计时，不再要求"有支撑"——高压堆里球体持续微颤导致支撑/速度判定
@@ -3166,31 +3169,8 @@ MG.layout.build();
     }
   }
 
-  // ---------- 结算 / 复活 / 重开 ----------
-  // 复活：不清空水滴——只冲走已越线的那几滴（否则它们悬在线上会立刻再次判负），其余局面原样保留
-  function doRevive() {
-    ads.show('复活', function () {
-      reviveCount++;
-      var bs = phys.bodies.slice(), i, removed = 0;
-      for (i = 0; i < bs.length; i++) {
-        var b = bs[i];
-        if ((b.y - b.r) < C.dangerY) {
-          burst(b.x, b.y, Math.max(0, b.tier), false);
-          phys.remove(b);
-          removed++;
-        }
-      }
-      for (i = 0; i < phys.bodies.length; i++) {
-        phys.bodies[i].dangerT = 0;
-        phys.bodies[i].grace = 0.8; // 短宽限，稳定局面
-      }
-      // v193：设计稿 y 158→250——addPopup 的公告带映射区间为 180~320，158 不进
-      // 映射、滞留 HUD 信息条（hudBottom=165，压任务条/潮汐胶囊）；250 与其余潮汐
-      // 公告（渐深提示/高潮/海事件）同带，经 annY 落到弹字带 mirrorCy+41=411
-      if (removed > 0) addPopup(C.W / 2, 250, '越线水滴被冲走 ×' + removed, false, 0, 1.6); // v325：复活反馈，1.6s
-      state = 'play';
-    });
-  }
+  // ---------- 结算 / 重开 ----------
+  // v327：复活（原"看广告复活"）已移除——先不做广告（结算页仅保留双倍/分享/重开）
   function doDouble() {
     // 不再看广告：直接双倍（广告占位已按需求移除）
     doubled = true;
@@ -3230,7 +3210,7 @@ MG.layout.build();
       offlineGain = null;
     }
     combo = 0; comboTimer = 0; cooldown = 0; maxCombo = 0;
-    reviveCount = 0; doubled = false;
+    doubled = false;
     runBuffered = false; // 新局重置深流缓冲
     skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
     seaCount = 0; scoreMult = 1;
@@ -3263,13 +3243,9 @@ MG.layout.build();
     // （面板几何走 MG.layout.overRect()，渲染 drawOver 与命中此处同源）
     var ovr = MG.layout.overRect();
     var areaTop = ovr.y + 190, areaBottom = ovr.y + ovr.h - 26;
-    var n = 1 + (doubled ? 0 : 1) + 2; // 复活(无限)/双倍/分享/重开（v274：深渊潜航入口撤出结算页）
+    var n = (doubled ? 0 : 1) + 2; // 双倍/分享/重开（v327：复活按钮移除——先不做广告）
     var groupH = n * bh + (n - 1) * gap;
     var y = areaTop + (areaBottom - areaTop - groupH) / 2;
-    {
-      overButtons.push({ x: x, y: y, w: bw, h: bh, label: '复活继续' + (reviveCount > 0 ? '（已复活 ' + reviveCount + ' 次）' : ''), action: doRevive, primary: true });
-      y += bh + gap;
-    }
     if (!doubled) {
       overButtons.push({ x: x, y: y, w: bw, h: bh, label: '结算双倍', action: doDouble });
       y += bh + gap;
@@ -3398,7 +3374,6 @@ MG.layout.build();
     audio.ensure();
     var p = toLocal(e);
     lastPointer = p;
-    if (adOverlay) return;
     if (menuTrans.dir && performance.now() / 1000 - menuTrans.t0 < menuTrans.dur) return; // v237：过渡动画期间屏蔽输入
     if (confirmOpen) {
       // 重开确认弹窗（v300 恢复标题栏）：右上 ✕ 关闭；三按钮 返回主页/重新开始/返回游戏；点面板外也视为返回游戏
@@ -3573,12 +3548,12 @@ MG.layout.build();
       achScroll = Math.max(0, Math.min(achDrag.s0 + (achDrag.y - p.y), achMaxScroll()));
       return;
     }
-    if (state !== 'play' || adOverlay || dexOpen || achOpen || setOpen || ngOpen || shareOpen || confirmOpen || evapMode || flowMode) return;
+    if (state !== 'play' || dexOpen || achOpen || setOpen || ngOpen || shareOpen || confirmOpen || evapMode || flowMode) return;
     aimX = clampAim(p.x);
   });
   canvas.addEventListener('pointerup', function (e) {
     achDrag = null; // v243 成就列表拖拽结束
-    if (!aiming || state !== 'play' || adOverlay || dexOpen || achOpen || setOpen || ngOpen || shareOpen || confirmOpen || evapMode || flowMode || rippleMode) { aiming = false; return; }
+    if (!aiming || state !== 'play' || dexOpen || achOpen || setOpen || ngOpen || shareOpen || confirmOpen || evapMode || flowMode || rippleMode) { aiming = false; return; }
     aiming = false;
     aimX = clampAim(toLocal(e).x);
     tryDrop();
@@ -3597,13 +3572,7 @@ MG.layout.build();
     // 海域换色渐变计时：任何状态都推进（面板/结算打开时背景过渡不冻结）
     if (seaFade) { seaFade.t += dt; if (seaFade.t >= seaFade.dur) seaFade = null; }
     if (state === 'menu') { time += dt; updateFx(dt); return; } // 开始界面：只跑视觉动画
-    if (adOverlay) {
-      time += dt; // 广告演示期间环境动画照常流动（原实现整屏静止 1 秒，观感像卡顿了一下）
-      adOverlay.t -= dt;
-      if (adOverlay.t <= 0) { var cb = adOverlay.cb; adOverlay = null; if (cb) cb(); }
-      updateFx(dt);
-      return;
-    }
+    // v327：广告占位整段移除（先不做广告）
     // 弹层暂停（v240）：图鉴/成就殿堂/设置/二周目选择/分享卡/重开确认任一打开时游戏冻结——
     // 潮汐计时、冷却、物理、判负计时全部停走；time 继续推进（水波/气泡等环境动画保持流动），
     // 关闭弹层后自动恢复。menu 态已被上方分支提前返回，主页面板不受影响。
@@ -6171,7 +6140,7 @@ MG.layout.build();
 
   // 特殊滴/符文/礁石名称标签：紧贴虚影球顶（在 render 末尾绘制，保证不被 HUD 盖住）
   function drawGhostLabel() {
-    if (state !== 'play' || adOverlay || evapMode || flowMode || rippleMode || confirmOpen) return; // v320：补 flowMode，与虚影球同显隐
+    if (state !== 'play' || evapMode || flowMode || rippleMode || confirmOpen) return; // v320：补 flowMode，与虚影球同显隐
     var r = nextIron ? C.iron.r : T[nextTier].r;
     var label = nextIron ? '珊瑚礁' : (nextSpecial ? specialLabel(nextSpecial) : (nextRune ? runeName(nextRune) + '符文' : null));
     if (!label) return;
@@ -6485,10 +6454,10 @@ MG.layout.build();
     if (dangerAlert <= 0.12) return;
     ctx.textAlign = 'center';
     ctx.font = 'bold 15px system-ui, sans-serif';
-    // 越线判负提示：与警戒线同语言、更急促的方波（2.5~4Hz），并随判定进度加剧
-    var dHz = 2.5 + dangerAlert * 1.5;
+    // 越线判负提示：与警戒线同语言、平缓方波（v327 降闪：原 2.5~4Hz 过快，用户"文本闪太快"）→ 1.2~1.8Hz，并提高最低不透明度保证可读
+    var dHz = 1.2 + dangerAlert * 0.6;
     var dsq = Math.pow(0.5 + 0.5 * Math.sin(time * dHz * 2 * Math.PI), 3);
-    var wa = Math.min(1, dangerAlert * 1.5) * (0.2 + 0.8 * dsq);
+    var wa = Math.min(1, 0.5 + dangerAlert * 0.6) * (0.45 + 0.55 * dsq);
     ctx.lineJoin = 'round';
     ctx.strokeStyle = 'rgba(255,255,255,' + wa + ')';
     ctx.lineWidth = 3;
@@ -7511,44 +7480,7 @@ MG.layout.build();
     ctx.globalAlpha = 1;
   }
 
-  function drawAdOverlay() {
-    // 深海主题化广告演示层：暗化海水渐变 + 上浮气泡 + 漂流瓶，替代生硬的纯黑遮罩
-    var dim = ctx.createLinearGradient(0, 0, 0, VH);
-    dim.addColorStop(0, 'rgba(6,30,56,0.82)');
-    dim.addColorStop(1, 'rgba(4,18,36,0.88)');
-    ctx.fillStyle = dim;
-    ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
-    ctx.strokeStyle = 'rgba(160,220,255,0.25)';
-    ctx.lineWidth = 1.2;
-    for (var i = 0; i < 8; i++) {
-      var bx2 = 40 + i * 48 + Math.sin(time * 1.2 + i * 2.2) * 10;
-      var by2 = (VH + 20) - ((time * 46 + i * 97) % (VH + 40));
-      ctx.beginPath(); ctx.arc(bx2, by2, 3 + (i % 3), 0, Math.PI * 2); ctx.stroke();
-    }
-    // 漂流瓶（随水流轻摆）
-    ctx.save();
-    var bcy = MG.layout.panel.focusCy; // v191 修 bug：原引 panel.blockCy（v183 起重写 layout 后该字段已不存在，锚点 NaN 导致漂流瓶不绘制）
-    ctx.translate(C.W / 2, bcy - 64);
-    ctx.rotate(Math.sin(time * 1.4) * 0.12);
-    ctx.fillStyle = 'rgba(150,220,200,0.9)';
-    roundRect(-13, -10, 26, 34, 8); ctx.fill();
-    ctx.fillStyle = 'rgba(196,238,222,0.95)';
-    roundRect(-7, -24, 14, 16, 5); ctx.fill();
-    ctx.fillStyle = '#C99046';
-    roundRect(-8, -30, 16, 7, 3); ctx.fill();
-    ctx.fillStyle = '#F5E9C8';
-    roundRect(-8, 0, 16, 12, 2); ctx.fill();
-    ctx.restore();
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 25px system-ui, sans-serif';
-    ctx.fillText('深海漂流瓶 · 激励视频', C.W / 2, bcy + 26);
-    ctx.font = '18px system-ui, sans-serif';
-    ctx.fillText(adOverlay.label + ' · ' + adOverlay.t.toFixed(1) + 's 后发放奖励', C.W / 2, bcy + 52);
-    ctx.font = '14px system-ui, sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.fillText('（演示占位：上线微信时替换为 wx.createRewardedVideoAd）', C.W / 2, bcy + 78);
-  }
+  // v327：广告演示层 drawAdOverlay 已移除（先不做广告）
 
   function drawOver() {
     buildOverButtons();
@@ -7613,7 +7545,7 @@ MG.layout.build();
 
   // ---------- 首局主动引导（前 5 投分步提示，只出现一次） ----------
   function drawTutorial() {
-    if (tutDone || state !== 'play' || adOverlay || dexOpen || confirmOpen) return;
+    if (tutDone || state !== 'play' || dexOpen || confirmOpen) return;
     var step = Math.min(dropCount, TUT_STEPS.length - 1);
     var ty = MG.layout.body.tutY;
     var pulse = 0.5 + 0.5 * Math.sin(time * 4);
@@ -8151,7 +8083,7 @@ MG.layout.build();
     drawDangerLine();
     drawWaterBack();
     // v310：指示线在实体层之前绘制（坠落中的水滴盖在线上，线在"水滴后面"）
-    if (state === 'play' && !adOverlay && !evapMode && !flowMode && !rippleMode && !confirmOpen) {
+    if (state === 'play' && !evapMode && !flowMode && !rippleMode && !confirmOpen) {
       drawGhostGuide(aimX, nextTier);
     }
 
@@ -8176,7 +8108,7 @@ MG.layout.build();
 
     drawTutorial(); // 首局分步引导（前 5 投）
 
-    if (state === 'play' && !adOverlay && !evapMode && !flowMode && !rippleMode && !confirmOpen) {
+    if (state === 'play' && !evapMode && !flowMode && !rippleMode && !confirmOpen) {
       drawGhost(aimX, C.spawnY, nextTier, cooldown > 0 ? 0.25 : 0.6);
     }
 
@@ -8275,7 +8207,7 @@ MG.layout.build();
     else if (achOpen || panelFxAlive('ach')) drawPanelFx('ach', achOpen, DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + DEX_PANEL.h / 2, 0.6, drawAchPanel);
     if (ngOpen || panelFxAlive('ng')) { var pnR = MG.layout.ngRect(); drawPanelFx('ng', ngOpen, pnR.x + pnR.w / 2, pnR.y + pnR.h / 2, 0.66, drawNgPick); }
     if (shareOpen || panelFxAlive('share')) { var pshR = MG.layout.shareRect(); drawPanelFx('share', shareOpen, pshR.x + pshR.w / 2, pshR.y + pshR.h / 2, 0.6, drawShare); }
-    if (adOverlay) drawAdOverlay();
+    // v327：广告演示层调用已移除（先不做广告）
     if (state === 'over') drawOver();
 
     ctx.restore();

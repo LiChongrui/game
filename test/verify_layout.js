@@ -278,7 +278,7 @@ eq('大字号公告默认2s', /var lf = life \|\| \(isBig \? 2\.0 : 1\.0\);/.tes
 eq('弹字生命引lf', /popups\.push\(\{ x: x, y: y, text: text, life: lf, max: lf, big: !!isBig, mult: mult \|\| 0, scale: 0\.4 \}\);/.test(SRC), true);
 eq('甘霖下一滴预告1.6s', /'甘霖 · 下一滴是「' \+ T\[t\]\.name \+ '」', false, 0, 1\.6\);/.test(SRC), true);
 eq('符文教程提示2s', /'带符文的水滴：合成即可为技能充能', false, 0, 2\.0\);/.test(SRC), true);
-eq('越线冲走复活反馈1.6s', /'越线水滴被冲走 ×' \+ removed, false, 0, 1\.6\);/.test(SRC), true);
+// v327：复活功能已移除（先不做广告），原"越线水滴被冲走 ×N"公告随 doRevive 一并删除；负向回归见 ⑧
 eq('任务已更新提示1.6s', /'任务已更新', false, 0, 1\.6\);/.test(SRC), true);
 eq('大宝箱错过提示1.6s', /'大宝箱沉入深渊…', false, 0, 1\.6\);/.test(SRC), true);
 console.log('④ v192公告ring锚定+深海事件(v194/v324)+弹字时长(v325)断言: ' + pass + ' pass, ' + fail + ' fail');
@@ -429,7 +429,7 @@ eq('虚影呼吸光晕', /createRadialGradient\(x, gy, r \* 0\.2, x, gy, r \* 1\
 eq('光晕随冷却变暗', /hexToRgba\(glowC, \(0\.22 \+ 0\.10 \* pulse\) \* \(alpha \/ 0\.6\)\)/.test(RSRC), true);
 eq('指示线顶跟随漂浮', /var gy = C\.spawnY \+ ghostBob\(\);/.test(RSRC), true);
 eq('标签随虚影同浮', /C\.spawnY - r - 10 \+ ghostBob\(\)/.test(RSRC), true);
-eq('标签与球同显隐flowMode', /state !== 'play' \|\| adOverlay \|\| evapMode \|\| flowMode/.test(RSRC), true);
+eq('标签与球同显隐flowMode', /state !== 'play' \|\| evapMode \|\| flowMode \|\| rippleMode \|\| confirmOpen/.test(RSRC), true);
 eq('虚影横向不漂移', /drawGhost\(aimX, C\.spawnY, nextTier,/.test(RSRC), true);
 eq('虚影无横向偏移量', /drawGhost\(aimX \+ /.test(RSRC), false);
 eq('旧静态虚影drawBall已移除', /drawBall\(\{ x: x, y: y, r: r, tier: tier/.test(RSRC), false);
@@ -565,4 +565,25 @@ eq('setClearBtnRect定义', /setClearBtnRect: function \(i\) \{/.test(LSRC2), tr
 eq('setClearCloseRect定义', /setClearCloseRect: function \(\) \{/.test(LSRC2), true);
 console.log('⑦ v317 清空存档断言（v318 文案精简）: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
+
+// ===== ⑧ v327：漩涡拽拉水滴豁免堆高判负 + 警示文字降闪 + 涨潮持续随海域拉长 + 广告全链路移除 =====
+// 反馈 2：漩涡滴带飞的水滴不参与堆高判定（用户："漩涡滴带飞的水滴不参与堆高判定"）+ 
+// 「堆高越线」文字闪太快（v326 为 2.5~4Hz 方波，降为 1.2~1.8Hz 并提高最低不透明度）。
+// 反馈 1 修复：涨潮持续随海域线性拉长至 durationMax（深海首潮方能兑现引信链）。
+// 反馈 3：移除广告（ads 模块 / drawAdOverlay / 复活按钮 / 看广告文案），先不做广告。
+pass = 0; fail = 0;
+eq('漩涡拽拉置豁免标记', /o\.vortexGrace = 0\.2;/.test(SRC), true);
+eq('漩涡豁免堆高判负', /if \(b\.vortexGrace > 0\) \{ b\.vortexGrace -= dt; b\.dangerT = 0; continue; \}/.test(SRC), true);
+eq('警示文字降闪(1.2~1.8Hz)', /var dHz = 1\.2 \+ dangerAlert \* 0\.6;/.test(RSRC), true);
+eq('深海涨潮持续随海域拉长', /tide\.timer = C\.tide\.duration \+ \(C\.tide\.durationMax - C\.tide\.duration\) \* seaStage\(\) \/ \(C\.seaStages\.length - 1\);/.test(SRC), true);
+// 广告全链路移除回归
+eq('广告门控已移除', /ads\.show/.test(SRC), false);
+eq('复活按钮文案已移除', /复活继续/.test(SRC), false);
+eq('广告模块已移除', /var ads = \{/.test(CSRC), false);
+eq('广告演示层已移除', /function drawAdOverlay\(/.test(RSRC), false);
+eq('结算双倍保留(非广告)', /不再看广告：直接双倍/.test(SRC), true);
+eq('越线冲走复活反馈已移除', /越线水滴被冲走/.test(SRC), false);
+console.log('⑧ v327 漩涡豁免+降闪+涨潮持续+广告移除断言: ' + pass + ' pass, ' + fail + ' fail');
+f2 += fail;
+
 process.exit(f2 ? 1 : 0);

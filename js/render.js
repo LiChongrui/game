@@ -1237,7 +1237,7 @@
 
   // 特殊滴/符文/礁石名称标签：紧贴虚影球顶（在 render 末尾绘制，保证不被 HUD 盖住）
   function drawGhostLabel() {
-    if (state !== 'play' || adOverlay || evapMode || flowMode || rippleMode || confirmOpen) return; // v320：补 flowMode，与虚影球同显隐
+    if (state !== 'play' || evapMode || flowMode || rippleMode || confirmOpen) return; // v320：补 flowMode，与虚影球同显隐
     var r = nextIron ? C.iron.r : T[nextTier].r;
     var label = nextIron ? '珊瑚礁' : (nextSpecial ? specialLabel(nextSpecial) : (nextRune ? runeName(nextRune) + '符文' : null));
     if (!label) return;
@@ -1551,10 +1551,10 @@
     if (dangerAlert <= 0.12) return;
     ctx.textAlign = 'center';
     ctx.font = 'bold 15px system-ui, sans-serif';
-    // 越线判负提示：与警戒线同语言、更急促的方波（2.5~4Hz），并随判定进度加剧
-    var dHz = 2.5 + dangerAlert * 1.5;
+    // 越线判负提示：与警戒线同语言、平缓方波（v327 降闪：原 2.5~4Hz 过快，用户"文本闪太快"）→ 1.2~1.8Hz，并提高最低不透明度保证可读
+    var dHz = 1.2 + dangerAlert * 0.6;
     var dsq = Math.pow(0.5 + 0.5 * Math.sin(time * dHz * 2 * Math.PI), 3);
-    var wa = Math.min(1, dangerAlert * 1.5) * (0.2 + 0.8 * dsq);
+    var wa = Math.min(1, 0.5 + dangerAlert * 0.6) * (0.45 + 0.55 * dsq);
     ctx.lineJoin = 'round';
     ctx.strokeStyle = 'rgba(255,255,255,' + wa + ')';
     ctx.lineWidth = 3;
@@ -2577,44 +2577,7 @@
     ctx.globalAlpha = 1;
   }
 
-  function drawAdOverlay() {
-    // 深海主题化广告演示层：暗化海水渐变 + 上浮气泡 + 漂流瓶，替代生硬的纯黑遮罩
-    var dim = ctx.createLinearGradient(0, 0, 0, VH);
-    dim.addColorStop(0, 'rgba(6,30,56,0.82)');
-    dim.addColorStop(1, 'rgba(4,18,36,0.88)');
-    ctx.fillStyle = dim;
-    ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
-    ctx.strokeStyle = 'rgba(160,220,255,0.25)';
-    ctx.lineWidth = 1.2;
-    for (var i = 0; i < 8; i++) {
-      var bx2 = 40 + i * 48 + Math.sin(time * 1.2 + i * 2.2) * 10;
-      var by2 = (VH + 20) - ((time * 46 + i * 97) % (VH + 40));
-      ctx.beginPath(); ctx.arc(bx2, by2, 3 + (i % 3), 0, Math.PI * 2); ctx.stroke();
-    }
-    // 漂流瓶（随水流轻摆）
-    ctx.save();
-    var bcy = MG.layout.panel.focusCy; // v191 修 bug：原引 panel.blockCy（v183 起重写 layout 后该字段已不存在，锚点 NaN 导致漂流瓶不绘制）
-    ctx.translate(C.W / 2, bcy - 64);
-    ctx.rotate(Math.sin(time * 1.4) * 0.12);
-    ctx.fillStyle = 'rgba(150,220,200,0.9)';
-    roundRect(-13, -10, 26, 34, 8); ctx.fill();
-    ctx.fillStyle = 'rgba(196,238,222,0.95)';
-    roundRect(-7, -24, 14, 16, 5); ctx.fill();
-    ctx.fillStyle = '#C99046';
-    roundRect(-8, -30, 16, 7, 3); ctx.fill();
-    ctx.fillStyle = '#F5E9C8';
-    roundRect(-8, 0, 16, 12, 2); ctx.fill();
-    ctx.restore();
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 25px system-ui, sans-serif';
-    ctx.fillText('深海漂流瓶 · 激励视频', C.W / 2, bcy + 26);
-    ctx.font = '18px system-ui, sans-serif';
-    ctx.fillText(adOverlay.label + ' · ' + adOverlay.t.toFixed(1) + 's 后发放奖励', C.W / 2, bcy + 52);
-    ctx.font = '14px system-ui, sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.fillText('（演示占位：上线微信时替换为 wx.createRewardedVideoAd）', C.W / 2, bcy + 78);
-  }
+  // v327：广告演示层 drawAdOverlay 已移除（先不做广告）
 
   function drawOver() {
     buildOverButtons();
@@ -2679,7 +2642,7 @@
 
   // ---------- 首局主动引导（前 5 投分步提示，只出现一次） ----------
   function drawTutorial() {
-    if (tutDone || state !== 'play' || adOverlay || dexOpen || confirmOpen) return;
+    if (tutDone || state !== 'play' || dexOpen || confirmOpen) return;
     var step = Math.min(dropCount, TUT_STEPS.length - 1);
     var ty = MG.layout.body.tutY;
     var pulse = 0.5 + 0.5 * Math.sin(time * 4);
@@ -3217,7 +3180,7 @@
     drawDangerLine();
     drawWaterBack();
     // v310：指示线在实体层之前绘制（坠落中的水滴盖在线上，线在"水滴后面"）
-    if (state === 'play' && !adOverlay && !evapMode && !flowMode && !rippleMode && !confirmOpen) {
+    if (state === 'play' && !evapMode && !flowMode && !rippleMode && !confirmOpen) {
       drawGhostGuide(aimX, nextTier);
     }
 
@@ -3242,7 +3205,7 @@
 
     drawTutorial(); // 首局分步引导（前 5 投）
 
-    if (state === 'play' && !adOverlay && !evapMode && !flowMode && !rippleMode && !confirmOpen) {
+    if (state === 'play' && !evapMode && !flowMode && !rippleMode && !confirmOpen) {
       drawGhost(aimX, C.spawnY, nextTier, cooldown > 0 ? 0.25 : 0.6);
     }
 
@@ -3341,7 +3304,7 @@
     else if (achOpen || panelFxAlive('ach')) drawPanelFx('ach', achOpen, DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + DEX_PANEL.h / 2, 0.6, drawAchPanel);
     if (ngOpen || panelFxAlive('ng')) { var pnR = MG.layout.ngRect(); drawPanelFx('ng', ngOpen, pnR.x + pnR.w / 2, pnR.y + pnR.h / 2, 0.66, drawNgPick); }
     if (shareOpen || panelFxAlive('share')) { var pshR = MG.layout.shareRect(); drawPanelFx('share', shareOpen, pshR.x + pshR.w / 2, pshR.y + pshR.h / 2, 0.6, drawShare); }
-    if (adOverlay) drawAdOverlay();
+    // v327：广告演示层调用已移除（先不做广告）
     if (state === 'over') drawOver();
 
     ctx.restore();
