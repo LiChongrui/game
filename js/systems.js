@@ -857,7 +857,7 @@
   // 成就难度分级：diff 1=★入门 2=★★进阶 3=★★★传说，奖励按难度递增
   var ACH_DEFS = [
     // v285：目标再上调一档（用户："难度还是太低了"）；desc 与 target 保持一致（已达成的成就保留不撤）
-    { id: 'score2k',  name: '深海富豪', desc: '单局得分达到 65000',        target: 65000,  diff: 1, perk: '永续 · 开局充能 +2', cur: function () { return Math.max(score, best, lifeStats.best || 0); } },
+    { id: 'score2k',  name: '深海富豪', desc: '单局得分达到 65000',        target: 65000,  diff: 1, perk: '永续 · 开局充能 +1', cur: function () { return Math.max(score, best, lifeStats.best || 0); } }, // v350：perk 文案 +2→+1 与实际一致
     { id: 'combo6',   name: '连浪十叠', desc: '达成 10 连击',              target: 10,     diff: 1, perk: '永续 · 连击窗 +0.3s', cur: function () { return Math.max(maxCombo, lifeStats.combo || 0); } },
     { id: 'chest5',   name: '寻宝猎人', desc: '累计开启 25 只大宝箱',  target: 25,     diff: 1, perk: '永续 · 大宝箱奖励 +50%', cur: function () { return lifeStats.chest || 0; } },
     { id: 'tide12',   name: '弄潮儿',   desc: '经历 55 次涨潮',            target: 55,     diff: 2, perk: '永续 · 潮期得分 +10%', cur: function () { return lifeStats.tide || 0; } },
@@ -883,9 +883,10 @@
       score += gain;
       scoreBump = 0.4;
       var pick = C.skills[(Math.random() * C.skills.length) | 0];
-      addCharge(pick.key, d === 3 ? 4 : (d === 2 ? 2 : 1));
+      // v350：成就充能 ★★★ 4→3（★/★★ 的 1/2 已是最低档，保持）
+      addCharge(pick.key, d === 3 ? 3 : (d === 2 ? 2 : 1));
       addPopup(C.W / 2, 240, '成就达成 · ' + a.name + ' +' + gain, true, 0);
-      addPopup(C.W / 2, 266, '「' + pick.name + '」充能 +' + (d === 3 ? 4 : (d === 2 ? 2 : 1)), false, 0);
+      addPopup(C.W / 2, 266, '「' + pick.name + '」充能 +' + (d === 3 ? 3 : (d === 2 ? 2 : 1)), false, 0);
       parts.push({ type: 'ring', x: C.W / 2, y: annY(150), r: 26, life: 0.6, max: 0.6, color: '#F5C542' });
       audio.quest();
       saveDex();
@@ -941,9 +942,9 @@
   // 领取记录持久化（mg_dex.col），老存档的既有收集会在下一局开始后 1 秒内自动补发
   var COL_MILESTONES = [
     { id: 'm25',  pct: 0.25, score: 500,  charge: 1, name: '收集 25%' },
-    { id: 'm50',  pct: 0.5,  score: 1200, charge: 2, name: '收集 50%', chest: true },
-    { id: 'm75',  pct: 0.75, score: 2500, charge: 3, name: '收集 75%', chest: true },
-    { id: 'm100', pct: 1,    score: 6000, charge: 0, name: '集齐图鉴', allCharge: 2 }
+    { id: 'm50',  pct: 0.5,  score: 1200, charge: 1, name: '收集 50%', chest: true },  // v350：2→1
+    { id: 'm75',  pct: 0.75, score: 2500, charge: 2, name: '收集 75%', chest: true },  // v350：3→2
+    { id: 'm100', pct: 1,    score: 6000, charge: 0, name: '集齐图鉴', allCharge: 1 }  // v350：全技能 2→1
   ];
   function colProgress() {
     var n = 0, t, k;
@@ -1972,19 +1973,20 @@
     chestTimer = 85 + Math.random() * 45; // v343：开启后重置间隔拉长（原 45+30rand）
     var r = Math.random();
     var chestBonus = perkOn('chest5') ? 1.5 : 1; // 成就加成：寻宝猎人
-    if (r < 0.6) {
+    if (r < 0.68) { // v350：分数档 60%→68%（符文档相应压缩到 12%）
       var gain = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
       score += gain; scoreBump = 0.4;
       if (score > best) { best = score; saveNum('mg_best', best); }
       addPopup(x, y - 30, '大宝箱开启 +' + gain, true, 0, 0, 'reward'); // v343：'good'不在 PCOLMAP 会回退蓝灰→改 reward 绿
-    } else if (r < 0.78) { // v344：符文充能概率 35%(0.4~0.75)→18%(0.6~0.78)，降低非符文滴获取符文的概率
+    } else if (r < 0.80) { // v344：35%(0.4~0.75)→18%(0.6~0.78)；v350：→12%(0.68~0.80)，道具获取整体降低
       // v316：只充已解锁技能（符文道具）；v329：未解锁任何技能时不开符文道具，改发积分
       // （用户："宝箱不能开出未出现的道具，例如符文道具还没激活"）——移除旧"全锁兜底充任意"逻辑
       var keys = ['swap', 'ripple', 'evap', 'flow'].filter(function (k) { return skillUnlocked(k); });
       if (keys.length) {
         var k = keys[(Math.random() * keys.length) | 0];
-        addCharge(k, perkOn('chest5') ? 3 : 2);
-        addPopup(x, y - 30, '大宝箱开启：' + runeName(k) + ' +2 充能', true, 0, 0, 'reward');
+        var cn = perkOn('chest5') ? 2 : 1; // v350：+2/+3 → +1/+2（宝箱符文收益同步降一档）
+        addCharge(k, cn);
+        addPopup(x, y - 30, '大宝箱开启：' + runeName(k) + ' +' + cn + ' 充能', true, 0, 0, 'reward');
       } else {
         var g2 = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
         score += g2; scoreBump = 0.4;
@@ -2281,11 +2283,11 @@
     tide.phase = 'idle'; tide.timer = C.tide.cycleInterval; tide.progress = 0; tide.banner = 0; // v315：同上
     endlessT = 0; rampStage = 0; climaxMark = 0;
     makeQuest(0);
-    // 成就加成：深海富豪开局随机技能充能 +2
+    // 成就加成：深海富豪开局随机技能充能 +1（v350：+2→+1，道具获取整体降低）
     if (perkOn('score2k')) {
       var pk = C.skills[(Math.random() * C.skills.length) | 0];
-      addCharge(pk.key, 2);
-      addPopup(C.W / 2, 280, '深海富豪：「' + pk.name + '」开局充能 +2', false, 0);
+      addCharge(pk.key, 1);
+      addPopup(C.W / 2, 280, '深海富豪：「' + pk.name + '」开局充能 +1', false, 0);
     }
     state = 'play';
   }
