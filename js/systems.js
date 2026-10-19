@@ -211,6 +211,20 @@
     p = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; // easeInOutQuad
     return { from: seaFade.from, to: seaFade.to, k: p };
   }
+  // v355：挑战完成度 = 当前分数在「到达最深海域所需分组」中的位置（唯一真源，渲染层直接调用）。
+  // 语义：8 个海域分组把全程均分成 n-1 档（每跨过一个海域 +1 档），**档内再按分数线性插值**——
+  // 不再像 v277 那样只在跨档瞬间跳变一整档（旧式：卡在 71% 整局不动，跨过 10 万才跳到 86%）。
+  // 到达最深海域（累计分 ≥ C.seaStages[last].at）= 100%，即任务完成。分数取与 seaStage 同源的
+  // 累计分 totalScore()（决定海域的是累计分，不是单局分）。
+  function seaProgress() {
+    var n = C.seaStages.length, last = n - 1, ts = totalScore();
+    if (ts >= C.seaStages[last].at) return 1;
+    var i = 0;
+    for (var k = last - 1; k >= 0; k--) { if (ts >= C.seaStages[k].at) { i = k; break; } }
+    var lo = C.seaStages[i].at, hi = C.seaStages[i + 1].at;
+    var f = hi > lo ? (ts - lo) / (hi - lo) : 0;
+    return Math.max(0, Math.min(1, (i + f) / last));
+  }
 
   // ---------- 每日任务（按日期种子生成，跨局累计；全完成涨连续天数） ----------
   function todayStr() {

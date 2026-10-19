@@ -2049,13 +2049,14 @@
   function drawChalChip() {
     if (!ng || !ng.active) return;
     // v276：所有模式的目标 = 到达最深的海洋（用户）。主行 = 词缀名 + 完成海域百分比
-    // （v277：已完成海域数/（总海域-1），初始 0%、每完成一个海域 +1 档、最深海域=100%）；
+    // （v355 起 = 当前分数在「到达最深海域所需分组」中的位置，档内按分数连续插值，见 systems.seaProgress）；
     // 第二行小字 = 完整增益（与词缀卡介绍一致：desc；v281 起无得分倍率）。两行水平居中、垂直均匀分布。
     var name, pctStr, sub, gold, prog;
     name = ng.active.name;
-    var sIdx = seaStage();
-    // v277：进度 = 已完成海域数 /（总海域-1）——初始 0%、每完成一个海域 +1 档、到达最深海域 = 100%
-    prog = Math.max(0, Math.min(1, sIdx / (C.seaStages.length - 1)));
+    // v355：进度引 systems.seaProgress() 唯一真源 = 当前分数在「到达最深海域所需分组」中的位置
+    // （每跨过一个海域分组占一档、档内按分数线性插值），不再用 v277 的海域序号粗分档
+    // （旧式只在跨档瞬间跳 1/7，一整局可能纹丝不动）。到达最深海域 = 100%，即任务完成。
+    prog = seaProgress();
     pctStr = Math.round(prog * 100) + '%';
     gold = prog >= 1;
     sub = ng.active.desc + (ng.active.mult ? ' · 得分 ×' + ng.active.mult : '');
@@ -2722,7 +2723,7 @@
     }
     // v276：挑战局结果行（与挑战芯片同语义：目标=到达最深海洋，显示海域进度+完整增益倍率）
     if (ng && ng.active) {
-      var chalPct = Math.min(100, Math.round((seaStage() + 1) / C.seaStages.length * 100));
+      var chalPct = Math.min(100, Math.round(seaProgress() * 100)); // v355：与芯片同真源
       var chalOk = chalPct >= 100;
       var chalText = ng.active.name + ' · 海域进度 ' + chalPct + '%' + (ng.active.mult ? ' · 得分 ×' + ng.active.mult : '');
       ctx.font = 'bold 15px system-ui, sans-serif';
