@@ -321,7 +321,7 @@
     { id: 'storm',   name: '疾风骤雨', desc: '潮汐间隔 -65%',          tideInt: 0.35 },
     { id: 'reef',    name: '暗礁密布', desc: '珊瑚礁概率 ×4',          ironX: 4 },
     { id: 'frost',   name: '寒冰速冻', desc: '水滴 35% 落水即冻',      ice: 0.35 },
-    { id: 'abyss',   name: '深渊试炼', desc: '重力 +40% 且潮汐 -65%',  grav: 1.4, tideInt: 0.35 },  // v328：用户"深渊试炼（重力 +40% 且潮汐 -65%）"——grav 1.8→1.4（+40%），tideInt 0.35 保持（潮汐 -65%）
+    { id: 'abyss',   name: '深渊试炼', desc: '重力 +40% · 潮汐更频且潮期涌动加剧、无宽限',  grav: 1.4, tideInt: 0.35, tideToss: 1.9, tideNoGrace: true },  // v339：原"潮汐 -65%"在正常局实为增益（潮水托离警戒线+潮期引信×2更安全），改为真减益——潮期浮力×1.9涌动更猛、且取消潮期引信宽限（tideNoGrace），靠近警戒线时潮期也是真危险
     { id: 'icereef', name: '冰礁交错', desc: '暗礁 ×5 且 45% 落水即冻', ironX: 5, ice: 0.45 }
   ];
   var dchal = (function () {
@@ -1335,9 +1335,18 @@
   function splitCloud(b) {
     phys.remove(b);
     burst(b.x, b.y, 0, false);
-    var s1 = phys.create(b.x - 14, b.y - 6, 0, -90, -60);
-    var s2 = phys.create(b.x + 14, b.y - 6, 0, 90, -60);
-    s1.popT = s2.popT = 0.25;
+    // v339：随机分裂 2~3 颗，每颗档位随机 0..maxTier（不大于当前等级，保持"补充低级滴"定位）
+    var n = C.cloud.minSplit + ((Math.random() < 0.5) ? 0 : (C.cloud.maxSplit - C.cloud.minSplit));
+    var cap = C.cloud.maxTier;
+    var spread = (n === 3) ? 1.0 : 0.7;   // 三颗撒得更开
+    for (var i = 0; i < n; i++) {
+      var tier = (Math.random() * (cap + 1)) | 0;                 // 0..cap 随机档位
+      var ang = (i / n - 0.5) * spread * Math.PI;                 // 以虚影为中心左右扇形散开
+      var vx = Math.sin(ang) * 80;
+      var vy = -55 - Math.random() * 45;
+      var d = phys.create(b.x + Math.sin(ang) * 16, b.y - 6, tier, vx, vy);
+      d.popT = 0.25;
+    }
     addPopup(b.x, b.y - 20, '雨云化雨', false, 0);
     audio.blip(520, 0.2, 'sine', 0.13, 1.8);
   }
@@ -1603,7 +1612,8 @@
       var subm = (b.y + b.r - wy) / (2 * b.r);
       if (subm <= 0) continue;
       var f = Math.min(1, subm);
-      b.vy -= C.tide.buoyancy * f * dt;
+      var buoy = C.tide.buoyancy * ((ng.active && ng.active.tideToss && tide.phase === 'active') ? ng.active.tideToss : 1); // v339：深渊试炼潮期浮力×tideToss，涌动更猛、更难落位
+      b.vy -= buoy * f * dt;
       // 水的阻力
       var drag = Math.min(0.9, 2.2 * f * dt);
       b.vx *= (1 - drag);
@@ -1763,7 +1773,7 @@
     // 失败判定：越线即计时、不看速度（v323/v326）。堆叠/微颤柱"明显越线却迟迟不判负"的根因是
     // 速度门把"持续越线"与"瞬时横穿"混为一谈，而后者由三重机制区分（出生宽限 0.6s、引信 1.1s、
     // 出线即清零），故越线滴一律计时。v328 起潮汐水面恒在警戒线下方（见 tideWaterMax），潮汐只做
-    // 水下浮力重排、不再把水滴推越线；潮汐期间引信仍 ×2（水下游动更慢，给足反应）。
+    // 水下浮力重排、不再把水滴推越线；潮汐期间引信仍 ×2（水下游动更慢，给足反应）——但深渊试炼(tideNoGrace)取消此宽限。
     // 三条豁免：冻结滴(b.frozen)、漩涡拽拉/甩飞(b.vortexGrace)、全部瞬态特殊滴(b.special)不计堆高。
     // 死亡缓冲：越线即显示"死亡缓冲"倒计时(dangerRemain)，每局一次首死延长引信即为缓冲（弹字已移除）。
     // ★ v323：潮汐判负两条修正（用户："涨潮引起的越线好像很难死亡，是判定不对吗？"；
@@ -1783,6 +1793,7 @@
     //   （~0.42s，sim_danger.js D 案 / sim_column.js J 案回归：峰速 572px/s 仍判负为无）；
     //   ② 引信 1.1s >> 穿线时长 0.2~0.4s；③ 出线（top≥dangerY）即清零。
     var tideOn = tide.progress > 0.15;
+    if (ng.active && ng.active.tideNoGrace) tideOn = false; // v339：深渊试炼取消潮期引信宽限——潮期靠近警戒线也是真危险（原潮期×2 反成安全网，是"潮汐更频"实为增益的根因）
     var bs = phys.bodies;
     var worst = 0, minRemain = 99;
     for (var i = 0; i < bs.length; i++) {

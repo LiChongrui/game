@@ -603,7 +603,7 @@ f2 += fail;
 //   （雨云/冰晶/磁吸/熔岩/间歇泉/虚空/极光/彩虹/雷霆/珍珠/甘霖）均不参与堆高；
 //   ② 恢复"复活继续"按钮（v327 误删——用户只要去广告，复活功能保留，直接复活无广告）；
 //   ③ 死亡缓冲改为倒计时（dangerRemain），移除"深流缓冲·宽限"专用弹字；
-//   ④ 词缀加重：重压深潜 +80%（grav 1.8）、深渊试炼 重力 +40% 且潮汐 -65%（grav 1.4 + tideInt 0.35）。
+//   ④ 词缀加重：重压深潜 +80%（grav 1.8）、深渊试炼 重力 +40% 且潮期涌动加剧·无宽限（grav 1.4 + tideInt 0.35 + tideToss 1.9 + tideNoGrace）。
 pass = 0; fail = 0;
 eq('漩涡拽拉置豁免标记', /o\.vortexGrace = 0\.2;/.test(SRC), true);
 eq('漩涡豁免堆高判负', /if \(b\.vortexGrace > 0\) \{ b\.vortexGrace -= dt; b\.dangerT = 0; continue; \}/.test(SRC), true);
@@ -627,7 +627,7 @@ eq('深流缓冲弹字已移除', /addPopup\([^)]*深流缓冲/.test(SRC), false
 var CFG = src('js/config.js');
 eq('重压深潜+80%(config)', /id: 'heavy', name: '重压深潜', desc: '重力 \+80%',\s*grav: 1\.8/.test(CFG), true);
 eq('重压深潜+80%(DCHAL)', /id: 'heavy',\s*name: '重压深潜', desc: '重力 \+80%',\s*grav: 1\.8/.test(SRC), true);
-eq('深渊试炼+40%且潮汐-65%(DCHAL)', /id: 'abyss',\s*name: '深渊试炼',\s*desc: '重力 \+40% 且潮汐 -65%',\s*grav: 1\.4, tideInt: 0\.35/.test(SRC), true);
+eq('深渊试炼真减益(DCHAL)', /id: 'abyss',\s*name: '深渊试炼',\s*desc: '重力 \+40% · 潮汐更频且潮期涌动加剧、无宽限',\s*grav: 1\.4, tideInt: 0\.35, tideToss: 1\.9, tideNoGrace: true/.test(SRC), true);
 console.log('⑧ v327/v328 漩涡/特殊滴豁免+降闪+涨潮持续+广告移除+复活恢复+词缀加重断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
