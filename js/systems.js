@@ -503,7 +503,7 @@
   var jellies = [];
   for (var ji = 0; ji < 2; ji++) {
     jellies.push({
-      x: 60 + Math.random() * (C.W - 120),
+      x: 60 + Math.random() * (LW - 120), // v347：水母画在全屏背景层（无 BX 偏移），旧版按 C.W 会开局全挤在左侧
       y: 260 + ji * 170,
       s: 13 + Math.random() * 9,
       ph: Math.random() * Math.PI * 2,

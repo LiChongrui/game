@@ -160,14 +160,14 @@
     ctx.fillRect(0, 0, LW, 300);
     ctx.fillStyle = grad('glowL' + lk, function () {
       var gg = ctx.createRadialGradient(LW * 0.22, -50, 10, LW * 0.22, -50, 280);
-      gg.addColorStop(0, 'rgba(255,255,255,0.34)');
+      gg.addColorStop(0, 'rgba(255,255,255,0.30)'); // v347：与 glowR 对齐，消除左亮右暗的偏侧感
       gg.addColorStop(1, 'rgba(255,255,255,0)');
       return gg;
     });
     ctx.fillRect(0, 0, LW, 300);
     ctx.fillStyle = grad('glowR' + lk, function () {
       var gg = ctx.createRadialGradient(LW * 0.8, -50, 10, LW * 0.8, -50, 280);
-      gg.addColorStop(0, 'rgba(255,255,255,0.26)');
+      gg.addColorStop(0, 'rgba(255,255,255,0.30)'); // v347：与 glowL 对齐
       gg.addColorStop(1, 'rgba(255,255,255,0)');
       return gg;
     });
@@ -2983,7 +2983,7 @@
     });
     // 顶部光柱（god rays）：4 道斜光缓慢摆动
     for (i = 0; i < 4; i++) {
-      var rayX = 60 + i * 100;
+      var rayX = -BX + LW * (0.15 + i * 0.23); // v347：横跨全屏（旧版 60+i*100 只在块内，宽屏两侧空）
       var sway = Math.sin(time * 0.35 + i * 1.7) * 26;
       var topW = 26 + (i % 2) * 14, botW = topW * 2.6;
       ctx.fillStyle = rg;
@@ -2997,7 +2997,7 @@
     // 浮游颗粒：微尘漂移 + 闪烁
     for (i = 0; i < 16; i++) {
       var sd = i * 137;
-      var px = 20 + (sd * 7 % (C.W - 40)) + Math.sin(time * 0.4 + i) * 8;
+      var px = -BX + 20 + (sd * 7 % (LW - 40)) + Math.sin(time * 0.4 + i) * 8;
       var py = (sd * 13 % VH) + Math.sin(time * 0.25 + i * 2.1) * 14;
       var pa = 0.04 + 0.05 * (0.5 + 0.5 * Math.sin(time * 1.2 + i * 2.3));
       ctx.fillStyle = 'rgba(230,248,255,' + pa.toFixed(2) + ')';
@@ -3006,7 +3006,7 @@
     // 气泡：上升 + 左右轻摆，大小分层
     for (i = 0; i < 12; i++) {
       var seed = i * 97;
-      var bx = 24 + (seed % (C.W - 48)) + Math.sin(time * 0.8 + i * 1.9) * 10;
+      var bx = -BX + 24 + (seed % (LW - 48)) + Math.sin(time * 0.8 + i * 1.9) * 10;
       var by = VH + 40 - ((time * (16 + i * 3.5) + seed * 3) % (VH + 140));
       var br = 2.5 + (i % 4) * 2.6;
       ctx.beginPath();
@@ -3020,10 +3020,15 @@
     for (i = 0; i < 2; i++) {
       var fd = i * 53, speed = 22 + i * 14;
       var trav = time * speed + fd * 40;
-      var fx2 = (trav % (C.W + 120)) - 60;
+      // v347：横跨全屏（旧版按 C.W 巡游，宽屏只在左侧一段来回、右侧全空）+ 翻面严格跟随
+      // 运动方向（旧版位移恒向右、flip 却按圈数交替 → 奇数圈朝左却向右移 = "倒着游泳"）
+      var span = LW + 120;
+      var cyc = Math.floor(trav / span), tIn = trav % span;
+      var goingRight = (cyc % 2) === 0;   // 偶数趟向右、奇数趟折返回左（来回转身）
+      var fx2 = -BX + (goingRight ? (tIn - 60) : (LW + 60 - tIn));
       var fy2 = 215 + i * 125 + Math.sin(time * 0.9 + i * 2.4) * 12;
       var fs2 = 0.8 + i * 0.35;
-      var flip = (Math.floor(trav / (C.W + 120)) % 2) ? -1 : 1;
+      var flip = goingRight ? 1 : -1;     // 与位移同向，绝不倒游
       ctx.save();
       ctx.translate(fx2, fy2); ctx.scale(fs2 * flip, fs2);
       ctx.fillStyle = 'rgba(10,44,74,0.20)';
