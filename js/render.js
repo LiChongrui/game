@@ -2545,7 +2545,8 @@
         ctx.strokeStyle = '#E24B4A'; ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(btn.cx, btn.cy, btn.r + 3, 0, Math.PI * 2); ctx.stroke();
       }
-      // 名称标签：圆钮下方居中
+      // 名称标签：圆钮下方居中（v344：画前显式 center——drawChargeBadge 末尾改过 textAlign='left'，会污染此处对齐导致文字右偏）
+      ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(240,250,252,0.95)';
       ctx.font = '13px system-ui, sans-serif';
       ctx.fillText(cfg.name, btn.cx, btn.cy + btn.r + 12);

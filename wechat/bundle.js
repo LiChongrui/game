@@ -1242,7 +1242,7 @@ MG.layout.build();
     '低级水滴先垫底，给大水滴留空间',
     '相同水滴碰到一起就会合成升级',
     '水堆漫过警戒线并停住就输了——留意上方白线',
-    '攒满符文即可点亮底部技能按钮'
+    '合成带符文的水滴，可为底部对应技能充能' // v344：原"攒满符文即可点亮"是 cost=1 前的旧措辞，已作废
   ];
   function endlessRamp() {
     return Math.min(1, endlessT / (C.ramp.minutes * 60));
@@ -3047,12 +3047,12 @@ MG.layout.build();
     chestTimer = 85 + Math.random() * 45; // v343：开启后重置间隔拉长（原 45+30rand）
     var r = Math.random();
     var chestBonus = perkOn('chest5') ? 1.5 : 1; // 成就加成：寻宝猎人
-    if (r < 0.4) {
+    if (r < 0.6) {
       var gain = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
       score += gain; scoreBump = 0.4;
       if (score > best) { best = score; saveNum('mg_best', best); }
       addPopup(x, y - 30, '大宝箱开启 +' + gain, true, 0, 0, 'reward'); // v343：'good'不在 PCOLMAP 会回退蓝灰→改 reward 绿
-    } else if (r < 0.75) {
+    } else if (r < 0.78) { // v344：符文充能概率 35%(0.4~0.75)→18%(0.6~0.78)，降低非符文滴获取符文的概率
       // v316：只充已解锁技能（符文道具）；v329：未解锁任何技能时不开符文道具，改发积分
       // （用户："宝箱不能开出未出现的道具，例如符文道具还没激活"）——移除旧"全锁兜底充任意"逻辑
       var keys = ['swap', 'ripple', 'evap', 'flow'].filter(function (k) { return skillUnlocked(k); });
@@ -7575,7 +7575,8 @@ MG.layout.build();
         ctx.strokeStyle = '#E24B4A'; ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(btn.cx, btn.cy, btn.r + 3, 0, Math.PI * 2); ctx.stroke();
       }
-      // 名称标签：圆钮下方居中
+      // 名称标签：圆钮下方居中（v344：画前显式 center——drawChargeBadge 末尾改过 textAlign='left'，会污染此处对齐导致文字右偏）
+      ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(240,250,252,0.95)';
       ctx.font = '13px system-ui, sans-serif';
       ctx.fillText(cfg.name, btn.cx, btn.cy + btn.r + 12);
