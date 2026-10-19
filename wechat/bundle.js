@@ -219,7 +219,10 @@ MG.config = {
   },
 
   // 特殊水滴（随机混入投放队列）
-  specialChance: 0.15,           // 每次投放出现特殊滴的概率
+  specialChance: 0.15,           // 每次投放出现特殊滴的概率（潮汐池基准；v354 起随海域线性升至 specialChanceMax）
+  specialChanceMax: 0.34,        // v354：最后一档海域（深渊王座）的特殊滴概率——海域越靠后，特殊滴整体越频繁
+  specialStageBoost: 0.5,        // v354：海域对应加成——特殊滴的解锁海域每深一档，权重 ×(1+boost×stage)，
+                                 // 使"当前海域所属"的特殊滴出现概率更大（浅海不受影响：可选项本来就少）
   // 符文水滴（随机附带道具属性）：合成带符文的水滴为对应技能 +1 充能（特殊滴/礁石不带符文）
   // v316：符文池不再按"已解锁技能"过滤——未解锁技能的符文正是解锁来源（滚出即解锁，见 systems.js rollRune/seeRune）
   rune: {
@@ -294,7 +297,7 @@ MG.config = {
                         // 随水面落回线下，二段引信永远差 ~0.3~1s 攒不满 ⇒ sea5~7 首个潮汐周期 72 个
                         // sea×tier 用例实测"判负: 无"，全部被缓冲+退潮救走（虚晃一枪）。拉长至 9s 后
                         // 引信链在退潮前兑现，深海潮汐首个周期即可判负
-    buoyancy: 4000,      // 浮力加速度（v341：2900→4000，净上托 2500）。v353：入水即全额上托、**不再随浸没比衰减**，水滴会被冲出水面并可越过警戒线（正常机制，按 v352 裁定不豁免）
+    buoyancy: 4000,      // 浮力加速度（v341：2900→4000，净上托 2500）。v353：衰减保留（用户"潮汐的衰减还是保留吧"），但完全浸没的水滴可被顶过警戒线（正常机制，按 v352 裁定不豁免）
     // v328：潮位规格（用户："潮汐最低是警戒线至底部的 1/4，最高值是 3/4！完全是不超过警戒线的"）
     // ——满潮水面 = 警戒线→底部(=floorY-dangerY=450px)的"填充比例"：浅海最低填 1/4、深海最高填 3/4，
     // 整条曲线线性、且恒在警戒线下方（最满 fill=3/4 时水面 = floorY-450×0.75 = 427.5，仍比警戒线 315 低 112.5px）。
@@ -322,8 +325,8 @@ MG.config = {
   // 潮汐限定合成：两枚「江河」只能在涨潮时聚成「大海」（彩虹跳级不受限）
   tidePair: { tier: 6, threshold: 0.15 },
 
-  // 高潮时刻：无尽模式每累计 +500 分，场上最高档的可合成对自发相聚
-  climaxEvery: 500,
+  // 高潮时刻：无尽模式每累计 +1500 分，场上最高档的可合成对自发相聚（v354：500→1500——原值后期触发过密）
+  climaxEvery: 1500,
 
   // 里程碑任务链
   questScoreBase: 35,
@@ -1672,15 +1675,23 @@ MG.layout.build();
     return 0;
   }
   function rollSpecial() {
-    if (Math.random() >= C.specialChance) return null;
+    // v354：海域越靠后 → ①特殊滴整体越频繁（specialChance → specialChanceMax 按海域线性插值）
+    //                    ②"该海域对应"的特殊滴权重越高（解锁海域越深，权重 ×(1+boost×stage)）
+    var cur = seaStage(), nSea = C.seaStages.length;
+    var sf = nSea > 1 ? cur / (nSea - 1) : 0;
+    var chance = C.specialChance + (C.specialChanceMax - C.specialChance) * sf;
+    if (Math.random() >= chance) return null;
     // 与海域绑定：未抵达对应海域的特殊滴静默过滤（越深的海，特殊滴越多越强）
     var pool = [['vortex', 30], ['cloud', 24], ['ice', 20], ['rainbow', 14], ['gale', 12],
       ['magnet', 10], ['spring', 10], ['thunder', 9], ['pearl', 9],
       ['magma', 8], ['geyser', 8], ['void', 6], ['aurora', 6]];
-    var cur = seaStage(), keys = [], ws2 = [], total = 0, i;
+    var keys = [], ws2 = [], total = 0, i;
+    var boost = C.specialStageBoost || 0;
     for (i = 0; i < pool.length; i++) {
-      if (cur < ((C.specialStage && C.specialStage[pool[i][0]]) || 0)) continue;
-      keys.push(pool[i][0]); ws2.push(pool[i][1]); total += pool[i][1];
+      var stg = (C.specialStage && C.specialStage[pool[i][0]]) || 0;
+      if (cur < stg) continue;
+      var w = pool[i][1] * (1 + boost * stg);
+      keys.push(pool[i][0]); ws2.push(w); total += w;
     }
     if (!keys.length) return null;
     var r = Math.random() * total;
@@ -2352,7 +2363,7 @@ MG.layout.build();
     }
   }
 
-  // 高潮时刻：无尽模式每累计 +500 分，场上最高档的可合成对自发相聚（防后期机械投放）
+  // 高潮时刻：无尽模式每累计 +1500 分（v354：500→1500），场上最高档的可合成对自发相聚（防后期机械投放）
   function doClimax() {
     var bs = phys.bodies, best = null, i, j;
     for (i = 0; i < bs.length; i++) {
@@ -2688,9 +2699,10 @@ MG.layout.build();
   // 线性、且恒在警戒线下方。fill(sea)=lowFrac+(highFrac-lowFrac)×sea/(n-1)；
   // 满潮水面 y = floorY - zone×fill（zone=floorY-dangerY）。最满 fill=0.75 时水面=427.5，仍在线下 112.5px。
   // 取代 v322 的 overMin/overMax（原深海满潮没过警戒线，违反"不超过警戒线"）。
-  // ★ v353：以上约束的是**水面高度**，不是水滴高度。浮力入水即全额上托（不随浸没比衰减），
-  // 水滴会冲出水面并可越过警戒线——这是正常机制、按 v352 裁定不豁免。禁止再用"水面恒在
-  // 警戒线下方"推导"浮力安全 / 不会把水滴托过线"（该结论错误，已删除）。
+  // ★ v353：以上约束的是**水面高度**，不是水滴高度。浮力仍随浸没比衰减（用户："潮汐的衰减还是
+  // 保留吧"），但**完全浸没的水滴净上托 2500（浮力 4000 > 重力 1500），会冲出水面并越过警戒线**
+  // ——正常机制、按 v352 裁定不豁免。禁止再用"水面恒在警戒线下方"推导"浮力安全 / 不会把水滴
+  // 托过线"（该结论错误，已删除）。
   function tideWaterMax() {
     var H = FLOORY - C.containerTop;
     var zone = FLOORY - C.dangerY;
@@ -2778,15 +2790,13 @@ MG.layout.build();
       if (b.iron || b.frozen > 0) continue; // 礁石沉底不浮起
       var subm = (b.y + b.r - wy) / (2 * b.r);
       if (subm <= 0) continue;
-      var f = Math.min(1, subm); // v353：f 只用于水的阻力与横向涌动（浸得越深、受阻越大、被涌得越明显），不再用于衰减浮力
+      var f = Math.min(1, subm); // 浸没比：浮力、水的阻力、横向涌动三者共用（浸得越浅浮力越弱、受阻越小）
       var buoy = C.tide.buoyancy * ((ng.active && ng.active.tideToss && tide.phase === 'active') ? ng.active.tideToss : 1); // v339：深渊试炼潮期浮力×tideToss，涌动更猛、更难落位
-      // ★ v353：浮力不再随浸没比衰减（用户："浮力随浸没比衰减是不对的"、"平衡位置恒在警戒线
-      // 下方这条设定要移除"、"不会把水滴托过线要移除"）。旧版 `* f` 造出"浸得越浅浮力越弱"
-      // 的负反馈，把水滴锁在水面附近的平衡位上——既让水滴浮不起来（v341 用户反馈"浮力太弱、
-      // 很容易浮不起水滴"），又被我当成"潮汐安全、不会托过线"的错误依据。
-      // 现只要入水（subm > 0）即全额上托：4000 > 重力 1500，净上托 2500；水滴会冲出水面，
-      // 浸没越深冲得越高，**完全可以把水滴顶过警戒线**——按 v352 裁定属正常机制、不豁免。
-      b.vy -= buoy * dt;
+      // ★ v353：浮力**保留**随浸没比衰减（用户："潮汐的衰减还是保留吧"）。
+      // 但严禁再由它推导出两条错误结论（用户已明令删除）：①"平衡位置恒在警戒线下方"
+      // ②"不会把水滴托过线"。事实是：完全浸没时浮力 4000 > 重力 1500、净上托 2500，水滴会
+      // 冲出水面并越过警戒线——按 v352 裁定属正常机制、**不豁免**，该判负就判负。
+      b.vy -= buoy * f * dt;
       // 水的阻力
       var drag = Math.min(0.9, 2.2 * f * dt);
       b.vx *= (1 - drag);
@@ -2947,7 +2957,8 @@ MG.layout.build();
     // 速度门把"持续越线"与"瞬时横穿"混为一谈，而后者由三重机制区分（出生宽限 0.6s、引信 1.1s、
     // 出线即清零），故越线滴一律计时。★ v353 更正：v328 定的是"**潮位水面**恒在警戒线下方"
     // （见 tideWaterMax，用户原话"完全是不超过警戒线的"）——那是水面高度规格，**不等于水滴
-    // 不会被托过线**。浮力 4000 > 重力 1500，入水即全额上托、水滴会冲出水面并明显越线。
+    // 不会被托过线**。浮力虽随浸没比衰减（v353 用户："潮汐的衰减还是保留吧"），但完全浸没时
+    // 净上托仍有 2500（浮力 4000 > 重力 1500），水滴会冲出水面并明显越线。
     // 旧注释写的"潮汐只做水下浮力重排、不再把水滴推越线"是错误结论，已删除（用户多次纠正）。
     // 潮汐期间引信仍 ×2（水下游动更慢，给足反应）——但深渊试炼(tideNoGrace)取消此宽限。
     // ★ v352 豁免范围界定（用户明确）：只有「被特殊滴外力拽拉」的水滴豁免（见 C.extGrace）。

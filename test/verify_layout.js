@@ -347,8 +347,8 @@ eq('潮汐倒计时固定位文本', /var ns = Math\.ceil\(tide\.timer\) \+ 's';
 // 的 overMin/overMax（原深海满潮没过警戒线上 35px，违反"不超过警戒线"）。fill(sea)=
 // lowFrac+(highFrac-lowFrac)×sea/(海域数-1)；满潮水面 y=floorY-zone×fill：浅海填 1/4→
 // 水面 652.5（最靠底）、深海填 3/4→水面 427.5（最靠线，仍在线下 112.5px）。整条曲线线性、
-// 且恒在警戒线下方。★ v353 更正：这只约束**水面**高度。浮力入水即全额上托（不随浸没比
-// 衰减），水滴会冲出水面并**可以越过警戒线**——正常机制、按 v352 裁定不豁免。旧注释写的
+// 且恒在警戒线下方。★ v353 更正：这只约束**水面**高度。浮力虽随浸没比衰减（保留），但完全
+// 浸没净上托 2500，水滴会冲出水面并**可以越过警戒线**——正常机制、按 v352 裁定不豁免。旧注释写的
 // "潮汐只做浮力重排、不再把水滴推越线"是错误结论，已删除（用户多次纠正）。
 eq('lowFrac配置', C.tide.lowFrac, 0.25);
 eq('highFrac配置', C.tide.highFrac, 0.75);
@@ -381,7 +381,7 @@ eq('最高潮位最靠线仍在线下(3/4)', (function () { // 最满 fill=0.75�
   var wy = L.body.floorY - zone * C.tide.highFrac;
   return wy > L.body.dangerY;
 })(), true);
-eq('满潮水面恒不超过警戒线', (function () { // v328 规格：全海域**水面**都在警戒线下方（y 更大）。★v353：这只约束水面，不约束水滴——浮力入水即全额上托，水滴可被顶过线且照常判负
+eq('满潮水面恒不超过警戒线', (function () { // v328 规格：全海域**水面**都在警戒线下方（y 更大）。★v353：这只约束水面，不约束水滴——浮力衰减虽保留，水滴仍可被顶过线且照常判负
   var zone = L.body.floorY - L.body.dangerY;
   for (var s = 0; s < C.seaStages.length; s++) {
     var fill = C.tide.lowFrac + (C.tide.highFrac - C.tide.lowFrac) * (s / (C.seaStages.length - 1));
