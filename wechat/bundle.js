@@ -6293,37 +6293,25 @@ MG.layout.build();
     var r = nextIron ? C.iron.r : T[tier].r;
     var gy = C.spawnY + ghostBob(); // v320：线顶跟随虚影漂浮，不断连
     // v338：固定长度辅助线（参考主流落子指示：短而明确的瞄准段，不随堆高伸缩）
-    // v342：改细（比警戒线细）+ 上深下浅（越低越浅）+ 去掉底部白圆点，仅留落点小箭头
+    // v349：①长度严格恒为 C.guideLen——去掉旧版 maxL 截断（堆高/大滴时会被裁短，"固定"名不副实）；
+    //       ②线尾不带任何符号——去掉 v342 保留的落点小箭头（用户："下方不要带任何符号"）
     var topY = gy + r + 2;
     var L = C.guideLen;
-    var maxL = FLOORY - topY - 10;                // 不越过床面
-    L = Math.max(0, Math.min(L, maxL));
+    var tipY = topY + L;
     ctx.save();
-    if (L >= 8) {
-      var tipY = topY + L;
-      // 主线段：细而淡（比警戒线细），上深下浅——越低越浅（v342）
-      var lg = ctx.createLinearGradient(0, topY, 0, tipY);
-      lg.addColorStop(0, 'rgba(110,195,250,0.85)');   // 顶部：较实
-      lg.addColorStop(1, 'rgba(205,242,255,0.32)');   // 底部：更浅更淡（越低越浅）
-      ctx.strokeStyle = lg;
-      ctx.lineWidth = 1.6;
-      ctx.setLineDash([6, 8]);
-      ctx.lineDashOffset = -time * 60;
-      ctx.beginPath();
-      ctx.moveTo(x, topY);
-      ctx.lineTo(x, tipY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      // 落点指示：仅保留向下小箭头（去掉底部白圆点，v342）
-      ctx.strokeStyle = 'rgba(180,232,255,0.9)';
-      ctx.lineWidth = 2.2;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(x - 7, tipY - 9);
-      ctx.lineTo(x, tipY);
-      ctx.lineTo(x + 7, tipY - 9);
-      ctx.stroke();
-    }
+    // 主线段：细而淡（比警戒线细），上深下浅——越低越浅（v342）
+    var lg = ctx.createLinearGradient(0, topY, 0, tipY);
+    lg.addColorStop(0, 'rgba(110,195,250,0.85)');   // 顶部：较实
+    lg.addColorStop(1, 'rgba(205,242,255,0.32)');   // 底部：更浅更淡（越低越浅）
+    ctx.strokeStyle = lg;
+    ctx.lineWidth = 1.6;
+    ctx.setLineDash([6, 8]);
+    ctx.lineDashOffset = -time * 60;
+    ctx.beginPath();
+    ctx.moveTo(x, topY);
+    ctx.lineTo(x, tipY);
+    ctx.stroke();
+    ctx.setLineDash([]);
     ctx.restore();
   }
   function drawGhost(x, y, tier, alpha) {
