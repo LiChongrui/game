@@ -477,10 +477,11 @@
     { tint: '184,146,236', tintD: '96,62,168',  s: [6, 12],  sp: [24, 50] }  // 深渊王座：幽紫发光鱼
   ];
   function fishLook() { return FISH_LOOK[Math.min(seaStage(), FISH_LOOK.length - 1)]; }
-  function resetFish(f) {
+  function resetFish(f, keepDir) {
     var lk = fishLook();
     f.stg = seaStage();
-    f.dir = Math.random() < 0.5 ? 1 : -1;
+    // v346：keepDir=true 时保留原游动方向（屏幕环绕用）；仅换海域重生才随机方向
+    f.dir = keepDir ? f.dir : (Math.random() < 0.5 ? 1 : -1);
     f.x = f.dir > 0 ? -70 : LW + 70;
     f.y = 110 + Math.random() * Math.max(240, VH - 220);
     f.sp = lk.sp[0] + Math.random() * (lk.sp[1] - lk.sp[0]);
@@ -488,7 +489,9 @@
     f.tint = lk.tint; f.tintD = lk.tintD;
     f.wob = Math.random() * Math.PI * 2;
   }
-  for (var fi = 0; fi < 5; fi++) {
+  // v346：鱼数随屏宽自适应（宽屏更密、分布更均匀，缓解"左右不均"观感）；窄屏保底 5 条
+  var FISH_N = Math.max(5, Math.round(LW / 170));
+  for (var fi = 0; fi < FISH_N; fi++) {
     var nf = { tail: 0, dir: 1, x: 0, y: 0, sp: 0, s: 0, wob: 0, fade: 0, stg: 0, tint: '', tintD: '' };
     resetFish(nf);
     nf.x = Math.random() * LW;
@@ -782,8 +785,10 @@
       else if (f.fade < 1) f.fade += dt / 1.6;
       if (f.fade <= 0) { f.fade = 0; resetFish(f); }
       if (f.fade > 1) f.fade = 1;
-      if (f.dir > 0 && f.x > LW + 70) resetFish(f);
-      if (f.dir < 0 && f.x < -70) resetFish(f);
+      // v346：平滑环绕——保留游动方向，游出一侧即从对侧同方向续游（不再瞬移+随机反向，
+      // 修复"右侧消失后左侧倒着游回来、左右不均衡"的观感）；换海域淡出淡入仍走下方 resetFish(f)
+      if (f.dir > 0 && f.x > LW + 70) resetFish(f, true);
+      else if (f.dir < 0 && f.x < -70) resetFish(f, true);
     }
     for (i = 0; i < jellies.length; i++) {
       var jl = jellies[i];
