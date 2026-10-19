@@ -259,7 +259,7 @@ MG.config = {
     void: 7, aurora: 7            // 深渊王座
   },
   // 新特殊滴行为参数
-  magnet:   { delay: 0.4, life: 1.8, pullR: 210, pullF: 105, score: 150 },
+  magnet:   { delay: 0.4, life: 1.8, pullR: 250, pullF: 620, score: 150 }, // 磁石滴：吸附范围/力度须强于漩涡滴（pullF 430），否则"聚拢大范围"名不副实
   magmaR: 95, magmaScore: 70,   // 熔岩滴：烧毁半径 / 每个目标折算分
   geyserW: 120, geyserF: 400,   // 间歇泉：水柱半宽 / 上冲力
   voidN: 5, voidScore: 90,      // 虚空滴：吞噬数量上限 / 每颗折算分
@@ -2315,14 +2315,14 @@ MG.layout.build();
     doMerge(a, b2);
   }
 
-  function pushNeighbors(x, y, R) {
-    var bs = phys.bodies;
+  function pushNeighbors(x, y, R, fmax) {
+    var bs = phys.bodies, F = (fmax != null) ? fmax : 140;
     for (var i = 0; i < bs.length; i++) {
       var b = bs[i];
       var dx = b.x - x, dy = b.y - y;
       var d = Math.sqrt(dx * dx + dy * dy);
       if (d > 0 && d < R) {
-        var f = (1 - d / R) * 140;
+        var f = (1 - d / R) * F;
         b.vx += dx / d * f; b.vy += dy / d * f;
       }
     }
@@ -2348,9 +2348,18 @@ MG.layout.build();
         } else if (b.special === 'gale') {
           // 疾风滴：落定瞬间吹开周围水滴（腾出空间，防堆高），随后变回普通水滴
           if (b.specialT >= 0.45 || b.y + b.r >= C.floorY - 4) {
-            pushNeighbors(b.x, b.y, 130);
+            pushNeighbors(b.x, b.y, 185, 260); // v337：加大吹开半径与力度，效果肉眼可见
             burst(b.x, b.y, b.tier, false);
-            parts.push({ type: 'ring', x: b.x, y: b.y, r: 16, life: 0.5, max: 0.5, color: '#BFE8D8' });
+            // v337：三圈扩散风环 + 横向阵风粒子，强化"吹开"的视觉反馈
+            for (var gi = 0; gi < 3; gi++) {
+              parts.push({ type: 'ring', x: b.x, y: b.y, r: 14 + gi * 26, life: 0.55 + gi * 0.12, max: 0.55 + gi * 0.12, color: '#CFF0E2' });
+            }
+            for (var gs = 0; gs < 14; gs++) {
+              var gdir = (gs % 2 === 0) ? 1 : -1;
+              parts.push({ type: 'dot', x: b.x + gdir * (10 + Math.random() * 30), y: b.y + (Math.random() - 0.5) * 70,
+                vx: gdir * (120 + Math.random() * 160), vy: (Math.random() - 0.5) * 80,
+                r: 1.5 + Math.random() * 2, life: 0.5, max: 0.5, color: '#DFF6EC' });
+            }
             addPopup(b.x, b.y - b.r - 14, '疾风！', false, 0);
             audio.swirl();
             b.special = null;
@@ -5544,6 +5553,17 @@ MG.layout.build();
     else if (b.special === 'geyser') drawGeyserMark(r);
     else if (b.special === 'void') drawVoidMark(r);
     else if (b.special === 'aurora') drawAuroraMark(r);
+    // v337：漩涡/磁石滴画一圈脉动吸附力场环（半径=实际 pullR），让"聚拢"这件事肉眼可见
+    else if (b.special === 'vortex' || b.special === 'magnet') {
+      var pr = (b.special === 'vortex') ? C.vortex.pullR : C.magnet.pullR;
+      var fp = 0.5 + 0.5 * Math.sin(time * 3 + r);
+      ctx.save();
+      ctx.strokeStyle = hexToRgba(b.special === 'vortex' ? '#8FA8E8' : '#9BC0F0', 0.18 + 0.12 * fp);
+      ctx.lineWidth = 2; ctx.setLineDash([10, 12]); ctx.lineDashOffset = -time * 40;
+      ctx.beginPath(); ctx.arc(0, 0, pr, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
     else if (b.tier <= 4) drawFace(r);
     else drawWaves(r);
     // 符文徽记（右上角小圆牌）
@@ -6219,6 +6239,24 @@ MG.layout.build();
   function drawGhost(x, y, tier, alpha) {
     var r = nextIron ? C.iron.r : T[tier].r;
     var gy = y + ghostBob(); // v320：虚影轻轻漂浮
+    // v337：极光庇护（延迟生效的 ×3）在下一滴上画一圈脉动光环 + 徽标，让"已激活"状态可见，
+    // 否则玩家落完极光滴没有任何棋盘反馈，根本记不住下一合成会翻倍
+    if (auroraNext && !nextIron) {
+      var ap = 0.5 + 0.5 * Math.sin(time * 4);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      var ag = ctx.createRadialGradient(x, gy, r * 0.9, x, gy, r * 1.9);
+      ag.addColorStop(0, hexToRgba('#9BE8D8', 0));
+      ag.addColorStop(0.7, hexToRgba('#9BE8D8', (0.30 + 0.18 * ap) * (alpha / 0.6)));
+      ag.addColorStop(1, hexToRgba('#C8B8F0', 0));
+      ctx.fillStyle = ag;
+      ctx.beginPath(); ctx.arc(x, gy, r * 1.9, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = hexToRgba('#9BE8D8', 0.85);
+      ctx.lineWidth = 3; ctx.setLineDash([6, 7]); ctx.lineDashOffset = -time * 30;
+      ctx.beginPath(); ctx.arc(x, gy, r * 1.45, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
     // 呼吸光晕：滴体同色系（特殊滴/符文取各自识别色），亮度随漂浮相位呼吸——
     // 给"虚影"以形体感，不再是一片平淡的半透明圆（v320）
     var glowC = nextIron ? '#8FA0AE' : (nextSpecial ? specialColor(nextSpecial) : (nextRune ? runeColor(nextRune) : T[tier].color));
@@ -6232,6 +6270,22 @@ MG.layout.build();
       drawIronBall({ x: x, y: gy, r: r, vx: 0, vy: 0 }, alpha);
     } else {
       drawBall({ x: x, y: gy, r: r, tier: tier, vx: 0, vy: 0, special: nextSpecial, rune: nextRune }, alpha);
+    }
+    // v337：极光庇护徽标（跟随虚影，常驻提示"下一合成 ×N"）
+    if (auroraNext && !nextIron) {
+      var ly2 = Math.max(C.containerTop + 15, C.spawnY - r - 10 + ghostBob());
+      var bx = x, by = ly2 - 40;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 12px system-ui, sans-serif';
+      var txt = '极光庇护 ×' + auroraNext;
+      var tw2 = ctx.measureText(txt).width + 16;
+      roundRect(Math.round(bx - tw2 / 2), Math.round(by - 14), tw2, 18, 9);
+      ctx.fillStyle = 'rgba(155,232,216,0.92)'; ctx.fill();
+      ctx.fillStyle = '#0E3B33';
+      ctx.fillText(txt, Math.round(bx), Math.round(by - 1));
+      ctx.restore();
     }
   }
 

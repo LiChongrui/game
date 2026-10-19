@@ -1226,14 +1226,14 @@
     doMerge(a, b2);
   }
 
-  function pushNeighbors(x, y, R) {
-    var bs = phys.bodies;
+  function pushNeighbors(x, y, R, fmax) {
+    var bs = phys.bodies, F = (fmax != null) ? fmax : 140;
     for (var i = 0; i < bs.length; i++) {
       var b = bs[i];
       var dx = b.x - x, dy = b.y - y;
       var d = Math.sqrt(dx * dx + dy * dy);
       if (d > 0 && d < R) {
-        var f = (1 - d / R) * 140;
+        var f = (1 - d / R) * F;
         b.vx += dx / d * f; b.vy += dy / d * f;
       }
     }
@@ -1259,9 +1259,18 @@
         } else if (b.special === 'gale') {
           // 疾风滴：落定瞬间吹开周围水滴（腾出空间，防堆高），随后变回普通水滴
           if (b.specialT >= 0.45 || b.y + b.r >= C.floorY - 4) {
-            pushNeighbors(b.x, b.y, 130);
+            pushNeighbors(b.x, b.y, 185, 260); // v337：加大吹开半径与力度，效果肉眼可见
             burst(b.x, b.y, b.tier, false);
-            parts.push({ type: 'ring', x: b.x, y: b.y, r: 16, life: 0.5, max: 0.5, color: '#BFE8D8' });
+            // v337：三圈扩散风环 + 横向阵风粒子，强化"吹开"的视觉反馈
+            for (var gi = 0; gi < 3; gi++) {
+              parts.push({ type: 'ring', x: b.x, y: b.y, r: 14 + gi * 26, life: 0.55 + gi * 0.12, max: 0.55 + gi * 0.12, color: '#CFF0E2' });
+            }
+            for (var gs = 0; gs < 14; gs++) {
+              var gdir = (gs % 2 === 0) ? 1 : -1;
+              parts.push({ type: 'dot', x: b.x + gdir * (10 + Math.random() * 30), y: b.y + (Math.random() - 0.5) * 70,
+                vx: gdir * (120 + Math.random() * 160), vy: (Math.random() - 0.5) * 80,
+                r: 1.5 + Math.random() * 2, life: 0.5, max: 0.5, color: '#DFF6EC' });
+            }
             addPopup(b.x, b.y - b.r - 14, '疾风！', false, 0);
             audio.swirl();
             b.special = null;

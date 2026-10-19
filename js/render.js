@@ -544,6 +544,17 @@
     else if (b.special === 'geyser') drawGeyserMark(r);
     else if (b.special === 'void') drawVoidMark(r);
     else if (b.special === 'aurora') drawAuroraMark(r);
+    // v337：漩涡/磁石滴画一圈脉动吸附力场环（半径=实际 pullR），让"聚拢"这件事肉眼可见
+    else if (b.special === 'vortex' || b.special === 'magnet') {
+      var pr = (b.special === 'vortex') ? C.vortex.pullR : C.magnet.pullR;
+      var fp = 0.5 + 0.5 * Math.sin(time * 3 + r);
+      ctx.save();
+      ctx.strokeStyle = hexToRgba(b.special === 'vortex' ? '#8FA8E8' : '#9BC0F0', 0.18 + 0.12 * fp);
+      ctx.lineWidth = 2; ctx.setLineDash([10, 12]); ctx.lineDashOffset = -time * 40;
+      ctx.beginPath(); ctx.arc(0, 0, pr, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
     else if (b.tier <= 4) drawFace(r);
     else drawWaves(r);
     // 符文徽记（右上角小圆牌）
@@ -1219,6 +1230,24 @@
   function drawGhost(x, y, tier, alpha) {
     var r = nextIron ? C.iron.r : T[tier].r;
     var gy = y + ghostBob(); // v320：虚影轻轻漂浮
+    // v337：极光庇护（延迟生效的 ×3）在下一滴上画一圈脉动光环 + 徽标，让"已激活"状态可见，
+    // 否则玩家落完极光滴没有任何棋盘反馈，根本记不住下一合成会翻倍
+    if (auroraNext && !nextIron) {
+      var ap = 0.5 + 0.5 * Math.sin(time * 4);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      var ag = ctx.createRadialGradient(x, gy, r * 0.9, x, gy, r * 1.9);
+      ag.addColorStop(0, hexToRgba('#9BE8D8', 0));
+      ag.addColorStop(0.7, hexToRgba('#9BE8D8', (0.30 + 0.18 * ap) * (alpha / 0.6)));
+      ag.addColorStop(1, hexToRgba('#C8B8F0', 0));
+      ctx.fillStyle = ag;
+      ctx.beginPath(); ctx.arc(x, gy, r * 1.9, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = hexToRgba('#9BE8D8', 0.85);
+      ctx.lineWidth = 3; ctx.setLineDash([6, 7]); ctx.lineDashOffset = -time * 30;
+      ctx.beginPath(); ctx.arc(x, gy, r * 1.45, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
     // 呼吸光晕：滴体同色系（特殊滴/符文取各自识别色），亮度随漂浮相位呼吸——
     // 给"虚影"以形体感，不再是一片平淡的半透明圆（v320）
     var glowC = nextIron ? '#8FA0AE' : (nextSpecial ? specialColor(nextSpecial) : (nextRune ? runeColor(nextRune) : T[tier].color));
@@ -1232,6 +1261,22 @@
       drawIronBall({ x: x, y: gy, r: r, vx: 0, vy: 0 }, alpha);
     } else {
       drawBall({ x: x, y: gy, r: r, tier: tier, vx: 0, vy: 0, special: nextSpecial, rune: nextRune }, alpha);
+    }
+    // v337：极光庇护徽标（跟随虚影，常驻提示"下一合成 ×N"）
+    if (auroraNext && !nextIron) {
+      var ly2 = Math.max(C.containerTop + 15, C.spawnY - r - 10 + ghostBob());
+      var bx = x, by = ly2 - 40;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 12px system-ui, sans-serif';
+      var txt = '极光庇护 ×' + auroraNext;
+      var tw2 = ctx.measureText(txt).width + 16;
+      roundRect(Math.round(bx - tw2 / 2), Math.round(by - 14), tw2, 18, 9);
+      ctx.fillStyle = 'rgba(155,232,216,0.92)'; ctx.fill();
+      ctx.fillStyle = '#0E3B33';
+      ctx.fillText(txt, Math.round(bx), Math.round(by - 1));
+      ctx.restore();
     }
   }
 

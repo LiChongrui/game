@@ -140,7 +140,7 @@ MG.config = {
     void: 7, aurora: 7            // 深渊王座
   },
   // 新特殊滴行为参数
-  magnet:   { delay: 0.4, life: 1.8, pullR: 210, pullF: 105, score: 150 },
+  magnet:   { delay: 0.4, life: 1.8, pullR: 250, pullF: 620, score: 150 }, // 磁石滴：吸附范围/力度须强于漩涡滴（pullF 430），否则"聚拢大范围"名不副实
   magmaR: 95, magmaScore: 70,   // 熔岩滴：烧毁半径 / 每个目标折算分
   geyserW: 120, geyserF: 400,   // 间歇泉：水柱半宽 / 上冲力
   voidN: 5, voidScore: 90,      // 虚空滴：吞噬数量上限 / 每颗折算分
