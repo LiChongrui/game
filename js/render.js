@@ -2662,30 +2662,36 @@
   };
   // 浮动文字（最后绘制，保证不被 HUD 遮挡）
   function drawPopups() {
-    var i, p;
+    // v356：字号越大优先级越高 ⇒ **大字最后画**（压在小字之上，"越不容易被遮挡"）；
+    // 小字先画。两趟遍历不排序、不分配数组（popups 每帧都在变，排序是纯浪费）。
+    var pass, i, p;
     ctx.globalAlpha = 1;
     ctx.textAlign = 'center';
-    for (i = 0; i < popups.length; i++) {
-      p = popups[i];
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.max * 1.5));
-      ctx.translate(p.x, p.y);
-      ctx.scale(p.scale, p.scale);
-      ctx.fillStyle = PCOLMAP[p.kind] || PCOLMAP.neutral;
-      ctx.font = (p.big ? 'bold 20px' : 'bold 17px') + ' system-ui, sans-serif';
-      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-      ctx.lineWidth = 3;
-      ctx.strokeText(p.text, 0, 0);
-      ctx.fillText(p.text, 0, 0);
-      if (p.mult > 1) {
-        ctx.font = 'bold 18px system-ui, sans-serif';
-        ctx.fillStyle = PCOLMAP.gain;
+    for (pass = 0; pass < 2; pass++) {
+      var wantBig = pass === 1;
+      for (i = 0; i < popups.length; i++) {
+        p = popups[i];
+        if (!!p.big !== wantBig) continue;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.max * 1.5));
+        ctx.translate(p.x, p.y);
+        ctx.scale(p.scale, p.scale);
+        ctx.fillStyle = PCOLMAP[p.kind] || PCOLMAP.neutral;
+        ctx.font = (p.big ? 'bold 20px' : 'bold 17px') + ' system-ui, sans-serif';
         ctx.strokeStyle = 'rgba(255,255,255,0.85)';
         ctx.lineWidth = 3;
-        ctx.strokeText('连击 x' + p.mult, 0, -24);
-        ctx.fillText('连击 x' + p.mult, 0, -24);
+        ctx.strokeText(p.text, 0, 0);
+        ctx.fillText(p.text, 0, 0);
+        if (p.mult > 1) {
+          ctx.font = 'bold 18px system-ui, sans-serif';
+          ctx.fillStyle = PCOLMAP.gain;
+          ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+          ctx.lineWidth = 3;
+          ctx.strokeText('连击 x' + p.mult, 0, -24);
+          ctx.fillText('连击 x' + p.mult, 0, -24);
+        }
+        ctx.restore();
       }
-      ctx.restore();
     }
     ctx.globalAlpha = 1;
   }

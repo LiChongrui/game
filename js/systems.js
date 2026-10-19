@@ -742,12 +742,17 @@
     //   冲突方在上且其下一行仍在容器底之上时下行，否则上行；一步到位收敛（不再
     //   固定 +30 反复往返）。上限 = 容器底 floorY：弹字绘制在实体层之上，压滴不
     //   挡字；底部道具带则一律不占。
+    // ★ v356：字号越大优先级越高（用户："提示词，字体越大，应当优先级越高，即显示越靠上，
+    //   越不容易被遮挡"）——冲突时**小字让位、大字占住上方原位**：新弹字是大字而冲突方是
+    //   小字时，把小字往下顶一行（仍夹在容器底之上）；小字无处可下时大字再往上让一行。
+    //   反向（新弹字是小字）仍走 v326 原规则，绝不挤走大字。
     var popMaxY = MG.layout.body.floorY;
     for (var i = 0; i < popups.length; i++) {
       var op = popups[i];
       if (op.life > 0.35 && Math.abs(op.x - x) < 220) {
         while (Math.abs(op.y - y) < 28) {
-          if (op.y < y && op.y + 30 <= popMaxY) y = op.y + 30;
+          if (isBig && !op.big && op.y + 30 <= popMaxY) op.y += 30;  // 小字让位下行，大字占上方
+          else if (op.y < y && op.y + 30 <= popMaxY) y = op.y + 30;
           else y = op.y - 30;
         }
       }
