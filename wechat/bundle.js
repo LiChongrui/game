@@ -637,6 +637,20 @@ MG.layout.build();
     if (i >= 0) this.bodies.splice(i, 1);
   };
 
+  // v351：批量删除——一趟遍历搞定（调用方原先是循环逐个 remove，每次都是
+  // indexOf(O(n)) + splice(O(n))，删 k 个即 O(k*n)）。count 可选：只删 list 前
+  // count 个（虚空吞噬只吞前 N 个 victim，传 count 可免 slice 分配）。
+  Physics.prototype.removeMany = function (list, count) {
+    if (!list || !list.length) return;
+    var n = (count == null) ? list.length : Math.min(count, list.length);
+    if (n <= 0) return;
+    var kill = {}, i;
+    for (i = 0; i < n; i++) if (list[i]) kill[list[i].id] = 1;
+    var bs = this.bodies, w = 0;
+    for (i = 0; i < bs.length; i++) { if (!kill[bs[i].id]) bs[w++] = bs[i]; }
+    bs.length = w;
+  };
+
   Physics.prototype.step = function (dt) {
     var bs = this.bodies;
     var n = C.substeps, h = dt / n;
@@ -1844,17 +1858,22 @@ MG.layout.build();
   }
   function updateFx(dt) {
     var i, p;
+    // v351：以下三个队列统一改「正序 write-index 原地压缩」——旧版倒序 splice 每删一个都要搬移
+    // 其后全部元素（O(n)），粒子/弹字密集时整段退化成 O(n²)；压缩版一趟 O(n)、零搬移、保序。
     // 涟漪次波（延迟到达的第二推）
-    for (i = rippleQueue.length - 1; i >= 0; i--) {
+    var rqw = 0;
+    for (i = 0; i < rippleQueue.length; i++) {
       var rq = rippleQueue[i];
       rq.t -= dt;
       if (rq.t <= 0) {
         applyRipplePush(rq.x, rq.y, C.ripple.secondPower);
         parts.push({ type: 'ring', x: rq.x, y: rq.y, r: 46, life: 0.5, max: 0.5, color: '#A8DDF5' });
-        rippleQueue.splice(i, 1);
-      }
+      } else rippleQueue[rqw++] = rq;
     }
-    for (i = parts.length - 1; i >= 0; i--) {
+    rippleQueue.length = rqw;
+
+    var pw = 0;
+    for (i = 0; i < parts.length; i++) {
       p = parts[i];
       p.life -= dt;
       if (p.type === 'dot') { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 400 * dt; }
@@ -1862,23 +1881,31 @@ MG.layout.build();
         var k = Math.min(1, dt * 13);
         p.x += (p.tx - p.x) * k; p.y += (p.ty - p.y) * k;
       }
-      if (p.life <= 0) parts.splice(i, 1);
+      if (p.life > 0) parts[pw++] = p;
     }
-    for (i = popups.length - 1; i >= 0; i--) {
+    parts.length = pw;
+
+    var upw = 0;
+    for (i = 0; i < popups.length; i++) {
       p = popups[i];
+      var alive = true;
       if (p.attach) { // 跟随实体：贴着目标移动；目标已不在场上（宝箱开启/沉走）则移除
-        if (phys.bodies.indexOf(p.attach) < 0) { popups.splice(i, 1); continue; }
-        p.x = p.attach.x + p.attachOff.x;
-        p.y = p.attach.y + p.attachOff.y;
-        p.life -= dt; // v340：跟随弹字也要走生命周期，否则大宝箱提示会一直贴着宝箱不消失
+        if (phys.bodies.indexOf(p.attach) < 0) alive = false;
+        else {
+          p.x = p.attach.x + p.attachOff.x;
+          p.y = p.attach.y + p.attachOff.y;
+          p.life -= dt; // v340：跟随弹字也要走生命周期，否则大宝箱提示会一直贴着宝箱不消失
+          if (p.scale < 1) p.scale = Math.min(1, p.scale + dt * 5);
+          if (p.life <= 0) alive = false;
+        }
+      } else {
+        p.life -= dt; p.y -= 28 * dt;
         if (p.scale < 1) p.scale = Math.min(1, p.scale + dt * 5);
-        if (p.life <= 0) popups.splice(i, 1);
-        continue;
+        if (p.life <= 0) alive = false;
       }
-      p.life -= dt; p.y -= 28 * dt;
-      if (p.scale < 1) p.scale = Math.min(1, p.scale + dt * 5);
-      if (p.life <= 0) popups.splice(i, 1);
+      if (alive) popups[upw++] = p;
     }
+    popups.length = upw;
     for (i = 0; i < bubbles.length; i++) {
       p = bubbles[i];
       p.y -= p.sp * dt;
@@ -2551,8 +2578,8 @@ MG.layout.build();
       var t2 = burn[i].iron ? 0 : burn[i].tier;
       gain += Math.round((C.magmaScore + T[t2].score * 2) * scoreMult);
       burst(burn[i].x, burn[i].y, Math.max(0, t2), false);
-      phys.remove(burn[i]);
     }
+    phys.removeMany(burn); // v351：批量一次删完（逐个 remove 是 indexOf+splice 的 O(k*n)）
     score += gain; scoreBump = 0.3;
     addPopup(b.x, b.y - b.r - 14, burn.length ? '熔岩灼烧 ×' + burn.length + ' +' + gain : '熔岩熄灭', burn.length, 0);
     if (burn.length) addShake(3, 0.25);
@@ -2592,8 +2619,8 @@ MG.layout.build();
     for (i = 0; i < victims.length && n < C.voidN; i++, n++) {
       gain += Math.round(C.voidScore * (1 + victims[i].tier * 0.3) * scoreMult);
       suckIn(b.x, b.y, Math.max(0, victims[i].tier));
-      phys.remove(victims[i]);
     }
+    phys.removeMany(victims, n); // v351：只吞前 n 个；count 参数避免 slice 分配
     score += gain; scoreBump = 0.3;
     if (gain > 0) addPopup(b.x, b.y - b.r - 14, '虚空吞噬 ×' + n + ' +' + gain, true, 0);
     else addPopup(b.x, b.y - b.r - 14, '虚空空空如也', false, 0);
@@ -6299,19 +6326,24 @@ MG.layout.build();
     //       ②线尾不带任何符号——去掉 v342 保留的落点小箭头（用户："下方不要带任何符号"）
     var topY = gy + r + 2;
     var L = C.guideLen;
-    var tipY = topY + L;
     ctx.save();
+    // v351：渐变改局部坐标 (0,0)->(0,L) 并配合 translate(0,topY)——原按绝对 topY 建立，
+    // 而 topY 随虚影漂浮每帧都在变，导致每帧新建渐变对象；局部化后只与长度有关，可缓存。
     // 主线段：细而淡（比警戒线细），上深下浅——越低越浅（v342）
-    var lg = ctx.createLinearGradient(0, topY, 0, tipY);
-    lg.addColorStop(0, 'rgba(110,195,250,0.85)');   // 顶部：较实
-    lg.addColorStop(1, 'rgba(205,242,255,0.32)');   // 底部：更浅更淡（越低越浅）
+    ctx.translate(0, topY);
+    var lg = grad('ghostGuide' + L, function () {
+      var g2 = ctx.createLinearGradient(0, 0, 0, L);
+      g2.addColorStop(0, 'rgba(110,195,250,0.85)');   // 顶部：较实
+      g2.addColorStop(1, 'rgba(205,242,255,0.32)');   // 底部：更浅更淡（越低越浅）
+      return g2;
+    });
     ctx.strokeStyle = lg;
     ctx.lineWidth = 1.6;
     ctx.setLineDash([6, 8]);
     ctx.lineDashOffset = -time * 60;
     ctx.beginPath();
-    ctx.moveTo(x, topY);
-    ctx.lineTo(x, tipY);
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, L);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.restore();

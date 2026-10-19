@@ -749,17 +749,22 @@
   }
   function updateFx(dt) {
     var i, p;
+    // v351：以下三个队列统一改「正序 write-index 原地压缩」——旧版倒序 splice 每删一个都要搬移
+    // 其后全部元素（O(n)），粒子/弹字密集时整段退化成 O(n²)；压缩版一趟 O(n)、零搬移、保序。
     // 涟漪次波（延迟到达的第二推）
-    for (i = rippleQueue.length - 1; i >= 0; i--) {
+    var rqw = 0;
+    for (i = 0; i < rippleQueue.length; i++) {
       var rq = rippleQueue[i];
       rq.t -= dt;
       if (rq.t <= 0) {
         applyRipplePush(rq.x, rq.y, C.ripple.secondPower);
         parts.push({ type: 'ring', x: rq.x, y: rq.y, r: 46, life: 0.5, max: 0.5, color: '#A8DDF5' });
-        rippleQueue.splice(i, 1);
-      }
+      } else rippleQueue[rqw++] = rq;
     }
-    for (i = parts.length - 1; i >= 0; i--) {
+    rippleQueue.length = rqw;
+
+    var pw = 0;
+    for (i = 0; i < parts.length; i++) {
       p = parts[i];
       p.life -= dt;
       if (p.type === 'dot') { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 400 * dt; }
@@ -767,23 +772,31 @@
         var k = Math.min(1, dt * 13);
         p.x += (p.tx - p.x) * k; p.y += (p.ty - p.y) * k;
       }
-      if (p.life <= 0) parts.splice(i, 1);
+      if (p.life > 0) parts[pw++] = p;
     }
-    for (i = popups.length - 1; i >= 0; i--) {
+    parts.length = pw;
+
+    var upw = 0;
+    for (i = 0; i < popups.length; i++) {
       p = popups[i];
+      var alive = true;
       if (p.attach) { // 跟随实体：贴着目标移动；目标已不在场上（宝箱开启/沉走）则移除
-        if (phys.bodies.indexOf(p.attach) < 0) { popups.splice(i, 1); continue; }
-        p.x = p.attach.x + p.attachOff.x;
-        p.y = p.attach.y + p.attachOff.y;
-        p.life -= dt; // v340：跟随弹字也要走生命周期，否则大宝箱提示会一直贴着宝箱不消失
+        if (phys.bodies.indexOf(p.attach) < 0) alive = false;
+        else {
+          p.x = p.attach.x + p.attachOff.x;
+          p.y = p.attach.y + p.attachOff.y;
+          p.life -= dt; // v340：跟随弹字也要走生命周期，否则大宝箱提示会一直贴着宝箱不消失
+          if (p.scale < 1) p.scale = Math.min(1, p.scale + dt * 5);
+          if (p.life <= 0) alive = false;
+        }
+      } else {
+        p.life -= dt; p.y -= 28 * dt;
         if (p.scale < 1) p.scale = Math.min(1, p.scale + dt * 5);
-        if (p.life <= 0) popups.splice(i, 1);
-        continue;
+        if (p.life <= 0) alive = false;
       }
-      p.life -= dt; p.y -= 28 * dt;
-      if (p.scale < 1) p.scale = Math.min(1, p.scale + dt * 5);
-      if (p.life <= 0) popups.splice(i, 1);
+      if (alive) popups[upw++] = p;
     }
+    popups.length = upw;
     for (i = 0; i < bubbles.length; i++) {
       p = bubbles[i];
       p.y -= p.sp * dt;
@@ -1456,8 +1469,8 @@
       var t2 = burn[i].iron ? 0 : burn[i].tier;
       gain += Math.round((C.magmaScore + T[t2].score * 2) * scoreMult);
       burst(burn[i].x, burn[i].y, Math.max(0, t2), false);
-      phys.remove(burn[i]);
     }
+    phys.removeMany(burn); // v351：批量一次删完（逐个 remove 是 indexOf+splice 的 O(k*n)）
     score += gain; scoreBump = 0.3;
     addPopup(b.x, b.y - b.r - 14, burn.length ? '熔岩灼烧 ×' + burn.length + ' +' + gain : '熔岩熄灭', burn.length, 0);
     if (burn.length) addShake(3, 0.25);
@@ -1497,8 +1510,8 @@
     for (i = 0; i < victims.length && n < C.voidN; i++, n++) {
       gain += Math.round(C.voidScore * (1 + victims[i].tier * 0.3) * scoreMult);
       suckIn(b.x, b.y, Math.max(0, victims[i].tier));
-      phys.remove(victims[i]);
     }
+    phys.removeMany(victims, n); // v351：只吞前 n 个；count 参数避免 slice 分配
     score += gain; scoreBump = 0.3;
     if (gain > 0) addPopup(b.x, b.y - b.r - 14, '虚空吞噬 ×' + n + ' +' + gain, true, 0);
     else addPopup(b.x, b.y - b.r - 14, '虚空空空如也', false, 0);

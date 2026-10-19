@@ -28,6 +28,20 @@
     if (i >= 0) this.bodies.splice(i, 1);
   };
 
+  // v351：批量删除——一趟遍历搞定（调用方原先是循环逐个 remove，每次都是
+  // indexOf(O(n)) + splice(O(n))，删 k 个即 O(k*n)）。count 可选：只删 list 前
+  // count 个（虚空吞噬只吞前 N 个 victim，传 count 可免 slice 分配）。
+  Physics.prototype.removeMany = function (list, count) {
+    if (!list || !list.length) return;
+    var n = (count == null) ? list.length : Math.min(count, list.length);
+    if (n <= 0) return;
+    var kill = {}, i;
+    for (i = 0; i < n; i++) if (list[i]) kill[list[i].id] = 1;
+    var bs = this.bodies, w = 0;
+    for (i = 0; i < bs.length; i++) { if (!kill[bs[i].id]) bs[w++] = bs[i]; }
+    bs.length = w;
+  };
+
   Physics.prototype.step = function (dt) {
     var bs = this.bodies;
     var n = C.substeps, h = dt / n;

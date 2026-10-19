@@ -1247,19 +1247,24 @@
     //       ②线尾不带任何符号——去掉 v342 保留的落点小箭头（用户："下方不要带任何符号"）
     var topY = gy + r + 2;
     var L = C.guideLen;
-    var tipY = topY + L;
     ctx.save();
+    // v351：渐变改局部坐标 (0,0)->(0,L) 并配合 translate(0,topY)——原按绝对 topY 建立，
+    // 而 topY 随虚影漂浮每帧都在变，导致每帧新建渐变对象；局部化后只与长度有关，可缓存。
     // 主线段：细而淡（比警戒线细），上深下浅——越低越浅（v342）
-    var lg = ctx.createLinearGradient(0, topY, 0, tipY);
-    lg.addColorStop(0, 'rgba(110,195,250,0.85)');   // 顶部：较实
-    lg.addColorStop(1, 'rgba(205,242,255,0.32)');   // 底部：更浅更淡（越低越浅）
+    ctx.translate(0, topY);
+    var lg = grad('ghostGuide' + L, function () {
+      var g2 = ctx.createLinearGradient(0, 0, 0, L);
+      g2.addColorStop(0, 'rgba(110,195,250,0.85)');   // 顶部：较实
+      g2.addColorStop(1, 'rgba(205,242,255,0.32)');   // 底部：更浅更淡（越低越浅）
+      return g2;
+    });
     ctx.strokeStyle = lg;
     ctx.lineWidth = 1.6;
     ctx.setLineDash([6, 8]);
     ctx.lineDashOffset = -time * 60;
     ctx.beginPath();
-    ctx.moveTo(x, topY);
-    ctx.lineTo(x, tipY);
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, L);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.restore();
