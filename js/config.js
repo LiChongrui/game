@@ -43,14 +43,15 @@ MG.config = {
   comboMaxMult: 4,     // 连击倍率上限
   rainCombo: 3,        // 甘霖触发：连击达到该次数时馈赠下一滴
 
-  // 技能（充能次数达标后可用；顺序对应底部按钮）
+  // 技能（每消除一个对应符文滴 +1 充能 = 可用 1 次，可连放；顺序对应底部按钮）
   // v316：解锁条件改为「对应符文滴首次出现即解锁」（跨刷新持久，见 systems.js runeSeen/seeRune）——
   // 旧版按累计分解锁（skillUnlock 分数门槛）已删除：未出现符文的技能保持锁定。
+  // v342：cost 改为 1（原 4/6/10/6 的"攒满才激活"设计作废——消除一个符文滴即获 1 次使用）
   skills: [
-    { key: 'swap',   name: '换滴', cost: 4 },
-    { key: 'ripple', name: '涟漪', cost: 6 },
-    { key: 'evap',   name: '蒸发', cost: 10 },
-    { key: 'flow',   name: '水流', cost: 6 }
+    { key: 'swap',   name: '换滴', cost: 1 },
+    { key: 'ripple', name: '涟漪', cost: 1 },
+    { key: 'evap',   name: '蒸发', cost: 1 },
+    { key: 'flow',   name: '水流', cost: 1 }
   ],
 
   // 二周目「深渊潜航」：免门槛直接可玩，菜单选一条海况词缀开高危高收益的无尽局
@@ -99,7 +100,7 @@ MG.config = {
     chance: 0.15,                                      // 普通投放带符文的概率（v338：0.30→0.15，提高获得道具门槛）
     weights: { swap: 0.28, ripple: 0.24, evap: 0.20, flow: 0.28 } // 四种符文的分布权重
   },
-  skillMaxQ: 3,              // 单技能可储备的充能次数上限（v338：支持"充能多次"，超额不再清零）
+  skillMaxQ: 5,              // v342：cost=1 后此值=单技能可储备的可用次数上限（最多连放 5 次，超额截断）
   guideLen: 170,             // 掉落辅助线固定长度（世界像素，v338：改为固定长度，参考主流落子指示）
   vortex: {                      // 漩涡滴：吸附周围水滴后消散
     pullR: 190,

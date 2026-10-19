@@ -1662,7 +1662,7 @@
     }
     if (key === 'evap') {
       if (evapMode) { evapMode = false; return; }
-      if (skillCharge.evap < skillCost('evap')) { flashSkill('evap', '符文 ' + skillCharge.evap + '/' + skillCost('evap')); return; }
+      if (skillCharge.evap < skillCost('evap')) { flashSkill('evap', '「' + runeName('evap') + '」符文不足'); return; }
       evapMode = true;
       rippleMode = false;
       flowMode = false; flowPick = null;
@@ -1670,14 +1670,14 @@
     }
     if (key === 'flow') {
       if (flowMode) { flowMode = false; flowPick = null; return; }
-      if (skillCharge.flow < skillCost('flow')) { flashSkill('flow', '符文 ' + skillCharge.flow + '/' + skillCost('flow')); return; }
+      if (skillCharge.flow < skillCost('flow')) { flashSkill('flow', '「' + runeName('flow') + '」符文不足'); return; }
       flowMode = true;
       evapMode = false; rippleMode = false;
       return;
     }
     if (key === 'ripple' && rippleMode) { rippleMode = false; return; } // 再点按钮取消选位
     if (skillCharge[key] < skillCost(key)) {
-      flashSkill(key, '符文 ' + skillCharge[key] + '/' + skillCost(key));
+      flashSkill(key, '「' + runeName(key) + '」符文不足');
       return;
     }
     if (key === 'swap') {
