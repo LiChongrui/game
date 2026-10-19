@@ -1355,7 +1355,7 @@
           var f = P.pullF * (1 - d / P.pullR);
           o.vx += dx / d * f * dt * 10;
           o.vy += dy / d * f * dt * 10;
-          o.vortexGrace = 0.2; // v327：被漩涡拽拉/甩飞的水滴免予堆高判负（用户："漩涡滴带飞的水滴不参与堆高判定"）
+          o.vortexGrace = C.extGrace; // v327：被漩涡拽拉/甩飞的水滴免予堆高判负（用户："漩涡滴带飞的水滴不参与堆高判定"）；v352：0.2s→extGrace(1.2s)——磁石吸力 6200 远大于重力，落回不止 0.2s
         }
       }
       if (Math.random() < 0.3) {
@@ -1390,6 +1390,16 @@
   }
   function dissolveVortex(b, P) {
     P = P || C.vortex;
+    // v352：消散瞬间再给范围内水滴补一次外力宽限——此刻被拽拉的水滴多半还在空中（正飞向/
+    // 围绕原中心），磁石一消失吸力即断，若只剩残余宽限就会在"落回途中"开始攒引信。补满
+    // extGrace 让它们从容落回；落定后若仍在越线区，那是真实堆高，照常计时判负。
+    var bs0 = phys.bodies;
+    for (var vi = 0; vi < bs0.length; vi++) {
+      var o = bs0[vi];
+      if (o === b || o.special || o.frozen > 0 || o.iron) continue;
+      var vdx = b.x - o.x, vdy = b.y - o.y;
+      if (vdx * vdx + vdy * vdy < P.pullR * P.pullR) o.vortexGrace = C.extGrace;
+    }
     var gain = Math.round((P.score || C.vortex.score) * scoreMult);
     score += gain;
     scoreBump = 0.25;
@@ -1812,7 +1822,10 @@
     // 速度门把"持续越线"与"瞬时横穿"混为一谈，而后者由三重机制区分（出生宽限 0.6s、引信 1.1s、
     // 出线即清零），故越线滴一律计时。v328 起潮汐水面恒在警戒线下方（见 tideWaterMax），潮汐只做
     // 水下浮力重排、不再把水滴推越线；潮汐期间引信仍 ×2（水下游动更慢，给足反应）——但深渊试炼(tideNoGrace)取消此宽限。
-    // 三条豁免：冻结滴(b.frozen)、漩涡拽拉/甩飞(b.vortexGrace)、全部瞬态特殊滴(b.special)不计堆高。
+    // ★ v352 豁免范围界定（用户明确）：只有「被特殊滴外力拽拉」的水滴豁免（见 C.extGrace）。
+    //   深海涌泉(1800)/风暴向心力(2400)/间歇泉(geyserF)/潮汐浮力造成的越线属正常游戏机制，
+    //   一律不豁免——它们把水滴顶过线，该判负就判负。
+    // 三条豁免：冻结滴(b.frozen)、漩涡/磁石拽拉甩飞(b.vortexGrace)、全部瞬态特殊滴(b.special)不计堆高。
     // 死亡缓冲：越线即显示"死亡缓冲"倒计时(dangerRemain)，每局一次首死延长引信即为缓冲（弹字已移除）。
     // ★ v323：潮汐判负两条修正（用户："涨潮引起的越线好像很难死亡，是判定不对吗？"；
     //   test/sim_danger.js 仿真定位）——① 引信 ×5→×2：漂浮滴均速仅 45~53px/s，却因

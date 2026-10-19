@@ -605,7 +605,8 @@ f2 += fail;
 //   ③ 死亡缓冲改为倒计时（dangerRemain），移除"深流缓冲·宽限"专用弹字；
 //   ④ 词缀加重：重压深潜 +80%（grav 1.8）、深渊试炼 重力 +40% 且潮期涌动加剧·无宽限（grav 1.4 + tideInt 0.35 + tideToss 1.9 + tideNoGrace）。
 pass = 0; fail = 0;
-eq('漩涡拽拉置豁免标记', /o\.vortexGrace = 0\.2;/.test(SRC), true);
+// v352：0.2s→C.extGrace(1.2s)——磁石吸力 6200 远大于重力 1500，落回不止 0.2s，会在落回途中攒引信
+eq('漩涡拽拉置豁免标记', /o\.vortexGrace = C\.extGrace;/.test(SRC), true);
 eq('漩涡豁免堆高判负', /if \(b\.vortexGrace > 0\) \{ b\.vortexGrace -= dt; b\.dangerT = 0; continue; \}/.test(SRC), true);
 eq('special豁免堆高判负', /if \(b\.special\) continue;/.test(SRC), true);
 eq('警示文字与倒计时同步1Hz呼吸', /var pulse = 0\.5 \+ 0\.5 \* Math\.sin\(time \* 2 \* Math\.PI\);/.test(RSRC), true); // v332：pow 尖峰频闪已移除，同相呼吸
