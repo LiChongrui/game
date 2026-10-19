@@ -272,7 +272,7 @@ eq('涌泉旧力2000已移除', /b\.vy -= 2000 \* dt;/.test(SRC), false);
 eq('涌泉旧作用区210已移除', /FLOORY - 210\)/.test(SRC), false);
 eq('涌泉旧力1900已移除', /b\.vy -= 1900 \* dt;/.test(SRC), false);
 eq('涌泉旧力1700已移除', /b\.vy -= 1700 \* dt;/.test(SRC), false);
-eq('涌泉辉光带保持90', /ctx\.fillRect\(0, FLOORY - 90, C\.W, 90\);/.test(SRC), true);
+eq('涌泉辉光带v341延展140', /ctx\.fillRect\(0, FLOORY - 140, C\.W, 140\);/.test(SRC), true);
 // ---- v325 公告弹字时长（用户："有些提示信息出现的太短了，比如海神恩泽等，出现时间要稍微长一点！请梳理一下类似的提示并做出优化！"）----
 // 原一律 life=1.0s，渲染 alpha=life/max×1.5 ⇒ 前 1/3 时长（0.33s）后即淡出，公告一闪而过。
 // 改：addPopup 增 life 参数；大字号公告默认 2.0s（不透明段 1.33s，4 倍可读时间），微反馈仍 1.0s。

@@ -163,8 +163,8 @@
   // v316：解锁判定 = 对应符文已出现（runeSeen，mg_rune 持久）——替代旧版累计分门槛
   function skillUnlocked(key) { return !!runeSeen[key]; }
 
-  // ---------- 二周目「深渊潜航」（累计 5 万解锁：带词缀的高危高收益无尽局，结算页开启） ----------
-  var ng = { unlocked: loadFlag('mg_ng'), active: null };
+  // ---------- 二周目「深渊潜航」（免门槛：带词缀的高危高收益无尽局，经菜单「每日挑战」进入） ----------
+  var ng = { unlocked: true, active: null };  // v341：免 5 万解锁门槛，直接进入（入口见菜单「每日挑战」）
   var ngOpen = false, ngPicks = [];   // 词缀三选一弹窗
   var ngPickRects = [];               // 三张词缀卡的命中区（draw 时填充）
   var GRAV0 = C.gravity;              // 基准重力（词缀局按倍率改写，重开恢复）
@@ -482,8 +482,8 @@
     var lk = fishLook();
     f.stg = seaStage();
     f.dir = Math.random() < 0.5 ? 1 : -1;
-    f.x = f.dir > 0 ? -70 : C.W + 70;
-    f.y = 160 + Math.random() * 400;
+    f.x = f.dir > 0 ? -70 : LW + 70;
+    f.y = 110 + Math.random() * Math.max(240, VH - 220);
     f.sp = lk.sp[0] + Math.random() * (lk.sp[1] - lk.sp[0]);
     f.s = lk.s[0] + Math.random() * (lk.s[1] - lk.s[0]);
     f.tint = lk.tint; f.tintD = lk.tintD;
@@ -783,7 +783,7 @@
       else if (f.fade < 1) f.fade += dt / 1.6;
       if (f.fade <= 0) { f.fade = 0; resetFish(f); }
       if (f.fade > 1) f.fade = 1;
-      if (f.dir > 0 && f.x > C.W + 70) resetFish(f);
+      if (f.dir > 0 && f.x > LW + 70) resetFish(f);
       if (f.dir < 0 && f.x < -70) resetFish(f);
     }
     for (i = 0; i < jellies.length; i++) {
@@ -2160,13 +2160,13 @@
       ctx.restore();
     } else if (seaEvent.type === 'surge') {
       var g = grad('surge' + Math.round(FLOORY), function () {
-        var gg = ctx.createLinearGradient(0, FLOORY - 90, 0, FLOORY);
+        var gg = ctx.createLinearGradient(0, FLOORY - 140, 0, FLOORY);
         gg.addColorStop(0, 'rgba(160,230,255,0)');
         gg.addColorStop(1, 'rgba(160,230,255,0.18)');
         return gg;
       });
       ctx.fillStyle = g;
-      ctx.fillRect(0, FLOORY - 90, C.W, 90);
+      ctx.fillRect(0, FLOORY - 140, C.W, 140);
     }
   }
 
@@ -2627,13 +2627,7 @@
 
     levelElapsed += dt; // 本局已进行时长（顶部计时显示用）
     checkDexGates();
-    // 二周目解锁：累计分抵达最深海域门槛
-    if (!ng.unlocked && totalScore() >= C.ng.unlockScore) {
-      ng.unlocked = true;
-      saveFlag('mg_ng', 1);
-      addPopup(C.W / 2, 260, '解锁「深渊潜航」：本局结束后可在结算页开启', true, 0);
-      audio.quest();
-    }
+    // v341：深渊潜航免门槛（unlockScore=0、ng.unlocked 恒 true），移除原 5 万分解锁逻辑
     // 海域演进：累计分跨过里程碑 → 世界换色（1.8s 渐变过渡）+ 弹报
     var stg = seaStage();
     if (stageSeen < 0) stageSeen = stg;
