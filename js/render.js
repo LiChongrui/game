@@ -544,6 +544,7 @@
     else if (b.special === 'geyser') drawGeyserMark(r);
     else if (b.special === 'void') drawVoidMark(r);
     else if (b.special === 'aurora') drawAuroraMark(r);
+    else if (b.special === 'ice') drawIceMark(r); // v340：冰晶滴未冻结时也画雪花标识，与普通水滴区分
     // v337：漩涡/磁石滴画一圈脉动吸附力场环（半径=实际 pullR），让"聚拢"这件事肉眼可见
     else if (b.special === 'vortex' || b.special === 'magnet') {
       var pr = (b.special === 'vortex') ? C.vortex.pullR : C.magnet.pullR;
@@ -1023,6 +1024,31 @@
     ctx.beginPath(); ctx.arc(-r * 0.06, r * 0.02, r * 0.05, 0, Math.PI * 2); ctx.fill(); // 珠光
     ctx.restore();
   }
+  // 冰晶滴标记：六角雪花（未冻结时也标识，与普通水滴区分）
+  function drawIceMark(r) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.97)';
+    ctx.lineWidth = Math.max(1.4, r * 0.07);
+    ctx.lineCap = 'round';
+    for (var i = 0; i < 3; i++) {
+      var a = i * Math.PI / 3;
+      var dx = Math.cos(a), dy = Math.sin(a);
+      var len = r * 0.52;
+      ctx.beginPath();
+      ctx.moveTo(-dx * len, -dy * len);
+      ctx.lineTo(dx * len, dy * len);
+      ctx.stroke();
+      // 中段两侧小分叉
+      var bx = dx * len * 0.58, by = dy * len * 0.58;
+      var px = -dy, py = dx;
+      var br = len * 0.26;
+      ctx.beginPath();
+      ctx.moveTo(bx - px * br, by - py * br);
+      ctx.lineTo(bx + px * br, by + py * br);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   // 熔岩滴标记：火苗
   function drawMagmaMark(r) {
     ctx.save();
@@ -1211,23 +1237,43 @@
     var r = nextIron ? C.iron.r : T[tier].r;
     var gy = C.spawnY + ghostBob(); // v320：线顶跟随虚影漂浮，不断连
     // v338：固定长度辅助线（参考主流落子指示：短而明确的瞄准段，不随堆高伸缩）
+    // v340：加粗 + 辉光 + 底部箭头 + 落点环，明显可见
     var topY = gy + r + 2;
     var L = C.guideLen;
-    var maxL = FLOORY - topY - 4;                 // 不越过床面
+    var maxL = FLOORY - topY - 10;                // 不越过床面
     L = Math.max(0, Math.min(L, maxL));
     ctx.save();
     if (L >= 8) {
-      var lg = ctx.createLinearGradient(0, topY, 0, topY + L);
-      lg.addColorStop(0, 'rgba(140,205,245,0.85)');
-      lg.addColorStop(1, 'rgba(140,205,245,0.30)');
+      var tipY = topY + L;
+      // 主线段：辉光 + 更亮渐变 + 更粗
+      ctx.shadowColor = 'rgba(120,205,255,0.9)';
+      ctx.shadowBlur = 7;
+      var lg = ctx.createLinearGradient(0, topY, 0, tipY);
+      lg.addColorStop(0, 'rgba(190,235,255,0.98)');
+      lg.addColorStop(1, 'rgba(120,205,255,0.65)');
       ctx.strokeStyle = lg;
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([7, 9]);
-      ctx.lineDashOffset = -time * 46;
+      ctx.lineWidth = 3.5;
+      ctx.setLineDash([8, 8]);
+      ctx.lineDashOffset = -time * 60;
       ctx.beginPath();
       ctx.moveTo(x, topY);
-      ctx.lineTo(x, topY + L);
+      ctx.lineTo(x, tipY);
       ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.setLineDash([]);
+      // 落点指示：向下箭头 + 小环，强调"这里落"
+      ctx.strokeStyle = 'rgba(170,230,255,0.98)';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x - 9, tipY - 11);
+      ctx.lineTo(x, tipY);
+      ctx.lineTo(x + 9, tipY - 11);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, tipY, 4, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(200,240,255,0.95)';
+      ctx.fill();
     }
     ctx.restore();
   }
@@ -2459,6 +2505,27 @@
     ctx.lineTo(rx0 + ax + 1, ry0 + ay + 6.5);
     ctx.closePath(); ctx.fill();
 
+    // v340：充能次数角标——独立于钮体的右上角圆牌，金色(就绪)/深蓝(充能中)，与钮面分离不再糊成一片
+    function drawChargeBadge(btn, ready, q, ch, cost) {
+      var bx = btn.cx + btn.r - 3, by = btn.cy - btn.r + 3, bd = 10;
+      ctx.beginPath(); ctx.arc(bx, by, bd, 0, Math.PI * 2);
+      ctx.fillStyle = ready ? '#F4C24A' : 'rgba(16,36,56,0.85)';
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = ready ? 'rgba(255,255,255,0.95)' : 'rgba(180,210,235,0.6)';
+      ctx.stroke();
+      ctx.fillStyle = ready ? '#3A2A05' : '#EAF4FB';
+      ctx.textAlign = 'center';
+      if (ready) {
+        ctx.font = 'bold 13px system-ui, sans-serif';
+        ctx.fillText('×' + q, bx, by + 4.5);
+      } else {
+        ctx.font = 'bold 10px system-ui, sans-serif';
+        ctx.fillText(ch + '/' + cost, bx, by + 3.5);
+      }
+      ctx.textAlign = 'left';
+    }
+
     ctx.textAlign = 'center';
     for (var i = 0; i < SKILL_BTNS.length; i++) {
       var btn = SKILL_BTNS[i], cfg = C.skills[i];
@@ -2480,23 +2547,19 @@
         ctx.font = '10px system-ui, sans-serif';
         ctx.fillText('待符文', btn.cx, btn.cy + 13);
       } else if (ready) {
-        // 已就绪：满环 + 可用次数 ×N（满储备显示"满"）
-        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        // 已就绪：满环 + 右上角金色角标显示可用次数（与钮体分离，不再融在钮内）
+        ctx.strokeStyle = 'rgba(255,255,255,0.92)';
         ctx.lineWidth = 3;
         ctx.beginPath(); ctx.arc(btn.cx, btn.cy, btn.r - 3, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = 'rgba(255,255,255,0.97)';
-        ctx.font = 'bold 14px system-ui, sans-serif';
-        ctx.fillText(q >= C.skillMaxQ ? '×' + q + ' 满' : '×' + q, btn.cx, btn.cy + 13);
+        drawChargeBadge(btn, true, q, ch, cost);
       } else {
-        // 充能中：进度环 + 当前/所需
+        // 充能中：进度环 + 右上角角标显示 当前/所需
         ctx.strokeStyle = 'rgba(255,255,255,0.85)';
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.arc(btn.cx, btn.cy, btn.r - 3, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
         ctx.stroke();
-        ctx.fillStyle = 'rgba(255,255,255,0.9)';
-        ctx.font = 'bold 13px system-ui, sans-serif';
-        ctx.fillText(ch + '/' + cost, btn.cx, btn.cy + 13);
+        drawChargeBadge(btn, false, q, ch, cost);
       }
       if (unl) drawSkillIcon(cfg.key, btn.cx, btn.cy - 6, ready ? '#FFFFFF' : 'rgba(255,255,255,0.85)');
       if (unl && ((cfg.key === 'evap' && evapMode) || (cfg.key === 'ripple' && rippleMode) || (cfg.key === 'flow' && flowMode))) {

@@ -645,8 +645,8 @@ eq('inferKind自动归类', /function inferKind\(t\) \{/.test(SRC), true);
 eq('弹字记录attachOffset', /p\.attachOff = \{ x: x - attach\.x, y: y - attach\.y \};/.test(SRC), true);
 eq('跟随实体每帧贴附', /p\.x = p\.attach\.x \+ p\.attachOff\.x;/.test(SRC), true);
 eq('实体移除弹字即删', /if \(phys\.bodies\.indexOf\(p\.attach\) < 0\) \{ popups\.splice\(i, 1\); continue; \}/.test(SRC), true);
-// ④ 大宝箱提示跟随宝箱（用户"宝箱降落、文本上升，一点也不和谐"）：spawn 弹字 attach=b
-eq('宝箱提示跟随宝箱', /addPopup\(b\.x, C\.dangerY \+ 10, '沉大宝箱！点它开启', true, 0, 0, 'todo', b\);/.test(SRC), true); // v331：warn→todo
+// ④ 大宝箱提示跟随宝箱（用户"宝箱降落、文本上升，一点也不和谐"）：spawn 弹字 attach=b；v340：life 显式 2.5s（跟随弹字也走生命周期，不再永不消失）
+eq('宝箱提示跟随宝箱', /addPopup\(b\.x, C\.dangerY \+ 10, '沉大宝箱！点它开启', true, 0, 2\.5, 'todo', b\);/.test(SRC), true); // v331：warn→todo
 // ⑤ 宝箱不开未解锁道具（用户"宝箱不能开出未出现的道具，例如符文道具还没激活"）
 eq('宝箱移除全锁兜底充任意', /if \(!keys\.length\) keys = \['swap', 'ripple', 'evap', 'flow'\];/.test(SRC), false);
 eq('宝箱仅充已解锁技能', /var keys = \['swap', 'ripple', 'evap', 'flow'\]\.filter\(function \(k\) \{ return skillUnlocked\(k\); \}\);[\s\S]*?if \(keys\.length\)/.test(SRC), true);

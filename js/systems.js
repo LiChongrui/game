@@ -566,7 +566,10 @@
   //       ② 滚出即 seeRune 记录"已出现"→ 对应道具解锁（预览可见即生效，mg_rune 持久）。
   //       调用方须保证只在"这一滴确实带符文"时调用（礁石/特殊滴占位不滚，见 rollNextDrop）。
   function rollRune() {
-    if (seaStage() < ((C.specialStage && C.specialStage.rune) || 2)) return null; // 蔚蓝深海起才带符文
+    // v340：符文首现海域以配置为准——必须显式判断 number，否则 specialStage.rune=0 会被 `|| 2`
+    // 当成 falsy 退回 2（蔚蓝深海），与图鉴 SP_DEFS rune.stage(=0 潮汐池) 不一致（用户核对发现）
+    var runeStage = (C.specialStage && typeof C.specialStage.rune === 'number') ? C.specialStage.rune : 2;
+    if (seaStage() < runeStage) return null; // 抵达配置海域才带符文（与图鉴一致）
     if (Math.random() >= C.rune.chance) return null;
     var keys = [], ws = [], total = 0, k;
     for (k in C.rune.weights) {
@@ -754,6 +757,7 @@
         if (phys.bodies.indexOf(p.attach) < 0) { popups.splice(i, 1); continue; }
         p.x = p.attach.x + p.attachOff.x;
         p.y = p.attach.y + p.attachOff.y;
+        p.life -= dt; // v340：跟随弹字也要走生命周期，否则大宝箱提示会一直贴着宝箱不消失
         if (p.scale < 1) p.scale = Math.min(1, p.scale + dt * 5);
         if (p.life <= 0) popups.splice(i, 1);
         continue;
@@ -1928,8 +1932,8 @@
     b.chest = true;
     b.r = 17; b.m = b.r * b.r * 6; // 比礁石轻，不会被砸得太凶
     chest = { b: b, t: 0, life: 14 }; // 14 秒内不点就沉走
-    // v329：提示跟随宝箱实体（attach=b），宝箱降落时文字同步下移，不再"宝箱落、文本升"错位
-    addPopup(b.x, C.dangerY + 10, '沉大宝箱！点它开启', true, 0, 0, 'todo', b);
+    // v340：提示跟随宝箱实体（attach=b），宝箱降落时文字同步下移；life 显式 2.5s，跟随弹字也走生命周期（不再永不消失）
+    addPopup(b.x, C.dangerY + 10, '沉大宝箱！点它开启', true, 0, 2.5, 'todo', b);
     audio.blip(392, 0.25, 'triangle', 0.14, 1.5);
   }
   function expireChest() {

@@ -257,7 +257,7 @@ const html = `<!DOCTYPE html>
 </section>
 
 <footer>
-  水滴合成深海 · Merge Ocean — v339 · 2026-10-19<br>
+  水滴合成深海 · Merge Ocean — v340 · 2026-10-19<br>
   在线试玩 <b>https://game.luosgeo.com</b> · 纯静态零依赖，也可本地打开 index.html 游玩
 </footer>
 </div>
