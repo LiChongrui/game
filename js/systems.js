@@ -68,7 +68,7 @@
   var skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
   // 大宝箱（无尽模式）：定期沉入一只，限时点击开启随机奖励
   var chest = null;
-  var chestTimer = 26 + Math.random() * 20;
+  var chestTimer = 45 + Math.random() * 25; // v343：宝箱出现间隔拉长（原 26+20rand），降低出现频率
   var questStaleT = 4; // 滞留任务检查计时
   // 随机深海事件（无尽模式）：涌泉 / 甘霖 / 漩涡风暴
   var seaEvent = { timer: 24 + Math.random() * 14, type: null, t: 0, t0: 6, x: 0, y: 0, data: null };
@@ -1933,7 +1933,7 @@
     b.r = 17; b.m = b.r * b.r * 6; // 比礁石轻，不会被砸得太凶
     chest = { b: b, t: 0, life: 14 }; // 14 秒内不点就沉走
     // v340：提示跟随宝箱实体（attach=b），宝箱降落时文字同步下移；life 显式 2.5s，跟随弹字也走生命周期（不再永不消失）
-    addPopup(b.x, C.dangerY + 10, '沉大宝箱！点它开启', true, 0, 2.5, 'todo', b);
+    addPopup(b.x, C.dangerY + 10, '沉大宝箱！点它开启', true, 0, 2.5, 'reward', b); // v343：出现提示统一绿色（与图鉴新发现/开启收益同色）
     audio.blip(392, 0.25, 'triangle', 0.14, 1.5);
   }
   function expireChest() {
@@ -1943,20 +1943,20 @@
       addPopup(C.W / 2, FLOORY - 60, '大宝箱沉入深渊…', false, 0, 1.6); // v325：错过提示，1.6s
     }
     chest = null;
-    chestTimer = 40 + Math.random() * 25;
+    chestTimer = 75 + Math.random() * 40; // v343：错过沉走后重置间隔拉长（原 40+25rand）
   }
   function openChest() {
     var x = chest.b.x, y = chest.b.y;
     phys.remove(chest.b);
     chest = null;
-    chestTimer = 45 + Math.random() * 30;
+    chestTimer = 85 + Math.random() * 45; // v343：开启后重置间隔拉长（原 45+30rand）
     var r = Math.random();
     var chestBonus = perkOn('chest5') ? 1.5 : 1; // 成就加成：寻宝猎人
     if (r < 0.4) {
       var gain = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
       score += gain; scoreBump = 0.4;
       if (score > best) { best = score; saveNum('mg_best', best); }
-      addPopup(x, y - 30, '大宝箱开启 +' + gain, true, 0, 0, 'good');
+      addPopup(x, y - 30, '大宝箱开启 +' + gain, true, 0, 0, 'reward'); // v343：'good'不在 PCOLMAP 会回退蓝灰→改 reward 绿
     } else if (r < 0.75) {
       // v316：只充已解锁技能（符文道具）；v329：未解锁任何技能时不开符文道具，改发积分
       // （用户："宝箱不能开出未出现的道具，例如符文道具还没激活"）——移除旧"全锁兜底充任意"逻辑
@@ -1964,23 +1964,23 @@
       if (keys.length) {
         var k = keys[(Math.random() * keys.length) | 0];
         addCharge(k, perkOn('chest5') ? 3 : 2);
-        addPopup(x, y - 30, '大宝箱开启：' + runeName(k) + ' +2 充能', true, 0, 0, 'good');
+        addPopup(x, y - 30, '大宝箱开启：' + runeName(k) + ' +2 充能', true, 0, 0, 'reward');
       } else {
         var g2 = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
         score += g2; scoreBump = 0.4;
         if (score > best) { best = score; saveNum('mg_best', best); }
-        addPopup(x, y - 30, '大宝箱开启 +' + g2, true, 0, 0, 'good');
+        addPopup(x, y - 30, '大宝箱开启 +' + g2, true, 0, 0, 'reward');
       }
     } else {
       // v329：彩虹滴未曾在图鉴出现（dexSpecial）前不开出，改发积分——同理不提前放出未解锁道具
       if (dexSpecial['rainbow']) {
         nextSpecial = 'rainbow'; nextIron = false; nextRune = null;
-        addPopup(x, y - 30, '大宝箱开启：下一滴是彩虹滴！', true, 0, 0, 'good');
+        addPopup(x, y - 30, '大宝箱开启：下一滴是彩虹滴！', true, 0, 0, 'reward');
       } else {
         var g3 = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
         score += g3; scoreBump = 0.4;
         if (score > best) { best = score; saveNum('mg_best', best); }
-        addPopup(x, y - 30, '大宝箱开启 +' + g3, true, 0, 0, 'good');
+        addPopup(x, y - 30, '大宝箱开启 +' + g3, true, 0, 0, 'reward');
       }
     }
     for (var i = 0; i < 12; i++) {

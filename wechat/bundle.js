@@ -216,7 +216,7 @@ MG.config = {
   // 符文水滴（随机附带道具属性）：合成带符文的水滴为对应技能 +1 充能（特殊滴/礁石不带符文）
   // v316：符文池不再按"已解锁技能"过滤——未解锁技能的符文正是解锁来源（滚出即解锁，见 systems.js rollRune/seeRune）
   rune: {
-    chance: 0.15,                                      // 普通投放带符文的概率（v338：0.30→0.15，提高获得道具门槛）
+    chance: 0.08,                                      // 普通投放带符文的概率（v343：0.15→0.08，配合 cost=1 进一步降低出现频率，避免充能泛滥）
     weights: { swap: 0.28, ripple: 0.24, evap: 0.20, flow: 0.28 } // 四种符文的分布权重
   },
   skillMaxQ: 5,              // v342：cost=1 后此值=单技能可储备的可用次数上限（最多连放 5 次，超额截断）
@@ -1163,7 +1163,7 @@ MG.layout.build();
   var skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
   // 大宝箱（无尽模式）：定期沉入一只，限时点击开启随机奖励
   var chest = null;
-  var chestTimer = 26 + Math.random() * 20;
+  var chestTimer = 45 + Math.random() * 25; // v343：宝箱出现间隔拉长（原 26+20rand），降低出现频率
   var questStaleT = 4; // 滞留任务检查计时
   // 随机深海事件（无尽模式）：涌泉 / 甘霖 / 漩涡风暴
   var seaEvent = { timer: 24 + Math.random() * 14, type: null, t: 0, t0: 6, x: 0, y: 0, data: null };
@@ -3028,7 +3028,7 @@ MG.layout.build();
     b.r = 17; b.m = b.r * b.r * 6; // 比礁石轻，不会被砸得太凶
     chest = { b: b, t: 0, life: 14 }; // 14 秒内不点就沉走
     // v340：提示跟随宝箱实体（attach=b），宝箱降落时文字同步下移；life 显式 2.5s，跟随弹字也走生命周期（不再永不消失）
-    addPopup(b.x, C.dangerY + 10, '沉大宝箱！点它开启', true, 0, 2.5, 'todo', b);
+    addPopup(b.x, C.dangerY + 10, '沉大宝箱！点它开启', true, 0, 2.5, 'reward', b); // v343：出现提示统一绿色（与图鉴新发现/开启收益同色）
     audio.blip(392, 0.25, 'triangle', 0.14, 1.5);
   }
   function expireChest() {
@@ -3038,20 +3038,20 @@ MG.layout.build();
       addPopup(C.W / 2, FLOORY - 60, '大宝箱沉入深渊…', false, 0, 1.6); // v325：错过提示，1.6s
     }
     chest = null;
-    chestTimer = 40 + Math.random() * 25;
+    chestTimer = 75 + Math.random() * 40; // v343：错过沉走后重置间隔拉长（原 40+25rand）
   }
   function openChest() {
     var x = chest.b.x, y = chest.b.y;
     phys.remove(chest.b);
     chest = null;
-    chestTimer = 45 + Math.random() * 30;
+    chestTimer = 85 + Math.random() * 45; // v343：开启后重置间隔拉长（原 45+30rand）
     var r = Math.random();
     var chestBonus = perkOn('chest5') ? 1.5 : 1; // 成就加成：寻宝猎人
     if (r < 0.4) {
       var gain = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
       score += gain; scoreBump = 0.4;
       if (score > best) { best = score; saveNum('mg_best', best); }
-      addPopup(x, y - 30, '大宝箱开启 +' + gain, true, 0, 0, 'good');
+      addPopup(x, y - 30, '大宝箱开启 +' + gain, true, 0, 0, 'reward'); // v343：'good'不在 PCOLMAP 会回退蓝灰→改 reward 绿
     } else if (r < 0.75) {
       // v316：只充已解锁技能（符文道具）；v329：未解锁任何技能时不开符文道具，改发积分
       // （用户："宝箱不能开出未出现的道具，例如符文道具还没激活"）——移除旧"全锁兜底充任意"逻辑
@@ -3059,23 +3059,23 @@ MG.layout.build();
       if (keys.length) {
         var k = keys[(Math.random() * keys.length) | 0];
         addCharge(k, perkOn('chest5') ? 3 : 2);
-        addPopup(x, y - 30, '大宝箱开启：' + runeName(k) + ' +2 充能', true, 0, 0, 'good');
+        addPopup(x, y - 30, '大宝箱开启：' + runeName(k) + ' +2 充能', true, 0, 0, 'reward');
       } else {
         var g2 = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
         score += g2; scoreBump = 0.4;
         if (score > best) { best = score; saveNum('mg_best', best); }
-        addPopup(x, y - 30, '大宝箱开启 +' + g2, true, 0, 0, 'good');
+        addPopup(x, y - 30, '大宝箱开启 +' + g2, true, 0, 0, 'reward');
       }
     } else {
       // v329：彩虹滴未曾在图鉴出现（dexSpecial）前不开出，改发积分——同理不提前放出未解锁道具
       if (dexSpecial['rainbow']) {
         nextSpecial = 'rainbow'; nextIron = false; nextRune = null;
-        addPopup(x, y - 30, '大宝箱开启：下一滴是彩虹滴！', true, 0, 0, 'good');
+        addPopup(x, y - 30, '大宝箱开启：下一滴是彩虹滴！', true, 0, 0, 'reward');
       } else {
         var g3 = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
         score += g3; scoreBump = 0.4;
         if (score > best) { best = score; saveNum('mg_best', best); }
-        addPopup(x, y - 30, '大宝箱开启 +' + g3, true, 0, 0, 'good');
+        addPopup(x, y - 30, '大宝箱开启 +' + g3, true, 0, 0, 'reward');
       }
     }
     for (var i = 0; i < 12; i++) {
@@ -7551,8 +7551,12 @@ MG.layout.build();
       var unl = skillUnlocked(cfg.key); // 渐进解锁：未点亮只显示锁
       // v342：cost=1——skillCharge 即为可用次数（消除一个符文滴 = 1 次，可连放）
       var q = skillCharge[cfg.key] || 0;
-      // 按钮样式恒定：解锁后统一蓝、不随充能变化（去掉就绪态变色/外发光/满环，避免"样式变"）
-      drawCircleBtn(btn, unl ? '#3E8DB5' : '#7E93A3', unl ? 1 : 0.4, false, 0);
+      // v343：三态——未解锁=灰锁；解锁但充能 0（符文不足）=禁用态(暗灰蓝+暗图标)；充能>=1=可用态(亮蓝+白图标)
+      var btnColor, btnAlpha, iconColor;
+      if (!unl) { btnColor = '#7E93A3'; btnAlpha = 0.4; iconColor = null; }
+      else if (q >= 1) { btnColor = '#3E8DB5'; btnAlpha = 1; iconColor = '#FFFFFF'; }
+      else { btnColor = '#5E7180'; btnAlpha = 0.45; iconColor = 'rgba(255,255,255,0.38)'; }
+      drawCircleBtn(btn, btnColor, btnAlpha, false, 0);
       if (!unl) {
         // 锁图标（小挂锁）
         ctx.strokeStyle = 'rgba(255,255,255,0.9)';
@@ -7563,11 +7567,10 @@ MG.layout.build();
         ctx.fillStyle = 'rgba(230,242,248,0.75)';
         ctx.font = '10px system-ui, sans-serif';
         ctx.fillText('待符文', btn.cx, btn.cy + 13);
-      } else if (q >= 1) {
-        // 充能计数：右上角简洁圆牌（深蓝底白数字），仅显示可用次数，不做金/蓝切换
-        drawChargeBadge(btn, q);
+      } else {
+        if (iconColor) drawSkillIcon(cfg.key, btn.cx, btn.cy, iconColor); // v342：图标垂直居中（去掉 -6 偏移）
+        if (q >= 1) drawChargeBadge(btn, q); // 仅充能>=1 显示可用次数角标
       }
-      if (unl) drawSkillIcon(cfg.key, btn.cx, btn.cy, '#FFFFFF'); // v342：图标垂直居中（去掉 -6 偏移）
       if (unl && ((cfg.key === 'evap' && evapMode) || (cfg.key === 'ripple' && rippleMode) || (cfg.key === 'flow' && flowMode))) {
         ctx.strokeStyle = '#E24B4A'; ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(btn.cx, btn.cy, btn.r + 3, 0, Math.PI * 2); ctx.stroke();

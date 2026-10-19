@@ -2521,8 +2521,12 @@
       var unl = skillUnlocked(cfg.key); // 渐进解锁：未点亮只显示锁
       // v342：cost=1——skillCharge 即为可用次数（消除一个符文滴 = 1 次，可连放）
       var q = skillCharge[cfg.key] || 0;
-      // 按钮样式恒定：解锁后统一蓝、不随充能变化（去掉就绪态变色/外发光/满环，避免"样式变"）
-      drawCircleBtn(btn, unl ? '#3E8DB5' : '#7E93A3', unl ? 1 : 0.4, false, 0);
+      // v343：三态——未解锁=灰锁；解锁但充能 0（符文不足）=禁用态(暗灰蓝+暗图标)；充能>=1=可用态(亮蓝+白图标)
+      var btnColor, btnAlpha, iconColor;
+      if (!unl) { btnColor = '#7E93A3'; btnAlpha = 0.4; iconColor = null; }
+      else if (q >= 1) { btnColor = '#3E8DB5'; btnAlpha = 1; iconColor = '#FFFFFF'; }
+      else { btnColor = '#5E7180'; btnAlpha = 0.45; iconColor = 'rgba(255,255,255,0.38)'; }
+      drawCircleBtn(btn, btnColor, btnAlpha, false, 0);
       if (!unl) {
         // 锁图标（小挂锁）
         ctx.strokeStyle = 'rgba(255,255,255,0.9)';
@@ -2533,11 +2537,10 @@
         ctx.fillStyle = 'rgba(230,242,248,0.75)';
         ctx.font = '10px system-ui, sans-serif';
         ctx.fillText('待符文', btn.cx, btn.cy + 13);
-      } else if (q >= 1) {
-        // 充能计数：右上角简洁圆牌（深蓝底白数字），仅显示可用次数，不做金/蓝切换
-        drawChargeBadge(btn, q);
+      } else {
+        if (iconColor) drawSkillIcon(cfg.key, btn.cx, btn.cy, iconColor); // v342：图标垂直居中（去掉 -6 偏移）
+        if (q >= 1) drawChargeBadge(btn, q); // 仅充能>=1 显示可用次数角标
       }
-      if (unl) drawSkillIcon(cfg.key, btn.cx, btn.cy, '#FFFFFF'); // v342：图标垂直居中（去掉 -6 偏移）
       if (unl && ((cfg.key === 'evap' && evapMode) || (cfg.key === 'ripple' && rippleMode) || (cfg.key === 'flow' && flowMode))) {
         ctx.strokeStyle = '#E24B4A'; ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(btn.cx, btn.cy, btn.r + 3, 0, Math.PI * 2); ctx.stroke();
