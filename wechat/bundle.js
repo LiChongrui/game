@@ -1548,11 +1548,25 @@ MG.layout.build();
     audio.blip(ok ? 760 : 300, 0.15, 'sine', 0.1, 1);
   }
 
+  // v348：横向均匀播种——第 i 个（共 n 个）元素落在第 i 条等宽竖带内（带内抖动保留自然感），
+  // 取代旧版 Math.random() * LW 的纯随机：元素数量少时纯随机会整片聚在一侧（用户：
+  // "左边元素比右边多"）。循环重生（气泡冒顶/闪粒出屏/水母升顶）也走它，
+  // 保证任何时刻都均匀铺满全屏，不会越跑越聚。数量同时随屏宽放大，宽屏两侧不再因
+  // 密度不足而显得空。
+  function bandX(i, n, pad) {
+    var w = LW / n, p = pad || 0;
+    var x = (i + 0.5) * w + (Math.random() - 0.5) * w * 0.8;
+    return Math.min(LW - p, Math.max(p, x));
+  }
+  // 数量随屏宽：以块宽 C.W 为密度基准，宽屏同密度铺满（上界防超宽屏过量）
+  function scaleN(base, cap) { return Math.min(cap, Math.max(base, Math.round(base * LW / C.W))); }
+
   // 背景气泡
   var bubbles = [];
-  for (var bi = 0; bi < 14; bi++) {
+  var BUB_N = scaleN(14, 30);
+  for (var bi = 0; bi < BUB_N; bi++) {
     bubbles.push({
-      x: Math.random() * LW, y: Math.random() * VH,
+      x: bandX(bi, BUB_N, 4), y: Math.random() * VH,
       r: 1.5 + Math.random() * 3.5, sp: 12 + Math.random() * 22,
       sway: Math.random() * Math.PI * 2
     });
@@ -1589,29 +1603,31 @@ MG.layout.build();
   for (var fi = 0; fi < FISH_N; fi++) {
     var nf = { tail: 0, dir: 1, x: 0, y: 0, sp: 0, s: 0, wob: 0, fade: 0, stg: 0, tint: '', tintD: '' };
     resetFish(nf);
-    nf.x = Math.random() * LW;
+    nf.x = bandX(fi, FISH_N, 0); // v348：开局按条带均匀铺开（原 rand*LW 少量样本会聚一侧）
     nf.fade = 1; // 开局即在场的鱼不做淡入
     fishes.push(nf);
   }
 
   // 水母
   var jellies = [];
-  for (var ji = 0; ji < 2; ji++) {
+  var JELLY_N = Math.min(4, Math.max(2, Math.round(LW / 300))); // v348：2 只样本太少，瞬时必然偏一侧
+  for (var ji = 0; ji < JELLY_N; ji++) {
     jellies.push({
-      x: 60 + Math.random() * (LW - 120), // v347：水母画在全屏背景层（无 BX 偏移），旧版按 C.W 会开局全挤在左侧
-      y: 260 + ji * 170,
+      x: bandX(ji, JELLY_N, 50), // v347：水母画在全屏背景层（无 BX 偏移），旧版按 C.W 会开局全挤在左侧
+      y: 240 + (ji * 170) % Math.max(200, VH - 320), // v348：多只时纵向错落且不越界
       s: 13 + Math.random() * 9,
       ph: Math.random() * Math.PI * 2,
       drift: 4 + Math.random() * 5,
-      tint: ji === 0 ? '255,175,205' : '185,160,255'
+      tint: (ji % 2) === 0 ? '255,175,205' : '185,160,255'
     });
   }
 
   // 微光闪粒
   var glitters = [];
-  for (var gi = 0; gi < 22; gi++) {
+  var GLI_N = scaleN(22, 46);
+  for (var gi = 0; gi < GLI_N; gi++) {
     glitters.push({
-      x: Math.random() * LW, y: Math.random() * VH,
+      x: bandX(gi, GLI_N, 2), y: Math.random() * VH,
       r: 0.8 + Math.random() * 1.5,
       ph: Math.random() * Math.PI * 2, sp: 1.5 + Math.random() * 2.5
     });
@@ -1867,7 +1883,7 @@ MG.layout.build();
       p = bubbles[i];
       p.y -= p.sp * dt;
       p.sway += dt;
-      if (p.y < -8) { p.y = VH + 8; p.x = Math.random() * LW; }
+      if (p.y < -8) { p.y = VH + 8; p.x = bandX(i, bubbles.length, 4); } // v348：重生也按条带
     }
     for (i = 0; i < fishes.length; i++) {
       var f = fishes[i];
@@ -1889,12 +1905,12 @@ MG.layout.build();
       var jl = jellies[i];
       jl.y -= jl.drift * dt;
       jl.x += Math.sin(time * 0.5 + jl.ph) * 9 * dt;
-      if (jl.y < 170) { jl.y = VH * 0.88; jl.x = 50 + Math.random() * (LW - 100); }
+      if (jl.y < 170) { jl.y = VH * 0.88; jl.x = bandX(i, jellies.length, 50); } // v348：重生也按条带
     }
     for (i = 0; i < glitters.length; i++) {
       var gl = glitters[i];
       gl.y -= gl.sp * dt;
-      if (gl.y < -6) { gl.y = VH + 6; gl.x = Math.random() * LW; }
+      if (gl.y < -6) { gl.y = VH + 6; gl.x = bandX(i, glitters.length, 2); } // v348：重生也按条带
     }
     if (shakeT > 0) { shakeT -= dt; if (shakeT <= 0) shakeAmp = 0; }
     if (scoreBump > 0) scoreBump -= dt;
@@ -5238,9 +5254,10 @@ MG.layout.build();
       return gg;
     });
     for (var bi = 0; bi < 3; bi++) {
-      var bx0 = BX + C.W * (0.16 + bi * 0.3) + Math.sin(time * 0.13 + bi * 2.1) * C.W * 0.04;
+      // v348：三道位置 0.16/0.46/0.76 → 0.18/0.50/0.82（旧组中心 0.46 而非 0.50，整组左偏 17px）
+      var bx0 = BX + C.W * (0.18 + bi * 0.32) + Math.sin(time * 0.13 + bi * 2.1) * C.W * 0.04;
       var tilt = Math.sin(time * 0.09 + bi * 1.4) * 0.10 + (bi - 1) * 0.06;
-      var bw = 46 + bi * 24;
+      var bw = 70 - Math.abs(bi - 1) * 18; // v348：中间宽两侧窄（旧 46/70/94 左细右粗，也是不对称）
       var rayA = 0.05 + 0.035 * (0.5 + 0.5 * Math.sin(time * 0.23 + bi * 2.6));
       ctx.save();
       ctx.translate(bx0, -10);
@@ -5257,13 +5274,18 @@ MG.layout.build();
     }
 
     // 远处缓慢漂移的水波纹
+    // v348：条数随屏宽 + 相位按周期均分（旧版 ri*240 固定偏移，宽屏下三条全落在左半屏，
+    // 且 10~22px/s 极慢、聚左状态要持续数十秒——这是"左边比右边丰富"最主要、最持久的来源）
     ctx.strokeStyle = 'rgba(255,255,255,0.10)';
     ctx.lineWidth = 1.5;
-    for (var ri = 0; ri < 3; ri++) {
-      var rx = ((time * (10 + ri * 6) + ri * 240) % (LW + 300)) - 150;
-      var ry = 210 + ri * 130;
+    var ripN = Math.min(6, Math.max(3, Math.round(LW / 260)));
+    var ripSpan = LW + 300;
+    for (var ri = 0; ri < ripN; ri++) {
+      var rx = ((time * (10 + (ri % 3) * 6) + ri * (ripSpan / ripN)) % ripSpan) - 150;
+      var rp = ripN > 1 ? ri / (ripN - 1) : 0.5;                 // 纵向按条带均分（不随条数挤在顶部）
+      var ry = VH * (0.22 + 0.62 * rp);
       ctx.beginPath();
-      ctx.ellipse(rx, ry, 90 + ri * 24, 12 + ri * 4, 0, 0, Math.PI * 2);
+      ctx.ellipse(rx, ry, 90 + (ri % 3) * 24, 12 + (ri % 3) * 4, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
 
@@ -8004,6 +8026,13 @@ MG.layout.build();
   // 沉浸式海底环境：顶部光柱 / 浮游颗粒 / 上升气泡 / 鱼群剪影 / 暗角
   // 全部 time 驱动程序绘制（无实体、无贴图），叠加在海域背景渐变之上制造纵深
   //（v291 水草删除、v292 海床沙丘删除）
+  // v348：菜单层横向均匀播种（必须确定性——菜单每帧重算，用 Math.random 会让元素每帧乱跳）。
+  // 第 i 个（共 n 个）落在第 i 条等宽竖带内，抖动取黄金角 sin 保证分散且逐帧稳定。
+  // 返回全屏逻辑 x；菜单层在 translate(BX,0) 之后，调用方需再 -BX 折算成内容坐标。
+  function menuBandX(i, n) {
+    var w = LW / n;
+    return (i + 0.5) * w + Math.sin(i * 2.399) * w * 0.36;
+  }
   function drawMenuScene() {
     var i;
     var mvk = Math.round(VH);
@@ -8028,20 +8057,22 @@ MG.layout.build();
       ctx.lineTo(rayX - botW / 2 + sway, VH * 0.75);
       ctx.closePath(); ctx.fill();
     }
-    // 浮游颗粒：微尘漂移 + 闪烁
-    for (i = 0; i < 16; i++) {
+    // 浮游颗粒：微尘漂移 + 闪烁（v348：数量随屏宽 + 条带均分，宽屏密度一致、不再随机聚一侧）
+    var dustN = Math.min(34, Math.max(16, Math.round(16 * LW / C.W)));
+    for (i = 0; i < dustN; i++) {
       var sd = i * 137;
-      var px = -BX + 20 + (sd * 7 % (LW - 40)) + Math.sin(time * 0.4 + i) * 8;
+      var px = -BX + menuBandX(i, dustN) + Math.sin(time * 0.4 + i) * 8;
       var py = (sd * 13 % VH) + Math.sin(time * 0.25 + i * 2.1) * 14;
       var pa = 0.04 + 0.05 * (0.5 + 0.5 * Math.sin(time * 1.2 + i * 2.3));
       ctx.fillStyle = 'rgba(230,248,255,' + pa.toFixed(2) + ')';
       ctx.beginPath(); ctx.arc(px, py, 1.2 + (i % 3) * 0.7, 0, Math.PI * 2); ctx.fill();
     }
-    // 气泡：上升 + 左右轻摆，大小分层
-    for (i = 0; i < 12; i++) {
+    // 气泡：上升 + 左右轻摆，大小分层（v348：同上，数量随屏宽 + 条带均分）
+    var mbN = Math.min(26, Math.max(12, Math.round(12 * LW / C.W)));
+    for (i = 0; i < mbN; i++) {
       var seed = i * 97;
-      var bx = -BX + 24 + (seed % (LW - 48)) + Math.sin(time * 0.8 + i * 1.9) * 10;
-      var by = VH + 40 - ((time * (16 + i * 3.5) + seed * 3) % (VH + 140));
+      var bx = -BX + menuBandX(i, mbN) + Math.sin(time * 0.8 + i * 1.9) * 10;
+      var by = VH + 40 - ((time * (16 + (i % 6) * 3.5) + seed * 3) % (VH + 140));
       var br = 2.5 + (i % 4) * 2.6;
       ctx.beginPath();
       ctx.fillStyle = 'rgba(255,255,255,' + (0.05 + (i % 3) * 0.045).toFixed(2) + ')';
@@ -8050,17 +8081,19 @@ MG.layout.build();
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-    // 鱼群剪影：2 条小鱼横向游过（不同深度/速度，出屏回绕，转身翻面）
-    for (i = 0; i < 2; i++) {
-      var fd = i * 53, speed = 22 + i * 14;
-      var trav = time * speed + fd * 40;
+    // 鱼群剪影：3 条小鱼横向游过（不同深度/速度，出屏回绕，转身翻面）
+    var menuFishN = 3; // v348：2 条太稀疏，宽屏下容易同时出现在同一侧
+    for (i = 0; i < menuFishN; i++) {
+      var speed = 22 + i * 14;
       // v347：横跨全屏（旧版按 C.W 巡游，宽屏只在左侧一段来回、右侧全空）+ 翻面严格跟随
       // 运动方向（旧版位移恒向右、flip 却按圈数交替 → 奇数圈朝左却向右移 = "倒着游泳"）
+      // v348：起始相位按 span/条数 均分——开局即分散在全屏（原 fd*40 相位接近、容易扎堆）
       var span = LW + 120;
+      var trav = time * speed + i * (span / menuFishN);
       var cyc = Math.floor(trav / span), tIn = trav % span;
       var goingRight = (cyc % 2) === 0;   // 偶数趟向右、奇数趟折返回左（来回转身）
       var fx2 = -BX + (goingRight ? (tIn - 60) : (LW + 60 - tIn));
-      var fy2 = 215 + i * 125 + Math.sin(time * 0.9 + i * 2.4) * 12;
+      var fy2 = 205 + i * 110 + Math.sin(time * 0.9 + i * 2.4) * 12;
       var fs2 = 0.8 + i * 0.35;
       var flip = goingRight ? 1 : -1;     // 与位移同向，绝不倒游
       ctx.save();

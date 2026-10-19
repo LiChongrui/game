@@ -453,11 +453,25 @@
     audio.blip(ok ? 760 : 300, 0.15, 'sine', 0.1, 1);
   }
 
+  // v348：横向均匀播种——第 i 个（共 n 个）元素落在第 i 条等宽竖带内（带内抖动保留自然感），
+  // 取代旧版 Math.random() * LW 的纯随机：元素数量少时纯随机会整片聚在一侧（用户：
+  // "左边元素比右边多"）。循环重生（气泡冒顶/闪粒出屏/水母升顶）也走它，
+  // 保证任何时刻都均匀铺满全屏，不会越跑越聚。数量同时随屏宽放大，宽屏两侧不再因
+  // 密度不足而显得空。
+  function bandX(i, n, pad) {
+    var w = LW / n, p = pad || 0;
+    var x = (i + 0.5) * w + (Math.random() - 0.5) * w * 0.8;
+    return Math.min(LW - p, Math.max(p, x));
+  }
+  // 数量随屏宽：以块宽 C.W 为密度基准，宽屏同密度铺满（上界防超宽屏过量）
+  function scaleN(base, cap) { return Math.min(cap, Math.max(base, Math.round(base * LW / C.W))); }
+
   // 背景气泡
   var bubbles = [];
-  for (var bi = 0; bi < 14; bi++) {
+  var BUB_N = scaleN(14, 30);
+  for (var bi = 0; bi < BUB_N; bi++) {
     bubbles.push({
-      x: Math.random() * LW, y: Math.random() * VH,
+      x: bandX(bi, BUB_N, 4), y: Math.random() * VH,
       r: 1.5 + Math.random() * 3.5, sp: 12 + Math.random() * 22,
       sway: Math.random() * Math.PI * 2
     });
@@ -494,29 +508,31 @@
   for (var fi = 0; fi < FISH_N; fi++) {
     var nf = { tail: 0, dir: 1, x: 0, y: 0, sp: 0, s: 0, wob: 0, fade: 0, stg: 0, tint: '', tintD: '' };
     resetFish(nf);
-    nf.x = Math.random() * LW;
+    nf.x = bandX(fi, FISH_N, 0); // v348：开局按条带均匀铺开（原 rand*LW 少量样本会聚一侧）
     nf.fade = 1; // 开局即在场的鱼不做淡入
     fishes.push(nf);
   }
 
   // 水母
   var jellies = [];
-  for (var ji = 0; ji < 2; ji++) {
+  var JELLY_N = Math.min(4, Math.max(2, Math.round(LW / 300))); // v348：2 只样本太少，瞬时必然偏一侧
+  for (var ji = 0; ji < JELLY_N; ji++) {
     jellies.push({
-      x: 60 + Math.random() * (LW - 120), // v347：水母画在全屏背景层（无 BX 偏移），旧版按 C.W 会开局全挤在左侧
-      y: 260 + ji * 170,
+      x: bandX(ji, JELLY_N, 50), // v347：水母画在全屏背景层（无 BX 偏移），旧版按 C.W 会开局全挤在左侧
+      y: 240 + (ji * 170) % Math.max(200, VH - 320), // v348：多只时纵向错落且不越界
       s: 13 + Math.random() * 9,
       ph: Math.random() * Math.PI * 2,
       drift: 4 + Math.random() * 5,
-      tint: ji === 0 ? '255,175,205' : '185,160,255'
+      tint: (ji % 2) === 0 ? '255,175,205' : '185,160,255'
     });
   }
 
   // 微光闪粒
   var glitters = [];
-  for (var gi = 0; gi < 22; gi++) {
+  var GLI_N = scaleN(22, 46);
+  for (var gi = 0; gi < GLI_N; gi++) {
     glitters.push({
-      x: Math.random() * LW, y: Math.random() * VH,
+      x: bandX(gi, GLI_N, 2), y: Math.random() * VH,
       r: 0.8 + Math.random() * 1.5,
       ph: Math.random() * Math.PI * 2, sp: 1.5 + Math.random() * 2.5
     });
@@ -772,7 +788,7 @@
       p = bubbles[i];
       p.y -= p.sp * dt;
       p.sway += dt;
-      if (p.y < -8) { p.y = VH + 8; p.x = Math.random() * LW; }
+      if (p.y < -8) { p.y = VH + 8; p.x = bandX(i, bubbles.length, 4); } // v348：重生也按条带
     }
     for (i = 0; i < fishes.length; i++) {
       var f = fishes[i];
@@ -794,12 +810,12 @@
       var jl = jellies[i];
       jl.y -= jl.drift * dt;
       jl.x += Math.sin(time * 0.5 + jl.ph) * 9 * dt;
-      if (jl.y < 170) { jl.y = VH * 0.88; jl.x = 50 + Math.random() * (LW - 100); }
+      if (jl.y < 170) { jl.y = VH * 0.88; jl.x = bandX(i, jellies.length, 50); } // v348：重生也按条带
     }
     for (i = 0; i < glitters.length; i++) {
       var gl = glitters[i];
       gl.y -= gl.sp * dt;
-      if (gl.y < -6) { gl.y = VH + 6; gl.x = Math.random() * LW; }
+      if (gl.y < -6) { gl.y = VH + 6; gl.x = bandX(i, glitters.length, 2); } // v348：重生也按条带
     }
     if (shakeT > 0) { shakeT -= dt; if (shakeT <= 0) shakeAmp = 0; }
     if (scoreBump > 0) scoreBump -= dt;
