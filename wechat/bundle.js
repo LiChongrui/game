@@ -215,9 +215,11 @@ MG.config = {
   // 符文水滴（随机附带道具属性）：合成带符文的水滴为对应技能 +1 充能（特殊滴/礁石不带符文）
   // v316：符文池不再按"已解锁技能"过滤——未解锁技能的符文正是解锁来源（滚出即解锁，见 systems.js rollRune/seeRune）
   rune: {
-    chance: 0.30,                                      // 普通投放带符文的概率
+    chance: 0.15,                                      // 普通投放带符文的概率（v338：0.30→0.15，提高获得道具门槛）
     weights: { swap: 0.28, ripple: 0.24, evap: 0.20, flow: 0.28 } // 四种符文的分布权重
   },
+  skillMaxQ: 3,              // 单技能可储备的充能次数上限（v338：支持"充能多次"，超额不再清零）
+  guideLen: 170,             // 掉落辅助线固定长度（世界像素，v338：改为固定长度，参考主流落子指示）
   vortex: {                      // 漩涡滴：吸附周围水滴后消散
     pullR: 190,
     pullF: 430,
@@ -1392,9 +1394,9 @@ MG.layout.build();
       var bonus = C.daily.streakBase + daily.streak * C.daily.streakStep;
       score += bonus;
       scoreBump = 0.4;
-      var pk = C.skills[(Math.random() * C.skills.length) | 0];
-      skillCharge[pk.key] += 2;
-      addPopup(C.W / 2, 232, '今日全勤！连续 ' + daily.streak + ' 天 +' + bonus, true, 0);
+    var pk = C.skills[(Math.random() * C.skills.length) | 0];
+    addCharge(pk.key, 2);
+    addPopup(C.W / 2, 232, '今日全勤！连续 ' + daily.streak + ' 天 +' + bonus, true, 0);
       addPopup(C.W / 2, 258, '「' + pk.name + '」充能 +2', false, 0);
       parts.push({ type: 'ring', x: C.W / 2, y: annY(232), r: 30, life: 0.7, max: 0.7, color: '#F5C542' });
       audio.quest();
@@ -1478,7 +1480,7 @@ MG.layout.build();
     scoreBump = 0.5;
     if (score > best) { best = score; saveNum('mg_best', best); }
     var pk = C.skills[(Math.random() * C.skills.length) | 0];
-    skillCharge[pk.key] += C.dailyChal.charge;
+    addCharge(pk.key, C.dailyChal.charge);
     addPopup(C.W / 2, 205, '每日挑战达成！+' + gain, true, 0);
     addPopup(C.W / 2, 232, '连续 ' + dchal.streak + ' 天 ·「' + pk.name + '」充能 +' + C.dailyChal.charge, false, 0);
     parts.push({ type: 'ring', x: C.W / 2, y: annY(205), r: 30, life: 0.7, max: 0.7, color: '#F5C542' });
@@ -1948,7 +1950,7 @@ MG.layout.build();
       score += gain;
       scoreBump = 0.4;
       var pick = C.skills[(Math.random() * C.skills.length) | 0];
-      skillCharge[pick.key] += d === 3 ? 4 : (d === 2 ? 2 : 1);
+      addCharge(pick.key, d === 3 ? 4 : (d === 2 ? 2 : 1));
       addPopup(C.W / 2, 240, '成就达成 · ' + a.name + ' +' + gain, true, 0);
       addPopup(C.W / 2, 266, '「' + pick.name + '」充能 +' + (d === 3 ? 4 : (d === 2 ? 2 : 1)), false, 0);
       parts.push({ type: 'ring', x: C.W / 2, y: annY(150), r: 26, life: 0.6, max: 0.6, color: '#F5C542' });
@@ -2036,12 +2038,12 @@ MG.layout.build();
         if (!keys.length) keys = C.skills.slice();
         if (keys.length) {
           var pick = keys[(Math.random() * keys.length) | 0];
-          skillCharge[pick.key] += m.charge;
+          addCharge(pick.key, m.charge);
           sub = '「' + pick.name + '」充能 +' + m.charge;
         }
       }
       if (m.allCharge) {
-        for (s = 0; s < C.skills.length; s++) skillCharge[C.skills[s].key] += m.allCharge;
+        for (s = 0; s < C.skills.length; s++) addCharge(C.skills[s].key, m.allCharge);
         sub = '全技能充能 +' + m.allCharge;
       }
       addPopup(C.W / 2, 240, '图鉴收集达成 · ' + m.name + ' +' + gain, true, 0);
@@ -2093,7 +2095,7 @@ MG.layout.build();
     scoreBump = 0.35;
     bumpStat('quest');
     var pick = C.skills[Math.floor(Math.random() * C.skills.length)];
-    skillCharge[pick.key] = pick.cost;
+    addCharge(pick.key, pick.cost);
     addPopup(C.W / 2, 240, '任务完成 +' + gain, true, 0);
     addPopup(C.W / 2, 266, '「' + pick.name + '」已充满', false, 0);
     parts.push({ type: 'ring', x: C.W / 2, y: annY(150), r: 20, life: 0.5, max: 0.5, color: '#F5C542' });
@@ -2703,10 +2705,16 @@ MG.layout.build();
   }
 
   // ---------- 技能 ----------
-  // 符文充能：合成带符文的水滴 → 对应技能 +1（充满可用）
+  // 充能写入（统一入口，v338：超额储备——允许叠到 skillMaxQ 倍 cost，溢出截断不再清零）
+  function addCharge(k, n) {
+    if (!(k in skillCharge)) return;
+    var cap = skillCost(k) * C.skillMaxQ;
+    skillCharge[k] = Math.min(cap, (skillCharge[k] || 0) + n);
+  }
+  // 符文充能：合成带符文的水滴 → 对应技能 +1（v338：可叠到 skillMaxQ 倍，不再满即停）
   function chargeRune(b, mx, my) {
     var k = b.rune;
-    if (skillCharge[k] >= skillCost(k)) return;
+    if (skillCharge[k] >= skillCost(k) * C.skillMaxQ) return;
     skillCharge[k]++;
     addPopup(mx + (Math.random() * 24 - 12), my - 10, '「' + runeName(k) + '」符文 +1', false, 0);
     audio.blip(880, 0.12, 'sine', 0.10, 1.35);
@@ -2750,7 +2758,7 @@ MG.layout.build();
       return;
     }
     if (key === 'swap') {
-      skillCharge.swap = 0;
+      skillCharge.swap -= skillCost('swap'); // v338：扣一次费用而非清零，支持多次充能连放
       nextTier = rollTier();
       rollNextDrop();
       aimX = clampAim(aimX);
@@ -2771,7 +2779,7 @@ MG.layout.build();
     a.vx = a.vy = b.vx = b.vy = 0;
     a.svx = a.svy = b.svx = b.svy = 0;
     a.trail = []; b.trail = [];
-    skillCharge.flow = 0;
+    skillCharge.flow -= skillCost('flow'); // v338：扣一次费用而非清零
     flowMode = false; flowPick = null;
     parts.push({ type: 'ring', x: a.x, y: a.y, r: a.r, life: 0.4, max: 0.4, color: '#7FD4FF' });
     parts.push({ type: 'ring', x: b.x, y: b.y, r: b.r, life: 0.4, max: 0.4, color: '#7FD4FF' });
@@ -2782,7 +2790,7 @@ MG.layout.build();
   function castRipple(x, y) {
     x = Math.max(12, Math.min(C.W - 12, x));
     y = Math.max(C.containerTop + 30, Math.min(FLOORY - 16, y));
-    skillCharge.ripple = 0;
+    skillCharge.ripple -= skillCost('ripple'); // v338：扣一次费用而非清零
     rippleMode = false;
     applyRipplePush(x, y, C.ripple.power);
     rippleQueue.push({ t: C.ripple.delay, x: x, y: y });
@@ -2827,7 +2835,7 @@ MG.layout.build();
     scoreBump = 0.25;
     addPopup(b.x, b.y - b.r - 8, b.iron ? '珊瑚礁移除 +' + gain : '+' + gain, false, 0);
     phys.remove(b);
-    skillCharge.evap = 0;
+    skillCharge.evap -= skillCost('evap'); // v338：扣一次费用而非清零
     evapMode = false;
     audio.blip(900, 0.25, 'sine', 0.15, 0.4);
   }
@@ -2940,7 +2948,7 @@ MG.layout.build();
   };
   // 测试钩子（仅自动化测试用）：充能 / 成就 / 局面构造 / 加压进度
   MG.debug = {
-    give: function (k, n) { if (k in skillCharge) skillCharge[k] = n; },
+    give: function (k, n) { addCharge(k, n); },
     setNext: function (opt) {
       opt = opt || {};
       nextIron = !!opt.iron;
@@ -3031,7 +3039,7 @@ MG.layout.build();
       var keys = ['swap', 'ripple', 'evap', 'flow'].filter(function (k) { return skillUnlocked(k); });
       if (keys.length) {
         var k = keys[(Math.random() * keys.length) | 0];
-        skillCharge[k] += perkOn('chest5') ? 3 : 2;
+        addCharge(k, perkOn('chest5') ? 3 : 2);
         addPopup(x, y - 30, '大宝箱开启：' + runeName(k) + ' +2 充能', true, 0, 0, 'good');
       } else {
         var g2 = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
@@ -3332,7 +3340,7 @@ MG.layout.build();
     // 成就加成：深海富豪开局随机技能充能 +2
     if (perkOn('score2k')) {
       var pk = C.skills[(Math.random() * C.skills.length) | 0];
-      skillCharge[pk.key] += 2;
+      addCharge(pk.key, 2);
       addPopup(C.W / 2, 280, '深海富豪：「' + pk.name + '」开局充能 +2', false, 0);
     }
     state = 'play';
@@ -6219,10 +6227,14 @@ MG.layout.build();
   function drawGhostGuide(x, tier) {
     var r = nextIron ? C.iron.r : T[tier].r;
     var gy = C.spawnY + ghostBob(); // v320：线顶跟随虚影漂浮，不断连
-    var landY = landingYFor(x, r);
+    // v338：固定长度辅助线（参考主流落子指示：短而明确的瞄准段，不随堆高伸缩）
+    var topY = gy + r + 2;
+    var L = C.guideLen;
+    var maxL = FLOORY - topY - 4;                 // 不越过床面
+    L = Math.max(0, Math.min(L, maxL));
     ctx.save();
-    if (landY - r > gy + r + 4) {                  // 有可视长度才画线（堆到出生点下时只留短提示）
-      var lg = ctx.createLinearGradient(0, gy + r, 0, landY - r);
+    if (L >= 8) {
+      var lg = ctx.createLinearGradient(0, topY, 0, topY + L);
       lg.addColorStop(0, 'rgba(140,205,245,0.85)');
       lg.addColorStop(1, 'rgba(140,205,245,0.30)');
       ctx.strokeStyle = lg;
@@ -6230,8 +6242,8 @@ MG.layout.build();
       ctx.setLineDash([7, 9]);
       ctx.lineDashOffset = -time * 46;
       ctx.beginPath();
-      ctx.moveTo(x, gy + r + 2);
-      ctx.lineTo(x, landY - r - 2);
+      ctx.moveTo(x, topY);
+      ctx.lineTo(x, topY + L);
       ctx.stroke();
     }
     ctx.restore();
@@ -7468,7 +7480,10 @@ MG.layout.build();
     for (var i = 0; i < SKILL_BTNS.length; i++) {
       var btn = SKILL_BTNS[i], cfg = C.skills[i];
       var unl = skillUnlocked(cfg.key); // 渐进解锁：未点亮只显示锁
-      var ch = skillCharge[cfg.key], ready = unl && ch >= cfg.cost;
+      // v338：支持多次充能——q=可用次数，frac=下一发进度
+      var ch = skillCharge[cfg.key], cost = cfg.cost;
+      var q = Math.floor(ch / cost), frac = (ch - q * cost) / cost;
+      var ready = unl && q >= 1;
       drawCircleBtn(btn, unl ? (ready ? '#2E86B4' : '#5E90B4') : '#7E93A3', unl ? (ready ? 1 : 0.55) : 0.4, ready, readyPulse);
       if (!unl) {
         // 锁图标（小挂锁）
@@ -7481,19 +7496,24 @@ MG.layout.build();
         ctx.fillStyle = 'rgba(230,242,248,0.75)';
         ctx.font = '10px system-ui, sans-serif';
         ctx.fillText('待符文', btn.cx, btn.cy + 13);
-      } else if (!ready) {
+      } else if (ready) {
+        // 已就绪：满环 + 可用次数 ×N（满储备显示"满"）
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(btn.cx, btn.cy, btn.r - 3, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.97)';
+        ctx.font = 'bold 14px system-ui, sans-serif';
+        ctx.fillText(q >= C.skillMaxQ ? '×' + q + ' 满' : '×' + q, btn.cx, btn.cy + 13);
+      } else {
+        // 充能中：进度环 + 当前/所需
         ctx.strokeStyle = 'rgba(255,255,255,0.85)';
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(btn.cx, btn.cy, btn.r - 3, -Math.PI / 2, -Math.PI / 2 + (ch / cfg.cost) * Math.PI * 2);
+        ctx.arc(btn.cx, btn.cy, btn.r - 3, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
         ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.9)';
         ctx.font = 'bold 13px system-ui, sans-serif';
-        ctx.fillText(ch + '/' + cfg.cost, btn.cx, btn.cy + 13);
-      } else {
-        ctx.fillStyle = 'rgba(255,255,255,0.95)';
-        ctx.font = 'bold 13px system-ui, sans-serif';
-        ctx.fillText('就绪', btn.cx, btn.cy + 13);
+        ctx.fillText(ch + '/' + cost, btn.cx, btn.cy + 13);
       }
       if (unl) drawSkillIcon(cfg.key, btn.cx, btn.cy - 6, ready ? '#FFFFFF' : 'rgba(255,255,255,0.85)');
       if (unl && ((cfg.key === 'evap' && evapMode) || (cfg.key === 'ripple' && rippleMode) || (cfg.key === 'flow' && flowMode))) {

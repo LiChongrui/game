@@ -303,9 +303,9 @@
       var bonus = C.daily.streakBase + daily.streak * C.daily.streakStep;
       score += bonus;
       scoreBump = 0.4;
-      var pk = C.skills[(Math.random() * C.skills.length) | 0];
-      skillCharge[pk.key] += 2;
-      addPopup(C.W / 2, 232, '今日全勤！连续 ' + daily.streak + ' 天 +' + bonus, true, 0);
+    var pk = C.skills[(Math.random() * C.skills.length) | 0];
+    addCharge(pk.key, 2);
+    addPopup(C.W / 2, 232, '今日全勤！连续 ' + daily.streak + ' 天 +' + bonus, true, 0);
       addPopup(C.W / 2, 258, '「' + pk.name + '」充能 +2', false, 0);
       parts.push({ type: 'ring', x: C.W / 2, y: annY(232), r: 30, life: 0.7, max: 0.7, color: '#F5C542' });
       audio.quest();
@@ -389,7 +389,7 @@
     scoreBump = 0.5;
     if (score > best) { best = score; saveNum('mg_best', best); }
     var pk = C.skills[(Math.random() * C.skills.length) | 0];
-    skillCharge[pk.key] += C.dailyChal.charge;
+    addCharge(pk.key, C.dailyChal.charge);
     addPopup(C.W / 2, 205, '每日挑战达成！+' + gain, true, 0);
     addPopup(C.W / 2, 232, '连续 ' + dchal.streak + ' 天 ·「' + pk.name + '」充能 +' + C.dailyChal.charge, false, 0);
     parts.push({ type: 'ring', x: C.W / 2, y: annY(205), r: 30, life: 0.7, max: 0.7, color: '#F5C542' });
@@ -859,7 +859,7 @@
       score += gain;
       scoreBump = 0.4;
       var pick = C.skills[(Math.random() * C.skills.length) | 0];
-      skillCharge[pick.key] += d === 3 ? 4 : (d === 2 ? 2 : 1);
+      addCharge(pick.key, d === 3 ? 4 : (d === 2 ? 2 : 1));
       addPopup(C.W / 2, 240, '成就达成 · ' + a.name + ' +' + gain, true, 0);
       addPopup(C.W / 2, 266, '「' + pick.name + '」充能 +' + (d === 3 ? 4 : (d === 2 ? 2 : 1)), false, 0);
       parts.push({ type: 'ring', x: C.W / 2, y: annY(150), r: 26, life: 0.6, max: 0.6, color: '#F5C542' });
@@ -947,12 +947,12 @@
         if (!keys.length) keys = C.skills.slice();
         if (keys.length) {
           var pick = keys[(Math.random() * keys.length) | 0];
-          skillCharge[pick.key] += m.charge;
+          addCharge(pick.key, m.charge);
           sub = '「' + pick.name + '」充能 +' + m.charge;
         }
       }
       if (m.allCharge) {
-        for (s = 0; s < C.skills.length; s++) skillCharge[C.skills[s].key] += m.allCharge;
+        for (s = 0; s < C.skills.length; s++) addCharge(C.skills[s].key, m.allCharge);
         sub = '全技能充能 +' + m.allCharge;
       }
       addPopup(C.W / 2, 240, '图鉴收集达成 · ' + m.name + ' +' + gain, true, 0);
@@ -1004,7 +1004,7 @@
     scoreBump = 0.35;
     bumpStat('quest');
     var pick = C.skills[Math.floor(Math.random() * C.skills.length)];
-    skillCharge[pick.key] = pick.cost;
+    addCharge(pick.key, pick.cost);
     addPopup(C.W / 2, 240, '任务完成 +' + gain, true, 0);
     addPopup(C.W / 2, 266, '「' + pick.name + '」已充满', false, 0);
     parts.push({ type: 'ring', x: C.W / 2, y: annY(150), r: 20, life: 0.5, max: 0.5, color: '#F5C542' });
@@ -1614,10 +1614,16 @@
   }
 
   // ---------- 技能 ----------
-  // 符文充能：合成带符文的水滴 → 对应技能 +1（充满可用）
+  // 充能写入（统一入口，v338：超额储备——允许叠到 skillMaxQ 倍 cost，溢出截断不再清零）
+  function addCharge(k, n) {
+    if (!(k in skillCharge)) return;
+    var cap = skillCost(k) * C.skillMaxQ;
+    skillCharge[k] = Math.min(cap, (skillCharge[k] || 0) + n);
+  }
+  // 符文充能：合成带符文的水滴 → 对应技能 +1（v338：可叠到 skillMaxQ 倍，不再满即停）
   function chargeRune(b, mx, my) {
     var k = b.rune;
-    if (skillCharge[k] >= skillCost(k)) return;
+    if (skillCharge[k] >= skillCost(k) * C.skillMaxQ) return;
     skillCharge[k]++;
     addPopup(mx + (Math.random() * 24 - 12), my - 10, '「' + runeName(k) + '」符文 +1', false, 0);
     audio.blip(880, 0.12, 'sine', 0.10, 1.35);
@@ -1661,7 +1667,7 @@
       return;
     }
     if (key === 'swap') {
-      skillCharge.swap = 0;
+      skillCharge.swap -= skillCost('swap'); // v338：扣一次费用而非清零，支持多次充能连放
       nextTier = rollTier();
       rollNextDrop();
       aimX = clampAim(aimX);
@@ -1682,7 +1688,7 @@
     a.vx = a.vy = b.vx = b.vy = 0;
     a.svx = a.svy = b.svx = b.svy = 0;
     a.trail = []; b.trail = [];
-    skillCharge.flow = 0;
+    skillCharge.flow -= skillCost('flow'); // v338：扣一次费用而非清零
     flowMode = false; flowPick = null;
     parts.push({ type: 'ring', x: a.x, y: a.y, r: a.r, life: 0.4, max: 0.4, color: '#7FD4FF' });
     parts.push({ type: 'ring', x: b.x, y: b.y, r: b.r, life: 0.4, max: 0.4, color: '#7FD4FF' });
@@ -1693,7 +1699,7 @@
   function castRipple(x, y) {
     x = Math.max(12, Math.min(C.W - 12, x));
     y = Math.max(C.containerTop + 30, Math.min(FLOORY - 16, y));
-    skillCharge.ripple = 0;
+    skillCharge.ripple -= skillCost('ripple'); // v338：扣一次费用而非清零
     rippleMode = false;
     applyRipplePush(x, y, C.ripple.power);
     rippleQueue.push({ t: C.ripple.delay, x: x, y: y });
@@ -1738,7 +1744,7 @@
     scoreBump = 0.25;
     addPopup(b.x, b.y - b.r - 8, b.iron ? '珊瑚礁移除 +' + gain : '+' + gain, false, 0);
     phys.remove(b);
-    skillCharge.evap = 0;
+    skillCharge.evap -= skillCost('evap'); // v338：扣一次费用而非清零
     evapMode = false;
     audio.blip(900, 0.25, 'sine', 0.15, 0.4);
   }
@@ -1851,7 +1857,7 @@
   };
   // 测试钩子（仅自动化测试用）：充能 / 成就 / 局面构造 / 加压进度
   MG.debug = {
-    give: function (k, n) { if (k in skillCharge) skillCharge[k] = n; },
+    give: function (k, n) { addCharge(k, n); },
     setNext: function (opt) {
       opt = opt || {};
       nextIron = !!opt.iron;
@@ -1942,7 +1948,7 @@
       var keys = ['swap', 'ripple', 'evap', 'flow'].filter(function (k) { return skillUnlocked(k); });
       if (keys.length) {
         var k = keys[(Math.random() * keys.length) | 0];
-        skillCharge[k] += perkOn('chest5') ? 3 : 2;
+        addCharge(k, perkOn('chest5') ? 3 : 2);
         addPopup(x, y - 30, '大宝箱开启：' + runeName(k) + ' +2 充能', true, 0, 0, 'good');
       } else {
         var g2 = Math.round((60 + Math.random() * 90) * cm(scoreMult * chestBonus));
@@ -2243,7 +2249,7 @@
     // 成就加成：深海富豪开局随机技能充能 +2
     if (perkOn('score2k')) {
       var pk = C.skills[(Math.random() * C.skills.length) | 0];
-      skillCharge[pk.key] += 2;
+      addCharge(pk.key, 2);
       addPopup(C.W / 2, 280, '深海富豪：「' + pk.name + '」开局充能 +2', false, 0);
     }
     state = 'play';

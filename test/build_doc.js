@@ -79,10 +79,10 @@ const spHtml = SPS.map(s => `<tr><td><img class="ic" src="${ico(s[0])}" alt="">$
 
 // 技能 4 个
 const SKILLS = [
-  ['skill_swap', '换滴', '4 次', '换滴符文首次出现', '把待投水滴换成下一颗'],
-  ['skill_ripple', '涟漪', '6 次', '涟漪符文首次出现', '以水堆重心炸开双重波纹推挤重排'],
-  ['skill_evap', '蒸发', '10 次', '蒸发符文首次出现', '进入选择模式，点掉一枚水滴或珊瑚礁'],
-  ['skill_flow', '水流', '6 次', '水流符文首次出现', '点选两枚水滴交换位置']
+  ['skill_swap', '换滴', '4 充能', '换滴符文首次出现', '把待投水滴换成下一颗'],
+  ['skill_ripple', '涟漪', '6 充能', '涟漪符文首次出现', '以水堆重心炸开双重波纹推挤重排'],
+  ['skill_evap', '蒸发', '10 充能', '蒸发符文首次出现', '进入选择模式，点掉一枚水滴或珊瑚礁'],
+  ['skill_flow', '水流', '6 充能', '水流符文首次出现', '点选两枚水滴交换位置']
 ];
 const skillHtml = SKILLS.map(s => `<tr><td><img class="ic" src="${ico(s[0])}" alt="">${s[1]}</td><td class="num">${s[2]}</td><td>${s[3]}</td><td>${s[4]}</td></tr>`).join('');
 
@@ -142,7 +142,7 @@ const html = `<!DOCTYPE html>
     ['操作', '点击 / 拖动瞄准，松手投放'],
     ['模式', '开局即无尽'],
     ['投放出现特殊滴', '15%'],
-    ['投放自带符文', '30%'],
+    ['投放自带符文', '15%'],
     ['连击窗口 / 最高倍率', '1.1 秒 / ×4'],
     ['渐进加压', '14 分钟到满强度'],
     ['高潮时刻', '每累计 +500 分，场上最高档可合成对自发相聚']
@@ -176,9 +176,10 @@ const html = `<!DOCTYPE html>
 <section>
   <h2>技能（4 个）</h2>
   <table>
-    <tr><th style="width:130px">技能</th><th class="num">充能</th><th style="width:160px">解锁</th><th>效果</th></tr>
+    <tr><th style="width:130px">技能</th><th class="num">每次消耗</th><th style="width:160px">解锁</th><th>效果</th></tr>
     ${skillHtml}
   </table>
+  <p class="note">充能可超额储备：单次使用只扣对应消耗，最多叠到 3 倍消耗（按钮显示可用次数 ×N），用完再充。</p>
 </section>
 
 <section>

@@ -1210,10 +1210,14 @@
   function drawGhostGuide(x, tier) {
     var r = nextIron ? C.iron.r : T[tier].r;
     var gy = C.spawnY + ghostBob(); // v320：线顶跟随虚影漂浮，不断连
-    var landY = landingYFor(x, r);
+    // v338：固定长度辅助线（参考主流落子指示：短而明确的瞄准段，不随堆高伸缩）
+    var topY = gy + r + 2;
+    var L = C.guideLen;
+    var maxL = FLOORY - topY - 4;                 // 不越过床面
+    L = Math.max(0, Math.min(L, maxL));
     ctx.save();
-    if (landY - r > gy + r + 4) {                  // 有可视长度才画线（堆到出生点下时只留短提示）
-      var lg = ctx.createLinearGradient(0, gy + r, 0, landY - r);
+    if (L >= 8) {
+      var lg = ctx.createLinearGradient(0, topY, 0, topY + L);
       lg.addColorStop(0, 'rgba(140,205,245,0.85)');
       lg.addColorStop(1, 'rgba(140,205,245,0.30)');
       ctx.strokeStyle = lg;
@@ -1221,8 +1225,8 @@
       ctx.setLineDash([7, 9]);
       ctx.lineDashOffset = -time * 46;
       ctx.beginPath();
-      ctx.moveTo(x, gy + r + 2);
-      ctx.lineTo(x, landY - r - 2);
+      ctx.moveTo(x, topY);
+      ctx.lineTo(x, topY + L);
       ctx.stroke();
     }
     ctx.restore();
@@ -2459,7 +2463,10 @@
     for (var i = 0; i < SKILL_BTNS.length; i++) {
       var btn = SKILL_BTNS[i], cfg = C.skills[i];
       var unl = skillUnlocked(cfg.key); // 渐进解锁：未点亮只显示锁
-      var ch = skillCharge[cfg.key], ready = unl && ch >= cfg.cost;
+      // v338：支持多次充能——q=可用次数，frac=下一发进度
+      var ch = skillCharge[cfg.key], cost = cfg.cost;
+      var q = Math.floor(ch / cost), frac = (ch - q * cost) / cost;
+      var ready = unl && q >= 1;
       drawCircleBtn(btn, unl ? (ready ? '#2E86B4' : '#5E90B4') : '#7E93A3', unl ? (ready ? 1 : 0.55) : 0.4, ready, readyPulse);
       if (!unl) {
         // 锁图标（小挂锁）
@@ -2472,19 +2479,24 @@
         ctx.fillStyle = 'rgba(230,242,248,0.75)';
         ctx.font = '10px system-ui, sans-serif';
         ctx.fillText('待符文', btn.cx, btn.cy + 13);
-      } else if (!ready) {
+      } else if (ready) {
+        // 已就绪：满环 + 可用次数 ×N（满储备显示"满"）
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(btn.cx, btn.cy, btn.r - 3, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.97)';
+        ctx.font = 'bold 14px system-ui, sans-serif';
+        ctx.fillText(q >= C.skillMaxQ ? '×' + q + ' 满' : '×' + q, btn.cx, btn.cy + 13);
+      } else {
+        // 充能中：进度环 + 当前/所需
         ctx.strokeStyle = 'rgba(255,255,255,0.85)';
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(btn.cx, btn.cy, btn.r - 3, -Math.PI / 2, -Math.PI / 2 + (ch / cfg.cost) * Math.PI * 2);
+        ctx.arc(btn.cx, btn.cy, btn.r - 3, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
         ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.9)';
         ctx.font = 'bold 13px system-ui, sans-serif';
-        ctx.fillText(ch + '/' + cfg.cost, btn.cx, btn.cy + 13);
-      } else {
-        ctx.fillStyle = 'rgba(255,255,255,0.95)';
-        ctx.font = 'bold 13px system-ui, sans-serif';
-        ctx.fillText('就绪', btn.cx, btn.cy + 13);
+        ctx.fillText(ch + '/' + cost, btn.cx, btn.cy + 13);
       }
       if (unl) drawSkillIcon(cfg.key, btn.cx, btn.cy - 6, ready ? '#FFFFFF' : 'rgba(255,255,255,0.85)');
       if (unl && ((cfg.key === 'evap' && evapMode) || (cfg.key === 'ripple' && rippleMode) || (cfg.key === 'flow' && flowMode))) {
