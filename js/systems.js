@@ -303,10 +303,9 @@
       var bonus = C.daily.streakBase + daily.streak * C.daily.streakStep;
       score += bonus;
       scoreBump = 0.4;
-    var pk = C.skills[(Math.random() * C.skills.length) | 0];
-    addCharge(pk.key, 2);
-    addPopup(C.W / 2, 232, '今日全勤！连续 ' + daily.streak + ' 天 +' + bonus, true, 0);
-      addPopup(C.W / 2, 258, '「' + pk.name + '」充能 +2', false, 0);
+      // v345：移除「每日全勤」顺带送的符文充能（原 addCharge(pk.key,2)）——它本是分数/连击奖励，
+      // 却额外发符文，属"非符文滴获取符文"的来源之一；现只保留分数奖励本身
+      addPopup(C.W / 2, 232, '今日全勤！连续 ' + daily.streak + ' 天 +' + bonus, true, 0);
       parts.push({ type: 'ring', x: C.W / 2, y: annY(232), r: 30, life: 0.7, max: 0.7, color: '#F5C542' });
       audio.quest();
     }
