@@ -5774,147 +5774,99 @@ MG.layout.build();
     ctx.restore();
   }
 
-  // 珊瑚礁（内部名 iron）：v363 —— **脑纹珊瑚（Brain Coral）**。
-  // 迭代记录：v358 岩石球（太素）→ v359 具象珊瑚丛（"过于形象化/太丑"）→ v360 柔球（和水滴太像）
-  //           → v361/v362 双色分界球（用户："不太像珊瑚礁！！"）。
-  // 本版取中间解：**球体表面雕出脑纹珊瑚的蜿蜒沟槽**——脑纹是最具识别度的珊瑚纹理，一眼是
-  // 珊瑚；但仍是抽象球体、无具象分枝，绘制成本低、任何尺寸（图鉴 13px 也一样）都成立。
-  // 结构：球体受光渐变 + 4~5 条横贯球面的深色沟槽（振幅中间大两头小，避免贴边）+ 沟槽间亮脊
-  //      （立体迷宫感）+ 4 颗口器点 + 双高光 + 内壁晕影。
-  // 配色仍为**全场唯一珊瑚色**（v361 用户定"只能有一个颜色"）：球体 #FFD9C9→#F0997B→#D85A30，
-  // 沟槽用同色相深阶 #993C1D。
-  // ★ 确定性：沟槽相位/振幅/口器位置按 b.id 派生，同一块终生一致（每帧重算不许跳帧）。
-  // ★ 视觉 = 碰撞圆（半径 r）：判定与观感同源；生长 = 球体本身变大（34→42）。
-  var CORAL = { lite: '#FFD9C9', body: '#F0997B', mid: '#D85A30', dark: '#993C1D', deep: '#5C2410' };
-  // 确定性伪随机（0..1）：seed=同一块珊瑚礁的 b.id，i/k 是元素下标——换 id 换形态，同 id 恒定
-  function reefJ(seed, i, k) {
-    var s = Math.sin(seed * 1.7 + i * 12.9898 + k * 78.233) * 43758.5453;
-    return s - Math.floor(s);
-  }
-  // 波浪点 / 口器位置暂存（模块级复用，避免每帧每礁分配数组）
-  var _wv = new Array(20), _bp = new Array(8);
-  // 生成波浪采样点（x=-r..r，y=y0+sin(...)*amp）写入 _wv；ph 为相位
-  function coralWavePts(r, y0, amp, ph) {
-    var NS = 7, si, st;
-    for (si = 0; si <= NS; si++) {
-      st = si / NS;
-      _wv[si * 2] = -r + 2 * r * st;
-      _wv[si * 2 + 1] = y0 + Math.sin(st * Math.PI * 2 + ph) * amp;
-    }
-    return NS;
-  }
-  // 按 Catmull-Rom 转 cubic 的平滑路径（不闭合；点数据来自 _wv）
-  function coralWavePath(NS) {
-    var i, x0, y0, x1, y1, xa, ya, xb, yb;
-    ctx.beginPath();
-    ctx.moveTo(_wv[0], _wv[1]);
-    for (i = 0; i < NS; i++) {
-      x0 = _wv[i * 2]; y0 = _wv[i * 2 + 1];
-      x1 = _wv[(i + 1) * 2]; y1 = _wv[(i + 1) * 2 + 1];
-      xa = i > 0 ? _wv[(i - 1) * 2] : x0; ya = i > 0 ? _wv[(i - 1) * 2 + 1] : y0;
-      xb = i < NS - 1 ? _wv[(i + 2) * 2] : x1; yb = i < NS - 1 ? _wv[(i + 2) * 2 + 1] : y1;
-      ctx.bezierCurveTo(x0 + (x1 - xa) / 6, y0 + (y1 - ya) / 6, x1 - (xb - x0) / 6, y1 - (yb - y0) / 6, x1, y1);
-    }
-  }
+  // 礁石（内部名 iron）：岩石球——内部全部径向渐变光效（天光/岩缝暗斑/苔藓绿斑/内壁晕影），无线描无实心填充
   function drawIronBall(b, alpha) {
     var r = b.r;
     var bx = b.rx != null ? b.rx : b.x, by = b.ry != null ? b.ry : b.y;
-    // 落地软阴影（与水滴统一）
+    // 落地软阴影
     var floorDist = FLOORY - (by + b.r);
     if (floorDist < 30 && floorDist > -b.r) {
-      var sa = 0.18 * (1 - Math.max(0, floorDist) / 30);
-      ctx.fillStyle = 'rgba(10,40,70,' + sa + ')';
+      var sa = 0.22 * (1 - Math.max(0, floorDist) / 30);
+      ctx.fillStyle = 'rgba(10,20,30,' + sa + ')';
       ctx.beginPath();
-      ctx.ellipse(bx, FLOORY - 2, b.r * 0.85, b.r * 0.2, 0, 0, Math.PI * 2);
+      ctx.ellipse(bx, FLOORY - 2, b.r * 0.9, b.r * 0.2, 0, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(bx, by);
+    // 岩石主体（径向渐变：左上受光暖灰 → 右下沉暗，渐变缓存）
     var rk2 = Math.round(r * 2) / 2;
-    var seed = (b.id == null ? 0 : b.id);       // 虚影/图鉴传入的对象无 id → 固定形态（0 号）
-    var ph = (seed % 5) * 1.257 + 0.4;          // 5 种相位：每块脑纹走势不同、终生不变
-    // ① 球体：径向渐变（左上受光亮珊瑚 → 右下暗珊瑚）
-    var g = grad('coralBall' + rk2, function () {
-      var gg = ctx.createRadialGradient(-r * 0.34, -r * 0.4, r * 0.08, 0, 0, r * 1.04);
-      gg.addColorStop(0, CORAL.lite);
-      gg.addColorStop(0.4, CORAL.body);
-      gg.addColorStop(1, CORAL.mid);
+    var g = grad('iron' + rk2, function () {
+      var gg = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r * 1.05);
+      gg.addColorStop(0, '#D5CFC0');
+      gg.addColorStop(0.45, '#999180');
+      gg.addColorStop(1, '#5E574A');
       return gg;
     });
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-    // 球内细节统一裁剪进球体
+    // 内部光效统一裁剪进岩体，边缘自然收进
     ctx.save();
     ctx.beginPath(); ctx.arc(0, 0, r * 0.99, 0, Math.PI * 2); ctx.clip();
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    // ② 脑纹沟槽：4~5 条横贯球面的蜿蜒深色槽线（振幅中间大、两头小 ⇒ 不会贴球边）
-    var nG = 4 + Math.round(reefJ(seed, 0, 1));      // 4~5 条
-    var gi, base, amp2, NS;
-    for (gi = 0; gi < nG; gi++) {
-      var t2 = nG > 1 ? gi / (nG - 1) : 0.5;
-      base = -r * 0.4 + t2 * r * 0.8;                          // 沟槽基准线（-0.4r..0.4r）
-      var cent = Math.abs(t2 - 0.5) * 2;                       // 0=中间 1=边缘
-      amp2 = r * (0.055 + 0.03 * reefJ(seed, gi, 2)) * (1 - 0.45 * cent); // 中间振幅大
-      NS = coralWavePts(r, base, amp2, ph + gi * 0.75 + reefJ(seed, gi, 3) * 0.4);
-      coralWavePath(NS);
-      ctx.strokeStyle = 'rgba(92,36,16,' + (0.5 - 0.12 * cent) + ')';
-      ctx.lineWidth = r * 0.055;
-      ctx.stroke();
-      // ③ 亮脊：两条沟槽之间的中脊（更细更淡，造出"脑回"的立体迷宫感）
-      if (gi < nG - 1) {
-        var base2 = (-r * 0.4 + ((t2 + 1 / (nG - 1)) / 2) * r * 0.8);
-        var NS2 = coralWavePts(r, base2, amp2 * 0.55, ph + gi * 0.75 + 0.38);
-        coralWavePath(NS2);
-        ctx.strokeStyle = 'rgba(255,217,201,0.3)';
-        ctx.lineWidth = r * 0.028;
-        ctx.stroke();
-      }
-    }
-    // ④ 口器点：4 颗，落在沟槽之间（lite 色小点，珊瑚虫的开口）
-    var placed = 0, pi = 0;
-    while (placed < 4 && pi < 30) {
-      var pa = reefJ(seed, pi, 6) * Math.PI * 2;
-      var pd = r * (0.34 + 0.22 * reefJ(seed, pi, 7));
-      var px2 = Math.cos(pa) * pd, py2 = Math.sin(pa) * pd;
-      pi++;
-      var ok = true, bi2;
-      for (bi2 = 0; bi2 < placed; bi2++) {
-        var ddx = px2 - _bp[bi2 * 2], ddy = py2 - _bp[bi2 * 2 + 1];
-        if (ddx * ddx + ddy * ddy < r * r * 0.1) { ok = false; break; }     // 最小间距 0.32r
-      }
-      if (!ok) continue;
-      _bp[placed * 2] = px2; _bp[placed * 2 + 1] = py2;
-      ctx.fillStyle = hexToRgba(CORAL.lite, 0.5);
-      ctx.beginPath(); ctx.arc(px2, py2, r * 0.05, 0, Math.PI * 2); ctx.fill();
-      placed++;
-    }
-    // ⑤ 双高光（与水滴 drawBall 同语言：左上大柔光 + 右上小亮点）
+    // ① 左上天光（径向光斑：四周渐隐，替代描边弧高光）
     ctx.save();
-    ctx.translate(-r * 0.32, -r * 0.36);
-    ctx.scale(r * 0.42, r * 0.25);
-    ctx.fillStyle = grad('coralHi', function () {
+    ctx.translate(-r * 0.34, -r * 0.4);
+    ctx.rotate(-0.55);
+    ctx.scale(r * 0.5, r * 0.3);
+    ctx.fillStyle = grad('ironSky' + rk2, function () {
       var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-      gg.addColorStop(0, 'rgba(255,253,250,0.5)');
-      gg.addColorStop(0.55, 'rgba(255,253,250,0.17)');
-      gg.addColorStop(1, 'rgba(255,253,250,0)');
+      gg.addColorStop(0, 'rgba(255,250,235,0.34)');
+      gg.addColorStop(0.55, 'rgba(255,250,235,0.13)');
+      gg.addColorStop(1, 'rgba(255,250,235,0)');
       return gg;
     });
     ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
-    ctx.fillStyle = 'rgba(255,255,255,0.32)';
-    ctx.beginPath(); ctx.arc(r * 0.3, -r * 0.52, r * 0.075, 0, Math.PI * 2); ctx.fill();
-    // ⑥ 内壁晕影：由内向外轻微加深（体积感 + 边缘统一收边）
-    ctx.fillStyle = grad('coralVg' + rk2, function () {
-      var gg = ctx.createRadialGradient(0, 0, r * 0.52, 0, 0, r);
-      gg.addColorStop(0, 'rgba(80,34,50,0)');
-      gg.addColorStop(0.76, 'rgba(80,34,50,0.12)');
-      gg.addColorStop(1, 'rgba(80,34,50,0.4)');
+    // ② 岩缝暗斑：三道斜向椭圆暗晕暗示裂缝走向（不描线，柔边过渡）
+    var cks = [
+      [-0.28, 0.04, 0.44, 0.1, -0.5],
+      [0.27, -0.3, 0.36, 0.09, 0.42],
+      [0.12, 0.44, 0.3, 0.08, 0.15]
+    ];
+    for (var ci = 0; ci < cks.length; ci++) {
+      var ck = cks[ci];
+      ctx.save();
+      ctx.translate(ck[0] * r, ck[1] * r);
+      ctx.rotate(ck[4]);
+      ctx.scale(r * ck[2], r * ck[3]);
+      ctx.fillStyle = grad('ironCk' + ci + '_' + rk2, function () {
+        var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+        gg.addColorStop(0, 'rgba(46,38,28,0.4)');
+        gg.addColorStop(0.5, 'rgba(46,38,28,0.18)');
+        gg.addColorStop(1, 'rgba(46,38,28,0)');
+        return gg;
+      });
+      ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    // ③ 苔藓斑（径向渐变绿晕：中心浓边缘透明，大小/纵比错落）
+    var mos = [[-0.45, 0.38, 0.2], [0.5, 0.28, 0.17], [0.02, -0.6, 0.13], [-0.22, 0.6, 0.15], [0.38, -0.38, 0.12]];
+    for (var mi = 0; mi < mos.length; mi++) {
+      var mp = mos[mi];
+      ctx.save();
+      ctx.translate(mp[0] * r, mp[1] * r);
+      ctx.scale(r * mp[2], r * mp[2] * (0.72 + 0.2 * (mi % 2)));
+      ctx.fillStyle = grad('ironMo' + mi + '_' + rk2, function () {
+        var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+        gg.addColorStop(0, 'rgba(118,146,84,0.5)');
+        gg.addColorStop(0.6, 'rgba(118,146,84,0.24)');
+        gg.addColorStop(1, 'rgba(118,146,84,0)');
+        return gg;
+      });
+      ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    // ④ 内壁晕影：由内向外轻微加深（体积感 + 所有内容在球壁处统一收边）
+    ctx.fillStyle = grad('ironVg' + rk2, function () {
+      var gg = ctx.createRadialGradient(0, 0, r * 0.5, 0, 0, r);
+      gg.addColorStop(0, 'rgba(20,16,10,0)');
+      gg.addColorStop(0.75, 'rgba(20,16,10,0.14)');
+      gg.addColorStop(1, 'rgba(20,16,10,0.42)');
       return gg;
     });
     ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-    ctx.restore(); // 球内裁剪
+    ctx.restore(); // 内部裁剪
     // 可能被冰晶冻住
     if (b.frozen > 0) drawFrozenShell(b, r);
     ctx.restore();
@@ -6541,7 +6493,7 @@ MG.layout.build();
     }
     // 呼吸光晕：滴体同色系（特殊滴/符文取各自识别色），亮度随漂浮相位呼吸——
     // 给"虚影"以形体感，不再是一片平淡的半透明圆（v320）
-    var glowC = nextIron ? '#F0997B' : (nextSpecial ? specialColor(nextSpecial) : (nextRune ? runeColor(nextRune) : T[tier].color)); // v361：虚影光晕与球体同色（珊瑚橙）
+    var glowC = nextIron ? '#8FA0AE' : (nextSpecial ? specialColor(nextSpecial) : (nextRune ? runeColor(nextRune) : T[tier].color));
     var pulse = 0.5 + 0.5 * Math.sin(time * 2.1 - 0.6);
     var hg = ctx.createRadialGradient(x, gy, r * 0.2, x, gy, r * 1.55);
     hg.addColorStop(0, hexToRgba(glowC, (0.22 + 0.10 * pulse) * (alpha / 0.6)));
@@ -6591,7 +6543,7 @@ MG.layout.build();
     // 距胶囊边只剩 ≈0.7px，字形的不对称留白被放大成"没居中"的观感；20 高给足 ≈3px 呼吸，
     // 视觉重心不再被边距挤压误导；x 全部取整消除亚像素模糊
     roundRect(Math.round(aimX - tw / 2), ly - 15, tw, 20, 10); ctx.fill();
-    ctx.fillStyle = nextIron ? '#B0526B' : (nextSpecial ? specialColor(nextSpecial) : runeColor(nextRune)); // v358：珊瑚礁标签色 = 珊瑚深粉
+    ctx.fillStyle = nextIron ? '#6B6353' : (nextSpecial ? specialColor(nextSpecial) : runeColor(nextRune));
     // v276：用实际字形边界（actualBoundingBox）精确垂直居中——canvas 'middle' 基线按 em 盒
     // 取中，CJK 字形实际偏上/偏下因字而异；胶囊几何中心 = ly-5，基线补 (asc-desc)/2 修正
     var asc = ink.has ? ink.a : 14 * 0.84, desc = ink.has ? ink.d : 14 * 0.06; // v300：无像素框 API 时用 CJK 排印常数
