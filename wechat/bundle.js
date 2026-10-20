@@ -5774,22 +5774,58 @@ MG.layout.build();
     ctx.restore();
   }
 
-  // 珊瑚礁（内部名 iron）：v358 起由"岩石球"重绘为**活的珊瑚丛**（用户："原来是珊瑚礁，现在是
-  // 珊瑚礁，珊瑚礁的样式也优化一下"）——半球珊瑚座 + 多条向外分叉的珊瑚枝，枝头带结节与口器点；
-  // 三套珊瑚色（粉 / 橙 / 紫粉）按 b.id 派生。
-  // ★ 确定性铁律：色相与枝形全部由 b.id 经 reefJ 派生，同一块珊瑚礁终生一致、绝不每帧跳
+  // 珊瑚礁（内部名 iron）：活的珊瑚丛——**圆丘座 + 鹿角状主枝（每根再分两岔）**。
+  // v359：v358 首版被用户判"太丑"，根因三条：① 枝全从同一点放射 ⇒ 像海胆/蒲公英；
+  //        ② 等粗两段笔触 ⇒ 粗短肉虫；③ 平色块无体积。重画要点：
+  //   ① 主枝 2~3 根、每根在 2/3 处**分叉成两岔**（鹿角形），不再是放射细棍；
+  //   ② 枝体用"锥形绶带"（coralRibbon：沿二次曲线由粗收窄到细 + 两端圆头），收分自然；
+  //   ③ 全株共用**一束左上光源线性渐变**（亮→中→暗），座与枝体积感一致；
+  //   ④ 座顶受光斑 + 座面脑纹水沟 + 口器点（呼吸），像活体而不是光滑色块。
+  // ★ 确定性铁律：色相/枝形全部由 b.id 经 reefJ 派生，同一块珊瑚礁终生一致、绝不每帧跳
   //   （虚影/图鉴每帧重算，用 Math.random 会让珊瑚每帧抽搐——v348 血的教训）。
-  // ★ 生长可视化：枝数与枝长随 (r − C.iron.r)/C.iron.growMax 增长 ⇒ v357 的"在场生长"看得见。
-  // ★ 物理半径不变（仍是 r 的圆），视觉做扁球+外扩枝，轮廓略大于碰撞圆但只大枝尖一点点。
+  // ★ 生长可视化：主枝数 2→3、枝长随 (r − C.iron.r)/C.iron.growMax 增长 ⇒ v357 的"生长"看得见。
+  // ★ 视觉轮廓封顶 ≈1.0r（不伸出碰撞圆）：避免"枝尖看着越线却不判负"的误导。
   var CORAL_PAL = [
-    { body: '#F2788F', dark: '#C74A66', tip: '#FFD9E1', poly: '#FFEFF3' }, // 粉珊瑚
-    { body: '#F59A6B', dark: '#C96F42', tip: '#FFE3C6', poly: '#FFF3E6' }, // 橙珊瑚
-    { body: '#C77BA8', dark: '#9A5285', tip: '#F2D2E8', poly: '#F9E7F3' }  // 紫粉珊瑚
+    { lite: '#FFC9D6', body: '#F08CA0', dark: '#BF5378' },  // 粉珊瑚
+    { lite: '#FFD8BC', body: '#F0996E', dark: '#BF5F38' },  // 橙珊瑚
+    { lite: '#FFE9B8', body: '#F2C14E', dark: '#BC8B25' }   // 金珊瑚
   ];
   // 确定性伪随机（0..1）：seed=同一块珊瑚礁的 b.id，i/k 是元素下标——换 id 换形态，同 id 恒定
   function reefJ(seed, i, k) {
     var s = Math.sin(seed * 1.7 + i * 12.9898 + k * 78.233) * 43758.5453;
     return s - Math.floor(s);
+  }
+  // 绶带取样暂存（模块级复用，避免每帧每枝分配数组——v351 同思路）
+  var _rp = [0, 0, 0, 0, 0, 0, 0];
+  function ribbonPt(t, x0, y0, cx, cy, x1, y1, w0, w1) {
+    var it = 1 - t;
+    var px = it * it * x0 + 2 * it * t * cx + t * t * x1;
+    var py = it * it * y0 + 2 * it * t * cy + t * t * y1;
+    var dx = 2 * it * (cx - x0) + 2 * t * (x1 - cx);
+    var dy = 2 * it * (cy - y0) + 2 * t * (y1 - cy);
+    var L = Math.sqrt(dx * dx + dy * dy) || 1;
+    var nx = -dy / L, ny = dx / L, w = (w0 + (w1 - w0) * t) / 2;
+    _rp[0] = px + nx * w; _rp[1] = py + ny * w;   // 右侧
+    _rp[2] = px - nx * w; _rp[3] = py - ny * w;   // 左侧
+    _rp[4] = px; _rp[5] = py; _rp[6] = w;
+  }
+  // 锥形绶带：沿二次贝塞尔把宽度从 w0 平滑收窄到 w1 的填充枝体（+ 两端圆头）
+  function coralRibbon(x0, y0, cx, cy, x1, y1, w0, w1) {
+    var N = 6, i, t;
+    ctx.beginPath();
+    for (i = 0; i <= N; i++) {
+      t = i / N; ribbonPt(t, x0, y0, cx, cy, x1, y1, w0, w1);
+      if (i === 0) ctx.moveTo(_rp[0], _rp[1]); else ctx.lineTo(_rp[0], _rp[1]);
+    }
+    for (i = N; i >= 0; i--) {
+      t = i / N; ribbonPt(t, x0, y0, cx, cy, x1, y1, w0, w1);
+      ctx.lineTo(_rp[2], _rp[3]);
+    }
+    ctx.closePath(); ctx.fill();
+    ribbonPt(0, x0, y0, cx, cy, x1, y1, w0, w1);            // 根部圆头
+    ctx.beginPath(); ctx.arc(_rp[4], _rp[5], _rp[6], 0, Math.PI * 2); ctx.fill();
+    ribbonPt(1, x0, y0, cx, cy, x1, y1, w0, w1);            // 梢端圆头
+    ctx.beginPath(); ctx.arc(_rp[4], _rp[5], _rp[6], 0, Math.PI * 2); ctx.fill();
   }
   function drawIronBall(b, alpha) {
     var r = b.r;
@@ -5797,7 +5833,7 @@ MG.layout.build();
     // 落地软阴影
     var floorDist = FLOORY - (by + b.r);
     if (floorDist < 30 && floorDist > -b.r) {
-      var sa = 0.22 * (1 - Math.max(0, floorDist) / 30);
+      var sa = 0.2 * (1 - Math.max(0, floorDist) / 30);
       ctx.fillStyle = 'rgba(10,20,30,' + sa + ')';
       ctx.beginPath();
       ctx.ellipse(bx, FLOORY - 2, b.r * 0.9, b.r * 0.2, 0, 0, Math.PI * 2);
@@ -5811,92 +5847,84 @@ MG.layout.build();
     var hueIdx = ((seed % 3) + 3) % 3;
     var pal = CORAL_PAL[hueIdx];
     var grow = Math.max(0, Math.min(1, (r - C.iron.r) / Math.max(0.01, C.iron.growMax))); // 0..1 生长度
-    // ① 珊瑚枝：向上扇形展开，基段粗、梢段细（两段 stroke + 圆头模拟收分），枝头结节 + 口器点
-    var nb = 5 + Math.round(grow * 3);          // 5 → 8 条
-    ctx.lineCap = 'round';
-    for (var bi = 0; bi < nb; bi++) {
-      var t = nb > 1 ? bi / (nb - 1) : 0.5;
-      var ang = -Math.PI / 2 + (t - 0.5) * Math.PI * 0.82 + (reefJ(seed, bi, 1) - 0.5) * 0.34;
-      // 枝长上限压在碰撞圆内（≤1.0r）：珊瑚枝可以向外张扬，但绝不伸出物理圆——
-      // 否则"枝尖看着越过警戒线却不判负"会造成误判（视觉与判定必须同源）
-      var len = r * (0.5 + 0.4 * grow) * (0.75 + 0.35 * reefJ(seed, bi, 2));
-      var dx = Math.cos(ang), dy = Math.sin(ang);
-      var x0 = dx * r * 0.18, y0 = r * 0.1 + dy * r * 0.18;              // 枝根（座顶附近）
-      var x1 = x0 + dx * len, y1 = y0 + dy * len;                        // 枝梢
-      var px = -dy, py = dx;                                             // 法线：弯枝方向
-      var bend = (reefJ(seed, bi, 3) - 0.5) * r * 0.34;
-      var mx = (x0 + x1) / 2 + px * bend, my = (y0 + y1) / 2 + py * bend;
-      ctx.strokeStyle = pal.dark;
-      ctx.lineWidth = r * 0.2;
-      ctx.beginPath();
-      ctx.moveTo(x0, y0);
-      ctx.quadraticCurveTo((x0 + mx) / 2 + px * bend * 0.2, (y0 + my) / 2 + py * bend * 0.2, mx, my);
-      ctx.stroke();
-      ctx.strokeStyle = pal.body;
-      ctx.lineWidth = r * 0.11;
-      ctx.beginPath();
-      ctx.moveTo(mx, my);
-      ctx.quadraticCurveTo((mx + x1) / 2 + px * bend * 0.15, (my + y1) / 2 + py * bend * 0.15, x1, y1);
-      ctx.stroke();
-      // 枝头结节 + 两个口器点（口器随呼吸明灭：活的珊瑚）
-      ctx.fillStyle = pal.tip;
-      ctx.beginPath(); ctx.arc(x1, y1, r * 0.12, 0, Math.PI * 2); ctx.fill();
-      var breathe = 0.5 + 0.4 * Math.sin(time * 1.9 + bi * 1.7 + (seed % 7));
-      ctx.fillStyle = hexToRgba(pal.poly, breathe);
-      ctx.beginPath(); ctx.arc(x1 + px * r * 0.15, y1 + py * r * 0.15, r * 0.045, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(x1 - px * r * 0.13, y1 - py * r * 0.13, r * 0.04, 0, Math.PI * 2); ctx.fill();
-    }
-    // ② 珊瑚座：扁球（半径≈碰撞圆、竖向略收），左上受光 → 右下沉暗
-    var bodyG = grad('coralBody' + hueIdx + '_' + rk2, function () {
-      var gg = ctx.createRadialGradient(-r * 0.3, -r * 0.36, r * 0.08, 0, 0, r * 1.02);
-      gg.addColorStop(0, pal.tip);
-      gg.addColorStop(0.42, pal.body);
+    // 全株共用同一束左上光（亮→中→暗线性渐变）：座与枝体积感一致，不再是平色块
+    var lg = grad('coralLin' + hueIdx + '_' + rk2, function () {
+      var gg = ctx.createLinearGradient(-r * 0.6, -r, r * 0.45, r * 0.85);
+      gg.addColorStop(0, pal.lite);
+      gg.addColorStop(0.45, pal.body);
       gg.addColorStop(1, pal.dark);
       return gg;
     });
-    ctx.fillStyle = bodyG;
-    ctx.beginPath(); ctx.ellipse(0, r * 0.12, r * 0.94, r * 0.86, 0, 0, Math.PI * 2); ctx.fill();
-    // 座内细节统一裁剪进座体（边缘自然收进）
+    // ① 鹿角主枝：2~3 根，每根在 2/3 处分两岔（先画，稍后被座体压住枝根）
+    var nTr = 2 + Math.round(grow);
+    for (var ti = 0; ti < nTr; ti++) {
+      var t0 = nTr > 1 ? ti / (nTr - 1) : 0.5;
+      var ang = -Math.PI / 2 + (t0 - 0.5) * Math.PI * 0.52 + (reefJ(seed, ti, 1) - 0.5) * 0.3;
+      var ca = Math.cos(ang), sa = Math.sin(ang);
+      var L1 = r * (0.4 + 0.2 * grow) * (0.85 + 0.3 * reefJ(seed, ti, 2));
+      var b0x = ca * r * 0.14, b0y = r * 0.16 + sa * r * 0.14;              // 枝根（座顶内）
+      var fkx = b0x + ca * L1, fky = b0y + sa * L1;                        // 分叉点
+      var nx = -sa, ny = ca;                                               // 枝法线（弯枝方向）
+      var bend = (reefJ(seed, ti, 3) - 0.5) * r * 0.2;
+      coralRibbon(b0x, b0y, (b0x + fkx) / 2 + nx * bend, (b0y + fky) / 2 + ny * bend, fkx, fky, r * 0.3, r * 0.16);
+      var L2 = L1 * (0.42 + 0.16 * grow);                                  // 两岔
+      for (var si = 0; si < 2; si++) {
+        var sgn = si ? 1 : -1;
+        var a2 = ang + sgn * (0.42 + 0.18 * grow + 0.08 * reefJ(seed, ti, 4 + si));
+        var c2 = Math.cos(a2), s2 = Math.sin(a2);
+        var tx = fkx + c2 * L2, ty = fky + s2 * L2;
+        var b2 = (reefJ(seed, ti, 6 + si) - 0.5) * r * 0.18;
+        coralRibbon(fkx, fky, (fkx + tx) / 2 + nx * b2, (fky + ty) / 2 + ny * b2, tx, ty, r * 0.16, r * 0.075);
+      }
+    }
+    // ② 圆丘座（椭圆：底贴碰撞圆底、顶在 -0.30r，压住所有枝根 ⇒ "从座里长出"）
+    ctx.fillStyle = lg;
+    ctx.beginPath(); ctx.ellipse(0, r * 0.35, r * 0.82, r * 0.65, 0, 0, Math.PI * 2); ctx.fill();
+    // 座内细节统一裁剪进座体
     ctx.save();
-    ctx.beginPath(); ctx.ellipse(0, r * 0.12, r * 0.94, r * 0.86, 0, 0, Math.PI * 2); ctx.clip();
+    ctx.beginPath(); ctx.ellipse(0, r * 0.35, r * 0.82, r * 0.65, 0, 0, Math.PI * 2); ctx.clip();
     // ③ 座顶受光斑（左上柔光）
     ctx.save();
-    ctx.translate(-r * 0.3, -r * 0.34);
-    ctx.scale(r * 0.46, r * 0.28);
+    ctx.translate(-r * 0.28, -r * 0.08);
+    ctx.scale(r * 0.42, r * 0.24);
     ctx.fillStyle = grad('coralSky' + hueIdx + '_' + rk2, function () {
       var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-      gg.addColorStop(0, 'rgba(255,252,246,0.36)');
-      gg.addColorStop(0.55, 'rgba(255,252,246,0.14)');
-      gg.addColorStop(1, 'rgba(255,252,246,0)');
+      gg.addColorStop(0, 'rgba(255,253,248,0.42)');
+      gg.addColorStop(0.55, 'rgba(255,253,248,0.15)');
+      gg.addColorStop(1, 'rgba(255,253,248,0)');
       return gg;
     });
     ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
-    // ④ 座面口器/珊瑚芽（确定性分布，随呼吸明灭）
-    for (var pi = 0; pi < 4; pi++) {
-      var pa = -Math.PI * 0.85 + pi * 0.62 + reefJ(seed, pi, 5) * 0.3;
-      var pr = r * (0.34 + 0.24 * reefJ(seed, pi, 6));
-      var cxp = Math.cos(pa) * pr, cyp = r * 0.06 + Math.sin(pa) * pr * 0.8;
-      var palpha = (0.4 + 0.35 * Math.sin(time * 2.3 + pi * 1.1 + (seed % 5))) * (0.6 + 0.4 * reefJ(seed, pi, 7));
-      ctx.fillStyle = hexToRgba(pal.poly, Math.max(0, palpha));
-      ctx.beginPath(); ctx.ellipse(cxp, cyp, r * 0.055, r * 0.04, pa, 0, Math.PI * 2); ctx.fill();
+    // ④ 脑纹水沟：3 道横向波浪暗线（活体纹理，不是光滑色块）
+    ctx.strokeStyle = 'rgba(90,30,50,0.22)';
+    ctx.lineWidth = r * 0.05;
+    ctx.lineCap = 'round';
+    for (var gi = 0; gi < 3; gi++) {
+      var gy = -r * 0.1 + gi * r * 0.26 + (reefJ(seed, gi, 8) - 0.5) * r * 0.08;
+      var gw = r * (0.6 + 0.16 * reefJ(seed, gi, 9));
+      ctx.beginPath();
+      ctx.moveTo(-gw, gy);
+      ctx.quadraticCurveTo(0, gy - r * (0.14 + 0.08 * reefJ(seed, gi, 10)), gw, gy);
+      ctx.stroke();
     }
-    // ⑤ 底部沉积暗影（坐底感）+ 内壁晕影（收边）
+    // ⑤ 座面口器点（呼吸明灭；确定性分布）
+    for (var pi = 0; pi < 5; pi++) {
+      var pa = -Math.PI * 0.82 + pi * 0.5 + reefJ(seed, pi, 11) * 0.28;
+      var pr = r * (0.3 + 0.26 * reefJ(seed, pi, 12));
+      var cxp = Math.cos(pa) * pr, cyp = r * 0.2 + Math.sin(pa) * pr * 0.72;
+      var palpha = Math.max(0, 0.35 + 0.4 * Math.sin(time * 2.2 + pi * 1.15 + (seed % 5))) * (0.55 + 0.45 * reefJ(seed, pi, 13));
+      ctx.fillStyle = hexToRgba(pal.lite, palpha);
+      ctx.beginPath(); ctx.ellipse(cxp, cyp, r * 0.05, r * 0.038, pa, 0, Math.PI * 2); ctx.fill();
+    }
+    // ⑥ 底部沉积暗影（坐底感）
     ctx.fillStyle = grad('coralBed' + hueIdx + '_' + rk2, function () {
-      var gg = ctx.createRadialGradient(0, r * 0.5, r * 0.05, 0, r * 0.5, r * 0.95);
-      gg.addColorStop(0, 'rgba(60,20,40,0.3)');
-      gg.addColorStop(1, 'rgba(60,20,40,0)');
+      var gg = ctx.createRadialGradient(0, r * 0.55, r * 0.05, 0, r * 0.55, r * 0.95);
+      gg.addColorStop(0, 'rgba(70,26,44,0.34)');
+      gg.addColorStop(1, 'rgba(70,26,44,0)');
       return gg;
     });
-    ctx.beginPath(); ctx.ellipse(0, r * 0.12, r * 0.94, r * 0.86, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = grad('coralVg' + hueIdx + '_' + rk2, function () {
-      var gg = ctx.createRadialGradient(0, 0, r * 0.55, 0, 0, r);
-      gg.addColorStop(0, 'rgba(50,20,36,0)');
-      gg.addColorStop(0.78, 'rgba(50,20,36,0.12)');
-      gg.addColorStop(1, 'rgba(50,20,36,0.36)');
-      return gg;
-    });
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, r * 0.35, r * 0.82, r * 0.65, 0, 0, Math.PI * 2); ctx.fill();
     ctx.restore(); // 座内裁剪
     // 可能被冰晶冻住
     if (b.frozen > 0) drawFrozenShell(b, r);
