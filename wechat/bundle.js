@@ -5774,26 +5774,25 @@ MG.layout.build();
     ctx.restore();
   }
 
-  // 珊瑚礁（内部名 iron）：v362 细节优化版（用户："细节还要在优化！"）。
-  // 造型沿用 v361 定稿（C 方案：上 2/3 珊瑚橙球体 + 下 1/3 深色岩座 + 波浪分界），本轮只抠细节：
-  //   ① 分界波浪由 7 段**折线**改 **Catmull-Rom 平滑曲线**（折线尖角是"廉价感"主因）；
-  //   ② 分界处改**三层结构**：岩座顶部暗带（渐变加深）+ 主暗描边 + 分界线上方一道窄亮边
-  //      （夹心）——旧版球体暗部 #D85A30 与岩座亮部 #993C1D 明度太接近，上下分区发糊；
-  //   ③ 珊瑚芽改为**恒定 3 颗**（旧版用 continue，某些 id 下只出 1~2 颗且分布失衡），并加最小间距；
-  //   ④ 补**次级小高光点**（与水滴 drawBall 的双高光同语言）；
-  //   ⑤ 沉积层理 x 收窄到 ±0.8r（旧版贴球边被裁出断头）；
-  //   ⑥ 落地软阴影宽度与水滴统一（0.85r）。
-  // 配色仍为**全场唯一珊瑚色**（v361 用户定）：球体 #F5C4B3→#F0997B→#D85A30，岩座同色相深阶。
-  // ★ 确定性：波浪相位 5 种、幅度/基准/芽点位置按 b.id 派生，同一块终生一致（每帧重算不许跳）。
+  // 珊瑚礁（内部名 iron）：v363 —— **脑纹珊瑚（Brain Coral）**。
+  // 迭代记录：v358 岩石球（太素）→ v359 具象珊瑚丛（"过于形象化/太丑"）→ v360 柔球（和水滴太像）
+  //           → v361/v362 双色分界球（用户："不太像珊瑚礁！！"）。
+  // 本版取中间解：**球体表面雕出脑纹珊瑚的蜿蜒沟槽**——脑纹是最具识别度的珊瑚纹理，一眼是
+  // 珊瑚；但仍是抽象球体、无具象分枝，绘制成本低、任何尺寸（图鉴 13px 也一样）都成立。
+  // 结构：球体受光渐变 + 4~5 条横贯球面的深色沟槽（振幅中间大两头小，避免贴边）+ 沟槽间亮脊
+  //      （立体迷宫感）+ 4 颗口器点 + 双高光 + 内壁晕影。
+  // 配色仍为**全场唯一珊瑚色**（v361 用户定"只能有一个颜色"）：球体 #FFD9C9→#F0997B→#D85A30，
+  // 沟槽用同色相深阶 #993C1D。
+  // ★ 确定性：沟槽相位/振幅/口器位置按 b.id 派生，同一块终生一致（每帧重算不许跳帧）。
   // ★ 视觉 = 碰撞圆（半径 r）：判定与观感同源；生长 = 球体本身变大（34→42）。
-  var CORAL = { lite: '#F5C4B3', body: '#F0997B', mid: '#D85A30', dark: '#8A3016', deep: '#4A1B0C' };
+  var CORAL = { lite: '#FFD9C9', body: '#F0997B', mid: '#D85A30', dark: '#993C1D', deep: '#5C2410' };
   // 确定性伪随机（0..1）：seed=同一块珊瑚礁的 b.id，i/k 是元素下标——换 id 换形态，同 id 恒定
   function reefJ(seed, i, k) {
     var s = Math.sin(seed * 1.7 + i * 12.9898 + k * 78.233) * 43758.5453;
     return s - Math.floor(s);
   }
-  // 波浪点暂存 / 珊瑚芽位置暂存（模块级复用，避免每帧每礁分配数组）
-  var _wv = new Array(20), _bp = new Array(6);
+  // 波浪点 / 口器位置暂存（模块级复用，避免每帧每礁分配数组）
+  var _wv = new Array(20), _bp = new Array(8);
   // 生成波浪采样点（x=-r..r，y=y0+sin(...)*amp）写入 _wv；ph 为相位
   function coralWavePts(r, y0, amp, ph) {
     var NS = 7, si, st;
@@ -5820,7 +5819,7 @@ MG.layout.build();
   function drawIronBall(b, alpha) {
     var r = b.r;
     var bx = b.rx != null ? b.rx : b.x, by = b.ry != null ? b.ry : b.y;
-    // 落地软阴影（宽度与水滴统一 0.85r）
+    // 落地软阴影（与水滴统一）
     var floorDist = FLOORY - (by + b.r);
     if (floorDist < 30 && floorDist > -b.r) {
       var sa = 0.18 * (1 - Math.max(0, floorDist) / 30);
@@ -5834,11 +5833,8 @@ MG.layout.build();
     ctx.translate(bx, by);
     var rk2 = Math.round(r * 2) / 2;
     var seed = (b.id == null ? 0 : b.id);       // 虚影/图鉴传入的对象无 id → 固定形态（0 号）
-    var y0 = r * (0.12 + 0.08 * reefJ(seed, 0, 1));   // 分界线基准高度
-    var amp = r * (0.055 + 0.04 * reefJ(seed, 0, 2)); // 波浪幅度
-    var ph = (seed % 5) * 1.257;                       // 5 种相位：每块略有不同、终生不变
-    var NS = coralWavePts(r, y0, amp, ph);
-    // ① 上 2/3 珊瑚球体：径向渐变（左上受光亮珊瑚 → 右下暗珊瑚）
+    var ph = (seed % 5) * 1.257 + 0.4;          // 5 种相位：每块脑纹走势不同、终生不变
+    // ① 球体：径向渐变（左上受光亮珊瑚 → 右下暗珊瑚）
     var g = grad('coralBall' + rk2, function () {
       var gg = ctx.createRadialGradient(-r * 0.34, -r * 0.4, r * 0.08, 0, 0, r * 1.04);
       gg.addColorStop(0, CORAL.lite);
@@ -5851,59 +5847,50 @@ MG.layout.build();
     // 球内细节统一裁剪进球体
     ctx.save();
     ctx.beginPath(); ctx.arc(0, 0, r * 0.99, 0, Math.PI * 2); ctx.clip();
-    // ② 下 1/3 深色岩座：波浪以下填同色相深阶，顶部自带一条暗带（与球体暗部拉开层次）
-    coralWavePath(NS);
-    ctx.lineTo(r, r); ctx.lineTo(-r, r); ctx.closePath();
-    ctx.fillStyle = grad('coralBase' + rk2, function () {
-      var gg = ctx.createLinearGradient(0, y0 - r * 0.1, 0, r);
-      gg.addColorStop(0, CORAL.dark);
-      gg.addColorStop(1, CORAL.deep);
-      return gg;
-    });
-    ctx.fill();
-    // ③ 沉积层理：岩座内两条更淡的平滑波浪（x 收窄到 ±0.8r，避免贴边被裁出断头）
-    ctx.lineWidth = Math.max(1, r * 0.035);
-    for (var li = 0; li < 2; li++) {
-      var NS2 = coralWavePts(r * 0.8, y0 + r * (0.24 + 0.18 * li), amp * 0.6, ph + 0.9 + li * 0.7);
-      coralWavePath(NS2);
-      ctx.strokeStyle = 'rgba(74,27,12,' + (0.32 - li * 0.12) + ')';
-      ctx.stroke();
-    }
-    NS = coralWavePts(r, y0, amp, ph); // 层理复用了 _wv，这里恢复主波浪点
-    // ④ 分界处三层结构：主暗描边（压住分区）+ 上方一道窄亮边（夹心，让"珊瑚压在岩上"可读）
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    coralWavePath(NS);
-    ctx.strokeStyle = CORAL.deep;
-    ctx.lineWidth = Math.max(1.2, r * 0.06);
-    ctx.stroke();
-    ctx.save();
-    ctx.translate(0, -r * 0.05);                 // 亮边略上移，贴在描边上方
-    coralWavePath(NS);
-    ctx.strokeStyle = 'rgba(245,196,179,0.5)';
-    ctx.lineWidth = Math.max(1, r * 0.045);
-    ctx.stroke();
-    ctx.restore();
-    // ⑤ 三颗珊瑚芽（恒定 3 颗：重采样直到合法且互不重叠，只点在上半球）
-    var placed = 0, pi = 0, bi2;
-    while (placed < 3 && pi < 30) {
+    // ② 脑纹沟槽：4~5 条横贯球面的蜿蜒深色槽线（振幅中间大、两头小 ⇒ 不会贴球边）
+    var nG = 4 + Math.round(reefJ(seed, 0, 1));      // 4~5 条
+    var gi, base, amp2, NS;
+    for (gi = 0; gi < nG; gi++) {
+      var t2 = nG > 1 ? gi / (nG - 1) : 0.5;
+      base = -r * 0.4 + t2 * r * 0.8;                          // 沟槽基准线（-0.4r..0.4r）
+      var cent = Math.abs(t2 - 0.5) * 2;                       // 0=中间 1=边缘
+      amp2 = r * (0.055 + 0.03 * reefJ(seed, gi, 2)) * (1 - 0.45 * cent); // 中间振幅大
+      NS = coralWavePts(r, base, amp2, ph + gi * 0.75 + reefJ(seed, gi, 3) * 0.4);
+      coralWavePath(NS);
+      ctx.strokeStyle = 'rgba(92,36,16,' + (0.5 - 0.12 * cent) + ')';
+      ctx.lineWidth = r * 0.055;
+      ctx.stroke();
+      // ③ 亮脊：两条沟槽之间的中脊（更细更淡，造出"脑回"的立体迷宫感）
+      if (gi < nG - 1) {
+        var base2 = (-r * 0.4 + ((t2 + 1 / (nG - 1)) / 2) * r * 0.8);
+        var NS2 = coralWavePts(r, base2, amp2 * 0.55, ph + gi * 0.75 + 0.38);
+        coralWavePath(NS2);
+        ctx.strokeStyle = 'rgba(255,217,201,0.3)';
+        ctx.lineWidth = r * 0.028;
+        ctx.stroke();
+      }
+    }
+    // ④ 口器点：4 颗，落在沟槽之间（lite 色小点，珊瑚虫的开口）
+    var placed = 0, pi = 0;
+    while (placed < 4 && pi < 30) {
       var pa = reefJ(seed, pi, 6) * Math.PI * 2;
-      var pd = r * (0.3 + 0.2 * reefJ(seed, pi, 7));
-      var px2 = Math.cos(pa) * pd, py2 = -r * 0.1 + Math.sin(pa) * pd * 0.8;
+      var pd = r * (0.34 + 0.22 * reefJ(seed, pi, 7));
+      var px2 = Math.cos(pa) * pd, py2 = Math.sin(pa) * pd;
       pi++;
-      if (py2 > y0 - r * 0.1) continue;                       // 不越岩座分区
-      var ok = true;
+      var ok = true, bi2;
       for (bi2 = 0; bi2 < placed; bi2++) {
         var ddx = px2 - _bp[bi2 * 2], ddy = py2 - _bp[bi2 * 2 + 1];
-        if (ddx * ddx + ddy * ddy < r * r * 0.09) { ok = false; break; }   // 最小间距 0.3r
+        if (ddx * ddx + ddy * ddy < r * r * 0.1) { ok = false; break; }     // 最小间距 0.32r
       }
       if (!ok) continue;
       _bp[placed * 2] = px2; _bp[placed * 2 + 1] = py2;
-      ctx.fillStyle = hexToRgba(CORAL.lite, 0.6);
-      ctx.beginPath(); ctx.arc(px2, py2, r * 0.055, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = hexToRgba(CORAL.lite, 0.5);
+      ctx.beginPath(); ctx.arc(px2, py2, r * 0.05, 0, Math.PI * 2); ctx.fill();
       placed++;
     }
-    // ⑥ 双高光（与水滴 drawBall 同语言：左上大柔光 + 右上小亮点）
+    // ⑤ 双高光（与水滴 drawBall 同语言：左上大柔光 + 右上小亮点）
     ctx.save();
     ctx.translate(-r * 0.32, -r * 0.36);
     ctx.scale(r * 0.42, r * 0.25);
@@ -5916,9 +5903,9 @@ MG.layout.build();
     });
     ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
-    ctx.fillStyle = 'rgba(255,255,255,0.34)';
+    ctx.fillStyle = 'rgba(255,255,255,0.32)';
     ctx.beginPath(); ctx.arc(r * 0.3, -r * 0.52, r * 0.075, 0, Math.PI * 2); ctx.fill();
-    // ⑦ 内壁晕影：由内向外轻微加深（体积感 + 边缘统一收边）
+    // ⑥ 内壁晕影：由内向外轻微加深（体积感 + 边缘统一收边）
     ctx.fillStyle = grad('coralVg' + rk2, function () {
       var gg = ctx.createRadialGradient(0, 0, r * 0.52, 0, 0, r);
       gg.addColorStop(0, 'rgba(80,34,50,0)');
