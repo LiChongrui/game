@@ -84,7 +84,7 @@
           if (dist < 0.0001) { nx = 0; ny = -1; dist = 0.0001; }
           else { nx = dx / dist; ny = dy / dist; }
 
-          // 礁石（iron）参与的接触：零容差 + 全量位置修正——礁石与普通滴严格分离，
+          // 珊瑚礁（iron）参与的接触：零容差 + 全量位置修正——珊瑚礁与普通滴严格分离，
           // 既不重叠（视觉穿模）也不压扁水滴（水滴-水滴仍保留 slop 让堆叠柔软自然）
           var ironPair = !!(a.iron || o.iron);
           var overlap = minD - dist - (ironPair ? 0 : C.slop);
@@ -94,7 +94,7 @@
           var ma = a.m || a.r * a.r, mo = o.m || o.r * o.r;
           var invA = 1 / ma, invO = 1 / mo, invSum = invA + invO;
 
-          // 位置修正（按反质量分配）；礁石对全量修正，杜绝残余重叠
+          // 位置修正（按反质量分配）；珊瑚礁对全量修正，杜绝残余重叠
           var corr = overlap / invSum * (ironPair ? 1.0 : 0.8);
           a.x -= nx * corr * invA; a.y -= ny * corr * invA;
           o.x += nx * corr * invO; o.y += ny * corr * invO;

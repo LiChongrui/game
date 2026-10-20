@@ -223,7 +223,7 @@ MG.config = {
   specialChanceMax: 0.34,        // v354：最后一档海域（深渊王座）的特殊滴概率——海域越靠后，特殊滴整体越频繁
   specialStageBoost: 0.5,        // v354：海域对应加成——特殊滴的解锁海域每深一档，权重 ×(1+boost×stage)，
                                  // 使"当前海域所属"的特殊滴出现概率更大（浅海不受影响：可选项本来就少）
-  // 符文水滴（随机附带道具属性）：合成带符文的水滴为对应技能 +1 充能（特殊滴/礁石不带符文）
+  // 符文水滴（随机附带道具属性）：合成带符文的水滴为对应技能 +1 充能（特殊滴/珊瑚礁不带符文）
   // v316：符文池不再按"已解锁技能"过滤——未解锁技能的符文正是解锁来源（滚出即解锁，见 systems.js rollRune/seeRune）
   rune: {
     chance: 0.05,                                      // 普通投放带符文的概率（v343：0.15→0.08；v350：0.08→0.05——道具获取整体降低，符文滴更稀缺）
@@ -250,24 +250,24 @@ MG.config = {
     radiusFactor: 2.4,           // 冻结半径 = 自身半径 × 该系数
     score: 5
   },
-  // 礁石：障碍物（砸穿水滴堆落底、不浮起）
+  // 珊瑚礁：障碍物（砸穿水滴堆落底、不浮起）
   // ★ v357 重设计（用户："珊瑚礁的游戏设计有些弱了，毕竟是期望他能增加游戏难度"）——
   //   旧设计三大漏洞：① 两块一碰就自动相消还倒给 15 分 ⇒ 障碍变成"会自动消失的送分物"；
   //   ② r=26 比第 4 档「浪花」(36) 还小 ⇒ "挤压堆叠空间"是空话；③ 蒸发 1 充能还 +5 分，
   //   清除不但不亏还赚 ⇒ 玩家可以无限期拖着不管。新设计 = 清除变贵 + 存在变痛 + 体积变真。
   iron: {
-    chance: 0.08,                // 每次投放是礁石的概率
+    chance: 0.08,                // 每次投放是珊瑚礁的概率
     maxActive: 5,                // 场上同时最多几个（v339：2→5）
     r: 34,                       // v357：26→34（原半径小于第 4 档水滴，占位毫无存在感）
     growRate: 0.35,              // v357：在场生长 px/s（珊瑚长枝，越拖越占地方）
     growMax: 8,                  // v357：半径最多再长 8px（34→42），约 23 秒长满
     massMult: 16,                // 质量倍率（远重于水滴，下落时把水滴挤开）
     evaporateScore: 0,           // v357：蒸发移除不再给分（原 5）
-    evapCost: 2,                 // v357：蒸发一块礁石耗 2 次充能（水滴仍 1 次）
+    evapCost: 2,                 // v357：蒸发一块珊瑚礁耗 2 次充能（水滴仍 1 次）
     pairScore: 30,               // v357：撞击相消奖励 15→30（清除变难，成功理应更值）
     impactSpeed: 300,            // v357：相对接近速度 ≥ 此值才撞碎——静置贴合不再自动互消，
                                  //       必须"带速度砸上去"（或被涟漪/水流/疾风推着撞上）
-    taxPer: 0.06,                // v357：每块在场礁石让全局得分倍率 −6%
+    taxPer: 0.06,                // v357：每块在场珊瑚礁让全局得分倍率 −6%
     taxMax: 0.30                 // v357：扣分上限 30%（5 块封顶）
   },
 
@@ -330,7 +330,7 @@ MG.config = {
   ramp: {
     minutes: 14,         // 达到满强度所需分钟数（收紧：压力更早到位）
     tideIntervalMin: 16, // 潮汐间隔下限（秒）
-    ironChanceMax: 0.16, // 礁石概率上限
+    ironChanceMax: 0.16, // 珊瑚礁概率上限
     spawnWeightsMax: [22, 24, 22, 16, 16] // 投放权重演进终点（向高级倾斜）
   },
 
@@ -715,7 +715,7 @@ MG.layout.build();
           if (dist < 0.0001) { nx = 0; ny = -1; dist = 0.0001; }
           else { nx = dx / dist; ny = dy / dist; }
 
-          // 礁石（iron）参与的接触：零容差 + 全量位置修正——礁石与普通滴严格分离，
+          // 珊瑚礁（iron）参与的接触：零容差 + 全量位置修正——珊瑚礁与普通滴严格分离，
           // 既不重叠（视觉穿模）也不压扁水滴（水滴-水滴仍保留 slop 让堆叠柔软自然）
           var ironPair = !!(a.iron || o.iron);
           var overlap = minD - dist - (ironPair ? 0 : C.slop);
@@ -725,7 +725,7 @@ MG.layout.build();
           var ma = a.m || a.r * a.r, mo = o.m || o.r * o.r;
           var invA = 1 / ma, invO = 1 / mo, invSum = invA + invO;
 
-          // 位置修正（按反质量分配）；礁石对全量修正，杜绝残余重叠
+          // 位置修正（按反质量分配）；珊瑚礁对全量修正，杜绝残余重叠
           var corr = overlap / invSum * (ironPair ? 1.0 : 0.8);
           a.x -= nx * corr * invA; a.y -= ny * corr * invA;
           o.x += nx * corr * invO; o.y += ny * corr * invO;
@@ -1258,7 +1258,7 @@ MG.layout.build();
 
   var quest = null, questDepth = 0;
 
-  // 关卡状态：1 = 限时得分关（低难度），2 = 无尽模式（礁石/潮汐齐全，计时改为累计进行时长）
+  // 关卡状态：1 = 限时得分关（低难度），2 = 无尽模式（珊瑚礁/潮汐齐全，计时改为累计进行时长）
   var levelElapsed = 0;                                  // 本局已进行时长（顶部计时显示用）
   var lifeScore = 0, runCounted = 0; // 累计分（图鉴门槛用）：刷新页面即重新计，不跨刷新保留
   function totalScore() { return lifeScore + (score - runCounted); }
@@ -1266,7 +1266,7 @@ MG.layout.build();
   // 潮汐状态
   var tide = { phase: 'idle', timer: C.tide.cycleInterval, progress: 0, banner: 0 }; // v315：首潮倒计时直接用潮汐间隔（用户："首次涨潮倒计时也用潮汐间隔的时间"）
   var achTick = 0; // 成就周期检查计时
-  // 无尽模式渐进加压：随时长线性到满（潮汐更频/礁石更多/投放向高级倾斜）
+  // 无尽模式渐进加压：随时长线性到满（潮汐更频/珊瑚礁更多/投放向高级倾斜）
   var endlessT = 0, rampStage = 0;
   var climaxMark = 0; // 高潮时刻：上次触发时的分数标记
   var tideGateHint = false; // 潮汐限定合成：一次性提示
@@ -1288,7 +1288,7 @@ MG.layout.build();
   function perkMult() { return (achDone.tide12 && tide.progress > 0.2) ? 1.1 : 1; }
   // 数值封顶：所有乘区叠乘后总倍率不超过 C.multCap（防成就/海域加成叠乘导致分数膨胀）
   // v281：词缀不再提供得分倍率收益（用户：倍率太高），只保留难度增益
-  // v357：礁石税——每块**在场**礁石削弱全局收益（用户："在场即扣分"）。旧设计里礁石躺在场上
+  // v357：珊瑚礁税——每块**在场**珊瑚礁削弱全局收益（用户："在场即扣分"）。旧设计里珊瑚礁躺在场上
   // 毫无代价，玩家可以无限期不管；现在拖着不管 = 收益持续变差，逼你主动清除。
   // 作用面 = 一切走 cm() 的收益（合成 / 彩虹 / 相消 / 图鉴里程碑 / 任务 / 每日挑战奖励）。
   function reefTax() {
@@ -1734,16 +1734,16 @@ MG.layout.build();
   }
   function rollIron() {
     if (seaStage() < ((C.specialStage && C.specialStage.iron != null) ? C.specialStage.iron : 0)) return false; // 珊瑚浅海起才落珊瑚礁（注意 0 是合法门槛，不能写 || 兜底）
-    if (seaEvent && seaEvent.type === 'storm') return false; // 保底：风暴期间不再落礁石，避免双重失控
-    if (ironCount() >= C.iron.maxActive) return false; // 场上已满员：预览不再出礁石，避免落下时被迫转成水滴
+    if (seaEvent && seaEvent.type === 'storm') return false; // 保底：风暴期间不再落珊瑚礁，避免双重失控
+    if (ironCount() >= C.iron.maxActive) return false; // 场上已满员：预览不再出珊瑚礁，避免落下时被迫转成水滴
     var ch = C.iron.chance + (C.ramp.ironChanceMax - C.iron.chance) * endlessRamp();
     if (ng && ng.active && ng.active.ironX) ch *= ng.active.ironX; // 二周目「暗礁密布」
     return Math.random() < ch;
-  } // 礁石概率随渐进加压提升
+  } // 珊瑚礁概率随渐进加压提升
   // 符文：普通水滴随机附带的道具属性，合成时为对应技能充能
   // v316：① 池子不再按 skillUnlocked 过滤——未解锁技能的符文正是解锁来源（旧过滤下永远解锁不了）；
   //       ② 滚出即 seeRune 记录"已出现"→ 对应道具解锁（预览可见即生效，mg_rune 持久）。
-  //       调用方须保证只在"这一滴确实带符文"时调用（礁石/特殊滴占位不滚，见 rollNextDrop）。
+  //       调用方须保证只在"这一滴确实带符文"时调用（珊瑚礁/特殊滴占位不滚，见 rollNextDrop）。
   function rollRune() {
     // v340：符文首现海域以配置为准——必须显式判断 number，否则 specialStage.rune=0 会被 `|| 2`
     // 当成 falsy 退回 2（蔚蓝深海），与图鉴 SP_DEFS rune.stage(=0 潮汐池) 不一致（用户核对发现）
@@ -1762,7 +1762,7 @@ MG.layout.build();
     return pick;
   }
   // 下一滴预览三连滚（v316 合并原 4 处重复写法：初始化 / 每次投放后 / 换滴 / 重开）：
-  // 特殊滴 → 礁石 → 符文。礁石/特殊滴占位的滴不带符文——预览所见即所得，
+  // 特殊滴 → 珊瑚礁 → 符文。珊瑚礁/特殊滴占位的滴不带符文——预览所见即所得，
   // 也保证 rollRune（内含 seeRune 解锁）只在符文真正会出现时被调用。
   function rollNextDrop() {
     nextSpecial = rollSpecial();
@@ -1791,9 +1791,9 @@ MG.layout.build();
     b.m = C.iron.r * C.iron.r * C.iron.massMult;     // 大质量 → 下落时把水滴挤开（砸穿效果）
     return b;
   }
-  // v357：礁石在场生长——越拖越占地方（半径 growRate px/s，至多 +growMax）。
+  // v357：珊瑚礁在场生长——越拖越占地方（半径 growRate px/s，至多 +growMax）。
   // 半径变大 ⇒ 占位更狠、更挡合成路径，也会把上方水滴顶高（越线压力）。质量同步按面积更新。
-  var reefCountPrev = 0;       // 上一帧在场礁石数（只在数量变化时提示，避免刷屏）
+  var reefCountPrev = 0;       // 上一帧在场珊瑚礁数（只在数量变化时提示，避免刷屏）
   function updateIrons(dt) {
     var bs = phys.bodies, n = 0;
     for (var i = 0; i < bs.length; i++) {
@@ -1806,8 +1806,8 @@ MG.layout.build();
     }
     // 收益惩罚必须让玩家看见（否则分数莫名变少）：数量变化时才提示，且 1 块不报（太平凡）
     if (n !== reefCountPrev) {
-      if (n >= 2) addPopup(C.W / 2, 250, '礁石 ×' + n + ' · 全局收益 −' + Math.round((1 - reefTax()) * 100) + '%', false, 0);
-      else if (n === 0 && reefCountPrev >= 2) addPopup(C.W / 2, 250, '礁石清空 · 收益恢复', false, 0);
+      if (n >= 2) addPopup(C.W / 2, 250, '珊瑚礁 ×' + n + ' · 全局收益 −' + Math.round((1 - reefTax()) * 100) + '%', false, 0);
+      else if (n === 0 && reefCountPrev >= 2) addPopup(C.W / 2, 250, '珊瑚礁清空 · 收益恢复', false, 0);
       reefCountPrev = n;
     }
   }
@@ -2288,8 +2288,8 @@ MG.layout.build();
     }
     for (i = 0; i < merges.length; i++) doMerge(merges[i][0], merges[i][1]);
 
-    // v357：礁石不再"接触即消"——只有**带速度撞上去**才碎（相对接近速度 ≥ C.iron.impactSpeed）。
-    // 旧版两块礁石随便一挨就一起消失还倒给分，障碍等于"会自动清零的送分物"，难度形同虚设；
+    // v357：珊瑚礁不再"接触即消"——只有**带速度撞上去**才碎（相对接近速度 ≥ C.iron.impactSpeed）。
+    // 旧版两块珊瑚礁随便一挨就一起消失还倒给分，障碍等于"会自动清零的送分物"，难度形同虚设；
     // 现在静置贴合不消，必须主动从高处砸、或被涟漪/水流/疾风推着撞上去才碎（砸偏会抬高堆顶，
     // 清除本身带风险）。奖励反而提高到 30（操作成功该有正反馈）。
     for (i = 0; i < bs.length; i++) {
@@ -2657,7 +2657,7 @@ MG.layout.build();
     addPopup(C.W / 2, 250, '珍珠祝福！「' + T[t].name + '」全体 +1', true, 0);
     audio.quest();
   }
-  // 熔岩滴：烧毁周围礁石与最低两档水滴，折算得分
+  // 熔岩滴：烧毁周围珊瑚礁与最低两档水滴，折算得分
   function triggerMagma(b) {
     var bs = phys.bodies, R = C.magmaR, burn = [], i;
     for (i = 0; i < bs.length; i++) {
@@ -2673,7 +2673,7 @@ MG.layout.build();
       var t2 = burn[i].iron ? 0 : burn[i].tier;
       gain += Math.round((C.magmaScore + T[t2].score * 2) * scoreMult);
       burst(burn[i].x, burn[i].y, Math.max(0, t2), false);
-      if (burn[i].iron) dailyProgress('iron'); // v357：熔岩烧掉礁石同样计入"消除珊瑚礁"
+      if (burn[i].iron) dailyProgress('iron'); // v357：熔岩烧掉珊瑚礁同样计入"消除珊瑚礁"
     }
     phys.removeMany(burn); // v351：批量一次删完（逐个 remove 是 indexOf+splice 的 O(k*n)）
     score += gain; scoreBump = 0.3;
@@ -2855,7 +2855,7 @@ MG.layout.build();
     var bs = phys.bodies;
     for (var i = 0; i < bs.length; i++) {
       var b = bs[i];
-      if (b.iron || b.frozen > 0) continue; // 礁石沉底不浮起
+      if (b.iron || b.frozen > 0) continue; // 珊瑚礁沉底不浮起
       var subm = (b.y + b.r - wy) / (2 * b.r);
       if (subm <= 0) continue;
       var f = Math.min(1, subm); // 浸没比：浮力、水的阻力、横向涌动三者共用（浸得越浅浮力越弱、受阻越小）
@@ -2913,7 +2913,7 @@ MG.layout.build();
       evapMode = true;
       rippleMode = false;
       flowMode = false; flowPick = null;
-      // v357：场上有礁石时明确告知涨价（避免玩家点下去才发现扣 2 次）
+      // v357：场上有珊瑚礁时明确告知涨价（避免玩家点下去才发现扣 2 次）
       if (ironCount() > 0) addPopup(C.W / 2, 250, '蒸发珊瑚礁需 ' + (skillCost('evap') * C.iron.evapCost) + ' 次充能', false, 0);
       return;
     }
@@ -2975,7 +2975,7 @@ MG.layout.build();
     var bs = phys.bodies;
     for (var i = 0; i < bs.length; i++) {
       var b = bs[i];
-      if (b.iron || b.frozen > 0) continue; // 冻结滴纹丝不动；礁石沉重推不动
+      if (b.iron || b.frozen > 0) continue; // 冻结滴纹丝不动；珊瑚礁沉重推不动
       var dx = b.x - cx, dy = b.y - cy;
       var d = Math.sqrt(dx * dx + dy * dy);
       if (d < 1) { dx = 0; dy = -1; d = 1; }
@@ -2996,7 +2996,7 @@ MG.layout.build();
   }
   function evaporate(b) {
     var gain;
-    var cost = skillCost('evap') * (b.iron ? C.iron.evapCost : 1); // v357：蒸发礁石 2 次充能、水滴仍 1 次
+    var cost = skillCost('evap') * (b.iron ? C.iron.evapCost : 1); // v357：蒸发珊瑚礁 2 次充能、水滴仍 1 次
     if (b.iron) {
       gain = C.iron.evaporateScore; // v357：不再给分（原 5）——清除是止损，不是收益
       burstIron(b.x, b.y);
@@ -3009,7 +3009,7 @@ MG.layout.build();
     scoreBump = 0.25;
     addPopup(b.x, b.y - b.r - 8, b.iron ? ('珊瑚礁移除 · 充能 −' + cost) : ('+' + gain), false, 0);
     phys.remove(b);
-    skillCharge.evap -= cost; // v338：扣一次费用而非清零（v357：礁石扣 evapCost 倍）
+    skillCharge.evap -= cost; // v338：扣一次费用而非清零（v357：珊瑚礁扣 evapCost 倍）
     evapMode = false;
     audio.blip(900, 0.25, 'sine', 0.15, 0.4);
   }
@@ -3188,7 +3188,7 @@ MG.layout.build();
     discoverSpecial('chest');
     var b = createIron(C.W * (0.2 + Math.random() * 0.6), C.dangerY + 52); // 警戒线下方开阔水域生成，不压坠落区虚影
     b.chest = true;
-    b.r = 17; b.m = b.r * b.r * 6; // 比礁石轻，不会被砸得太凶
+    b.r = 17; b.m = b.r * b.r * 6; // 比珊瑚礁轻，不会被砸得太凶
     chest = { b: b, t: 0, life: 14 }; // 14 秒内不点就沉走
     // v340：提示跟随宝箱实体（attach=b），宝箱降落时文字同步下移；life 显式 2.5s，跟随弹字也走生命周期（不再永不消失）
     addPopup(b.x, C.dangerY + 10, '沉大宝箱！点它开启', true, 0, 2.5, 'reward', b); // v343：出现提示统一绿色（与图鉴新发现/开启收益同色）
@@ -3335,7 +3335,7 @@ MG.layout.build();
       var R = 360;
       for (i = 0; i < bs.length; i++) {
         b = bs[i];
-        if (b.iron) continue; // 礁石沉底，不被卷动
+        if (b.iron) continue; // 珊瑚礁沉底，不被卷动
         var dx = seaEvent.x - b.x, dy = seaEvent.y - b.y, d = Math.sqrt(dx * dx + dy * dy);
         if (d > 6 && d < R) {
           var ux = dx / d, uy = dy / d;                 // 指向中心的单位向量（向心）
@@ -3508,7 +3508,7 @@ MG.layout.build();
     reviveCount = 0; // 新局重置复活次数（v328）
     runBuffered = false; // 新局重置深流缓冲
     skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
-    reefCountPrev = 0; // v357：礁石税提示计数随局重置
+    reefCountPrev = 0; // v357：珊瑚礁税提示计数随局重置
     seaCount = 0; scoreMult = 1;
     evapMode = false; rippleMode = false; flowMode = false; flowPick = null; rainHint = 0;
     auroraNext = 0; // 极光庇护只在单次合成内生效
@@ -3818,7 +3818,7 @@ MG.layout.build();
     }
     if (evapMode) {
       var ball = ballAt(p);
-      // v357：点礁石要 2 次充能，不足时提示而不是硬扣（否则充能会被扣成负数）
+      // v357：点珊瑚礁要 2 次充能，不足时提示而不是硬扣（否则充能会被扣成负数）
       if (ball && ball.iron && skillCharge.evap < skillCost('evap') * C.iron.evapCost) {
         flashSkill('evap', '蒸发珊瑚礁需 ' + (skillCost('evap') * C.iron.evapCost) + ' 次充能');
         return;
@@ -3966,7 +3966,7 @@ MG.layout.build();
     audio.bgm.setDanger(dg);
     audio.bgm.setTide(tide.progress, (tide.phase === 'idle' && tide.timer < C.tide.warnTime) ? 1 : 0);
 
-    updateIrons(dt);   // v357：礁石在场生长（越拖越占地方），须在合成/判负之前
+    updateIrons(dt);   // v357：珊瑚礁在场生长（越拖越占地方），须在合成/判负之前
     processMerges();
     updateChest(dt);
     updateSeaEvent(dt);
@@ -4359,8 +4359,8 @@ MG.layout.build();
             continue;
           }
           if (found2) {
-            // v292：统一玻璃底圆（r12）——每格图标共用同一可见包络。礁石/宝箱是深色实体、
-            // 多数水滴是浅色球，浅色球的淡边缘在浅底上"看着"比深色图标窄（用户报礁石/漩涡滴
+            // v292：统一玻璃底圆（r12）——每格图标共用同一可见包络。珊瑚礁/宝箱是深色实体、
+            // 多数水滴是浅色球，浅色球的淡边缘在浅底上"看着"比深色图标窄（用户报珊瑚礁/漩涡滴
             // 不对齐，实测两者实体左缘同为 242 像素级重合）；有了同尺寸底圆后列对齐一目了然
             ctx.fillStyle = 'rgba(255,255,255,0.30)';
             ctx.beginPath(); ctx.arc(cx2, cy2, 12, 0, Math.PI * 2); ctx.fill();
@@ -4597,7 +4597,7 @@ MG.layout.build();
     ctx.restore();
   }
 
-  // 图鉴内特殊滴的实际形态（小尺寸）：礁石=岩石 / 符文滴=水滴+符文牌 / 宝箱=迷你木箱 / 其余=水滴+专属标记
+  // 图鉴内特殊滴的实际形态（小尺寸）：珊瑚礁=珊瑚丛 / 符文滴=水滴+符文牌 / 宝箱=迷你木箱 / 其余=水滴+专属标记
   function drawSpForm(spIdx, x, y) {
     // v292：宝箱 0.55→0.76——实体箱身 15.8→22 逻辑px，与水滴直径（r11×2）同宽，
     // 左右实体缘与各排水滴严格对齐（用户截图实测：水滴实体 380..412、宝箱实体 384..407，
@@ -4947,7 +4947,7 @@ MG.layout.build();
       ctx.strokeStyle = done ? 'rgba(217,169,63,0.45)' : 'rgba(46,110,150,0.12)';
       ctx.lineWidth = 1;
       roundRect(x + 0.5, ty0 + 0.5, w - 1, rowH - 1, 12); ctx.stroke();
-      // 圆形图标底 + 游戏本体现有图标（水滴/技能/宝箱/海域徽章/礁石，不自绘）
+      // 圆形图标底 + 游戏本体现有图标（水滴/技能/宝箱/海域徽章/珊瑚礁，不自绘）
       var ix = x + 12, iy = ty0 + (rowH - 40) / 2, icx = ix + 20, icy = iy + 20;
       ctx.fillStyle = done ? 'rgba(217,169,63,0.16)' : 'rgba(143,169,186,0.16)';
       ctx.beginPath(); ctx.arc(icx, icy, 20, 0, Math.PI * 2); ctx.fill();
@@ -4973,7 +4973,7 @@ MG.layout.build();
         ctx.scale(1.5, 1.5);
         drawSeaBadge(seaStage(), 0, 0, true); // 当前海域徽章
       } else {
-        drawIronBall({ x: 0, y: 0, r: 13, vx: 0, vy: 0 }, 1); // 礁石球
+        drawIronBall({ x: 0, y: 0, r: 13, vx: 0, vy: 0 }, 1); // 珊瑚礁丛（v358 重绘）
       }
       ctx.restore();
       // 标题 + 右上难度星与奖励
@@ -5620,7 +5620,7 @@ MG.layout.build();
     return 1.15 - 0.15 * (0.6 - t) / 0.6;
   }
 
-  // 礁石压顶不做压扁/形变：物理层已让礁石与普通滴严格分离（零容差全量修正），保持各自圆形
+  // 珊瑚礁压顶不做压扁/形变：物理层已让珊瑚礁与普通滴严格分离（零容差全量修正），保持各自圆形
   function drawBall(b, alpha) {
     if (b.iron) { if (b.chest) drawChest(b, alpha); else drawIronBall(b, alpha); return; }
     var t = T[b.tier];
@@ -5774,7 +5774,23 @@ MG.layout.build();
     ctx.restore();
   }
 
-  // 礁石（内部名 iron）：岩石球——内部全部径向渐变光效（天光/岩缝暗斑/苔藓绿斑/内壁晕影），无线描无实心填充
+  // 珊瑚礁（内部名 iron）：v358 起由"岩石球"重绘为**活的珊瑚丛**（用户："原来是珊瑚礁，现在是
+  // 珊瑚礁，珊瑚礁的样式也优化一下"）——半球珊瑚座 + 多条向外分叉的珊瑚枝，枝头带结节与口器点；
+  // 三套珊瑚色（粉 / 橙 / 紫粉）按 b.id 派生。
+  // ★ 确定性铁律：色相与枝形全部由 b.id 经 reefJ 派生，同一块珊瑚礁终生一致、绝不每帧跳
+  //   （虚影/图鉴每帧重算，用 Math.random 会让珊瑚每帧抽搐——v348 血的教训）。
+  // ★ 生长可视化：枝数与枝长随 (r − C.iron.r)/C.iron.growMax 增长 ⇒ v357 的"在场生长"看得见。
+  // ★ 物理半径不变（仍是 r 的圆），视觉做扁球+外扩枝，轮廓略大于碰撞圆但只大枝尖一点点。
+  var CORAL_PAL = [
+    { body: '#F2788F', dark: '#C74A66', tip: '#FFD9E1', poly: '#FFEFF3' }, // 粉珊瑚
+    { body: '#F59A6B', dark: '#C96F42', tip: '#FFE3C6', poly: '#FFF3E6' }, // 橙珊瑚
+    { body: '#C77BA8', dark: '#9A5285', tip: '#F2D2E8', poly: '#F9E7F3' }  // 紫粉珊瑚
+  ];
+  // 确定性伪随机（0..1）：seed=同一块珊瑚礁的 b.id，i/k 是元素下标——换 id 换形态，同 id 恒定
+  function reefJ(seed, i, k) {
+    var s = Math.sin(seed * 1.7 + i * 12.9898 + k * 78.233) * 43758.5453;
+    return s - Math.floor(s);
+  }
   function drawIronBall(b, alpha) {
     var r = b.r;
     var bx = b.rx != null ? b.rx : b.x, by = b.ry != null ? b.ry : b.y;
@@ -5790,83 +5806,98 @@ MG.layout.build();
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(bx, by);
-    // 岩石主体（径向渐变：左上受光暖灰 → 右下沉暗，渐变缓存）
     var rk2 = Math.round(r * 2) / 2;
-    var g = grad('iron' + rk2, function () {
-      var gg = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r * 1.05);
-      gg.addColorStop(0, '#D5CFC0');
-      gg.addColorStop(0.45, '#999180');
-      gg.addColorStop(1, '#5E574A');
+    var seed = (b.id == null ? 0 : b.id);       // 虚影/图鉴传入的对象无 id → 固定形态（0 号）
+    var hueIdx = ((seed % 3) + 3) % 3;
+    var pal = CORAL_PAL[hueIdx];
+    var grow = Math.max(0, Math.min(1, (r - C.iron.r) / Math.max(0.01, C.iron.growMax))); // 0..1 生长度
+    // ① 珊瑚枝：向上扇形展开，基段粗、梢段细（两段 stroke + 圆头模拟收分），枝头结节 + 口器点
+    var nb = 5 + Math.round(grow * 3);          // 5 → 8 条
+    ctx.lineCap = 'round';
+    for (var bi = 0; bi < nb; bi++) {
+      var t = nb > 1 ? bi / (nb - 1) : 0.5;
+      var ang = -Math.PI / 2 + (t - 0.5) * Math.PI * 0.82 + (reefJ(seed, bi, 1) - 0.5) * 0.34;
+      // 枝长上限压在碰撞圆内（≤1.0r）：珊瑚枝可以向外张扬，但绝不伸出物理圆——
+      // 否则"枝尖看着越过警戒线却不判负"会造成误判（视觉与判定必须同源）
+      var len = r * (0.5 + 0.4 * grow) * (0.75 + 0.35 * reefJ(seed, bi, 2));
+      var dx = Math.cos(ang), dy = Math.sin(ang);
+      var x0 = dx * r * 0.18, y0 = r * 0.1 + dy * r * 0.18;              // 枝根（座顶附近）
+      var x1 = x0 + dx * len, y1 = y0 + dy * len;                        // 枝梢
+      var px = -dy, py = dx;                                             // 法线：弯枝方向
+      var bend = (reefJ(seed, bi, 3) - 0.5) * r * 0.34;
+      var mx = (x0 + x1) / 2 + px * bend, my = (y0 + y1) / 2 + py * bend;
+      ctx.strokeStyle = pal.dark;
+      ctx.lineWidth = r * 0.2;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.quadraticCurveTo((x0 + mx) / 2 + px * bend * 0.2, (y0 + my) / 2 + py * bend * 0.2, mx, my);
+      ctx.stroke();
+      ctx.strokeStyle = pal.body;
+      ctx.lineWidth = r * 0.11;
+      ctx.beginPath();
+      ctx.moveTo(mx, my);
+      ctx.quadraticCurveTo((mx + x1) / 2 + px * bend * 0.15, (my + y1) / 2 + py * bend * 0.15, x1, y1);
+      ctx.stroke();
+      // 枝头结节 + 两个口器点（口器随呼吸明灭：活的珊瑚）
+      ctx.fillStyle = pal.tip;
+      ctx.beginPath(); ctx.arc(x1, y1, r * 0.12, 0, Math.PI * 2); ctx.fill();
+      var breathe = 0.5 + 0.4 * Math.sin(time * 1.9 + bi * 1.7 + (seed % 7));
+      ctx.fillStyle = hexToRgba(pal.poly, breathe);
+      ctx.beginPath(); ctx.arc(x1 + px * r * 0.15, y1 + py * r * 0.15, r * 0.045, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x1 - px * r * 0.13, y1 - py * r * 0.13, r * 0.04, 0, Math.PI * 2); ctx.fill();
+    }
+    // ② 珊瑚座：扁球（半径≈碰撞圆、竖向略收），左上受光 → 右下沉暗
+    var bodyG = grad('coralBody' + hueIdx + '_' + rk2, function () {
+      var gg = ctx.createRadialGradient(-r * 0.3, -r * 0.36, r * 0.08, 0, 0, r * 1.02);
+      gg.addColorStop(0, pal.tip);
+      gg.addColorStop(0.42, pal.body);
+      gg.addColorStop(1, pal.dark);
       return gg;
     });
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-    // 内部光效统一裁剪进岩体，边缘自然收进
+    ctx.fillStyle = bodyG;
+    ctx.beginPath(); ctx.ellipse(0, r * 0.12, r * 0.94, r * 0.86, 0, 0, Math.PI * 2); ctx.fill();
+    // 座内细节统一裁剪进座体（边缘自然收进）
     ctx.save();
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.99, 0, Math.PI * 2); ctx.clip();
-    // ① 左上天光（径向光斑：四周渐隐，替代描边弧高光）
+    ctx.beginPath(); ctx.ellipse(0, r * 0.12, r * 0.94, r * 0.86, 0, 0, Math.PI * 2); ctx.clip();
+    // ③ 座顶受光斑（左上柔光）
     ctx.save();
-    ctx.translate(-r * 0.34, -r * 0.4);
-    ctx.rotate(-0.55);
-    ctx.scale(r * 0.5, r * 0.3);
-    ctx.fillStyle = grad('ironSky' + rk2, function () {
+    ctx.translate(-r * 0.3, -r * 0.34);
+    ctx.scale(r * 0.46, r * 0.28);
+    ctx.fillStyle = grad('coralSky' + hueIdx + '_' + rk2, function () {
       var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-      gg.addColorStop(0, 'rgba(255,250,235,0.34)');
-      gg.addColorStop(0.55, 'rgba(255,250,235,0.13)');
-      gg.addColorStop(1, 'rgba(255,250,235,0)');
+      gg.addColorStop(0, 'rgba(255,252,246,0.36)');
+      gg.addColorStop(0.55, 'rgba(255,252,246,0.14)');
+      gg.addColorStop(1, 'rgba(255,252,246,0)');
       return gg;
     });
     ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
-    // ② 岩缝暗斑：三道斜向椭圆暗晕暗示裂缝走向（不描线，柔边过渡）
-    var cks = [
-      [-0.28, 0.04, 0.44, 0.1, -0.5],
-      [0.27, -0.3, 0.36, 0.09, 0.42],
-      [0.12, 0.44, 0.3, 0.08, 0.15]
-    ];
-    for (var ci = 0; ci < cks.length; ci++) {
-      var ck = cks[ci];
-      ctx.save();
-      ctx.translate(ck[0] * r, ck[1] * r);
-      ctx.rotate(ck[4]);
-      ctx.scale(r * ck[2], r * ck[3]);
-      ctx.fillStyle = grad('ironCk' + ci + '_' + rk2, function () {
-        var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-        gg.addColorStop(0, 'rgba(46,38,28,0.4)');
-        gg.addColorStop(0.5, 'rgba(46,38,28,0.18)');
-        gg.addColorStop(1, 'rgba(46,38,28,0)');
-        return gg;
-      });
-      ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
+    // ④ 座面口器/珊瑚芽（确定性分布，随呼吸明灭）
+    for (var pi = 0; pi < 4; pi++) {
+      var pa = -Math.PI * 0.85 + pi * 0.62 + reefJ(seed, pi, 5) * 0.3;
+      var pr = r * (0.34 + 0.24 * reefJ(seed, pi, 6));
+      var cxp = Math.cos(pa) * pr, cyp = r * 0.06 + Math.sin(pa) * pr * 0.8;
+      var palpha = (0.4 + 0.35 * Math.sin(time * 2.3 + pi * 1.1 + (seed % 5))) * (0.6 + 0.4 * reefJ(seed, pi, 7));
+      ctx.fillStyle = hexToRgba(pal.poly, Math.max(0, palpha));
+      ctx.beginPath(); ctx.ellipse(cxp, cyp, r * 0.055, r * 0.04, pa, 0, Math.PI * 2); ctx.fill();
     }
-    // ③ 苔藓斑（径向渐变绿晕：中心浓边缘透明，大小/纵比错落）
-    var mos = [[-0.45, 0.38, 0.2], [0.5, 0.28, 0.17], [0.02, -0.6, 0.13], [-0.22, 0.6, 0.15], [0.38, -0.38, 0.12]];
-    for (var mi = 0; mi < mos.length; mi++) {
-      var mp = mos[mi];
-      ctx.save();
-      ctx.translate(mp[0] * r, mp[1] * r);
-      ctx.scale(r * mp[2], r * mp[2] * (0.72 + 0.2 * (mi % 2)));
-      ctx.fillStyle = grad('ironMo' + mi + '_' + rk2, function () {
-        var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-        gg.addColorStop(0, 'rgba(118,146,84,0.5)');
-        gg.addColorStop(0.6, 'rgba(118,146,84,0.24)');
-        gg.addColorStop(1, 'rgba(118,146,84,0)');
-        return gg;
-      });
-      ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-    }
-    // ④ 内壁晕影：由内向外轻微加深（体积感 + 所有内容在球壁处统一收边）
-    ctx.fillStyle = grad('ironVg' + rk2, function () {
-      var gg = ctx.createRadialGradient(0, 0, r * 0.5, 0, 0, r);
-      gg.addColorStop(0, 'rgba(20,16,10,0)');
-      gg.addColorStop(0.75, 'rgba(20,16,10,0.14)');
-      gg.addColorStop(1, 'rgba(20,16,10,0.42)');
+    // ⑤ 底部沉积暗影（坐底感）+ 内壁晕影（收边）
+    ctx.fillStyle = grad('coralBed' + hueIdx + '_' + rk2, function () {
+      var gg = ctx.createRadialGradient(0, r * 0.5, r * 0.05, 0, r * 0.5, r * 0.95);
+      gg.addColorStop(0, 'rgba(60,20,40,0.3)');
+      gg.addColorStop(1, 'rgba(60,20,40,0)');
+      return gg;
+    });
+    ctx.beginPath(); ctx.ellipse(0, r * 0.12, r * 0.94, r * 0.86, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = grad('coralVg' + hueIdx + '_' + rk2, function () {
+      var gg = ctx.createRadialGradient(0, 0, r * 0.55, 0, 0, r);
+      gg.addColorStop(0, 'rgba(50,20,36,0)');
+      gg.addColorStop(0.78, 'rgba(50,20,36,0.12)');
+      gg.addColorStop(1, 'rgba(50,20,36,0.36)');
       return gg;
     });
     ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-    ctx.restore(); // 内部裁剪
+    ctx.restore(); // 座内裁剪
     // 可能被冰晶冻住
     if (b.frozen > 0) drawFrozenShell(b, r);
     ctx.restore();
@@ -6493,7 +6524,7 @@ MG.layout.build();
     }
     // 呼吸光晕：滴体同色系（特殊滴/符文取各自识别色），亮度随漂浮相位呼吸——
     // 给"虚影"以形体感，不再是一片平淡的半透明圆（v320）
-    var glowC = nextIron ? '#8FA0AE' : (nextSpecial ? specialColor(nextSpecial) : (nextRune ? runeColor(nextRune) : T[tier].color));
+    var glowC = nextIron ? '#E8879B' : (nextSpecial ? specialColor(nextSpecial) : (nextRune ? runeColor(nextRune) : T[tier].color)); // v358：珊瑚礁虚影光晕改用珊瑚粉
     var pulse = 0.5 + 0.5 * Math.sin(time * 2.1 - 0.6);
     var hg = ctx.createRadialGradient(x, gy, r * 0.2, x, gy, r * 1.55);
     hg.addColorStop(0, hexToRgba(glowC, (0.22 + 0.10 * pulse) * (alpha / 0.6)));
@@ -6523,7 +6554,7 @@ MG.layout.build();
     }
   }
 
-  // 特殊滴/符文/礁石名称标签：紧贴虚影球顶（在 render 末尾绘制，保证不被 HUD 盖住）
+  // 特殊滴/符文/珊瑚礁名称标签：紧贴虚影球顶（在 render 末尾绘制，保证不被 HUD 盖住）
   function drawGhostLabel() {
     if (state !== 'play' || evapMode || flowMode || rippleMode || confirmOpen) return; // v320：补 flowMode，与虚影球同显隐
     var r = nextIron ? C.iron.r : T[nextTier].r;
@@ -6543,7 +6574,7 @@ MG.layout.build();
     // 距胶囊边只剩 ≈0.7px，字形的不对称留白被放大成"没居中"的观感；20 高给足 ≈3px 呼吸，
     // 视觉重心不再被边距挤压误导；x 全部取整消除亚像素模糊
     roundRect(Math.round(aimX - tw / 2), ly - 15, tw, 20, 10); ctx.fill();
-    ctx.fillStyle = nextIron ? '#6B6353' : (nextSpecial ? specialColor(nextSpecial) : runeColor(nextRune));
+    ctx.fillStyle = nextIron ? '#B0526B' : (nextSpecial ? specialColor(nextSpecial) : runeColor(nextRune)); // v358：珊瑚礁标签色 = 珊瑚深粉
     // v276：用实际字形边界（actualBoundingBox）精确垂直居中——canvas 'middle' 基线按 em 盒
     // 取中，CJK 字形实际偏上/偏下因字而异；胶囊几何中心 = ly-5，基线补 (asc-desc)/2 修正
     var asc = ink.has ? ink.a : 14 * 0.84, desc = ink.has ? ink.d : 14 * 0.06; // v300：无像素框 API 时用 CJK 排印常数
@@ -8631,7 +8662,7 @@ MG.layout.build();
     drawDangerLine(); // v333：警戒线（含警示渐晕/光带）叠在水滴之上——原在实体层之前被堆体盖住
     drawDangerText(); // v326：越线警示文字改在实体层之后绘制（原在 drawDangerLine 内，堆高越线时被水滴盖住）
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
-    drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）
+    drawPopups();     // 浮动文字最上层（珊瑚礁来袭/任务完成/得分等，不被 HUD 遮挡）
     drawSkillBar();
     // v274：弹层统一弹性出入场（关闭后动画未完仍继续绘制至收拢完毕）
     if (confirmOpen || panelFxAlive('confirm')) { var pcR = MG.layout.confirmRect(); drawPanelFx('confirm', confirmOpen, pcR.x + pcR.w / 2, pcR.y + pcR.h / 2, 0.55, drawConfirm); }
@@ -8668,7 +8699,7 @@ MG.layout.build();
       // 合成链水滴：标准球体 + 表情/波纹
       drawBall({ x: 0, y: 0, r: 30, tier: id, vx: 0, vy: 0 }, 1);
     } else if (kind === 'sp') {
-      // 特殊滴：与图鉴 drawSpForm 同构（礁石/符文/冰晶特殊处理）
+      // 特殊滴：与图鉴 drawSpForm 同构（珊瑚礁/符文/冰晶特殊处理）
       var r = 26;
       if (id === 'iron') drawIronBall({ x: 0, y: 0, r: r, vx: 0, vy: 0 }, 1);
       else if (id === 'rune') drawBall({ x: 0, y: 0, r: r, tier: 1, vx: 0, vy: 0, rune: 'ripple' }, 1);

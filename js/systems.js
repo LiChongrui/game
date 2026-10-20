@@ -127,7 +127,7 @@
 
   var quest = null, questDepth = 0;
 
-  // 关卡状态：1 = 限时得分关（低难度），2 = 无尽模式（礁石/潮汐齐全，计时改为累计进行时长）
+  // 关卡状态：1 = 限时得分关（低难度），2 = 无尽模式（珊瑚礁/潮汐齐全，计时改为累计进行时长）
   var levelElapsed = 0;                                  // 本局已进行时长（顶部计时显示用）
   var lifeScore = 0, runCounted = 0; // 累计分（图鉴门槛用）：刷新页面即重新计，不跨刷新保留
   function totalScore() { return lifeScore + (score - runCounted); }
@@ -135,7 +135,7 @@
   // 潮汐状态
   var tide = { phase: 'idle', timer: C.tide.cycleInterval, progress: 0, banner: 0 }; // v315：首潮倒计时直接用潮汐间隔（用户："首次涨潮倒计时也用潮汐间隔的时间"）
   var achTick = 0; // 成就周期检查计时
-  // 无尽模式渐进加压：随时长线性到满（潮汐更频/礁石更多/投放向高级倾斜）
+  // 无尽模式渐进加压：随时长线性到满（潮汐更频/珊瑚礁更多/投放向高级倾斜）
   var endlessT = 0, rampStage = 0;
   var climaxMark = 0; // 高潮时刻：上次触发时的分数标记
   var tideGateHint = false; // 潮汐限定合成：一次性提示
@@ -157,7 +157,7 @@
   function perkMult() { return (achDone.tide12 && tide.progress > 0.2) ? 1.1 : 1; }
   // 数值封顶：所有乘区叠乘后总倍率不超过 C.multCap（防成就/海域加成叠乘导致分数膨胀）
   // v281：词缀不再提供得分倍率收益（用户：倍率太高），只保留难度增益
-  // v357：礁石税——每块**在场**礁石削弱全局收益（用户："在场即扣分"）。旧设计里礁石躺在场上
+  // v357：珊瑚礁税——每块**在场**珊瑚礁削弱全局收益（用户："在场即扣分"）。旧设计里珊瑚礁躺在场上
   // 毫无代价，玩家可以无限期不管；现在拖着不管 = 收益持续变差，逼你主动清除。
   // 作用面 = 一切走 cm() 的收益（合成 / 彩虹 / 相消 / 图鉴里程碑 / 任务 / 每日挑战奖励）。
   function reefTax() {
@@ -603,16 +603,16 @@
   }
   function rollIron() {
     if (seaStage() < ((C.specialStage && C.specialStage.iron != null) ? C.specialStage.iron : 0)) return false; // 珊瑚浅海起才落珊瑚礁（注意 0 是合法门槛，不能写 || 兜底）
-    if (seaEvent && seaEvent.type === 'storm') return false; // 保底：风暴期间不再落礁石，避免双重失控
-    if (ironCount() >= C.iron.maxActive) return false; // 场上已满员：预览不再出礁石，避免落下时被迫转成水滴
+    if (seaEvent && seaEvent.type === 'storm') return false; // 保底：风暴期间不再落珊瑚礁，避免双重失控
+    if (ironCount() >= C.iron.maxActive) return false; // 场上已满员：预览不再出珊瑚礁，避免落下时被迫转成水滴
     var ch = C.iron.chance + (C.ramp.ironChanceMax - C.iron.chance) * endlessRamp();
     if (ng && ng.active && ng.active.ironX) ch *= ng.active.ironX; // 二周目「暗礁密布」
     return Math.random() < ch;
-  } // 礁石概率随渐进加压提升
+  } // 珊瑚礁概率随渐进加压提升
   // 符文：普通水滴随机附带的道具属性，合成时为对应技能充能
   // v316：① 池子不再按 skillUnlocked 过滤——未解锁技能的符文正是解锁来源（旧过滤下永远解锁不了）；
   //       ② 滚出即 seeRune 记录"已出现"→ 对应道具解锁（预览可见即生效，mg_rune 持久）。
-  //       调用方须保证只在"这一滴确实带符文"时调用（礁石/特殊滴占位不滚，见 rollNextDrop）。
+  //       调用方须保证只在"这一滴确实带符文"时调用（珊瑚礁/特殊滴占位不滚，见 rollNextDrop）。
   function rollRune() {
     // v340：符文首现海域以配置为准——必须显式判断 number，否则 specialStage.rune=0 会被 `|| 2`
     // 当成 falsy 退回 2（蔚蓝深海），与图鉴 SP_DEFS rune.stage(=0 潮汐池) 不一致（用户核对发现）
@@ -631,7 +631,7 @@
     return pick;
   }
   // 下一滴预览三连滚（v316 合并原 4 处重复写法：初始化 / 每次投放后 / 换滴 / 重开）：
-  // 特殊滴 → 礁石 → 符文。礁石/特殊滴占位的滴不带符文——预览所见即所得，
+  // 特殊滴 → 珊瑚礁 → 符文。珊瑚礁/特殊滴占位的滴不带符文——预览所见即所得，
   // 也保证 rollRune（内含 seeRune 解锁）只在符文真正会出现时被调用。
   function rollNextDrop() {
     nextSpecial = rollSpecial();
@@ -660,9 +660,9 @@
     b.m = C.iron.r * C.iron.r * C.iron.massMult;     // 大质量 → 下落时把水滴挤开（砸穿效果）
     return b;
   }
-  // v357：礁石在场生长——越拖越占地方（半径 growRate px/s，至多 +growMax）。
+  // v357：珊瑚礁在场生长——越拖越占地方（半径 growRate px/s，至多 +growMax）。
   // 半径变大 ⇒ 占位更狠、更挡合成路径，也会把上方水滴顶高（越线压力）。质量同步按面积更新。
-  var reefCountPrev = 0;       // 上一帧在场礁石数（只在数量变化时提示，避免刷屏）
+  var reefCountPrev = 0;       // 上一帧在场珊瑚礁数（只在数量变化时提示，避免刷屏）
   function updateIrons(dt) {
     var bs = phys.bodies, n = 0;
     for (var i = 0; i < bs.length; i++) {
@@ -675,8 +675,8 @@
     }
     // 收益惩罚必须让玩家看见（否则分数莫名变少）：数量变化时才提示，且 1 块不报（太平凡）
     if (n !== reefCountPrev) {
-      if (n >= 2) addPopup(C.W / 2, 250, '礁石 ×' + n + ' · 全局收益 −' + Math.round((1 - reefTax()) * 100) + '%', false, 0);
-      else if (n === 0 && reefCountPrev >= 2) addPopup(C.W / 2, 250, '礁石清空 · 收益恢复', false, 0);
+      if (n >= 2) addPopup(C.W / 2, 250, '珊瑚礁 ×' + n + ' · 全局收益 −' + Math.round((1 - reefTax()) * 100) + '%', false, 0);
+      else if (n === 0 && reefCountPrev >= 2) addPopup(C.W / 2, 250, '珊瑚礁清空 · 收益恢复', false, 0);
       reefCountPrev = n;
     }
   }
@@ -1157,8 +1157,8 @@
     }
     for (i = 0; i < merges.length; i++) doMerge(merges[i][0], merges[i][1]);
 
-    // v357：礁石不再"接触即消"——只有**带速度撞上去**才碎（相对接近速度 ≥ C.iron.impactSpeed）。
-    // 旧版两块礁石随便一挨就一起消失还倒给分，障碍等于"会自动清零的送分物"，难度形同虚设；
+    // v357：珊瑚礁不再"接触即消"——只有**带速度撞上去**才碎（相对接近速度 ≥ C.iron.impactSpeed）。
+    // 旧版两块珊瑚礁随便一挨就一起消失还倒给分，障碍等于"会自动清零的送分物"，难度形同虚设；
     // 现在静置贴合不消，必须主动从高处砸、或被涟漪/水流/疾风推着撞上去才碎（砸偏会抬高堆顶，
     // 清除本身带风险）。奖励反而提高到 30（操作成功该有正反馈）。
     for (i = 0; i < bs.length; i++) {
@@ -1526,7 +1526,7 @@
     addPopup(C.W / 2, 250, '珍珠祝福！「' + T[t].name + '」全体 +1', true, 0);
     audio.quest();
   }
-  // 熔岩滴：烧毁周围礁石与最低两档水滴，折算得分
+  // 熔岩滴：烧毁周围珊瑚礁与最低两档水滴，折算得分
   function triggerMagma(b) {
     var bs = phys.bodies, R = C.magmaR, burn = [], i;
     for (i = 0; i < bs.length; i++) {
@@ -1542,7 +1542,7 @@
       var t2 = burn[i].iron ? 0 : burn[i].tier;
       gain += Math.round((C.magmaScore + T[t2].score * 2) * scoreMult);
       burst(burn[i].x, burn[i].y, Math.max(0, t2), false);
-      if (burn[i].iron) dailyProgress('iron'); // v357：熔岩烧掉礁石同样计入"消除珊瑚礁"
+      if (burn[i].iron) dailyProgress('iron'); // v357：熔岩烧掉珊瑚礁同样计入"消除珊瑚礁"
     }
     phys.removeMany(burn); // v351：批量一次删完（逐个 remove 是 indexOf+splice 的 O(k*n)）
     score += gain; scoreBump = 0.3;
@@ -1724,7 +1724,7 @@
     var bs = phys.bodies;
     for (var i = 0; i < bs.length; i++) {
       var b = bs[i];
-      if (b.iron || b.frozen > 0) continue; // 礁石沉底不浮起
+      if (b.iron || b.frozen > 0) continue; // 珊瑚礁沉底不浮起
       var subm = (b.y + b.r - wy) / (2 * b.r);
       if (subm <= 0) continue;
       var f = Math.min(1, subm); // 浸没比：浮力、水的阻力、横向涌动三者共用（浸得越浅浮力越弱、受阻越小）
@@ -1782,7 +1782,7 @@
       evapMode = true;
       rippleMode = false;
       flowMode = false; flowPick = null;
-      // v357：场上有礁石时明确告知涨价（避免玩家点下去才发现扣 2 次）
+      // v357：场上有珊瑚礁时明确告知涨价（避免玩家点下去才发现扣 2 次）
       if (ironCount() > 0) addPopup(C.W / 2, 250, '蒸发珊瑚礁需 ' + (skillCost('evap') * C.iron.evapCost) + ' 次充能', false, 0);
       return;
     }
@@ -1844,7 +1844,7 @@
     var bs = phys.bodies;
     for (var i = 0; i < bs.length; i++) {
       var b = bs[i];
-      if (b.iron || b.frozen > 0) continue; // 冻结滴纹丝不动；礁石沉重推不动
+      if (b.iron || b.frozen > 0) continue; // 冻结滴纹丝不动；珊瑚礁沉重推不动
       var dx = b.x - cx, dy = b.y - cy;
       var d = Math.sqrt(dx * dx + dy * dy);
       if (d < 1) { dx = 0; dy = -1; d = 1; }
@@ -1865,7 +1865,7 @@
   }
   function evaporate(b) {
     var gain;
-    var cost = skillCost('evap') * (b.iron ? C.iron.evapCost : 1); // v357：蒸发礁石 2 次充能、水滴仍 1 次
+    var cost = skillCost('evap') * (b.iron ? C.iron.evapCost : 1); // v357：蒸发珊瑚礁 2 次充能、水滴仍 1 次
     if (b.iron) {
       gain = C.iron.evaporateScore; // v357：不再给分（原 5）——清除是止损，不是收益
       burstIron(b.x, b.y);
@@ -1878,7 +1878,7 @@
     scoreBump = 0.25;
     addPopup(b.x, b.y - b.r - 8, b.iron ? ('珊瑚礁移除 · 充能 −' + cost) : ('+' + gain), false, 0);
     phys.remove(b);
-    skillCharge.evap -= cost; // v338：扣一次费用而非清零（v357：礁石扣 evapCost 倍）
+    skillCharge.evap -= cost; // v338：扣一次费用而非清零（v357：珊瑚礁扣 evapCost 倍）
     evapMode = false;
     audio.blip(900, 0.25, 'sine', 0.15, 0.4);
   }
@@ -2057,7 +2057,7 @@
     discoverSpecial('chest');
     var b = createIron(C.W * (0.2 + Math.random() * 0.6), C.dangerY + 52); // 警戒线下方开阔水域生成，不压坠落区虚影
     b.chest = true;
-    b.r = 17; b.m = b.r * b.r * 6; // 比礁石轻，不会被砸得太凶
+    b.r = 17; b.m = b.r * b.r * 6; // 比珊瑚礁轻，不会被砸得太凶
     chest = { b: b, t: 0, life: 14 }; // 14 秒内不点就沉走
     // v340：提示跟随宝箱实体（attach=b），宝箱降落时文字同步下移；life 显式 2.5s，跟随弹字也走生命周期（不再永不消失）
     addPopup(b.x, C.dangerY + 10, '沉大宝箱！点它开启', true, 0, 2.5, 'reward', b); // v343：出现提示统一绿色（与图鉴新发现/开启收益同色）
@@ -2204,7 +2204,7 @@
       var R = 360;
       for (i = 0; i < bs.length; i++) {
         b = bs[i];
-        if (b.iron) continue; // 礁石沉底，不被卷动
+        if (b.iron) continue; // 珊瑚礁沉底，不被卷动
         var dx = seaEvent.x - b.x, dy = seaEvent.y - b.y, d = Math.sqrt(dx * dx + dy * dy);
         if (d > 6 && d < R) {
           var ux = dx / d, uy = dy / d;                 // 指向中心的单位向量（向心）
@@ -2377,7 +2377,7 @@
     reviveCount = 0; // 新局重置复活次数（v328）
     runBuffered = false; // 新局重置深流缓冲
     skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
-    reefCountPrev = 0; // v357：礁石税提示计数随局重置
+    reefCountPrev = 0; // v357：珊瑚礁税提示计数随局重置
     seaCount = 0; scoreMult = 1;
     evapMode = false; rippleMode = false; flowMode = false; flowPick = null; rainHint = 0;
     auroraNext = 0; // 极光庇护只在单次合成内生效
@@ -2687,7 +2687,7 @@
     }
     if (evapMode) {
       var ball = ballAt(p);
-      // v357：点礁石要 2 次充能，不足时提示而不是硬扣（否则充能会被扣成负数）
+      // v357：点珊瑚礁要 2 次充能，不足时提示而不是硬扣（否则充能会被扣成负数）
       if (ball && ball.iron && skillCharge.evap < skillCost('evap') * C.iron.evapCost) {
         flashSkill('evap', '蒸发珊瑚礁需 ' + (skillCost('evap') * C.iron.evapCost) + ' 次充能');
         return;
@@ -2835,7 +2835,7 @@
     audio.bgm.setDanger(dg);
     audio.bgm.setTide(tide.progress, (tide.phase === 'idle' && tide.timer < C.tide.warnTime) ? 1 : 0);
 
-    updateIrons(dt);   // v357：礁石在场生长（越拖越占地方），须在合成/判负之前
+    updateIrons(dt);   // v357：珊瑚礁在场生长（越拖越占地方），须在合成/判负之前
     processMerges();
     updateChest(dt);
     updateSeaEvent(dt);
