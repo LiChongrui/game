@@ -250,23 +250,21 @@ MG.config = {
     radiusFactor: 2.4,           // 冻结半径 = 自身半径 × 该系数
     score: 5
   },
-  // 珊瑚礁：障碍物（砸穿水滴堆落底、不浮起）
-  // ★ v357 重设计（用户："珊瑚礁的游戏设计有些弱了，毕竟是期望他能增加游戏难度"）——
-  //   旧设计三大漏洞：① 两块一碰就自动相消还倒给 15 分 ⇒ 障碍变成"会自动消失的送分物"；
-  //   ② r=26 比第 4 档「浪花」(36) 还小 ⇒ "挤压堆叠空间"是空话；③ 蒸发 1 充能还 +5 分，
-  //   清除不但不亏还赚 ⇒ 玩家可以无限期拖着不管。新设计 = 清除变贵 + 存在变痛 + 体积变真。
+  // 珊瑚礁：障碍物（砸穿水滴堆落底、不浮起、两两相消或蒸发移除）
+  // ★ v357 重设计（用户："珊瑚礁的游戏设计有些弱了，毕竟是期望他能增加游戏难度"）：
+  //   ① r 26→34（原半径小于第 4 档水滴，占位毫无存在感）② 蒸发 1 充能 +5 分 → **2 充能、不给分**
+  //   （清除从"不亏反赚"变成止损）③ 新增**礁石税**：每块在场 −6% 全局收益（上限 −30%），
+  //   拖着不管就持续吃亏。清除途径：两两相消（15 分）/ 蒸发（2 充能）/ 熔岩范围烧。
+  // ★ v365：应用户要求**移除两项**——① "撞击才碎"（impactSpeed）移除，恢复**接触即相消**；
+  //   ② "在场生长"（growRate/growMax）移除，半径恒定 34。礁石税与蒸发涨价保留。
   iron: {
     chance: 0.08,                // 每次投放是珊瑚礁的概率
     maxActive: 5,                // 场上同时最多几个（v339：2→5）
-    r: 34,                       // v357：26→34（原半径小于第 4 档水滴，占位毫无存在感）
-    growRate: 0.35,              // v357：在场生长 px/s（珊瑚长枝，越拖越占地方）
-    growMax: 8,                  // v357：半径最多再长 8px（34→42），约 23 秒长满
+    r: 34,                       // v357：26→34（原半径小于第 4 档水滴，占位毫无存在感）；v365：恒定，不再生长
     massMult: 16,                // 质量倍率（远重于水滴，下落时把水滴挤开）
     evaporateScore: 0,           // v357：蒸发移除不再给分（原 5）
     evapCost: 2,                 // v357：蒸发一块珊瑚礁耗 2 次充能（水滴仍 1 次）
-    pairScore: 30,               // v357：撞击相消奖励 15→30（清除变难，成功理应更值）
-    impactSpeed: 300,            // v357：相对接近速度 ≥ 此值才撞碎——静置贴合不再自动互消，
-                                 //       必须"带速度砸上去"（或被涟漪/水流/疾风推着撞上）
+    pairScore: 15,               // 两块珊瑚礁相消的奖励（v357 曾因"撞击才碎"提到 30，v365 恢复接触即消后回到 15）
     taxPer: 0.06,                // v357：每块在场珊瑚礁让全局得分倍率 −6%
     taxMax: 0.30                 // v357：扣分上限 30%（5 块封顶）
   },
@@ -1786,30 +1784,19 @@ MG.layout.build();
     var b = phys.create(x, y, 0, 0, 0);
     b.iron = true;
     b.tier = -1;
-    b.r = C.iron.r;
-    b.ironAge = 0;                                   // v357：在场时长（驱动"珊瑚生长"）
+    b.r = C.iron.r;                                    // v365：半径恒定（"在场生长"已按用户要求移除）
     b.m = C.iron.r * C.iron.r * C.iron.massMult;     // 大质量 → 下落时把水滴挤开（砸穿效果）
     return b;
   }
-  // v357：珊瑚礁在场生长——越拖越占地方（半径 growRate px/s，至多 +growMax）。
-  // 半径变大 ⇒ 占位更狠、更挡合成路径，也会把上方水滴顶高（越线压力）。质量同步按面积更新。
+  // 礁石税提示（v357）：收益惩罚必须让玩家看见（否则分数莫名变少）——数量变化时才提示，
+  // 且 1 块不报（太平凡）。v365：生长机制移除后，这个计数提示独立成函数仍在主循环调用。
   var reefCountPrev = 0;       // 上一帧在场珊瑚礁数（只在数量变化时提示，避免刷屏）
-  function updateIrons(dt) {
-    var bs = phys.bodies, n = 0;
-    for (var i = 0; i < bs.length; i++) {
-      var b = bs[i];
-      if (!b.iron || b.chest) continue;              // 大宝箱也是 iron 标记，不参与生长
-      n++;
-      b.ironAge = (b.ironAge || 0) + dt;
-      var nr = Math.min(C.iron.r + C.iron.growMax, C.iron.r + b.ironAge * C.iron.growRate);
-      if (nr > b.r) { b.r = nr; b.m = b.r * b.r * C.iron.massMult; }
-    }
-    // 收益惩罚必须让玩家看见（否则分数莫名变少）：数量变化时才提示，且 1 块不报（太平凡）
-    if (n !== reefCountPrev) {
-      if (n >= 2) addPopup(C.W / 2, 250, '珊瑚礁 ×' + n + ' · 全局收益 −' + Math.round((1 - reefTax()) * 100) + '%', false, 0);
-      else if (n === 0 && reefCountPrev >= 2) addPopup(C.W / 2, 250, '珊瑚礁清空 · 收益恢复', false, 0);
-      reefCountPrev = n;
-    }
+  function updateReefHint() {
+    var n = ironCount();
+    if (n === reefCountPrev) return;
+    if (n >= 2) addPopup(C.W / 2, 250, '珊瑚礁 ×' + n + ' · 全局收益 −' + Math.round((1 - reefTax()) * 100) + '%', false, 0);
+    else if (n === 0 && reefCountPrev >= 2) addPopup(C.W / 2, 250, '珊瑚礁清空 · 收益恢复', false, 0);
+    reefCountPrev = n;
   }
   function specialLabel(sp) {
     var i = spIndexByKey(sp);
@@ -2099,7 +2086,7 @@ MG.layout.build();
   var SP_DEFS = [
     { key: 'vortex',  stage: 2, name: '漩涡滴', color: '#7B6FD0', desc: '吸附周围水滴后消散，聚拢散滴。' },
     { key: 'cloud',   stage: 1, name: '雨云滴', color: '#8FA8BC', desc: '分裂成两颗雾泡，补充低级滴。' },
-    { key: 'iron',    stage: 1, name: '珊瑚礁', color: '#6E7B88', desc: '沉重障碍，会随时间生长；需带速度撞碎或蒸发（2 充能）移除；在场越多收益越低。' },
+    { key: 'iron',    stage: 1, name: '珊瑚礁', color: '#6E7B88', desc: '沉重障碍，两两相消或蒸发（2 充能）移除；在场越多收益越低。' },
     { key: 'ice',     stage: 2, name: '冰晶滴', color: '#A8DFF2', desc: '冻结周围水滴，可当临时平台。' },
     { key: 'rune',    stage: 0, name: '符文滴', color: '#B08FD0', desc: '合成时为对应技能 +1 充能。' },
     { key: 'rainbow', stage: 3, name: '彩虹滴', color: '#E86FA8', desc: '使碰到的水滴跳 2 级，得分双倍。' },
@@ -2288,10 +2275,7 @@ MG.layout.build();
     }
     for (i = 0; i < merges.length; i++) doMerge(merges[i][0], merges[i][1]);
 
-    // v357：珊瑚礁不再"接触即消"——只有**带速度撞上去**才碎（相对接近速度 ≥ C.iron.impactSpeed）。
-    // 旧版两块珊瑚礁随便一挨就一起消失还倒给分，障碍等于"会自动清零的送分物"，难度形同虚设；
-    // 现在静置贴合不消，必须主动从高处砸、或被涟漪/水流/疾风推着撞上去才碎（砸偏会抬高堆顶，
-    // 清除本身带风险）。奖励反而提高到 30（操作成功该有正反馈）。
+    // v365：恢复"接触即相消"（v357 的"撞击才碎"按用户要求移除）——两块珊瑚礁相触即互相消除
     for (i = 0; i < bs.length; i++) {
       var ia = bs[i];
       if (!ia.iron || ia.chest || used[ia.id] || ia.frozen > 0) continue;
@@ -2300,15 +2284,11 @@ MG.layout.build();
         if (!ib.iron || ib.chest || used[ib.id] || ib.frozen > 0) continue;
         var idx = ib.x - ia.x, idy = ib.y - ia.y;
         var iminD = ia.r + ib.r + 0.5;
-        if (idx * idx + idy * idy > iminD * iminD) continue;
-        // 接近速度 = 相对速度在 ia→ib 法线上的投影（>0 表示正在互相靠近）
-        var dd = Math.sqrt(idx * idx + idy * idy);
-        if (dd < 0.001) continue;                    // 完全重合：无碰撞方向，视为静置
-        var appr = ((ia.vx - ib.vx) * idx + (ia.vy - ib.vy) * idy) / dd;
-        if (appr < C.iron.impactSpeed) continue;      // 静置/缓慢贴合：不消
-        used[ia.id] = used[ib.id] = 1;
-        ironPairMerge(ia, ib);
-        break;
+        if (idx * idx + idy * idy <= iminD * iminD) {
+          used[ia.id] = used[ib.id] = 1;
+          ironPairMerge(ia, ib);
+          break;
+        }
       }
     }
   }
@@ -2320,7 +2300,7 @@ MG.layout.build();
     score += gain;
     scoreBump = 0.3;
     if (score > best) { best = score; saveNum('mg_best', best); }
-    addPopup(mx, my - b.r - 12, '撞碎珊瑚礁！', true, 0); // v357：清除靠撞击，值得一条大字
+    addPopup(mx, my - b.r - 12, '珊瑚礁相消', true, 0);
     addPopup(mx, my - b.r + 10, '+' + gain, false, 0);
     burstIron(mx, my);
     burstIron(a.x, a.y);
@@ -3966,7 +3946,7 @@ MG.layout.build();
     audio.bgm.setDanger(dg);
     audio.bgm.setTide(tide.progress, (tide.phase === 'idle' && tide.timer < C.tide.warnTime) ? 1 : 0);
 
-    updateIrons(dt);   // v357：珊瑚礁在场生长（越拖越占地方），须在合成/判负之前
+    updateReefHint();  // v357：礁石税提示（数量变化时才报）；v365：生长机制已移除
     processMerges();
     updateChest(dt);
     updateSeaEvent(dt);
