@@ -573,19 +573,17 @@
     ctx.restore();
   }
 
-  // 珊瑚礁（内部名 iron）：v360 第三版——**回到球体语言，形态完全抽象**。
-  // 迭代记录：v358 岩石球（太素/像石头）→ v359 珊瑚丛+鹿角枝（用户："太丑了…不要过于追求
-  // 形象化了"）。本版结论：**和普通水滴同一套"球体 + 径向渐变 + 高光 + 内壁晕影"语言**，
-  // 只把色相换成珊瑚色系（粉 / 橙 / 金），用 2~3 个柔和大暗斑暗示礁面质地、3 颗小亮点暗示
-  // 珊瑚芽——**不画枝杈、不画座体、不搞具象造型**。
-  // ★ 视觉 = 碰撞圆（半径 r）：判定与观感完全同源，不会再有"看着越线却不判负"的偏差。
-  // ★ 确定性：色相与暗斑/亮点的排布由 b.id 派生，同一块终生一致（每帧重算不许跳帧）。
-  // ★ 生长 = 球体本身变大（34→42），比画枝自然得多。
-  var CORAL_PAL = [
-    { lite: '#FFD2DA', body: '#F2A0AE', dark: '#C9758A' },   // 粉珊瑚
-    { lite: '#FFD9BC', body: '#F0A97F', dark: '#C4784F' },   // 橙珊瑚
-    { lite: '#FFE9B8', body: '#EFC266', dark: '#B98F35' }    // 金珊瑚
-  ];
+  // 珊瑚礁（内部名 iron）：v361 第四版——**用户选定 C 方案（双色分界球）+ 单一珊瑚色**。
+  // 迭代记录：v358 岩石球 → v359 珊瑚丛（太具象）→ v360 单色柔球（和水滴太像）→ v361 本版。
+  // 形态（照 C 示意图）：**上 2/3 珊瑚色球体 + 下 1/3 深色岩座**，中间一道波浪分界线——
+  // 上半保留"珊瑚"身份，下半的暗色压出"沉重障碍"的语义，和所有水滴既不同形也不同色。
+  // 配色（用户："珊瑚礁只能有一个颜色"）：**全场唯一一套珊瑚色**（不再按 id 分三色），
+  // 岩座用同色相深阶（#993C1D → #712B13），上下靠明度分层而不是靠色相——蓝绿海底 + 蓝色
+  // 水滴堆里，这团暖橙一眼可辨。
+  // ★ 确定性：分界波浪的相位/幅度、珊瑚芽位置按 b.id 派生，同一块终生一致（每帧重算不许跳）。
+  // ★ 视觉 = 碰撞圆（半径 r）：判定与观感同源，不会"看着越线却不判负"。
+  // ★ 生长 = 球体本身变大（34→42）。
+  var CORAL = { lite: '#F5C4B3', body: '#F0997B', mid: '#D85A30', dark: '#993C1D', deep: '#712B13' };
   // 确定性伪随机（0..1）：seed=同一块珊瑚礁的 b.id，i/k 是元素下标——换 id 换形态，同 id 恒定
   function reefJ(seed, i, k) {
     var s = Math.sin(seed * 1.7 + i * 12.9898 + k * 78.233) * 43758.5453;
@@ -608,14 +606,12 @@
     ctx.translate(bx, by);
     var rk2 = Math.round(r * 2) / 2;
     var seed = (b.id == null ? 0 : b.id);       // 虚影/图鉴传入的对象无 id → 固定形态（0 号）
-    var hueIdx = ((seed % 3) + 3) % 3;
-    var pal = CORAL_PAL[hueIdx];
-    // ① 球体：径向渐变（左上受光亮珊瑚 → 右下暗珊瑚），与水滴同一套体积语言
-    var g = grad('coralBall' + hueIdx + '_' + rk2, function () {
+    // ① 上 2/3 珊瑚球体：径向渐变（左上受光亮珊瑚 → 右下暗珊瑚）
+    var g = grad('coralBall' + rk2, function () {
       var gg = ctx.createRadialGradient(-r * 0.34, -r * 0.4, r * 0.08, 0, 0, r * 1.04);
-      gg.addColorStop(0, pal.lite);
-      gg.addColorStop(0.4, pal.body);
-      gg.addColorStop(1, pal.dark);
+      gg.addColorStop(0, CORAL.lite);
+      gg.addColorStop(0.4, CORAL.body);
+      gg.addColorStop(1, CORAL.mid);
       return gg;
     });
     ctx.fillStyle = g;
@@ -623,34 +619,57 @@
     // 球内细节统一裁剪进球体
     ctx.save();
     ctx.beginPath(); ctx.arc(0, 0, r * 0.99, 0, Math.PI * 2); ctx.clip();
-    // ② 礁面柔斑：2~3 个大而柔的暗色晕斑（抽象质地，非具象纹理；渐变定义在单位圆上，三斑共用）
-    var nb = 2 + Math.round(reefJ(seed, 0, 1));   // 2~3 个
-    for (var bi = 0; bi < nb; bi++) {
-      var ba = reefJ(seed, bi, 2) * Math.PI * 2;
-      var bd = r * (0.26 + 0.3 * reefJ(seed, bi, 3));
-      var bxx = Math.cos(ba) * bd, byy = Math.sin(ba) * bd * 0.9;
-      var bs = r * (0.26 + 0.18 * reefJ(seed, bi, 4));
-      ctx.save();
-      ctx.translate(bxx, byy);
-      ctx.scale(bs, bs * (0.68 + 0.3 * reefJ(seed, bi, 5)));
-      ctx.fillStyle = grad('coralSpot', function () {
-        var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-        gg.addColorStop(0, 'rgba(96,44,58,0.3)');
-        gg.addColorStop(0.6, 'rgba(96,44,58,0.13)');
-        gg.addColorStop(1, 'rgba(96,44,58,0)');
-        return gg;
-      });
-      ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
+    // ② 下 1/3 深色岩座：波浪分界线以下（同色相深阶），分界线描边 + 两条沉积层理
+    var y0 = r * (0.1 + 0.1 * reefJ(seed, 0, 1));      // 分界线基准高度
+    var amp = r * (0.06 + 0.05 * reefJ(seed, 0, 2));   // 波浪幅度
+    var ph = (seed % 5) * 1.257;                        // 5 种相位：每块略有不同、终生不变
+    var NS = 7, si, st, sx, sy;
+    ctx.beginPath();
+    for (si = 0; si <= NS; si++) {
+      st = si / NS; sx = -r + 2 * r * st;
+      sy = y0 + Math.sin(st * Math.PI * 2 + ph) * amp;
+      if (si === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
     }
-    // ③ 三颗小珊瑚芽（静态小亮点：克制到只够标明"这是珊瑚"，绝不形象化）
+    ctx.lineTo(r, r); ctx.lineTo(-r, r); ctx.closePath();
+    ctx.fillStyle = grad('coralBase' + rk2, function () {
+      var gg = ctx.createLinearGradient(0, y0, 0, r);
+      gg.addColorStop(0, CORAL.dark);
+      gg.addColorStop(1, CORAL.deep);
+      return gg;
+    });
+    ctx.fill();
+    // 分界线描边（同一条波浪，只描不填）
+    ctx.beginPath();
+    for (si = 0; si <= NS; si++) {
+      st = si / NS; sx = -r + 2 * r * st;
+      sy = y0 + Math.sin(st * Math.PI * 2 + ph) * amp;
+      if (si === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+    }
+    ctx.strokeStyle = CORAL.deep;
+    ctx.lineWidth = Math.max(1, r * 0.05);
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    // 沉积层理：岩座内两条更淡的波浪（静态，暗示岩层）
+    ctx.lineWidth = Math.max(1, r * 0.035);
+    for (var li = 0; li < 2; li++) {
+      var ly = y0 + r * (0.22 + 0.18 * li) + amp * 0.4;
+      ctx.beginPath();
+      for (si = 0; si <= NS; si++) {
+        st = si / NS; sx = -r + 2 * r * st;
+        sy = ly + Math.sin(st * Math.PI * 2 + ph + 0.9 + li * 0.7) * amp * 0.55;
+        if (si === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+      }
+      ctx.strokeStyle = 'rgba(113,43,19,' + (0.3 - li * 0.1) + ')';
+      ctx.stroke();
+    }
+    // ③ 三颗珊瑚芽（静态小亮点，只够标明"这是珊瑚"，绝不形象化）
     for (var pi = 0; pi < 3; pi++) {
       var pa = reefJ(seed, pi, 6) * Math.PI * 2;
-      var pd = r * (0.34 + 0.22 * reefJ(seed, pi, 7));
-      ctx.fillStyle = hexToRgba(pal.lite, 0.5);
-      ctx.beginPath();
-      ctx.arc(Math.cos(pa) * pd, r * 0.08 + Math.sin(pa) * pd * 0.85, r * 0.055, 0, Math.PI * 2);
-      ctx.fill();
+      var pd = r * (0.3 + 0.2 * reefJ(seed, pi, 7));
+      var px2 = Math.cos(pa) * pd, py2 = -r * 0.12 + Math.sin(pa) * pd * 0.8;
+      if (py2 > y0 - r * 0.06) continue;              // 不越过岩座分界线（保持上下分区干净）
+      ctx.fillStyle = hexToRgba(CORAL.lite, 0.55);
+      ctx.beginPath(); ctx.arc(px2, py2, r * 0.055, 0, Math.PI * 2); ctx.fill();
     }
     // ④ 左上天光斑（球体通用高光语言）
     ctx.save();
@@ -665,8 +684,8 @@
     });
     ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
-    // ⑤ 内壁晕影：由内向外轻微加深（体积感 + 边缘统一收边，与水滴一致）
-    ctx.fillStyle = grad('coralVg' + hueIdx + '_' + rk2, function () {
+    // ⑤ 内壁晕影：由内向外轻微加深（体积感 + 边缘统一收边）
+    ctx.fillStyle = grad('coralVg' + rk2, function () {
       var gg = ctx.createRadialGradient(0, 0, r * 0.52, 0, 0, r);
       gg.addColorStop(0, 'rgba(80,34,50,0)');
       gg.addColorStop(0.76, 'rgba(80,34,50,0.12)');
@@ -1301,7 +1320,7 @@
     }
     // 呼吸光晕：滴体同色系（特殊滴/符文取各自识别色），亮度随漂浮相位呼吸——
     // 给"虚影"以形体感，不再是一片平淡的半透明圆（v320）
-    var glowC = nextIron ? '#E8879B' : (nextSpecial ? specialColor(nextSpecial) : (nextRune ? runeColor(nextRune) : T[tier].color)); // v358：珊瑚礁虚影光晕改用珊瑚粉
+    var glowC = nextIron ? '#F0997B' : (nextSpecial ? specialColor(nextSpecial) : (nextRune ? runeColor(nextRune) : T[tier].color)); // v361：虚影光晕与球体同色（珊瑚橙）
     var pulse = 0.5 + 0.5 * Math.sin(time * 2.1 - 0.6);
     var hg = ctx.createRadialGradient(x, gy, r * 0.2, x, gy, r * 1.55);
     hg.addColorStop(0, hexToRgba(glowC, (0.22 + 0.10 * pulse) * (alpha / 0.6)));
