@@ -3323,20 +3323,6 @@
     var i;
     for (i = 0; i < phys.bodies.length; i++) drawBall(phys.bodies[i], 1);
 
-    // 潮汐限定标记：旱期的江河带脉动波纹虚线圈（提示需等潮才能合成大海）
-    for (i = 0; i < phys.bodies.length; i++) {
-      var tb = phys.bodies[i];
-      if (!tb.iron && !tb.chest && tb.tier === C.tidePair.tier && tide.progress < C.tidePair.threshold) {
-        ctx.save();
-        ctx.strokeStyle = 'rgba(127,212,255,' + (0.32 + 0.25 * Math.sin(time * 3)).toFixed(2) + ')';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 6]);
-        ctx.lineDashOffset = -time * 24;
-        ctx.beginPath(); ctx.arc(tb.x, tb.y, tb.r + 6, 0, Math.PI * 2); ctx.stroke();
-        ctx.restore();
-      }
-    }
-
     drawWaterFront();
 
     drawTutorial(); // 首局分步引导（前 5 投）

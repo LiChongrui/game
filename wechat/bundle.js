@@ -258,8 +258,9 @@ MG.config = {
   // ★ v365：应用户要求**移除两项**——① "撞击才碎"（impactSpeed）移除，恢复**接触即相消**；
   //   ② "在场生长"（growRate/growMax）移除，半径恒定 34。礁石税与蒸发涨价保留。
   // ★ v366：应用户要求**只有涨潮才能消除礁石**（其他水滴无此限制）——相消与蒸发两条主动
-  //   清除途径都要求 tide.progress ≥ tideNeed（阈值与「江河→大海」潮汐闸门一致，同一套设计
-  //   语言）；熔岩范围烧是特殊滴的被动清除，不限潮汐（保留一个不挑时机的出口，避免死局）。
+  //   清除途径都要求 tide.progress ≥ tideNeed；v367 起「江河→大海」潮汐闸门已移除，礁石是
+  //   场上唯一仍受潮汐限制的清除途径。熔岩范围烧是特殊滴的被动清除，不限潮汐（保留一个不挑
+  //   时机的出口，避免死局）。
   iron: {
     chance: 0.08,                // 每次投放是礁石的概率
     maxActive: 5,                // 场上同时最多几个（v339：2→5）
@@ -268,7 +269,7 @@ MG.config = {
     evaporateScore: 0,           // v357：蒸发移除不再给分（原 5）
     evapCost: 2,                 // v357：蒸发一块礁石耗 2 次充能（水滴仍 1 次）
     pairScore: 15,               // 两块礁石相消的奖励（v357 曾因"撞击才碎"提到 30，v365 恢复接触即消后回到 15）
-    tideNeed: 0.15,              // v366：涨潮进度 ≥ 此值才允许消除礁石（相消 / 蒸发）；与 C.tidePair.threshold 同值
+    tideNeed: 0.15,              // v366：涨潮进度 ≥ 此值才允许消除礁石（相消 / 蒸发）
     taxPer: 0.06,                // v357：每块在场礁石让全局得分倍率 −6%
     taxMax: 0.30                 // v357：扣分上限 30%（5 块封顶）
   },
@@ -335,9 +336,6 @@ MG.config = {
     ironChanceMax: 0.16, // 礁石概率上限
     spawnWeightsMax: [22, 24, 22, 16, 16] // 投放权重演进终点（向高级倾斜）
   },
-
-  // 潮汐限定合成：两枚「江河」只能在涨潮时聚成「大海」（彩虹跳级不受限）
-  tidePair: { tier: 6, threshold: 0.15 },
 
   // 高潮时刻：无尽模式每累计 +1500 分，场上最高档的可合成对自发相聚（v354：500→1500——原值后期触发过密）
   climaxEvery: 1500,
@@ -1271,7 +1269,6 @@ MG.layout.build();
   // 无尽模式渐进加压：随时长线性到满（潮汐更频/礁石更多/投放向高级倾斜）
   var endlessT = 0, rampStage = 0;
   var climaxMark = 0; // 高潮时刻：上次触发时的分数标记
-  var tideGateHint = false; // 潮汐限定合成：一次性提示
   var tideKillHint = false; // 潮汐可致死（浮起越线判负）：一次性提示
   // 首局主动引导：前 5 投分步提示（只出现一次，localStorage 标记）
   var dropCount = 0, tutDone = loadFlag('mg_tut');
@@ -2260,14 +2257,6 @@ MG.layout.build();
       for (j = i + 1; j < bs.length; j++) {
         var b = bs[j];
         if (used[b.id] || b.special || b.frozen > 0 || b.iron || b.tier !== a.tier || b.popT > 0) continue;
-        // 潮汐限定合成：两枚「江河」只能在涨潮时聚成「大海」（彩虹跳级不受限）
-        if (a.tier === C.tidePair.tier && tide.progress < C.tidePair.threshold) {
-          if (!tideGateHint) {
-            tideGateHint = true;
-            addPopup(C.W / 2, 250, '两枚「江河」需在潮汐中才能聚成「大海」', true, 0);
-          }
-          continue;
-        }
         var dx = b.x - a.x, dy = b.y - a.y;
         // 合成阈值：接触即合（+0.5 容差覆盖物理 slop 允许的静置重叠）
         var minD = a.r + b.r + 0.5;
@@ -2283,8 +2272,8 @@ MG.layout.build();
     // v365：恢复"接触即相消"（v357 的"撞击才碎"按用户要求移除）
     // ★ v366：**只有涨潮才能消除礁石**（用户："可以把礁石设置为只有涨潮才能消除，其他的水滴
     //   不需要这样的条件"）——退潮时两块礁石即使相触也不相消（纯障碍），涨潮后才一起消失。
-    //   与「江河→大海」的潮汐闸门（C.tidePair）同一套设计语言、同一阈值。提示按 5 秒节流，
-    //   不像 tideGateHint 那样一次性（礁石会在不同时间多次碰到）。
+    //   v367：「江河→大海」潮汐闸门已移除，礁石是场上唯一仍受潮汐限制的合成外清除途径；
+    //   提示按 5 秒节流（礁石会在不同时间多次碰到，避免提示刷屏）。
     for (i = 0; i < bs.length; i++) {
       var ia = bs[i];
       if (!ia.iron || ia.chest || used[ia.id] || ia.frozen > 0) continue;
@@ -3514,7 +3503,6 @@ MG.layout.build();
     seaCount = 0; scoreMult = 1;
     evapMode = false; rippleMode = false; flowMode = false; flowPick = null; rainHint = 0;
     auroraNext = 0; // 极光庇护只在单次合成内生效
-    tideGateHint = false;
     levelElapsed = 0; runCounted = 0;
     nextTier = rollTier();
     rollNextDrop();
@@ -8530,20 +8518,6 @@ MG.layout.build();
 
     var i;
     for (i = 0; i < phys.bodies.length; i++) drawBall(phys.bodies[i], 1);
-
-    // 潮汐限定标记：旱期的江河带脉动波纹虚线圈（提示需等潮才能合成大海）
-    for (i = 0; i < phys.bodies.length; i++) {
-      var tb = phys.bodies[i];
-      if (!tb.iron && !tb.chest && tb.tier === C.tidePair.tier && tide.progress < C.tidePair.threshold) {
-        ctx.save();
-        ctx.strokeStyle = 'rgba(127,212,255,' + (0.32 + 0.25 * Math.sin(time * 3)).toFixed(2) + ')';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 6]);
-        ctx.lineDashOffset = -time * 24;
-        ctx.beginPath(); ctx.arc(tb.x, tb.y, tb.r + 6, 0, Math.PI * 2); ctx.stroke();
-        ctx.restore();
-      }
-    }
 
     drawWaterFront();
 
