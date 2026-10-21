@@ -1187,7 +1187,6 @@ MG.layout.build();
   var combo = 0, comboTimer = 0, maxCombo = 0;
   var doubled = false; // 结算双倍（v161 起去广告门，直接双倍）
   var reviveCount = 0; // 本局复活次数（v328 恢复：直接复活，无广告；先不做广告）
-  var runBuffered = false; // 每局一次「深流缓冲」是否已用
   var popups = [], parts = [];
   var rippleQueue = []; // 待发的涟漪次波 { t, x, y }
   var time = 0;
@@ -1472,7 +1471,7 @@ MG.layout.build();
     { id: 'storm',   name: '疾风骤雨', desc: '潮汐间隔 -65%',          tideInt: 0.35 },
     { id: 'reef',    name: '暗礁密布', desc: '礁石概率 ×4',          ironX: 4 },
     { id: 'frost',   name: '寒冰速冻', desc: '水滴 35% 落水即冻',      ice: 0.35 },
-    { id: 'abyss',   name: '深渊试炼', desc: '重力 +40% · 潮汐更频且潮期涌动加剧、无宽限',  grav: 1.4, tideInt: 0.35, tideToss: 1.9, tideNoGrace: true },  // v339：原"潮汐 -65%"在正常局实为增益（潮水托离警戒线+潮期引信×2更安全），改为真减益——潮期浮力×1.9涌动更猛、且取消潮期引信宽限（tideNoGrace），靠近警戒线时潮期也是真危险
+    { id: 'abyss',   name: '深渊试炼', desc: '重力 +40% · 潮汐更频且潮期涌动加剧',  grav: 1.4, tideInt: 0.35, tideToss: 1.9 },  // v339：原"潮汐 -65%"在正常局实为增益（潮水托离警戒线+潮期引信×2更安全），改为真减益——潮期浮力×1.9涌动更猛、靠近警戒线时潮期也是真危险。v368 越线缓冲统一 3s 后 tideNoGrace 机制已移除（v369 删字段，三处"无宽限"描述同步清除）
     { id: 'icereef', name: '冰礁交错', desc: '暗礁 ×5 且 45% 落水即冻', ironX: 5, ice: 0.45 }
   ];
   var dchal = (function () {
@@ -1824,7 +1823,7 @@ MG.layout.build();
       counts[b.tier] = (counts[b.tier] || 0) + 1;
     }
     var bestT = -1, bestN = 0;
-    for (i = 0; i < C.spawnWeights.length; i++) {
+    for (i = 0; i < T.length; i++) {
       if (counts[i] && counts[i] > bestN) { bestN = counts[i]; bestT = i; }
     }
     return bestT;
@@ -2408,6 +2407,7 @@ MG.layout.build();
       var t = mostCommonTier();
       if (t >= 0 && t !== nextTier) {
         nextTier = t;
+        nextIron = false; nextSpecial = null; nextRune = null; // v369：清掉旧预览标志，避免甘霖被特殊滴/礁石覆盖（修复 2.1 类 bug）
         rainHint = 2.5;
         aimX = clampAim(aimX);
         addPopup(C.W / 2, 240, '甘霖 · 下一滴是「' + T[t].name + '」', false, 0, 1.6); // v325：预告类信息，1.6s 够读完
@@ -2596,6 +2596,7 @@ MG.layout.build();
     b.special = null;
     if (t >= 0 && t !== nextTier) {
       nextTier = t;
+      nextIron = false; nextSpecial = null; nextRune = null; // v369：同上，避免被旧预览标志覆盖
       rainHint = 2.5;
       aimX = clampAim(aimX);
     }
@@ -3157,8 +3158,9 @@ MG.layout.build();
     ngInfo: function () { return { unlocked: ng.unlocked, active: ng.active ? ng.active.id : null }; },
     ngUnlock: function () { ng.unlocked = true; saveFlag('mg_ng', 1); },
     ngStart: function (id) {
-      var af = null;
-      for (var i = 0; i < C.ng.affixes.length; i++) if (C.ng.affixes[i].id === id) af = C.ng.affixes[i];
+      var af = null, k;
+      for (k = 0; k < C.ng.affixes.length; k++) if (C.ng.affixes[k].id === id) af = C.ng.affixes[k];
+      if (!af) for (k = 0; k < DCHAL_AFFIXES.length; k++) if (DCHAL_AFFIXES[k].id === id) af = DCHAL_AFFIXES[k]; // v369：词缀两份真源，调试启动需同时能解析每日专属词缀（abyss/icereef）
       if (af) ngStartRun(af);
       return af ? af.name : null;
     },
@@ -3434,7 +3436,7 @@ MG.layout.build();
   // 被移除的水滴化作气泡消散（不给分——复活是抢救不是奖励）。
   function doRevive() {
     state = 'play';
-    dangerAlert = 0; dangerRemain = 0; runBuffered = true; // 直接回到对局；本局缓冲已用（避免再吃一次首死宽限）
+    dangerAlert = 0; dangerRemain = 0; // v369：清缓冲计时（v368 起越线缓冲已统一 3s，首死宽限概念移除）
     var bs = phys.bodies, i, j;
     var drops = [];
     for (i = 0; i < bs.length; i++) { if (!bs[i].iron && !bs[i].chest) drops.push(bs[i]); }
@@ -3494,7 +3496,7 @@ MG.layout.build();
     combo = 0; comboTimer = 0; cooldown = 0; maxCombo = 0;
     doubled = false;
     reviveCount = 0; // 新局重置复活次数（v328）
-    runBuffered = false; // 新局重置深流缓冲
+    dangerAlert = 0; dangerRemain = 0; // v369：新局顺手清（每帧由 checkDanger 重算，避免跨局首帧残留）
     skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
     reefCountPrev = 0; // v357：礁石税提示计数随局重置
     seaCount = 0; scoreMult = 1;
@@ -3618,9 +3620,10 @@ MG.layout.build();
     var nb;
     // 甘霖馈赠：事件期间最多 3 滴使用馈赠档位（仅对普通滴生效）
     var useTier = nextTier;
-    if (!nextIron && !nextSpecial && seaEvent.type === 'bless' && seaEvent.data && seaEvent.data.left > 0) {
+    if (seaEvent.type === 'bless' && seaEvent.data && seaEvent.data.left > 0) {
       useTier = seaEvent.data.tier;
       seaEvent.data.left--;
+      nextIron = false; nextSpecial = null; nextRune = null; // v369：祝福期间不被旧预览标志覆盖（同 2.1 bug）
     }
     if (nextIron && ironCount() < C.iron.maxActive) {
       createIron(clampAim(aimX), C.spawnY);
@@ -3644,9 +3647,9 @@ MG.layout.build();
     dropCount++;
     if (dropCount >= TUT_STEPS.length && !tutDone) { tutDone = true; saveFlag('mg_tut', 1); }
     nextTier = rollTier();
-    // 甘霖期间：虚影预览也显示馈赠档位，所见即所得
-    if (!nextSpecial && !nextIron && seaEvent.type === 'bless' && seaEvent.data && seaEvent.data.left > 0) nextTier = seaEvent.data.tier;
     rollNextDrop();
+    // v369：祝福期间虚影预览显示祝福档位，且不被重新 roll 出的特殊滴/礁石覆盖
+    if (seaEvent.type === 'bless' && seaEvent.data && seaEvent.data.left > 0) { nextTier = seaEvent.data.tier; nextIron = false; nextSpecial = null; nextRune = null; }
     aimX = clampAim(aimX);
   }
 

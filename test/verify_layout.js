@@ -604,7 +604,7 @@ f2 += fail;
 //   （雨云/冰晶/磁吸/熔岩/间歇泉/虚空/极光/彩虹/雷霆/珍珠/甘霖）均不参与堆高；
 //   ② 恢复"复活继续"按钮（v327 误删——用户只要去广告，复活功能保留，直接复活无广告）；
 //   ③ 死亡缓冲改为倒计时（dangerRemain），移除"深流缓冲·宽限"专用弹字；
-//   ④ 词缀加重：重压深潜 +80%（grav 1.8）、深渊试炼 重力 +40% 且潮期涌动加剧·无宽限（grav 1.4 + tideInt 0.35 + tideToss 1.9 + tideNoGrace）。
+//   ④ 词缀加重：重压深潜 +80%（grav 1.8）、深渊试炼 重力 +40% 且潮期涌动加剧（grav 1.4 + tideInt 0.35 + tideToss 1.9）。
 pass = 0; fail = 0;
 // v352：0.2s→C.extGrace(1.2s)——磁石吸力 6200 远大于重力 1500，落回不止 0.2s，会在落回途中攒引信
 eq('漩涡拽拉置豁免标记', /o\.vortexGrace = C\.extGrace;/.test(SRC), true);
@@ -623,13 +623,14 @@ eq('越线冲走复活反馈已移除', /越线水滴被冲走/.test(SRC), false
 eq('复活按钮已恢复', /复活继续/.test(SRC), true);
 eq('复活按钮接doRevive', /label: '复活继续', action: doRevive/.test(SRC), true);
 eq('doRevive直接复活', /function doRevive\(\) \{[\s\S]*?state = 'play';/.test(SRC), true);
-eq('doRevive清缓冲计时', /dangerAlert = 0; dangerRemain = 0; runBuffered = true;/.test(SRC), true);
+eq('doRevive清缓冲计时', /dangerAlert = 0; dangerRemain = 0;/.test(SRC), true);
+eq('runBuffered死变量已移除', /runBuffered/.test(SRC), false);
 eq('深流缓冲弹字已移除', /addPopup\([^)]*深流缓冲/.test(SRC), false); // 用户"原来的缓冲提示是不需要的"——移除专用缓冲弹字（倒计时即缓冲）
 // ---- v328 词缀加重（config.ng.affixes + systems.DCHAL_AFFIXES 两处同步）----
 var CFG = src('js/config.js');
 eq('重压深潜+80%(config)', /id: 'heavy', name: '重压深潜', desc: '重力 \+80%',\s*grav: 1\.8/.test(CFG), true);
 eq('重压深潜+80%(DCHAL)', /id: 'heavy',\s*name: '重压深潜', desc: '重力 \+80%',\s*grav: 1\.8/.test(SRC), true);
-eq('深渊试炼真减益(DCHAL)', /id: 'abyss',\s*name: '深渊试炼',\s*desc: '重力 \+40% · 潮汐更频且潮期涌动加剧、无宽限',\s*grav: 1\.4, tideInt: 0\.35, tideToss: 1\.9, tideNoGrace: true/.test(SRC), true);
+eq('深渊试炼真减益(DCHAL)', /id: 'abyss',\s*name: '深渊试炼',\s*desc: '重力 \+40% · 潮汐更频且潮期涌动加剧',\s*grav: 1\.4, tideInt: 0\.35, tideToss: 1\.9/.test(SRC), true);
 console.log('⑧ v327/v328 漩涡/特殊滴豁免+降闪+涨潮持续+广告移除+复活恢复+词缀加重断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
@@ -676,7 +677,7 @@ eq('复活清场-排除铁礁宝箱', /if \(!bs\[i\]\.iron && !bs\[i\]\.chest\) 
 eq('复活清场-气泡消散特效', /parts\.push\(\{ type: 'ring', x: d\.x, y: d\.y, r: d\.r \* 0\.6, life: 0\.5, max: 0\.5, color: '#BFE3F7' \}\);/.test(SRC), true);
 eq('复活清场-清走计数弹字', /'复活！清走 ' \+ removed \+ ' 滴 · 继续深潜'/.test(SRC), true);
 // ② v336：倒计时单次——两段式缓冲分支已移除（原首段 3s 走完重置、再 1.1s 倒数第二遍），
-//    引信到点直接结算；首次越线 3s / 复活后 1.1s（doRevive 置 runBuffered）
+//    引信到点直接结算；v368 起越线缓冲统一 3s（doRevive 不再置 runBuffered，v369 删该死变量）
 eq('倒计时单次-到点直接结算', /if \(remain <= 0\) \{ dangerAlert = 0; dangerRemain = 0; gameOver\(\); return; \}/.test(SRC), true);
 eq('两段式缓冲分支已移除', /worst = 0\.999; minRemain = C\.dangerTime; break;/.test(SRC), false);
 // ③ 提示分色梳理：v331 起 5 类并 7 类（词缀 world、宝箱/符文教程 todo）
