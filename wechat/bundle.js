@@ -152,7 +152,7 @@ MG.config = {
   slop: 0.5,           // 允许重叠量（防抖）
 
   // 失败判定
-  dangerTime: 1.1,     // 越线静止持续多久判负
+  dangerTime: 3,       // v368：堆高越线缓冲期（统一 3s，不再分潮汐 ×2 / 首次 ×3 / 容器顶 ×0.55）
   dangerSpeed: 80,     // 低于此速度视为"静止"
   graceTime: 0.6,      // 新球出生宽限（不参与危险判定）
   // v352：外力位移豁免时长（秒）——被磁石/漩涡滴拽拉而越过警戒线的水滴，在外力停止后仍有
@@ -3023,7 +3023,7 @@ MG.layout.build();
     // 不会被托过线**。浮力虽随浸没比衰减（v353 用户："潮汐的衰减还是保留吧"），但完全浸没时
     // 净上托仍有 2500（浮力 4000 > 重力 1500），水滴会冲出水面并明显越线。
     // 旧注释写的"潮汐只做水下浮力重排、不再把水滴推越线"是错误结论，已删除（用户多次纠正）。
-    // 潮汐期间引信仍 ×2（水下游动更慢，给足反应）——但深渊试炼(tideNoGrace)取消此宽限。
+    // ★ v368：堆高越线缓冲期统一为 C.dangerTime(3s)，不再区分潮汐 ×2 / 首次 ×3 / 容器顶 ×0.55——
     // ★ v352 豁免范围界定（用户明确）：只有「被特殊滴外力拽拉」的水滴豁免（见 C.extGrace）。
     //   深海涌泉(1800)/风暴向心力(2400)/间歇泉(geyserF)/潮汐浮力造成的越线属正常游戏机制，
     //   一律不豁免——它们把水滴顶过线，该判负就判负。
@@ -3045,8 +3045,6 @@ MG.layout.build();
     //   而后者由三重机制区分、不需要速度门：① 出生宽限 0.6s > 任何容器内穿线时长
     //   （~0.42s，sim_danger.js D 案 / sim_column.js J 案回归：峰速 572px/s 仍判负为无）；
     //   ② 引信 1.1s >> 穿线时长 0.2~0.4s；③ 出线（top≥dangerY）即清零。
-    var tideOn = tide.progress > 0.15;
-    if (ng.active && ng.active.tideNoGrace) tideOn = false; // v339：深渊试炼取消潮期引信宽限——潮期靠近警戒线也是真危险（原潮期×2 反成安全网，是"潮汐更频"实为增益的根因）
     var bs = phys.bodies;
     var worst = 0, minRemain = 99;
     for (var i = 0; i < bs.length; i++) {
@@ -3057,13 +3055,12 @@ MG.layout.build();
       if (b.vortexGrace > 0) { b.vortexGrace -= dt; b.dangerT = 0; continue; } // v327：漩涡拽拉/甩飞豁免堆高判负
       var top = b.y - b.r;
       if (top >= C.dangerY) { b.dangerT = 0; continue; } // 线下，重置
-      var fuse = tideOn ? C.dangerTime * 2 : C.dangerTime * (top < C.containerTop ? 0.55 : 1);
-      if (!runBuffered) fuse = Math.max(fuse, C.dangerTime * 3); // 首次越线引信延长至 3s（缓冲），复活后不再延长
+      var fuse = C.dangerTime; // v368：堆高越线缓冲期统一 3s（潮汐 / 首次越线 / 容器顶一律不再区分）
       b.dangerT += dt;
       var remain = fuse - b.dangerT;
       // v336：倒计时只走一次（用户"堆高越线会倒计时两次！"）——原两段式（首段 3s 走完
       // 重置全体计时、再按常规引信 1.1s 倒数第二遍才结算）观感即"倒计时两次"。现引信到点
-      // 直接结算：首次越线 3s、复活后 1.1s（doRevive 已置 runBuffered），倒计时只出现一轮。
+      // 直接结算。v368 起缓冲期统一为 C.dangerTime(3s)，首次越线与复活后一致，倒计时只出现一轮。
       if (remain <= 0) { dangerAlert = 0; dangerRemain = 0; gameOver(); return; }
       var w = b.dangerT / fuse;
       if (w > worst) worst = w;

@@ -401,7 +401,7 @@ eq('满潮水面恒不超过警戒线', (function () { // v328 规格：全海�
 //   无闪烁无文字无判负）。瞬时横穿由三重机制区分、不需要速度门：出生宽限 0.6s
 //   （> 任何容器内穿线时长 ~0.42s）+ 引信 1.1s（>> 穿线 0.2~0.4s）+ 出线即清零；
 //   回归保护见 sim_danger.js D 案 / sim_column.js J 案（峰速 572px/s 判负为无）。
-eq('潮汐引信×2', /var fuse = tideOn \? C\.dangerTime \* 2 : C\.dangerTime \* \(top < C\.containerTop \? 0\.55 : 1\);/.test(SRC), true);
+eq('堆高越线缓冲期统一3s', /var fuse = C\.dangerTime;/.test(SRC), true);
 eq('旧潮汐引信×5已移除', /C\.dangerTime \* 5/.test(SRC), false);
 eq('越线即计时不分潮汐', /b\.dangerT \+= dt;/.test(SRC), true);
 eq('潮汐旧速度门条件已移除', /if \(tideOn \|\| sp < C\.dangerSpeed \* 1\.5\) \{/.test(SRC), false);
