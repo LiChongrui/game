@@ -419,7 +419,7 @@
     return 1.15 - 0.15 * (0.6 - t) / 0.6;
   }
 
-  // 珊瑚礁压顶不做压扁/形变：物理层已让珊瑚礁与普通滴严格分离（零容差全量修正），保持各自圆形
+  // 礁石压顶不做压扁/形变：物理层已让礁石与普通滴严格分离（零容差全量修正），保持各自圆形
   function drawBall(b, alpha) {
     if (b.iron) { if (b.chest) drawChest(b, alpha); else drawIronBall(b, alpha); return; }
     var t = T[b.tier];
@@ -1322,11 +1322,11 @@
     }
   }
 
-  // 特殊滴/符文/珊瑚礁名称标签：紧贴虚影球顶（在 render 末尾绘制，保证不被 HUD 盖住）
+  // 特殊滴/符文/礁石名称标签：紧贴虚影球顶（在 render 末尾绘制，保证不被 HUD 盖住）
   function drawGhostLabel() {
     if (state !== 'play' || evapMode || flowMode || rippleMode || confirmOpen) return; // v320：补 flowMode，与虚影球同显隐
     var r = nextIron ? C.iron.r : T[nextTier].r;
-    var label = nextIron ? '珊瑚礁' : (nextSpecial ? specialLabel(nextSpecial) : (nextRune ? runeName(nextRune) + '符文' : null));
+    var label = nextIron ? '礁石' : (nextSpecial ? specialLabel(nextSpecial) : (nextRune ? runeName(nextRune) + '符文' : null));
     if (!label) return;
     var alpha = cooldown > 0 ? 0.35 : 0.9;
     ctx.save();
@@ -3210,7 +3210,7 @@
   // 水滴吉祥物：大方的水滴角色（上尖下圆 + 高光 + 表情），轻轻浮动
   // 中央展示水滴（v287：弃自绘吉祥物水滴，改轮播游戏内水滴——每秒切换一颗：
   // 普通 1~8 档 → 12 种特殊滴（漩涡/雨云/彩虹/疾风/磁石/泉涌/雷霆/珍珠/熔岩/间歇泉/虚空/极光）
-  // → 珊瑚礁 → 大宝箱，共 22 颗循环；切换时 easeOutBack 弹出，本体逐笔复用游戏渲染
+  // → 礁石 → 大宝箱，共 22 颗循环；切换时 easeOutBack 弹出，本体逐笔复用游戏渲染
   // drawBall/drawIronBall/drawChest，与局内完全同款（用户："更换为游戏水滴样式"）
   var MASCOT_SHOWS = null;
   function mascotShows() {
@@ -3360,7 +3360,7 @@
         ctx.restore();
       }
       ctx.textAlign = 'center';
-      drawPropHint('蒸发模式：点击要移除的水滴或珊瑚礁（再点按钮取消）');
+      drawPropHint('蒸发模式：点击要移除的水滴或礁石（再点按钮取消）');
     }
 
     // 涟漪选位模式：显示波纹中心指示
@@ -3430,7 +3430,7 @@
     drawDangerLine(); // v333：警戒线（含警示渐晕/光带）叠在水滴之上——原在实体层之前被堆体盖住
     drawDangerText(); // v326：越线警示文字改在实体层之后绘制（原在 drawDangerLine 内，堆高越线时被水滴盖住）
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
-    drawPopups();     // 浮动文字最上层（珊瑚礁来袭/任务完成/得分等，不被 HUD 遮挡）
+    drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）
     drawSkillBar();
     // v274：弹层统一弹性出入场（关闭后动画未完仍继续绘制至收拢完毕）
     if (confirmOpen || panelFxAlive('confirm')) { var pcR = MG.layout.confirmRect(); drawPanelFx('confirm', confirmOpen, pcR.x + pcR.w / 2, pcR.y + pcR.h / 2, 0.55, drawConfirm); }
@@ -3467,7 +3467,7 @@
       // 合成链水滴：标准球体 + 表情/波纹
       drawBall({ x: 0, y: 0, r: 30, tier: id, vx: 0, vy: 0 }, 1);
     } else if (kind === 'sp') {
-      // 特殊滴：与图鉴 drawSpForm 同构（珊瑚礁/符文/冰晶特殊处理）
+      // 特殊滴：与图鉴 drawSpForm 同构（礁石/符文/冰晶特殊处理）
       var r = 26;
       if (id === 'iron') drawIronBall({ x: 0, y: 0, r: r, vx: 0, vy: 0 }, 1);
       else if (id === 'rune') drawBall({ x: 0, y: 0, r: r, tier: 1, vx: 0, vy: 0, rune: 'ripple' }, 1);
