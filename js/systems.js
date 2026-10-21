@@ -158,8 +158,9 @@
   // v357：礁石税——每块**在场**礁石削弱全局收益（用户："在场即扣分"）。旧设计里礁石躺在场上
   // 毫无代价，玩家可以无限期不管；现在拖着不管 = 收益持续变差，逼你主动清除。
   // 作用面 = 一切走 cm() 的收益（合成 / 彩虹 / 相消 / 图鉴里程碑 / 任务 / 每日挑战奖励）。
+  var ironN = 0; // v369：在场礁石数缓存（每帧由 update 起点 ironCount() 重算；reefTax/updateReefHint 读此值，消除每分/每帧重复 O(n) 扫描）
   function reefTax() {
-    var n = ironCount();
+    var n = ironN;
     if (n <= 0) return 1;
     return Math.max(1 - C.iron.taxMax, 1 - C.iron.taxPer * n);
   }
@@ -175,11 +176,8 @@
   var ngPickRects = [];               // 三张词缀卡的命中区（draw 时填充）
   var GRAV0 = C.gravity;              // 基准重力（词缀局按倍率改写，重开恢复）
   function ngStartRun(affix, fromDaily) {
-    ng.active = affix;
-    ng.fromDaily = !!fromDaily;
-    C.gravity = GRAV0 * (affix.grav || 1);
-    restart();
-    ng.active = affix;                 // restart 会清 active，重设
+    restart();                         // restart→ngEndRun 会清 active/fromDaily/gravity，故下方重设
+    ng.active = affix;                 // v369：删掉 restart 前的冗余赋值（会被 ngEndRun 清掉）
     ng.fromDaily = !!fromDaily;
     C.gravity = GRAV0 * (affix.grav || 1);
     addPopup(C.W / 2, 300, (fromDaily ? '每日挑战 ·「' : '深渊潜航 ·「') + affix.name + '」', true, 0, 0, 'world'); // v331：挑战开局公告归 world（词缀名如"重压深潜"不含事件关键词）
@@ -662,7 +660,7 @@
   var reefCountPrev = 0;       // 上一帧在场礁石数（只在数量变化时提示，避免刷屏）
   var ironGateHintT = -9;      // v366：礁石潮汐闸门提示的上次时刻（5 秒节流，防刷屏）
   function updateReefHint() {
-    var n = ironCount();
+    var n = ironN;
     if (n === reefCountPrev) return;
     if (n >= 2) addPopup(C.W / 2, 250, '礁石 ×' + n + ' · 全局收益 −' + Math.round((1 - reefTax()) * 100) + '%', false, 0);
     else if (n === 0 && reefCountPrev >= 2) addPopup(C.W / 2, 250, '礁石清空 · 收益恢复', false, 0);
@@ -1360,6 +1358,7 @@
             addPopup(b.x, b.y - b.r - 14, '疾风！', false, 0);
             audio.swirl();
             b.special = null;
+            phys.remove(b); // v369：消耗自身
           }
         } else if (b.special === 'spring') {
           if (b.specialT >= 0.45 || b.y + b.r >= C.floorY - 4) triggerSpring(b);
@@ -1472,6 +1471,7 @@
     addPopup(b.x, b.y - b.r - 14, '甘霖降临！', false, 0);
     parts.push({ type: 'ring', x: b.x, y: b.y, r: 18, life: 0.5, max: 0.5, color: '#BFE8D0' });
     audio.quest();
+    phys.remove(b); // v369：落定即触发后消耗自身（与虚空/漩涡一致），不再遗留普通滴
   }
   // 雷霆滴：场上一对同档水滴直接合成（选距离最近的一对）
   function triggerThunder(b) {
@@ -1487,19 +1487,20 @@
       }
     }
     b.special = null;
-    if (!best) { addPopup(b.x, b.y - b.r - 14, '雷落空了…', false, 0); return; }
+    if (!best) { addPopup(b.x, b.y - b.r - 14, '雷落空了…', false, 0); phys.remove(b); return; }
     parts.push({ type: 'ring', x: best.a.x, y: best.a.y, r: best.a.r, life: 0.5, max: 0.5, color: '#F2C14E' });
     parts.push({ type: 'ring', x: best.o.x, y: best.o.y, r: best.o.r, life: 0.5, max: 0.5, color: '#F2C14E' });
     addPopup(C.W / 2, 250, '雷霆引合！', true, 0);
     addShake(2, 0.2);
     audio.freeze();
     doMerge(best.a, best.o);
+    phys.remove(b); // v369：消耗自身
   }
   // 珍珠滴：场上最多的档位全体 +1 级
   function triggerPearl(b) {
     var t = mostCommonTier(), n = 0;
     b.special = null;
-    if (t < 0 || t >= T.length - 1) { addPopup(b.x, b.y - b.r - 14, '珍珠黯淡了…', false, 0); return; }
+    if (t < 0 || t >= T.length - 1) { addPopup(b.x, b.y - b.r - 14, '珍珠黯淡了…', false, 0); phys.remove(b); return; }
     var bs = phys.bodies;
     for (var i = 0; i < bs.length; i++) {
       var o = bs[i];
@@ -1511,6 +1512,7 @@
     }
     addPopup(C.W / 2, 250, '珍珠祝福！「' + T[t].name + '」全体 +1', true, 0);
     audio.quest();
+    phys.remove(b); // v369：消耗自身
   }
   // 熔岩滴：烧毁周围礁石与最低两档水滴，折算得分
   function triggerMagma(b) {
@@ -1535,6 +1537,7 @@
     addPopup(b.x, b.y - b.r - 14, burn.length ? '熔岩灼烧 ×' + burn.length + ' +' + gain : '熔岩熄灭', burn.length, 0);
     if (burn.length) addShake(3, 0.25);
     parts.push({ type: 'ring', x: b.x, y: b.y, r: R * 0.7, life: 0.5, max: 0.5, color: '#F2A05E' });
+    phys.remove(b); // v369：熔岩灼烧后消耗自身，不再遗留普通滴
     audio.freeze();
   }
   // 间歇泉滴：垂直水柱冲开上方水滴
@@ -1554,6 +1557,7 @@
         r: 1.5 + Math.random() * 2.5, life: 0.6, max: 0.6, color: '#BFF0F8' });
     }
     addPopup(b.x, b.y - b.r - 14, n ? '间歇泉！' : '泉眼枯了', false, 0);
+    phys.remove(b); // v369：消耗自身
     audio.swirl();
   }
   // 虚空滴：吞噬场上最低档水滴（至多 voidN 颗），折算高分
@@ -1590,6 +1594,7 @@
         r: 2 + Math.random() * 2, life: 0.8, max: 0.8, color: k % 2 ? '#9BE8D8' : '#C8B8F0' });
     }
     addPopup(C.W / 2, 250, '极光庇护！下次合成 ×3', true, 0);
+    phys.remove(b); // v369：消耗自身
     audio.quest();
   }
   function freezeAround(b, bs) {
@@ -2750,6 +2755,7 @@
     }
     if (state !== 'play') { time += dt; updateFx(dt); return; } // 结算页：背景保持流动（仅物理冻结）
 
+    ironN = ironCount(); // v369：每帧重算在场礁石数缓存（reefTax/updateReefHint 读此值）
     time += dt;
     if (rainHint > 0) rainHint -= dt;
     cooldown = Math.max(0, cooldown - dt);
