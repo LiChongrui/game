@@ -2179,7 +2179,7 @@ MG.layout.build();
   // ---------- 任务链 ----------
   // 当前已解锁的最高水滴档（任务难度随进度缩放的基准）
   function questMaxTier() {
-    var m = 1;
+    var m = 0; // v371：默认 0（下游 makeQuest 已 Math.max(1,…) 夹住；无档解锁时语义才正确，不再误导为"tier1 已解锁"）
     for (var i = 0; i < T.length; i++) if (dexUnlocked[i]) m = i;
     return m;
   }
@@ -2768,8 +2768,12 @@ MG.layout.build();
     var fill = C.tide.lowFrac + (C.tide.highFrac - C.tide.lowFrac) * (seaStage() / (C.seaStages.length - 1));
     return (zone * fill) / H; // 满潮水面 = FLOORY - H×tideWaterMax = FLOORY - zone×fill（恒 ≥ 警戒线）
   }
+  var _tideYKey = -1, _tideYVal = 0; // v371：按 tide.progress 缓存，tideCrest 每帧多次采样只读一次 tideWaterMax()/seaStage()
   function tideY() {
-    return FLOORY - tide.progress * (FLOORY - C.containerTop) * tideWaterMax();
+    if (_tideYKey === tide.progress) return _tideYVal;
+    _tideYKey = tide.progress;
+    _tideYVal = FLOORY - tide.progress * (FLOORY - C.containerTop) * tideWaterMax();
+    return _tideYVal;
   }
   // 波浪振幅随潮汐增强（潮越大浪越涌），物理水面(tideY)保持平，仅视觉起浪
   function tideAmp() {
@@ -3505,6 +3509,8 @@ MG.layout.build();
     skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
     reefCountPrev = 0; // v357：礁石税提示计数随局重置
     seaCount = 0; scoreMult = 1;
+    // v371：新局清深海事件（风暴/祝福/涌泉…），避免上局残留事件跨局继承（上局死在事件进行中时尤甚）
+    seaEvent.type = null; seaEvent.data = null; seaEvent.t = 0; seaEvent.t0 = 6; seaEvent.timer = 24 + Math.random() * 14;
     evapMode = false; rippleMode = false; flowMode = false; flowPick = null; rainHint = 0;
     auroraNext = 0; // 极光庇护只在单次合成内生效
     levelElapsed = 0; runCounted = 0;
@@ -3645,7 +3651,7 @@ MG.layout.build();
         }
       }
       if (ng.active && ng.active.ice && Math.random() < ng.active.ice) nb.ngIce = true; // 二周目「冰封之海」
-      unlockTier(nextTier);
+      unlockTier(useTier); // v371：解锁实际投放档（祝福覆盖后用的是 useTier，而非覆盖前的预览档 nextTier）
     }
     cooldown = C.dropCooldown;
     audio.drop();
