@@ -6548,15 +6548,6 @@ MG.layout.build();
     ctx.lineTo(aimX, FLOORY - r);
     ctx.stroke();
     ctx.setLineDash([]);
-    // 落点预览圈（呼吸虚线圈），提示水滴将落在此处
-    var pulse = 0.5 + 0.5 * Math.sin(time * 3);
-    ctx.strokeStyle = 'rgba(255,255,255,' + (0.32 + 0.26 * pulse) + ')';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 6]);
-    ctx.beginPath();
-    ctx.arc(aimX, FLOORY - r, r + 3, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
     ctx.restore();
   }
   function drawGhost(x, y, tier, alpha) {
@@ -8692,7 +8683,7 @@ MG.layout.build();
     // v310：指示线在实体层之前绘制（坠落中的水滴盖在线上，线在"水滴后面"）
     if (state === 'play' && !evapMode && !flowMode && !rippleMode && !confirmOpen) {
       drawGhostGuide(aimX, nextTier);
-      drawLandPreview(); // v372：落点预览圈 + 竖直瞄准列
+      drawLandPreview(); // v372：竖直瞄准列（落点预览圈已按需求移除）
     }
 
     var i;
