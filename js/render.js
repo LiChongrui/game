@@ -1621,7 +1621,7 @@
   function drawComboMeter() {
     if (state !== 'play') return;
     if (combo < 2 || comboTimer <= 0) return;
-    var x = C.W / 2, y = 104;
+    var x = C.W / 2 + 120, y = 80;
     var pulse = 0.5 + 0.5 * Math.sin(time * 8);
     ctx.save();
     ctx.textAlign = 'center';
@@ -3520,7 +3520,7 @@
     drawTideBanner(); // v188：涨潮横幅锚堆叠空间中心（非 HUD 元素，不吃 hudInset 平移）
     drawDangerLine(); // v333：警戒线（含警示渐晕/光带）叠在水滴之上——原在实体层之前被堆体盖住
     drawDangerText(); // v326：越线警示文字改在实体层之后绘制（原在 drawDangerLine 内，堆高越线时被水滴盖住）
-    drawComboMeter(); // v372：连击常驻显示（顶部居中）
+    drawComboMeter(); // v372：连击常驻显示（顶部右侧空白带，避开分数/seaBar/任务卡/统计）
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
     drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）
     drawSkillBar();
