@@ -8819,10 +8819,10 @@ MG.layout.build();
     drawDangerLine(); // v333：警戒线（含警示渐晕/光带）叠在水滴之上
     drawDangerText(); // v326：越线警示文字
     drawReefCancelHint(); // v375：礁石相邻+退潮 → 外圈虚线 + 礁石上「需涨潮相消」提示
-    drawComboMeter(); // v375：连击常驻显示（警戒线下方居中，避免遮挡分数）
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
     drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）
     drawTideBanner(); // v375：涨潮横幅置于最上层（原被弹字/警示文字遮挡）
+    drawComboMeter(); // v375：连击常驻显示（警戒线下方居中），置于顶层不被弹字/横幅遮挡
     drawSkillBar();
     // v274：弹层统一弹性出入场（关闭后动画未完仍继续绘制至收拢完毕）
     if (confirmOpen || panelFxAlive('confirm')) { var pcR = MG.layout.confirmRect(); drawPanelFx('confirm', confirmOpen, pcR.x + pcR.w / 2, pcR.y + pcR.h / 2, 0.55, drawConfirm); }
