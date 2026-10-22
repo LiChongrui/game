@@ -1621,7 +1621,7 @@
   function drawComboMeter() {
     if (state !== 'play') return;
     if (combo < 2 || comboTimer <= 0) return;
-    var x = C.W / 2, y = C.dangerY + 55;
+    var x = C.W / 2, y = C.dangerY + 70; // v377：连击文本置于涨潮横幅(mirrorCy=dangerY+55)之下、公告弹字之上的干净带，避免与涨潮文本同高相撞
     var pulse = 0.5 + 0.5 * Math.sin(time * 8);
     ctx.save();
     ctx.textAlign = 'center';
