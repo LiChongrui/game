@@ -1621,7 +1621,7 @@
   function drawComboMeter() {
     if (state !== 'play') return;
     if (combo < 2 || comboTimer <= 0) return;
-    var x = C.W / 2 + 120, y = 80;
+    var x = C.W / 2, y = C.dangerY + 55;
     var pulse = 0.5 + 0.5 * Math.sin(time * 8);
     ctx.save();
     ctx.textAlign = 'center';
@@ -1641,6 +1641,46 @@
     ctx.restore();
   }
 
+  // v375：礁石相邻(退潮)提示——两块礁石相触且处于退潮(tide.progress<tideNeed)时，
+  // 在每块相邻礁石外圈加一层虚线圆，并在礁石群上方标注「需涨潮相消」（替换原全局弹字）
+  function drawReefCancelHint() {
+    if (tide.progress >= C.iron.tideNeed) return; // 涨潮可相消，无需提示
+    var bs = phys.bodies, i, j, k, n = bs.length, dx, dy, d2, rr;
+    var adj = [];
+    for (i = 0; i < n; i++) {
+      if (!bs[i].iron || bs[i].chest) continue;
+      var linked = false;
+      for (j = 0; j < n; j++) {
+        if (j === i || !bs[j].iron || bs[j].chest) continue;
+        dx = bs[j].x - bs[i].x; dy = bs[j].y - bs[i].y;
+        rr = bs[i].r + bs[j].r + 8;
+        if (dx * dx + dy * dy <= rr * rr) { linked = true; break; }
+      }
+      if (linked) adj.push(bs[i]);
+    }
+    if (adj.length < 2) return; // 至少两块相邻才提示
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 6]);
+    for (k = 0; k < adj.length; k++) {
+      ctx.beginPath();
+      ctx.arc(adj[k].x, adj[k].y, adj[k].r + 8, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    var cx = 0, topY = 1e9;
+    for (k = 0; k < adj.length; k++) { cx += adj[k].x; topY = Math.min(topY, adj[k].y - adj[k].r); }
+    cx /= adj.length;
+    ctx.font = 'bold 15px system-ui, sans-serif';
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 3;
+    ctx.strokeText('需涨潮相消', cx, topY - 12);
+    ctx.fillStyle = '#FFD86B';
+    ctx.fillText('需涨潮相消', cx, topY - 12);
+    ctx.restore();
+  }
   function drawDangerLine() {
     // 危险度：仅当水滴顶逼近警戒线 ≤ dangerWarnH（从下方逼近）才进入「闪烁警示」；
     // 更远时线条保持安静（恒定暗青蓝，不闪），避免无意义常亮。
@@ -3517,12 +3557,13 @@
     drawTideTimer();                // 潮汐计时器：原 drawTidePill，v202 重设计为动态一行
     drawChalChip();                 // v273：深渊潜航/每日挑战局信息芯片（挑战中显示目标与进度）
     if (hudInset > 0) ctx.restore();
-    drawTideBanner(); // v188：涨潮横幅锚堆叠空间中心（非 HUD 元素，不吃 hudInset 平移）
-    drawDangerLine(); // v333：警戒线（含警示渐晕/光带）叠在水滴之上——原在实体层之前被堆体盖住
-    drawDangerText(); // v326：越线警示文字改在实体层之后绘制（原在 drawDangerLine 内，堆高越线时被水滴盖住）
-    drawComboMeter(); // v372：连击常驻显示（顶部右侧空白带，避开分数/seaBar/任务卡/统计）
+    drawDangerLine(); // v333：警戒线（含警示渐晕/光带）叠在水滴之上
+    drawDangerText(); // v326：越线警示文字
+    drawReefCancelHint(); // v375：礁石相邻+退潮 → 外圈虚线 + 礁石上「需涨潮相消」提示
+    drawComboMeter(); // v375：连击常驻显示（警戒线下方居中，避免遮挡分数）
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
     drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）
+    drawTideBanner(); // v375：涨潮横幅置于最上层（原被弹字/警示文字遮挡）
     drawSkillBar();
     // v274：弹层统一弹性出入场（关闭后动画未完仍继续绘制至收拢完毕）
     if (confirmOpen || panelFxAlive('confirm')) { var pcR = MG.layout.confirmRect(); drawPanelFx('confirm', confirmOpen, pcR.x + pcR.w / 2, pcR.y + pcR.h / 2, 0.55, drawConfirm); }

@@ -663,8 +663,8 @@
   function updateReefHint() {
     var n = ironN;
     if (n === reefCountPrev) return;
-    if (n >= 2) addPopup(C.W / 2, 250, '礁石 ×' + n + ' · 全局收益 −' + Math.round((1 - reefTax()) * 100) + '%', false, 0);
-    else if (n === 0 && reefCountPrev >= 2) addPopup(C.W / 2, 250, '礁石清空 · 收益恢复', false, 0);
+    if (n >= 2) addPopup(C.W / 2, C.dangerY + 24, '礁石 ×' + n + ' · 全局收益 −' + Math.round((1 - reefTax()) * 100) + '%', false, 0);
+    else if (n === 0 && reefCountPrev >= 2) addPopup(C.W / 2, C.dangerY + 24, '礁石清空 · 收益恢复', false, 0);
     reefCountPrev = n;
   }
   // v372：礁石可控出口——水滴与礁石接触即缓慢磨蚀，磨穿后碎裂移除并小幅加分，
@@ -1025,7 +1025,7 @@
     var i = spIndexByKey(sp);
     addPopup(C.W / 2, 240, '图鉴新发现 · ' + (i >= 0 ? SP_DEFS[i].name : '大宝箱'), true, 0);
     if (i >= 0 && SP_DEFS[i].desc) { // v372：特殊滴首现追加一句话玩法说明（复用图鉴描述，2.8s 读全）
-      addPopup(C.W / 2, 282, (SP_DEFS[i].name + '：' + SP_DEFS[i].desc), false, 0, 2.8, 'todo');
+      addPopup(C.W / 2, C.dangerY + 30, (SP_DEFS[i].name + '：' + SP_DEFS[i].desc), false, 0, 2.8, 'todo');
     }
     checkCollection();
   }
@@ -1182,11 +1182,7 @@
       var ia = bs[i];
       if (!ia.iron || ia.chest || used[ia.id] || ia.frozen > 0) continue;
       if (tide.progress < C.iron.tideNeed) {
-        if (time - ironGateHintT > 5) {
-          ironGateHintT = time;
-          addPopup(C.W / 2, 250, '退潮中 · 两块礁石要在潮汐中才能相消', true, 0);
-        }
-        break; // 退潮期整段跳过（与江河闸门同理：不是这一对的问题）
+        break; // v375：退潮期整段跳过（相消提示改由 drawReefCancelHint 画在礁石上，不再全局弹字）
       }
       for (j = i + 1; j < bs.length; j++) {
         var ib = bs[j];
@@ -1343,7 +1339,7 @@
         vx: (Math.random() - 0.5) * 160, vy: -40 - Math.random() * 120,
         r: 1.5 + Math.random() * 2, life: 0.7, max: 0.7, color: '#F5D76E' });
     }
-    addPopup(C.W / 2, 250, '海潮高潮！水滴自发相聚', true, 0);
+    addPopup(C.W / 2, C.dangerY + 24, '海潮高潮！水滴自发相聚', true, 0);
     addShake(2, 0.2);
     audio.quest();
     doMerge(a, b2);
@@ -1529,7 +1525,7 @@
     if (!best) { addPopup(b.x, b.y - b.r - 14, '雷落空了…', false, 0); phys.remove(b); return; }
     parts.push({ type: 'ring', x: best.a.x, y: best.a.y, r: best.a.r, life: 0.5, max: 0.5, color: '#F2C14E' });
     parts.push({ type: 'ring', x: best.o.x, y: best.o.y, r: best.o.r, life: 0.5, max: 0.5, color: '#F2C14E' });
-    addPopup(C.W / 2, 250, '雷霆引合！', true, 0);
+    addPopup(C.W / 2, C.dangerY + 24, '雷霆引合！', true, 0);
     addShake(2, 0.2);
     audio.freeze();
     doMerge(best.a, best.o);
@@ -1549,7 +1545,7 @@
       o.tier += 1; o.r = T[o.tier].r; o.popT = 0.3; n++;
       parts.push({ type: 'ring', x: o.x, y: o.y, r: o.r * 0.6, life: 0.45, max: 0.45, color: '#F0E6D2' });
     }
-    addPopup(C.W / 2, 250, '珍珠祝福！「' + T[t].name + '」全体 +1', true, 0);
+    addPopup(C.W / 2, C.dangerY + 24, '珍珠祝福！「' + T[t].name + '」全体 +1', true, 0);
     audio.quest();
     phys.remove(b); // v369：消耗自身
   }
@@ -1632,7 +1628,7 @@
         vx: (Math.random() - 0.5) * 60, vy: -60 - Math.random() * 100,
         r: 2 + Math.random() * 2, life: 0.8, max: 0.8, color: k % 2 ? '#9BE8D8' : '#C8B8F0' });
     }
-    addPopup(C.W / 2, 250, '极光庇护！下次合成 ×3', true, 0);
+    addPopup(C.W / 2, C.dangerY + 24, '极光庇护！下次合成 ×3', true, 0);
     phys.remove(b); // v369：消耗自身
     audio.quest();
   }
@@ -1705,7 +1701,7 @@
         // v327：涨潮持续随海域线性拉长（sea0=duration → 深渊王座=durationMax），让深海引信链在退潮前兑现（原写死 duration，深海首潮永不致死）
         tide.timer = C.tide.duration + (C.tide.durationMax - C.tide.duration) * seaStage() / (C.seaStages.length - 1);
         tide.banner = 2.4;
-        if (!tideKillHint) { tideKillHint = true; addPopup(C.W / 2, 250, '潮位渐深 · 水下浮力增强', true, 0); }
+        if (!tideKillHint) { tideKillHint = true; addPopup(C.W / 2, C.dangerY + 24, '潮位渐深 · 水下浮力增强', true, 0); }
         audio.tide();
       }
     } else {
@@ -1818,7 +1814,7 @@
       flowMode = false; flowPick = null;
       // v357：场上有礁石时明确告知涨价（避免玩家点下去才发现扣 2 次）
       // v366：追加"限涨潮"——退潮时点礁石会被拒绝且不扣充能
-      if (ironCount() > 0) addPopup(C.W / 2, 250, '蒸发礁石需 ' + (skillCost('evap') * C.iron.evapCost) + ' 次充能 · 限涨潮', false, 0);
+      if (ironCount() > 0) addPopup(C.W / 2, C.dangerY + 24, '蒸发礁石需 ' + (skillCost('evap') * C.iron.evapCost) + ' 次充能 · 限涨潮', false, 0);
       return;
     }
     if (key === 'flow') {
@@ -2189,7 +2185,7 @@
       bless: '海神甘霖！接下来 3 滴同档',
       storm: '漩涡风暴！水滴被卷起'
     };
-    addPopup(C.W / 2, 250, names[seaEvent.type], true, 0);
+    addPopup(C.W / 2, C.dangerY + 24, names[seaEvent.type], true, 0);
     if (seaEvent.type === 'bless') {
       var tier = mostCommonTier();
       seaEvent.data = { tier: tier < 0 ? rollTier() : tier, left: 3 };
@@ -2883,7 +2879,7 @@
     // 无尽渐进加压计时 + 档位提示 + 高潮时刻
     endlessT += dt;
     var stgR = Math.floor(endlessRamp() * 4);
-    if (stgR > rampStage) { rampStage = stgR; addPopup(C.W / 2, 250, '海域渐深：潮汐更频 · 礁石更多', true, 0); }
+    if (stgR > rampStage) { rampStage = stgR; addPopup(C.W / 2, C.dangerY + 24, '海域渐深：潮汐更频 · 礁石更多', true, 0); }
     if (score - climaxMark >= C.climaxEvery) doClimax();
     // 声音预警：危险→母线低通收紧；潮汐临近/进行→低频隆隆
     var dg = 0;
