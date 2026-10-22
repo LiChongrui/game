@@ -268,6 +268,8 @@ MG.config = {
     massMult: 16,                // 质量倍率（远重于水滴，下落时把水滴挤开）
     evaporateScore: 0,           // v357：蒸发移除不再给分（原 5）
     evapCost: 2,                 // v357：蒸发一块礁石耗 2 次充能（水滴仍 1 次）
+    hp: 4.0,                     // v372：礁石被水滴接触磨蚀的总时长（秒），磨穿即碎裂移除（玩家正向出口）
+    erodeScore: 12,              // v372：礁石磨碎移除的奖励分（清礁石同时小幅回血，不再是纯负面）
     pairScore: 15,               // 两块礁石相消的奖励（v357 曾因"撞击才碎"提到 30，v365 恢复接触即消后回到 15）
     tideNeed: 0.15,              // v366：涨潮进度 ≥ 此值才允许消除礁石（相消 / 蒸发）
     taxPer: 0.06,                // v357：每块在场礁石让全局得分倍率 −6%
@@ -1784,6 +1786,7 @@ MG.layout.build();
     b.tier = -1;
     b.r = C.iron.r;                                    // v365：半径恒定（"在场生长"已按用户要求移除）
     b.m = C.iron.r * C.iron.r * C.iron.massMult;     // 大质量 → 下落时把水滴挤开（砸穿效果）
+    b.hp = C.iron.hp; b.hpMax = C.iron.hp;           // v372：接触磨蚀耐久（落地堆叠/故意落子即可磨穿，给玩家清礁石的正向出口）
     return b;
   }
   // 礁石税提示（v357）：收益惩罚必须让玩家看见（否则分数莫名变少）——数量变化时才提示，
@@ -1796,6 +1799,40 @@ MG.layout.build();
     if (n >= 2) addPopup(C.W / 2, 250, '礁石 ×' + n + ' · 全局收益 −' + Math.round((1 - reefTax()) * 100) + '%', false, 0);
     else if (n === 0 && reefCountPrev >= 2) addPopup(C.W / 2, 250, '礁石清空 · 收益恢复', false, 0);
     reefCountPrev = n;
+  }
+  // v372：礁石可控出口——水滴与礁石接触即缓慢磨蚀，磨穿后碎裂移除并小幅加分，
+  // 给玩家"用落子清礁石"的正向手段（此前礁石纯负面，只能靠涨潮/蒸发被动清除）。
+  function updateReefErode(dt) {
+    if (ironN === 0) return; // 无礁石不扫描
+    var bs = phys.bodies, i, j, b, o, dx, dy, d;
+    for (i = 0; i < bs.length; i++) {
+      b = bs[i];
+      if (!b.iron || b.hp == null) continue;
+      var touching = false;
+      for (j = 0; j < bs.length; j++) {
+        if (j === i) continue;
+        o = bs[j];
+        if (o.iron || o.chest || o.special) continue; // 礁石/宝箱/特殊滴不计入接触
+        dx = o.x - b.x; dy = o.y - b.y;
+        d = Math.sqrt(dx * dx + dy * dy);
+        if (d < (b.r + o.r) * 0.98) { touching = true; break; } // 接近相切即算接触（堆叠静置必然触发）
+      }
+      if (!touching) continue;
+      b.hp -= dt; // 持续接触才磨蚀，快速穿过不掉血
+      if (b.hp > 0) continue;
+      var gain = Math.round(C.iron.erodeScore * cm(scoreMult));
+      score += gain; scoreBump = 0.25;
+      if (score > best) { best = score; saveNum('mg_best', best); }
+      dailyProgress('iron'); // 计入"消除礁石"每日任务（与蒸发/涨潮相消口径统一）
+      addPopup(b.x, b.y - b.r - 8, '礁石磨碎 · +' + gain, false, 0, 1.4, 'todo');
+      for (var k = 0; k < 8; k++) {
+        var ang = Math.random() * Math.PI * 2, sp = 40 + Math.random() * 90;
+        parts.push({ type: 'dot', x: b.x, y: b.y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+          r: 1.5 + Math.random() * 2, life: 0.5, max: 0.5, color: '#9FB0BC' });
+      }
+      audio.freeze(); // 碎裂短音（复用冻结音，清脆不突兀）
+      phys.remove(b);
+    }
   }
   function specialLabel(sp) {
     var i = spIndexByKey(sp);
@@ -2120,6 +2157,9 @@ MG.layout.build();
     saveDex();
     var i = spIndexByKey(sp);
     addPopup(C.W / 2, 240, '图鉴新发现 · ' + (i >= 0 ? SP_DEFS[i].name : '大宝箱'), true, 0);
+    if (i >= 0 && SP_DEFS[i].desc) { // v372：特殊滴首现追加一句话玩法说明（复用图鉴描述，2.8s 读全）
+      addPopup(C.W / 2, 282, (SP_DEFS[i].name + '：' + SP_DEFS[i].desc), false, 0, 2.8, 'todo');
+    }
     checkCollection();
   }
 
@@ -2356,6 +2396,7 @@ MG.layout.build();
     combo++; comboTimer = C.comboWindow + (perkOn('combo6') ? 0.3 : 0); // 成就加成：连浪六叠延长连击窗口
     if (combo > maxCombo) { maxCombo = combo; if (maxCombo > (lifeStats.combo || 0)) { lifeStats.combo = maxCombo; } }
     dailyProgress('combo', 0, combo); // 每日任务：连击取峰值
+    if (combo >= 2) hap(Math.min(50, 8 + combo * 3)); // v372：连击分级震动（2 连轻振→高连更强，配合已有 pop 震动）
     var mult = Math.min(combo, C.comboMaxMult);
 
     // 顶级「沧海」两两相消 → 汇入海域
@@ -2390,7 +2431,7 @@ MG.layout.build();
     dailyProgress('merge', nt);
 
     unlockTier(nt, mx, my - T[nt].r - 38);
-    addPopup(mx, my - T[nt].r - 12, '+' + gain2, nt >= T.length - 1, mult > 1 ? mult : 0);
+    addPopup(mx, my - T[nt].r - 12, '+' + gain2, nt >= T.length - 1, mult > 1 ? mult : 0); // v372：分数飘字随连击倍率放大（drawPopups 按 mult 缩放字号）
     burst(mx, my, nt, nt >= 6);
     suckIn(mx, my, tier);
     pushNeighbors(mx, my, T[nt].r + 30);
@@ -3353,11 +3394,23 @@ MG.layout.build();
     seaEvent.data = null;
     seaEvent.timer = 30 + Math.random() * 20;
   }
+  var seaWarn = null;     // v372：事件来袭预警（风暴/涌泉前 1.6s 屏幕泛光+文字预警，给反应时间；甘霖为增益即时触发）
+  var SEA_WARN_T = 1.6;
   function updateSeaEvent(dt) {
     if (tide.phase === 'active') return; // 保底：涨潮期间冻结事件节奏，避免双重混乱
+    if (seaWarn) { // 预警阶段：倒计时结束后正式触发事件
+      seaWarn.t -= dt;
+      if (seaWarn.t <= 0) { var tp = seaWarn.type; seaWarn = null; startSeaEvent(tp); }
+      return;
+    }
     if (!seaEvent.type) {
       seaEvent.timer -= dt;
-      if (seaEvent.timer <= 0) startSeaEvent();
+      if (seaEvent.timer <= 0) {
+        var pool = ['surge', 'bless', 'storm'];
+        var t = pool[(Math.random() * pool.length) | 0];
+        if (t === 'bless') startSeaEvent('bless');   // 甘霖是增益，即时触发无需预警
+        else seaWarn = { type: t, t: SEA_WARN_T };     // 风暴/涌泉先预警再触发
+      }
     } else {
       seaEvent.t -= dt;
       applySeaEvent(dt);
@@ -3511,6 +3564,7 @@ MG.layout.build();
     seaCount = 0; scoreMult = 1;
     // v371：新局清深海事件（风暴/祝福/涌泉…），避免上局残留事件跨局继承（上局死在事件进行中时尤甚）
     seaEvent.type = null; seaEvent.data = null; seaEvent.t = 0; seaEvent.t0 = 6; seaEvent.timer = 24 + Math.random() * 14;
+    seaWarn = null; // v372：预警态一并清空，避免残留「X 将至」泛光跨局
     evapMode = false; rippleMode = false; flowMode = false; flowPick = null; rainHint = 0;
     auroraNext = 0; // 极光庇护只在单次合成内生效
     levelElapsed = 0; runCounted = 0;
@@ -3917,6 +3971,7 @@ MG.layout.build();
     updateTide(dt);
     phys.step(dt);
     applyBuoyancy(dt);
+    updateReefErode(dt); // v372：礁石接触磨蚀（玩家可控出口）
     updateSpecials(dt);
 
     var i, b;
@@ -6477,6 +6532,33 @@ MG.layout.build();
     ctx.setLineDash([]);
     ctx.restore();
   }
+  // v372：落点预览——半透明竖直瞄准列（虚影底→落点） + 落点虚线圈，提升手机落位精度
+  function drawLandPreview() {
+    var r = nextIron ? C.iron.r : T[nextTier].r;
+    var gy = C.spawnY + ghostBob();
+    var topY = gy + r + 2;
+    ctx.save();
+    // 竖直瞄准列（细、淡），与已有短引导线同源，向下延伸到落点
+    ctx.strokeStyle = 'rgba(127,206,250,0.16)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 9]);
+    ctx.lineDashOffset = -time * 30;
+    ctx.beginPath();
+    ctx.moveTo(aimX, topY);
+    ctx.lineTo(aimX, FLOORY - r);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // 落点预览圈（呼吸虚线圈），提示水滴将落在此处
+    var pulse = 0.5 + 0.5 * Math.sin(time * 3);
+    ctx.strokeStyle = 'rgba(255,255,255,' + (0.32 + 0.26 * pulse) + ')';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 6]);
+    ctx.beginPath();
+    ctx.arc(aimX, FLOORY - r, r + 3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
   function drawGhost(x, y, tier, alpha) {
     var r = nextIron ? C.iron.r : T[tier].r;
     var gy = y + ghostBob(); // v320：虚影轻轻漂浮
@@ -6750,6 +6832,85 @@ MG.layout.build();
     ctx.strokeText(text, C.W / 2, y);
     ctx.fillStyle = '#FFFFFF';
     ctx.fillText(text, C.W / 2, y);
+  }
+
+  // v372：潮汐浮力致死透明度——被浮力持续顶起、逼近/越过警戒线的水滴套橙色呼吸预警圈，
+  // 让玩家理解"被托上去"而非凭空死（沿用 dangerAlert 的橙色警示语言）
+  function drawBuoyWarn() {
+    if (state !== 'play') return;
+    if (tide.progress <= 0.02) return; // 无潮汐浮力不预警
+    var wy = tideY();
+    for (var i = 0; i < phys.bodies.length; i++) {
+      var b = phys.bodies[i];
+      if (b.iron || b.frozen > 0 || b.special) continue;
+      var top = b.y - b.r;
+      if (top > C.dangerY - 72) continue; // 仅关注接近/已越警戒线
+      var subm = (b.y + b.r - wy) / (2 * b.r);
+      if (subm <= 0.02) continue;        // 需在水面以下（受浮力）
+      if (b.vy > -6) continue;           // 需正被向上托举
+      var prox = Math.min(1, (C.dangerY - top + 72) / 144);
+      var pulse = 0.5 + 0.5 * Math.sin(time * 5);
+      var a = (0.22 + 0.4 * prox) * (0.45 + 0.55 * pulse);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,150,90,' + a + ')';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([5, 5]);
+      ctx.lineDashOffset = -time * 40;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r + 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  }
+
+  // v372：深海事件来袭预警——风暴/涌泉触发前 1.6s 屏幕边缘泛光 + 中央文字预警，给反应时间
+  function drawEventWarn() {
+    if (!seaWarn) return;
+    var w = 1 - Math.max(0, seaWarn.t) / SEA_WARN_T; // 0→1 进度
+    var danger = seaWarn.type === 'storm' || seaWarn.type === 'surge';
+    var col = danger ? '224,90,70' : '120,185,255';
+    var a = (0.10 + 0.16 * (1 - Math.abs(w - 0.5) * 2)) * (0.6 + 0.4 * Math.sin(time * 7));
+    var g = ctx.createRadialGradient(C.W / 2, VH / 2, VH * 0.28, C.W / 2, VH / 2, VH * 0.78);
+    g.addColorStop(0, 'rgba(' + col + ',0)');
+    g.addColorStop(1, 'rgba(' + col + ',' + Math.max(0, a) + ')');
+    ctx.fillStyle = g;
+    ctx.fillRect(-BX, -renderOy, C.W + BX * 2, VH);
+    var label = seaWarn.type === 'storm' ? '漩涡风暴 将至' : seaWarn.type === 'surge' ? '深海涌泉 将至' : '海神甘霖 将至';
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.globalAlpha = 0.6 + 0.4 * Math.sin(time * 7);
+    ctx.font = 'bold 26px system-ui, sans-serif';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.strokeText(label, C.W / 2, C.dangerY - 40);
+    ctx.fillStyle = danger ? '#F2614A' : '#7FD4FF';
+    ctx.fillText(label, C.W / 2, C.dangerY - 40);
+    ctx.restore();
+  }
+
+  // v372：连击常驻显示——连击数 + 连击窗口剩余条（顶部居中），强化"我在秀操作"正反馈
+  function drawComboMeter() {
+    if (state !== 'play') return;
+    if (combo < 2 || comboTimer <= 0) return;
+    var x = C.W / 2, y = 104;
+    var pulse = 0.5 + 0.5 * Math.sin(time * 8);
+    ctx.save();
+    ctx.textAlign = 'center';
+    var fs = 22 + Math.min(16, combo * 1.2);
+    ctx.font = 'bold ' + fs + 'px system-ui, sans-serif';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.strokeText('连击 ×' + combo, x, y);
+    ctx.fillStyle = '#FFD86B';
+    ctx.fillText('连击 ×' + combo, x, y);
+    var bw = 110, bh = 5, bx = x - bw / 2, by = y + 12;
+    var frac = Math.max(0, Math.min(1, comboTimer / C.comboWindow));
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    roundRect(bx, by, bw, bh, 2.5); ctx.fill();
+    ctx.fillStyle = 'rgba(255,216,107,' + (0.6 + 0.4 * pulse) + ')';
+    roundRect(bx, by, bw * frac, bh, 2.5); ctx.fill();
+    ctx.restore();
   }
 
   function drawDangerLine() {
@@ -7750,8 +7911,11 @@ MG.layout.build();
         if (q >= 1) drawChargeBadge(btn, q); // 仅充能>=1 显示可用次数角标
       }
       if (unl && ((cfg.key === 'evap' && evapMode) || (cfg.key === 'ripple' && rippleMode) || (cfg.key === 'flow' && flowMode))) {
-        ctx.strokeStyle = '#E24B4A'; ctx.lineWidth = 2.5;
-        ctx.beginPath(); ctx.arc(btn.cx, btn.cy, btn.r + 3, 0, Math.PI * 2); ctx.stroke();
+        // v372：激活态脉冲高亮（呼吸放大 + 透明度呼吸），配合 drawPropHint 的"再点按钮取消"提示
+        var pr = (btn.r + 3) + 2 * (0.5 + 0.5 * Math.sin(time * 6));
+        ctx.strokeStyle = 'rgba(226,75,74,' + (0.7 + 0.3 * Math.sin(time * 6)) + ')';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(btn.cx, btn.cy, pr, 0, Math.PI * 2); ctx.stroke();
       }
       // 名称标签：圆钮下方居中（v344：画前显式 center——drawChargeBadge 末尾改过 textAlign='left'，会污染此处对齐导致文字右偏）
       ctx.textAlign = 'center';
@@ -7883,9 +8047,11 @@ MG.layout.build();
         ctx.save();
         ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.max * 1.5));
         ctx.translate(p.x, p.y);
-        ctx.scale(p.scale, p.scale);
+        ctx.scale(p.scale * (p.baseScale || 1), p.scale * (p.baseScale || 1)); // v372：连击飘字按 baseScale 放大
         ctx.fillStyle = PCOLMAP[p.kind] || PCOLMAP.neutral;
-        ctx.font = (p.big ? 'bold 20px' : 'bold 17px') + ' system-ui, sans-serif';
+        // v372：分数飘字随连击倍率放大（mult 即连击倍率；上限 1.7 防过大）
+        var mscale = Math.min(1.7, 1 + Math.max(0, p.mult - 1) * 0.08);
+        ctx.font = 'bold ' + ((p.big ? 20 : 17) * mscale) + 'px system-ui, sans-serif';
         ctx.strokeStyle = 'rgba(255,255,255,0.85)';
         ctx.lineWidth = 3;
         ctx.strokeText(p.text, 0, 0);
@@ -8526,6 +8692,7 @@ MG.layout.build();
     // v310：指示线在实体层之前绘制（坠落中的水滴盖在线上，线在"水滴后面"）
     if (state === 'play' && !evapMode && !flowMode && !rippleMode && !confirmOpen) {
       drawGhostGuide(aimX, nextTier);
+      drawLandPreview(); // v372：落点预览圈 + 竖直瞄准列
     }
 
     var i;
@@ -8533,6 +8700,7 @@ MG.layout.build();
 
     drawWaterFront();
 
+    drawBuoyWarn(); // v372：潮汐浮力顶起的预警圈（叠在水滴之上）
     drawTutorial(); // 首局分步引导（前 5 投）
 
     if (state === 'play' && !evapMode && !flowMode && !rippleMode && !confirmOpen) {
@@ -8541,6 +8709,7 @@ MG.layout.build();
 
     drawFx();
     drawEventVfx(); // 随机深海事件视觉（漩涡风暴/涌泉）
+    drawEventWarn(); // v372：事件来袭预警（风暴/涌泉前泛光+文字）
 
     if (evapMode) {
       ctx.fillStyle = 'rgba(10,40,70,0.18)';
@@ -8623,6 +8792,7 @@ MG.layout.build();
     drawTideBanner(); // v188：涨潮横幅锚堆叠空间中心（非 HUD 元素，不吃 hudInset 平移）
     drawDangerLine(); // v333：警戒线（含警示渐晕/光带）叠在水滴之上——原在实体层之前被堆体盖住
     drawDangerText(); // v326：越线警示文字改在实体层之后绘制（原在 drawDangerLine 内，堆高越线时被水滴盖住）
+    drawComboMeter(); // v372：连击常驻显示（顶部居中）
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
     drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）
     drawSkillBar();

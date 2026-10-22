@@ -653,6 +653,7 @@
     b.tier = -1;
     b.r = C.iron.r;                                    // v365：半径恒定（"在场生长"已按用户要求移除）
     b.m = C.iron.r * C.iron.r * C.iron.massMult;     // 大质量 → 下落时把水滴挤开（砸穿效果）
+    b.hp = C.iron.hp; b.hpMax = C.iron.hp;           // v372：接触磨蚀耐久（落地堆叠/故意落子即可磨穿，给玩家清礁石的正向出口）
     return b;
   }
   // 礁石税提示（v357）：收益惩罚必须让玩家看见（否则分数莫名变少）——数量变化时才提示，
@@ -665,6 +666,40 @@
     if (n >= 2) addPopup(C.W / 2, 250, '礁石 ×' + n + ' · 全局收益 −' + Math.round((1 - reefTax()) * 100) + '%', false, 0);
     else if (n === 0 && reefCountPrev >= 2) addPopup(C.W / 2, 250, '礁石清空 · 收益恢复', false, 0);
     reefCountPrev = n;
+  }
+  // v372：礁石可控出口——水滴与礁石接触即缓慢磨蚀，磨穿后碎裂移除并小幅加分，
+  // 给玩家"用落子清礁石"的正向手段（此前礁石纯负面，只能靠涨潮/蒸发被动清除）。
+  function updateReefErode(dt) {
+    if (ironN === 0) return; // 无礁石不扫描
+    var bs = phys.bodies, i, j, b, o, dx, dy, d;
+    for (i = 0; i < bs.length; i++) {
+      b = bs[i];
+      if (!b.iron || b.hp == null) continue;
+      var touching = false;
+      for (j = 0; j < bs.length; j++) {
+        if (j === i) continue;
+        o = bs[j];
+        if (o.iron || o.chest || o.special) continue; // 礁石/宝箱/特殊滴不计入接触
+        dx = o.x - b.x; dy = o.y - b.y;
+        d = Math.sqrt(dx * dx + dy * dy);
+        if (d < (b.r + o.r) * 0.98) { touching = true; break; } // 接近相切即算接触（堆叠静置必然触发）
+      }
+      if (!touching) continue;
+      b.hp -= dt; // 持续接触才磨蚀，快速穿过不掉血
+      if (b.hp > 0) continue;
+      var gain = Math.round(C.iron.erodeScore * cm(scoreMult));
+      score += gain; scoreBump = 0.25;
+      if (score > best) { best = score; saveNum('mg_best', best); }
+      dailyProgress('iron'); // 计入"消除礁石"每日任务（与蒸发/涨潮相消口径统一）
+      addPopup(b.x, b.y - b.r - 8, '礁石磨碎 · +' + gain, false, 0, 1.4, 'todo');
+      for (var k = 0; k < 8; k++) {
+        var ang = Math.random() * Math.PI * 2, sp = 40 + Math.random() * 90;
+        parts.push({ type: 'dot', x: b.x, y: b.y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+          r: 1.5 + Math.random() * 2, life: 0.5, max: 0.5, color: '#9FB0BC' });
+      }
+      audio.freeze(); // 碎裂短音（复用冻结音，清脆不突兀）
+      phys.remove(b);
+    }
   }
   function specialLabel(sp) {
     var i = spIndexByKey(sp);
@@ -989,6 +1024,9 @@
     saveDex();
     var i = spIndexByKey(sp);
     addPopup(C.W / 2, 240, '图鉴新发现 · ' + (i >= 0 ? SP_DEFS[i].name : '大宝箱'), true, 0);
+    if (i >= 0 && SP_DEFS[i].desc) { // v372：特殊滴首现追加一句话玩法说明（复用图鉴描述，2.8s 读全）
+      addPopup(C.W / 2, 282, (SP_DEFS[i].name + '：' + SP_DEFS[i].desc), false, 0, 2.8, 'todo');
+    }
     checkCollection();
   }
 
@@ -1225,6 +1263,7 @@
     combo++; comboTimer = C.comboWindow + (perkOn('combo6') ? 0.3 : 0); // 成就加成：连浪六叠延长连击窗口
     if (combo > maxCombo) { maxCombo = combo; if (maxCombo > (lifeStats.combo || 0)) { lifeStats.combo = maxCombo; } }
     dailyProgress('combo', 0, combo); // 每日任务：连击取峰值
+    if (combo >= 2) hap(Math.min(50, 8 + combo * 3)); // v372：连击分级震动（2 连轻振→高连更强，配合已有 pop 震动）
     var mult = Math.min(combo, C.comboMaxMult);
 
     // 顶级「沧海」两两相消 → 汇入海域
@@ -1259,7 +1298,7 @@
     dailyProgress('merge', nt);
 
     unlockTier(nt, mx, my - T[nt].r - 38);
-    addPopup(mx, my - T[nt].r - 12, '+' + gain2, nt >= T.length - 1, mult > 1 ? mult : 0);
+    addPopup(mx, my - T[nt].r - 12, '+' + gain2, nt >= T.length - 1, mult > 1 ? mult : 0); // v372：分数飘字随连击倍率放大（drawPopups 按 mult 缩放字号）
     burst(mx, my, nt, nt >= 6);
     suckIn(mx, my, tier);
     pushNeighbors(mx, my, T[nt].r + 30);
@@ -2222,11 +2261,23 @@
     seaEvent.data = null;
     seaEvent.timer = 30 + Math.random() * 20;
   }
+  var seaWarn = null;     // v372：事件来袭预警（风暴/涌泉前 1.6s 屏幕泛光+文字预警，给反应时间；甘霖为增益即时触发）
+  var SEA_WARN_T = 1.6;
   function updateSeaEvent(dt) {
     if (tide.phase === 'active') return; // 保底：涨潮期间冻结事件节奏，避免双重混乱
+    if (seaWarn) { // 预警阶段：倒计时结束后正式触发事件
+      seaWarn.t -= dt;
+      if (seaWarn.t <= 0) { var tp = seaWarn.type; seaWarn = null; startSeaEvent(tp); }
+      return;
+    }
     if (!seaEvent.type) {
       seaEvent.timer -= dt;
-      if (seaEvent.timer <= 0) startSeaEvent();
+      if (seaEvent.timer <= 0) {
+        var pool = ['surge', 'bless', 'storm'];
+        var t = pool[(Math.random() * pool.length) | 0];
+        if (t === 'bless') startSeaEvent('bless');   // 甘霖是增益，即时触发无需预警
+        else seaWarn = { type: t, t: SEA_WARN_T };     // 风暴/涌泉先预警再触发
+      }
     } else {
       seaEvent.t -= dt;
       applySeaEvent(dt);
@@ -2380,6 +2431,7 @@
     seaCount = 0; scoreMult = 1;
     // v371：新局清深海事件（风暴/祝福/涌泉…），避免上局残留事件跨局继承（上局死在事件进行中时尤甚）
     seaEvent.type = null; seaEvent.data = null; seaEvent.t = 0; seaEvent.t0 = 6; seaEvent.timer = 24 + Math.random() * 14;
+    seaWarn = null; // v372：预警态一并清空，避免残留「X 将至」泛光跨局
     evapMode = false; rippleMode = false; flowMode = false; flowPick = null; rainHint = 0;
     auroraNext = 0; // 极光庇护只在单次合成内生效
     levelElapsed = 0; runCounted = 0;
@@ -2786,6 +2838,7 @@
     updateTide(dt);
     phys.step(dt);
     applyBuoyancy(dt);
+    updateReefErode(dt); // v372：礁石接触磨蚀（玩家可控出口）
     updateSpecials(dt);
 
     var i, b;
