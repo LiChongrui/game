@@ -8073,7 +8073,10 @@ MG.layout.build();
         if (!!p.big !== wantBig) continue;
         ctx.save();
         ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.max * 1.5));
-        ctx.translate(p.x, p.y);
+        // v376：文本越大越靠上、越小越靠下，错开不同大小的公告，避免多条挤在同一行；
+        // 大字基础 y 已贴警戒线，故只轻上移 4，小字明显下移 20，两类稳定错开约 24px 且都在线下方
+        var yOff = p.big ? -4 : 20;
+        ctx.translate(p.x, p.y + yOff);
         ctx.scale(p.scale * (p.baseScale || 1), p.scale * (p.baseScale || 1)); // v372：连击飘字按 baseScale 放大
         ctx.fillStyle = PCOLMAP[p.kind] || PCOLMAP.neutral;
         // v372：分数飘字随连击倍率放大（mult 即连击倍率；上限 1.7 防过大）
