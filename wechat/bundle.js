@@ -273,7 +273,22 @@ MG.config = {
     pairScore: 15,               // 两块礁石相消的奖励（v357 曾因"撞击才碎"提到 30，v365 恢复接触即消后回到 15）
     tideNeed: 0.15,              // v366：涨潮进度 ≥ 此值才允许消除礁石（相消 / 蒸发）
     taxPer: 0.06,                // v357：每块在场礁石让全局得分倍率 −6%
-    taxMax: 0.30                 // v357：扣分上限 30%（5 块封顶）
+    taxMax: 0.30,                // v357：扣分上限 30%（5 块封顶）
+    // ③ 礁石主动博弈（v384）：点礁石蓄力，再点同礁石引爆（满蓄力自动引爆）；
+    // 爆发清场计分，冲击波向上推外侧水滴（可能顶过线——按 v352 不豁免）；蓄力越久威力越大、风险也越大
+    blastMax: 1.6,                  // 满蓄力时长（秒）
+    blastR: 80,                     // 基础清除半径
+    blastRAdd: 80,                  // 满蓄力额外清除半径（最大 160）
+    blastScore: 14,                 // 每清除一滴基础分（× 全局收益倍率）
+    blastShockR: 190,               // 冲击波作用半径
+    blastShockF: 420                // 冲击波向上冲量（满蓄力 ×1.5）
+  },
+
+  // 特殊滴组合技（v383）：两种特殊滴同时在场触发的协同效果
+  combo: {
+    siphonR: 160,                   // 定向虹吸：收束半径
+    siphonF: 25,                    // 定向虹吸：横向收束力
+    iceR: 95                       // 冰泉支架：冻结成柱半径
   },
 
   // 图鉴积分门槛：累计得分（跨局）达到后才解锁该级图鉴（0 = 无门槛，前 5 级免费）
@@ -1869,6 +1884,102 @@ MG.layout.build();
       phys.remove(b);
     }
   }
+  // ③ 礁石主动博弈（v384）：点击礁石蓄力，再次点击同礁石引爆（满蓄力自动引爆）。
+  // 爆发清除范围内水滴并计分；冲击波把外侧水滴向上抛（可能顶过线——按 v352 不豁免，照常判负）。
+  // 蓄力越久：清除半径 / 冲击波越强，但把自身周边水滴顶过线的风险也越大，构成"主动博弈"。
+  function detonateReef(b) {
+    var frac = Math.min(1, (b.charge || 0) / C.iron.blastMax);
+    var R = C.iron.blastR + C.iron.blastRAdd * frac;
+    var bs = phys.bodies, i, o, dx, dy, d;
+    var kill = [];
+    for (i = 0; i < bs.length; i++) {
+      o = bs[i];
+      if (o === b || o.iron || o.chest) continue;
+      dx = o.x - b.x; dy = o.y - b.y; d = Math.sqrt(dx * dx + dy * dy);
+      if (d < R) kill.push(o);
+    }
+    var gain = 0;
+    for (i = 0; i < kill.length; i++) {
+      burst(kill[i].x, kill[i].y, kill[i].tier, false);
+      gain += Math.round(C.iron.blastScore * cm(scoreMult));
+    }
+    phys.removeMany(kill);
+    score += gain; scoreBump = 0.3;
+    if (score > best) { best = score; saveNum('mg_best', best); }
+    // 冲击波：向外 + 向上推（不豁免越线判负）
+    var shockR = C.iron.blastShockR, shockF = C.iron.blastShockF * (0.5 + frac * 0.5);
+    for (i = 0; i < phys.bodies.length; i++) {
+      o = phys.bodies[i];
+      if (o === b || o.iron || o.chest) continue;
+      dx = o.x - b.x; dy = o.y - b.y; d = Math.sqrt(dx * dx + dy * dy);
+      if (d >= R && d < shockR) {
+        var f = shockF * (1 - (d - R) / (shockR - R));
+        o.vx += (d > 0 ? dx / d : 0) * f * 0.5;
+        o.vy -= f; // 向上冲击（风险：可能顶过线）
+      }
+    }
+    addPopup(b.x, b.y - b.r - 10, '礁石引爆 · 清 ' + kill.length + ' 滴 +' + gain, true, 0, 1.6, 'burst');
+    addShake(4 + frac * 3, 0.3);
+    parts.push({ type: 'ring', x: b.x, y: b.y, r: R * 0.6, life: 0.5, max: 0.5, color: '#FFB24A' });
+    parts.push({ type: 'ring', x: b.x, y: b.y, r: R, life: 0.6, max: 0.6, color: '#FFD27A' });
+    audio.freeze();
+    phys.remove(b); // 礁石自身引爆消失
+  }
+  // ===== ② 特殊滴组合技（v383）=====
+  // 两种特殊滴同时在场即触发协同效果（"组合技"）。磁石+漩涡=定向虹吸通道（把附近水滴
+  // 收束向两者中点的竖直通道，便于成柱合并）；冰封+间歇泉=冰泉支架（间歇泉落地瞬间把
+  // 周围水滴冻结成临时冰柱，缓解底部压力）。两者均不豁免越线判负（按 v352 边界）。
+  var comboDefs = [
+    { key: 'siphon', a: 'magnet', b: 'vortex', name: '定向虹吸', on: false },
+    { key: 'icefount', a: 'ice', b: 'geyser', name: '冰泉支架', on: false }
+  ];
+  var reefGambleTaught = false; // ③ 首次蓄力教学提示（会话内一次）
+  function findSpecial(t) {
+    var bs = phys.bodies;
+    for (var i = 0; i < bs.length; i++) if (bs[i].special === t) return bs[i];
+    return null;
+  }
+  function comboHas(t) { return !!findSpecial(t); }
+  function updateCombos(dt) {
+    for (var i = 0; i < comboDefs.length; i++) {
+      var c = comboDefs[i];
+      var active = comboHas(c.a) && comboHas(c.b);
+      if (active && !c.on) {
+        c.on = true;
+        addPopup(C.W / 2, 250, '组合技 · ' + c.name + '！', true, 0, 2.0, 'world');
+        audio.quest();
+      } else if (!active && c.on) {
+        c.on = false;
+      }
+    }
+    // 定向虹吸：磁石+漩涡在场时，把附近水滴收束向两者中点的竖直通道
+    if (comboDefs[0].on) {
+      var ma = findSpecial('magnet'), vo = findSpecial('vortex');
+      if (ma && vo) applySiphon(dt, (ma.x + vo.x) / 2);
+    }
+  }
+  function applySiphon(dt, ax) {
+    var bs = phys.bodies, R = C.combo.siphonR, F = C.combo.siphonF;
+    for (var i = 0; i < bs.length; i++) {
+      var o = bs[i];
+      if (o.iron || o.chest || o.special || o.frozen > 0) continue;
+      var dx = o.x - ax;
+      if (Math.abs(dx) < R) o.vx += (-dx / R) * F * dt * 10;
+    }
+  }
+  // 冰泉支架：间歇泉落地瞬间，把周围水滴冻结成临时冰柱（缓解底部压力）
+  function comboIceFountain(b, bs) {
+    var R = C.combo.iceR;
+    for (var j = 0; j < bs.length; j++) {
+      var o = bs[j];
+      if (o === b || o.special || o.frozen > 0 || o.iron || o.chest) continue;
+      var dx = o.x - b.x, dy = o.y - b.y;
+      if (dx * dx + dy * dy <= R * R) o.frozen = C.ice.freezeTime * 0.92;
+    }
+    addPopup(b.x, b.y - b.r - 14, '冰泉支架！', false, 0, 1.6, 'world');
+    parts.push({ type: 'ring', x: b.x, y: b.y, r: R, life: 0.5, max: 0.5, color: '#BFEAFF' });
+    audio.freeze();
+  }
   function specialLabel(sp) {
     var i = spIndexByKey(sp);
     return i >= 0 ? SP_DEFS[i].name : sp;
@@ -2760,6 +2871,7 @@ MG.layout.build();
         r: 1.5 + Math.random() * 2.5, life: 0.6, max: 0.6, color: '#BFF0F8' });
     }
     addPopup(b.x, b.y - b.r - 14, n ? '间歇泉！' : '泉眼枯了', false, 0);
+    if (comboHas('ice')) comboIceFountain(b, bs); // ② 冰泉支架：冰封+间歇泉组合技
     phys.remove(b); // v369：消耗自身
     audio.swirl();
   }
@@ -3058,6 +3170,16 @@ MG.layout.build();
       var b = bs[i];
       var dx = p.x - b.x, dy = p.y - b.y;
       var rr = b.r + 5;
+      if (dx * dx + dy * dy <= rr * rr) return b;
+    }
+    return null;
+  }
+  function ironAt(p) {
+    var bs = phys.bodies;
+    for (var i = bs.length - 1; i >= 0; i--) {
+      var b = bs[i];
+      if (!b.iron) continue;
+      var dx = p.x - b.x, dy = p.y - b.y, rr = b.r + 12;
       if (dx * dx + dy * dy <= rr * rr) return b;
     }
     return null;
@@ -3936,6 +4058,19 @@ MG.layout.build();
         var cdx = p.x - chest.b.x, cdy = p.y - chest.b.y;
         if (cdx * cdx + cdy * cdy <= (chest.b.r + 14) * (chest.b.r + 14)) { openChest(); return; }
       }
+      // ③ 礁石主动博弈：点礁石蓄力，再次点同礁石引爆（满蓄力自动引爆）
+      if (!evapMode && !flowMode && !rippleMode) {
+        var tapIron = ironAt(p);
+        if (tapIron) {
+          if (tapIron.charging) detonateReef(tapIron);
+          else {
+            tapIron.charging = true; tapIron.charge = 0;
+            if (!reefGambleTaught) { reefGambleTaught = true; addPopup(tapIron.x, tapIron.y - tapIron.r - 14, '蓄力中 · 再点礁石引爆（蓄越久威力越大）', false, 0, 1.8, 'todo'); }
+            else addPopup(tapIron.x, tapIron.y - tapIron.r - 12, '蓄力中…', false, 0, 1.0, 'todo');
+          }
+          return;
+        }
+      }
     }
     if (state === 'over') {
       var b = hitButton(p);
@@ -4044,6 +4179,17 @@ MG.layout.build();
     applyBuoyancy(dt);
     updateReefErode(dt); // v372：礁石接触磨蚀（玩家可控出口）
     updateSpecials(dt);
+    updateCombos(dt);
+    // ③ 礁石蓄力推进（满蓄力自动引爆）
+    var blastList = [];
+    for (var bi = 0; bi < phys.bodies.length; bi++) {
+      var rb2 = phys.bodies[bi];
+      if (rb2.iron && rb2.charging) {
+        rb2.charge += dt;
+        if (rb2.charge >= C.iron.blastMax) blastList.push(rb2);
+      }
+    }
+    for (var bi2 = 0; bi2 < blastList.length; bi2++) detonateReef(blastList[bi2]);
 
     var i, b;
     // 变形平滑：维护"变形矢量"（方向×幅度整体插值）——
@@ -6002,6 +6148,17 @@ MG.layout.build();
     ctx.restore(); // 内部裁剪
     // 可能被冰晶冻住
     if (b.frozen > 0) drawFrozenShell(b, r);
+    // ③ 礁石蓄力指示：脉冲外环 + 蓄力弧
+    if (b.charging) {
+      var cf = Math.min(1, (b.charge || 0) / (C.iron.blastMax || 1.6));
+      var pulse = 0.5 + 0.5 * Math.sin(time * 8);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(255,' + Math.round(130 + 90 * cf) + ',50,' + (0.55 + 0.4 * pulse) + ')';
+      ctx.beginPath(); ctx.arc(0, 0, r + 8 + cf * 8, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = 'rgba(255,190,50,0.95)';
+      ctx.beginPath(); ctx.arc(0, 0, r + 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * cf); ctx.stroke();
+    }
     ctx.restore();
   }
 

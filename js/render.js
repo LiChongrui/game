@@ -668,6 +668,17 @@
     ctx.restore(); // 内部裁剪
     // 可能被冰晶冻住
     if (b.frozen > 0) drawFrozenShell(b, r);
+    // ③ 礁石蓄力指示：脉冲外环 + 蓄力弧
+    if (b.charging) {
+      var cf = Math.min(1, (b.charge || 0) / (C.iron.blastMax || 1.6));
+      var pulse = 0.5 + 0.5 * Math.sin(time * 8);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(255,' + Math.round(130 + 90 * cf) + ',50,' + (0.55 + 0.4 * pulse) + ')';
+      ctx.beginPath(); ctx.arc(0, 0, r + 8 + cf * 8, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = 'rgba(255,190,50,0.95)';
+      ctx.beginPath(); ctx.arc(0, 0, r + 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * cf); ctx.stroke();
+    }
     ctx.restore();
   }
 
