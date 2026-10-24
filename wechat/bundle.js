@@ -331,6 +331,14 @@ MG.config = {
     minDrops: 4          // 场上普通水滴少于此数不触发
   },
 
+  // 深海事件节律（v380 节奏张力）：危机(风暴/涌泉)后必接奖励(甘霖)，形成「危机→奖励」情绪曲线；
+  // 间隔收窄为可预期节拍（±jitter 小抖动，取代原 30~50s 离散），让玩家能预判事件窗
+  seaEvent: {
+    interval: 26,          // 事件间基准间隔（秒）
+    jitter: 4,             // 间隔抖动（±秒），保持可预期又不机械
+    blessAfterCrisis: true  // 危机事件(风暴/涌泉)结束后，下一个事件强制为奖励(甘霖)
+  },
+
   // 无尽模式渐进加压（进入无尽后随时长线性到满，坡度平缓）
   ramp: {
     minutes: 14,         // 达到满强度所需分钟数（收紧：压力更早到位）
@@ -1203,7 +1211,7 @@ MG.layout.build();
   var chestTimer = 45 + Math.random() * 25; // v343：宝箱出现间隔拉长（原 26+20rand），降低出现频率
   var questStaleT = 4; // 滞留任务检查计时
   // 随机深海事件（无尽模式）：涌泉 / 甘霖 / 漩涡风暴
-  var seaEvent = { timer: 24 + Math.random() * 14, type: null, t: 0, t0: 6, x: 0, y: 0, data: null };
+  var seaEvent = { timer: (C.seaEvent ? C.seaEvent.interval : 26) - 8 + Math.random() * 8, type: null, t: 0, t0: 6, x: 0, y: 0, data: null, nextForced: null };
   var rippleMode = false; // 涟漪选位模式：点击画布指定波纹中心
   var flowMode = false;   // 水流模式：点选两枚水滴交换位置（布局型道具）
   var flowPick = null;    // 水流模式已选中的第一枚水滴
@@ -3385,10 +3393,15 @@ MG.layout.build();
     }
     // bless 无持续效果：在 tryDrop 里消耗
   }
+  // v380：危机(风暴/涌泉)后必接奖励(甘霖)，形成「危机→奖励」情绪曲线；间隔收窄为可预期节拍
   function endSeaEvent() {
+    var ended = seaEvent.type;
     seaEvent.type = null;
     seaEvent.data = null;
-    seaEvent.timer = 30 + Math.random() * 20;
+    seaEvent.timer = C.seaEvent.interval + (Math.random() * 2 - 1) * C.seaEvent.jitter; // 可预期节拍（±jitter 小抖动，不再 30~50s 离散）
+    if (C.seaEvent.blessAfterCrisis && (ended === 'storm' || ended === 'surge')) {
+      seaEvent.nextForced = 'bless'; // 危机结束后，下一个事件强制为奖励（甘霖）
+    }
   }
   var seaWarn = null;     // v372：事件来袭预警（风暴/涌泉前 1.6s 屏幕泛光+文字预警，给反应时间；甘霖为增益即时触发）
   var SEA_WARN_T = 1.6;
@@ -3402,10 +3415,16 @@ MG.layout.build();
     if (!seaEvent.type) {
       seaEvent.timer -= dt;
       if (seaEvent.timer <= 0) {
-        var pool = ['surge', 'bless', 'storm'];
-        var t = pool[(Math.random() * pool.length) | 0];
-        if (t === 'bless') startSeaEvent('bless');   // 甘霖是增益，即时触发无需预警
-        else seaWarn = { type: t, t: SEA_WARN_T };     // 风暴/涌泉先预警再触发
+        // v380：危机(风暴/涌泉)与奖励(甘霖)分离——甘霖只在危机后由 nextForced 强制出现，
+        // 随机池只出危机事件，保证「危机→奖励」的稳定情绪曲线（甘霖即时触发无需预警）
+        if (seaEvent.nextForced) {
+          var fb = seaEvent.nextForced; seaEvent.nextForced = null;
+          startSeaEvent(fb);
+        } else {
+          var pool = ['surge', 'storm'];
+          var t = pool[(Math.random() * pool.length) | 0];
+          seaWarn = { type: t, t: SEA_WARN_T }; // 风暴/涌泉先预警再触发
+        }
       }
     } else {
       seaEvent.t -= dt;
@@ -3559,7 +3578,7 @@ MG.layout.build();
     reefCountPrev = 0; // v357：礁石税提示计数随局重置
     seaCount = 0; scoreMult = 1;
     // v371：新局清深海事件（风暴/祝福/涌泉…），避免上局残留事件跨局继承（上局死在事件进行中时尤甚）
-    seaEvent.type = null; seaEvent.data = null; seaEvent.t = 0; seaEvent.t0 = 6; seaEvent.timer = 24 + Math.random() * 14;
+    seaEvent.type = null; seaEvent.data = null; seaEvent.t = 0; seaEvent.t0 = 6; seaEvent.nextForced = null; seaEvent.timer = (C.seaEvent ? C.seaEvent.interval : 26) - 8 + Math.random() * 8;
     seaWarn = null; // v372：预警态一并清空，避免残留「X 将至」泛光跨局
     evapMode = false; rippleMode = false; flowMode = false; flowPick = null; rainHint = 0;
     auroraNext = 0; // 极光庇护只在单次合成内生效
