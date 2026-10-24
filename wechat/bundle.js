@@ -7048,6 +7048,44 @@ MG.layout.build();
     ctx.fillText('堆高越线 ' + sec.toFixed(1) + 's', C.W / 2, C.dangerY - 26);
   }
 
+  // 临界「心跳」表现（v380 · ④节奏张力）：堆叠逼近/越线缓冲时——① 屏幕四边呼吸红光晕，
+  // 制造全局紧张「心跳」；② 3s 越线缓冲给清晰的环形倒计时（与越线文字同心，弧从满到空）。
+  // 复用 checkDanger 写入的 dangerAlert(0..1 危险进度) 与 dangerRemain(缓冲剩余秒)，不另算判据。
+  function drawHeartbeat() {
+    if (dangerAlert <= 0.02) return;
+    var pulse = 0.5 + 0.5 * Math.sin(time * 2 * Math.PI); // 1Hz 同相呼吸（与 drawDangerText 一致）
+    // ① 屏幕四边呼吸红光（边带，中心/HUD 区保持干净，只在外缘泛红）
+    var a = Math.min(0.42, dangerAlert * (0.20 + 0.18 * pulse));
+    var band = 130;
+    var gT = ctx.createLinearGradient(0, -renderOy, 0, -renderOy + band);
+    gT.addColorStop(0, 'rgba(220,55,45,' + a + ')'); gT.addColorStop(1, 'rgba(220,55,45,0)');
+    ctx.fillStyle = gT; ctx.fillRect(-BX, -renderOy, C.W + BX * 2, band);
+    var gB = ctx.createLinearGradient(0, VH - renderOy, 0, VH - renderOy - band);
+    gB.addColorStop(0, 'rgba(220,55,45,' + a + ')'); gB.addColorStop(1, 'rgba(220,55,45,0)');
+    ctx.fillStyle = gB; ctx.fillRect(-BX, VH - renderOy - band, C.W + BX * 2, band);
+    var gL = ctx.createLinearGradient(-BX, 0, -BX + band, 0);
+    gL.addColorStop(0, 'rgba(220,55,45,' + a + ')'); gL.addColorStop(1, 'rgba(220,55,45,0)');
+    ctx.fillStyle = gL; ctx.fillRect(-BX, -renderOy, band, VH);
+    var gR = ctx.createLinearGradient(C.W + BX, 0, C.W + BX - band, 0);
+    gR.addColorStop(0, 'rgba(220,55,45,' + a + ')'); gR.addColorStop(1, 'rgba(220,55,45,0)');
+    ctx.fillStyle = gR; ctx.fillRect(C.W + BX - band, -renderOy, band, VH);
+    // ② 3s 越线缓冲 · 环形倒计时（与越线文字同心：弧从满(3s)到空(0s)顺时针消减）
+    if (dangerRemain > 0 && dangerRemain <= C.dangerTime + 0.001) {
+      var cx = C.W / 2, cy = C.dangerY - 26, rad = 52;
+      var frac = Math.max(0, Math.min(1, dangerRemain / C.dangerTime));
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+      ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.stroke();
+      var a0 = -Math.PI / 2;
+      ctx.strokeStyle = frac > 0.34 ? '#E03C30' : '#FF7A3D'; // 最后 1s 转亮橙告警
+      ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(cx, cy, rad, a0, a0 + Math.PI * 2 * frac); ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
   function drawHUD() {
     ctx.textAlign = 'left';
@@ -8664,6 +8702,18 @@ MG.layout.build();
   }
 
   // ---------- 主渲染 ----------
+  // ====================================================================
+  // ★ v379 UI 层级契约（一次性梳理，防 v374–v378 反复修遮挡的回归）
+  // 绘制顺序（render() 自底向上，不得调换，门禁⑫锁）：
+  //   背景 → 容器 → 水体后 → 水滴 → 水体前 → 浮力预警圈 → 事件特效/预警 →
+  //   HUD(0~hudBottom) → 警戒线 → 越线文字 → 礁石相消提示 → 虚影标签 →
+  //   弹字 → 涨潮横幅 → 连击 → 技能栏
+  // 文本安全区（居中大区带，全部在警戒线下方）：
+  //   ① 居中公告弹字经 annY 映射，设计稿 y∈[180,320] ⇒ 实际落在 mirrorCy 带（涨潮横幅之下）
+  //   ② 连击文本 y = C.dangerY + 70（警戒线下方、公告之上，门禁锁）
+  //   ③ 涨潮横幅(drawTideBanner) 始终在弹字之上、连击之下（最上层文字，门禁锁）
+  //   ④ HUD 文本（分数/统计/计时/任务/潮汐卡）独占顶部 0~hudBottom，不与游戏区文本交叠
+  // ====================================================================
   function render() {
     grabTransSnap(); // 涟漪揭幕：过渡首帧开头截取旧画面（此刻画布上仍是上一帧的源场景）
 
@@ -8821,6 +8871,7 @@ MG.layout.build();
     if (hudInset > 0) ctx.restore();
     drawDangerLine(); // v333：警戒线（含警示渐晕/光带）叠在水滴之上
     drawDangerText(); // v326：越线警示文字
+    drawHeartbeat();  // v380：临界心跳（边缘红光晕 + 3s 缓冲环形倒计时）
     drawReefCancelHint(); // v375：礁石相邻+退潮 → 外圈虚线 + 礁石上「需涨潮相消」提示
     drawGhostLabel(); // 最后绘制，保证特殊滴标签浮在最上层且紧贴虚影球
     drawPopups();     // 浮动文字最上层（礁石来袭/任务完成/得分等，不被 HUD 遮挡）

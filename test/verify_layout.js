@@ -711,4 +711,41 @@ eq('inferKind旧类返回已移除', /return '(info|event|good|warn|bad)';/.test
 console.log('⑪ v331 提示分色7类断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
+// ===== ⑫ v379：UI 层级契约（防 v374–v378 反复修遮挡的回归）=====
+// render() 绘制顺序 + 文本安全区（见 render.js 顶部契约注释）：连击始终在警戒线下方；
+// 涨潮横幅在弹字之上、连击之下（最上层文字）；连击文本 y 锁定 C.dangerY + 70。
+pass = 0; fail = 0;
+eq('连击文本在警戒线下', /var x = C\.W \/ 2, y = C\.dangerY \+ 70;/.test(RSRC), true);
+eq('涨潮横幅在弹字之上', (function () {
+  var i0 = RSRC.indexOf('drawPopups();');
+  var i1 = RSRC.indexOf('drawTideBanner();');
+  return i0 >= 0 && i1 > i0;
+})(), true);
+eq('连击在涨潮横幅之上', (function () {
+  var i0 = RSRC.indexOf('drawTideBanner();');
+  var i1 = RSRC.indexOf('drawComboMeter();');
+  return i0 >= 0 && i1 > i0;
+})(), true);
+eq('连击调用点在警戒线后', (function () {
+  var iD = RSRC.indexOf('drawDangerLine();');
+  var iC = RSRC.indexOf('drawComboMeter();');
+  return iD >= 0 && iC > iD;
+})(), true);
+console.log('⑫ v379 UI 层级契约断言: ' + pass + ' pass, ' + fail + ' fail');
+f2 += fail;
+
+// ===== ⑬ v380：临界心跳（④节奏张力）=====
+// 临界心跳 drawHeartbeat 定义 + 在越线文字之后绘制（屏幕边缘红光晕 + 3s 缓冲环形倒计时）。
+pass = 0; fail = 0;
+eq('临界心跳drawHeartbeat定义', /function drawHeartbeat\(\) \{/.test(RSRC), true);
+eq('临界心跳在越线文字后绘制', (function () {
+  var i0 = RSRC.indexOf('drawDangerText();');
+  var i1 = RSRC.indexOf('drawHeartbeat();');
+  return i0 >= 0 && i1 > i0;
+})(), true);
+eq('临界心跳边缘红光带', /rgba\(220,55,45,/.test(RSRC), true);
+eq('临界心跳环形倒计时引dangerTime', /frac = Math\.max\(0, Math\.min\(1, dangerRemain \/ C\.dangerTime\)\);/.test(RSRC), true);
+console.log('⑬ v380 临界心跳断言: ' + pass + ' pass, ' + fail + ' fail');
+f2 += fail;
+
 process.exit(f2 ? 1 : 0);
