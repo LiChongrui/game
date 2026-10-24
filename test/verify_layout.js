@@ -735,7 +735,7 @@ console.log('⑫ v379 UI 层级契约断言: ' + pass + ' pass, ' + fail + ' fai
 f2 += fail;
 
 // ===== ⑬ v380：临界心跳（④节奏张力）=====
-// 临界心跳 drawHeartbeat 定义 + 在越线文字之后绘制（屏幕边缘红光晕 + 3s 缓冲环形倒计时）。
+// 临界心跳 drawHeartbeat 定义 + 在越线文字之后绘制（屏幕边缘呼吸红光晕；倒计时文字已由 drawDangerText 承担，环形倒计时已移除）。
 pass = 0; fail = 0;
 eq('临界心跳drawHeartbeat定义', /function drawHeartbeat\(\) \{/.test(RSRC), true);
 eq('临界心跳在越线文字后绘制', (function () {
@@ -744,7 +744,6 @@ eq('临界心跳在越线文字后绘制', (function () {
   return i0 >= 0 && i1 > i0;
 })(), true);
 eq('临界心跳边缘红光带', /rgba\(220,55,45,/.test(RSRC), true);
-eq('临界心跳环形倒计时引dangerTime', /frac = Math\.max\(0, Math\.min\(1, dangerRemain \/ C\.dangerTime\)\);/.test(RSRC), true);
 console.log('⑬ v380 临界心跳断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 

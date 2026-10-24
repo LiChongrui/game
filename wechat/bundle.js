@@ -7088,21 +7088,6 @@ MG.layout.build();
     var gR = ctx.createLinearGradient(C.W + BX, 0, C.W + BX - band, 0);
     gR.addColorStop(0, 'rgba(220,55,45,' + a + ')'); gR.addColorStop(1, 'rgba(220,55,45,0)');
     ctx.fillStyle = gR; ctx.fillRect(C.W + BX - band, -renderOy, band, VH);
-    // ② 3s 越线缓冲 · 环形倒计时（与越线文字同心：弧从满(3s)到空(0s)顺时针消减）
-    if (dangerRemain > 0 && dangerRemain <= C.dangerTime + 0.001) {
-      var cx = C.W / 2, cy = C.dangerY - 26, rad = 52;
-      var frac = Math.max(0, Math.min(1, dangerRemain / C.dangerTime));
-      ctx.save();
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-      ctx.lineWidth = 5;
-      ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.stroke();
-      var a0 = -Math.PI / 2;
-      ctx.strokeStyle = frac > 0.34 ? '#E03C30' : '#FF7A3D'; // 最后 1s 转亮橙告警
-      ctx.lineWidth = 5;
-      ctx.beginPath(); ctx.arc(cx, cy, rad, a0, a0 + Math.PI * 2 * frac); ctx.stroke();
-      ctx.restore();
-    }
   }
 
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
