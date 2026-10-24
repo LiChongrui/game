@@ -231,6 +231,24 @@ MG.layout = {
   ngRect: function () {
     var p = this.panel.ng, W = MG.config.W;
     return { x: (W - p.w) / 2, y: (840 - p.h) / 2 + this.dy, w: p.w, h: p.h };
+  },
+  // v382 手感微调面板（设置弹窗内「手感微调 ▸」入口打开）：块内居中，随 dy 平移
+  handfeelRect: function () {
+    var w = 300, h = 360, W = MG.config.W;
+    return { x: (W - w) / 2, y: (840 - h) / 2 + this.dy, w: w, h: h };
+  },
+  handfeelRowRect: function (i) {
+    var r = this.handfeelRect();
+    return { x: r.x + 20, y: r.y + 64 + i * 64, w: r.w - 40, h: 52 };
+  },
+  handfeelCloseRect: function () {
+    var r = this.handfeelRect();
+    return { x: r.x + r.w - 40, y: r.y + 8, w: 30, h: 30 };
+  },
+  // 设置弹窗底部「手感微调 ▸」入口热区（setClear 行下方 22px 空隙内，不新增行）
+  handfeelEntRect: function () {
+    var r = this.setRect();
+    return { x: r.x + 20, y: r.y + r.h - 20, w: r.w - 40, h: 18 };
   }
 };
 MG.layout.build();
