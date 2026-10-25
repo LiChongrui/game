@@ -249,6 +249,11 @@ MG.layout = {
   handfeelEntRect: function () {
     var r = this.setRect();
     return { x: r.x + 20, y: r.y + r.h - 20, w: r.w - 40, h: 18 };
+  },
+  // v383b 下一颗预告徽标（①）：play-field 右上、贴出生点(260+dy)基线、随 dy 平移；纯展示无命中
+  nextDropRect: function () {
+    var w = 66, h = 50, W = MG.config.W;
+    return { x: W - w - 8, y: this.body.spawnY + 14, w: w, h: h };
   }
 };
 MG.layout.build();

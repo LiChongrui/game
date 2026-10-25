@@ -1823,6 +1823,52 @@
     ctx.fillStyle = gR; ctx.fillRect(C.W + BX - band, -renderOy, band, VH);
   }
 
+  // ---------- 下一颗预告（v383b，① 玩法提升：常驻展示即将落下的水滴） ----------
+  // 复用 drawGhost 的取色逻辑（nextIron/nextSpecial/nextRune/nextTier + specialColor/runeColor），
+  // 纯展示徽标，无命中区。仅 play 态、非技能模式时绘制。
+  function drawNextDrop() {
+    var r = MG.layout.nextDropRect();
+    ctx.save();
+    // 徽标底框
+    roundRect(r.x, r.y, r.w, r.h, 12);
+    ctx.fillStyle = 'rgba(8,30,54,0.55)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(127,200,255,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+    // 标签
+    ctx.fillStyle = 'rgba(200,225,245,0.9)';
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText('下一颗', r.x + r.w / 2, r.y + 15);
+    // 图标
+    var cx = r.x + r.w / 2, cy = r.y + r.h - 15, dispR = 13;
+    if (nextIron) {
+      drawIronBall({ x: cx, y: cy, r: dispR, vx: 0, vy: 0 }, 1);
+    } else if (nextSpecial) {
+      var sc = specialColor(nextSpecial);
+      var sg = ctx.createRadialGradient(cx, cy, dispR * 0.2, cx, cy, dispR * 1.5);
+      sg.addColorStop(0, sc); sg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = sg;
+      ctx.beginPath(); ctx.arc(cx, cy, dispR * 1.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = sc;
+      ctx.beginPath(); ctx.arc(cx, cy, dispR, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(cx, cy, dispR, 0, Math.PI * 2); ctx.stroke();
+    } else {
+      var tc = nextRune ? runeColor(nextRune) : C.tiers[nextTier].color;
+      ctx.fillStyle = tc;
+      ctx.beginPath(); ctx.arc(cx, cy, dispR, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(cx, cy, dispR, 0, Math.PI * 2); ctx.stroke();
+      if (nextRune) {
+        ctx.strokeStyle = runeColor(nextRune);
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.arc(cx, cy, dispR + 4, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+    ctx.restore();
+  }
+
   // ---------- 顶部 HUD（无背景板，悬浮文字 + 描边保证可读） ----------
   function drawHUD() {
     ctx.textAlign = 'left';
@@ -3644,6 +3690,8 @@
     // 仍在胶囊下缘之上」的残余量（fit 里算好：高屏居中即避开胶囊→0，矮屏才给 ≤24）；
     // HUD（分数/进度/任务/潮汐胶囊/设置钮）统一 +hudInset 平移；设置钮命中侧同步 +hudInset。
     // 涨潮横幅 v188 起锚堆叠空间中心，不参与平移。
+    // v383b 下一颗预告：play-field 元素，不随 hudInset 偏移，置于 HUD 之前绘制
+    if (state === 'play' && !evapMode && !flowMode && !rippleMode && !confirmOpen) { drawNextDrop(); }
     if (hudInset > 0) { ctx.save(); ctx.translate(0, hudInset); }
     drawHUD();
     if (!questHidden) drawQuest();   // v202：任务元素隐藏时跳过（开关 questHidden）
