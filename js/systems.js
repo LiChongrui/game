@@ -2100,6 +2100,7 @@
     checkAchievements();
     saveDex();
     audio.over();
+    if (MG.ad) MG.ad.maybeInterstitial(); // v387：局间插屏（每 N 次结算，config.ad.interstitialEvery）
   }
 
   // 只读探针：供自动化测试读取内部状态（不写入、不影响任何游戏逻辑）
@@ -2504,6 +2505,12 @@
     addPopup(C.W / 2, 300, removed > 0 ? '复活！清走 ' + removed + ' 滴 · 继续深潜' : '复活！继续深潜', true, 0);
     audio.blip(660, 0.22, 'sine', 0.12, 1.2);
   }
+  // v387：复活改走 30s 激励视频门控（覆盖 v327/v328 的"无广告直接复活"）。
+  // Web/无广告位时降级为直接复活，保证可玩；微信端看完视频才复活，中途关闭则进结算。
+  function requestRevive() {
+    if (MG.ad && MG.ad.showReward) { MG.ad.showReward(function (ok) { if (ok) doRevive(); }); }
+    else { doRevive(); }
+  }
   // 返回主页（v234 重开确认新增）：局面数据不动（主页「开始游戏」会走 restart() 全量重置），仅切态+收起瞄准；
   // v237：带水域扫屏过渡动画（menuTrans，渲染层消费）
   function goHome() {
@@ -2581,7 +2588,7 @@
       overButtons.push({ x: x, y: y, w: bw, h: bh, label: '结算双倍', action: doDouble });
       y += bh + gap;
     }
-    overButtons.push({ x: x, y: y, w: bw, h: bh, label: '复活继续', action: doRevive });
+    overButtons.push({ x: x, y: y, w: bw, h: bh, label: '看广告复活', action: requestRevive });
     y += bh + gap;
     overButtons.push({ x: x, y: y, w: bw, h: bh, label: '分享战报', action: openShare });
     y += bh + gap;

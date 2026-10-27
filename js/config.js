@@ -291,7 +291,16 @@ MG.config = {
     { name: '江河', r: 66, color: '#7A55BE', dark: '#3B2A6E', score: 29 },
     { name: '大海', r: 78, color: '#27479C', dark: '#101F56', score: 38 },
     { name: '沧海', r: 92, color: '#122A5E', dark: '#060F2E', score: 50 }
-  ]
+  ],
+
+  // 微信广告（v387）：原生 Banner / 激励视频 / 插屏 配置（adUnitId 占位，真机需在微信公众平台·流量主申请）
+  ad: {
+    bannerId: '',          // 常驻 Banner 广告位 ID（游戏中/菜单/结算页共用同一实例）；留空 → 不创建 Banner
+    rewardId: '',          // 复活 30s 激励视频广告位 ID（看完才复活）
+    interstitialId: '',    // 局间插屏广告位 ID（可选）
+    minBandPx: 90,         // 下方留白带 ≥ 此高度(屏幕 px)才显示游戏内常驻 Banner；过矮机型自动隐藏，绝不遮挡
+    interstitialEvery: 3   // 每 N 次结算展示一次插屏（0 = 不展示）
+  }
 };
 
 // 手感微调（v382）：乘子，1.0 = 默认；经设置→手感面板滑块调节，存 localStorage(mg_tuning)。

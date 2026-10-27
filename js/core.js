@@ -78,6 +78,11 @@
     if (canvas.height !== nh) canvas.height = nh;
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
+    // 微信广告（v387）：首次 fit 惰性初始化；每帧重算方块下方留白带（Banner 停靠死区）
+    if (MG.ad) {
+      if (!MG.ad._inited) { MG.ad.init(); MG.ad._inited = true; }
+      MG.ad.layout();
+    }
     // 按钮恒贴在容器底下方（cy=layout.band.btnCy=FLOORY+28，与容器底恒距 28，v163 定版）——
     // 块高/比例变化时容器整体下移，按钮随容器走（不钉屏幕、不贴块底，v172 贴底事故的根治）
     var cy = MG.layout.band.btnCy;
@@ -368,4 +373,84 @@
     }
   };
 
-  // v327：广告占位（ads / adOverlay）已移除——先不做广告
+  // ---------- 微信广告（v387）：原生 Banner（游戏中/菜单/结算常驻）+ 复活激励视频 + 局间插屏 ----------
+  // 原则：wx.createBannerAd 是系统级原生广告，不在 canvas 绘制；停靠在 fit() 算出的
+  // 「方块下方留白带死区」（由 (oy+C.H)*view.s 起算），方块内部 HUD/警戒线/六按钮/floor 一条不碰 →
+  // layout.js 零改动、门禁零触碰。复活改走 30s 激励视频（看完才复活，覆盖 v327/v328 的"无广告直接复活"）。
+  MG.ad = {
+    banner: null, reward: null, interstitial: null,
+    adH: 96, bandTop: 0, bandH: 0, inGameOk: false,
+    lastState: null, lastShow: false, _overN: 0,
+    init: function () {
+      if (!MG.platform || !MG.platform.isWx || typeof wx === 'undefined') return; // Web/非微信：全降级为空操作（复活直接放行）
+      var cfg = MG.config.ad, self = this;
+      try {
+        if (cfg.bannerId) {
+          this.banner = wx.createBannerAd({ adUnitId: cfg.bannerId, style: { left: 0, top: 0, width: 320 } });
+          this.banner.onResize(function (r) { if (r && r.height) { self.adH = r.height; self.layout(); if (self.lastShow) self.reposition(); } });
+          this.banner.onError(function () {});
+        }
+        if (cfg.rewardId) {
+          this.reward = wx.createRewardedVideoAd({ adUnitId: cfg.rewardId });
+          this.reward.onError(function () {});
+        }
+        if (cfg.interstitialId) {
+          this.interstitial = wx.createInterstitialAd({ adUnitId: cfg.interstitialId });
+          this.interstitial.onError(function () {});
+        }
+      } catch (e) {}
+      this.layout();
+    },
+    layout: function () { // 由 core.fit() 每帧尺寸变化时调用：算方块下方留白带
+      var h = window.innerHeight || 0;
+      this.bandTop = (oy + C.H) * view.s;       // 方块底边（屏幕 css px）
+      this.bandH = Math.max(0, h - this.bandTop);
+      this.inGameOk = this.bandH >= (MG.config.ad.minBandPx || 90);
+    },
+    reposition: function () { // 底部对齐钉死在留白带，绝不侵入方块
+      if (!this.banner) return;
+      var w = window.innerWidth || 0, h = window.innerHeight || 0;
+      var top = Math.max(this.bandTop, h - this.adH); // 底部对齐；留白带够高则顶到方块下沿
+      if (top + this.adH > h) top = h - this.adH;
+      var width = Math.min(w - 12, 400);
+      try { this.banner.style = { left: (w - width) / 2, top: top, width: width }; } catch (e) {}
+    },
+    showBanner: function () {
+      if (!this.banner) return;
+      if (!this.inGameOk) { try { this.banner.hide(); } catch (e) {} this.lastShow = false; return; }
+      this.reposition();
+      try { this.banner.show(); this.lastShow = true; } catch (e) {}
+    },
+    hideBanner: function () { if (this.banner) { try { this.banner.hide(); } catch (e) {} } this.lastShow = false; },
+    sync: function (st) { // 每帧由 render 调用：Banner 显隐跟随 state
+      if (!this.banner) { this.lastState = st; return; }
+      if (st === this.lastState) return;
+      this.lastState = st;
+      if (st === 'play' || st === 'menu' || st === 'over') this.showBanner();
+      else this.hideBanner();
+    },
+    showReward: function (cb) { // 复活 30s 激励视频：看完才复活，中途关闭则不复活
+      if (!this.reward) { try { cb(true); } catch (e) {} return; } // Web/无广告位：直接放行
+      var self = this, done = false;
+      var onClose = function (res) {
+        try { self.reward.offClose(onClose); } catch (e) {}
+        var ended = !res || res.isEnded;
+        if (!ended) { try { self.showBanner(); } catch (e) {} } // 中途关闭：不复活，恢复结算页 Banner
+        if (!done) { done = true; try { cb(ended); } catch (e) {} }
+      };
+      try { this.reward.onClose(onClose); } catch (e) {}
+      var showIt = function () { try { self.reward.show(); } catch (e) { try { cb(true); } catch (e2) {} } };
+      try {
+        this.reward.show().catch(function () { try { self.reward.load().then(showIt); } catch (e) { try { cb(true); } catch (e2) {} } });
+      } catch (e) { try { cb(true); } catch (e2) {} }
+    },
+    maybeInterstitial: function () { // 局间插屏（每 N 次结算，config.ad.interstitialEvery）
+      if (!this.interstitial) return;
+      if (!MG.config.ad.interstitialEvery) return;
+      this._overN++;
+      if (this._overN % MG.config.ad.interstitialEvery !== 0) return;
+      var self = this;
+      try { this.interstitial.show().catch(function () { try { self.interstitial.load().then(function () { self.interstitial.show(); }); } catch (e) {} }); } catch (e) {}
+    }
+  };
+

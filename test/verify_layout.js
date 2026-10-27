@@ -613,15 +613,16 @@ eq('special豁免堆高判负', /if \(b\.special\) continue;/.test(SRC), true);
 eq('警示文字与倒计时同步1Hz呼吸', /var pulse = 0\.5 \+ 0\.5 \* Math\.sin\(time \* 2 \* Math\.PI\);/.test(RSRC), true); // v332：pow 尖峰频闪已移除，同相呼吸
 eq('旧1.2~1.8Hz独立闪已移除', /var dHz = 1\.2 \+ dangerAlert \* 0\.6;/.test(RSRC), false);
 eq('深海涨潮持续随海域拉长', /tide\.timer = C\.tide\.duration \+ \(C\.tide\.durationMax - C\.tide\.duration\) \* seaStage\(\) \/ \(C\.seaStages\.length - 1\);/.test(SRC), true);
-// 广告全链路移除回归（v327 起，v328 仍保持——复活无广告门控）
-eq('广告门控已移除', /ads\.show\(/.test(SRC), false); // 调用形态（注释"无 ads.show 门控"不计）；复活无广告门控
-eq('广告模块已移除', /var ads = \{/.test(CSRC), false);
-eq('广告演示层已移除', /function drawAdOverlay\(/.test(RSRC), false);
+// 广告接入（v387）：原生 Banner（游戏中/菜单/结算常驻）+ 复活 30s 激励视频 —— 覆盖 v327/v328 的"广告全链路移除"
+// 注意：旧 ads 全局 / ads.show / drawAdOverlay 仍不得回归（下方断言持续守卫）
+eq('旧ads.show门控未回归', /ads\.show\(/.test(SRC), false); // v387 新广告走 MG.ad，不引入旧 ads 全局
+eq('广告模块未回归', /var ads = \{/.test(CSRC), false);
+eq('广告演示层未回归', /function drawAdOverlay\(/.test(RSRC), false);
 eq('结算双倍保留(非广告)', /不再看广告：直接双倍/.test(SRC), true);
 eq('越线冲走复活反馈已移除', /越线水滴被冲走/.test(SRC), false);
-// ---- v328 复活恢复（直接复活，无广告门控）----
-eq('复活按钮已恢复', /复活继续/.test(SRC), true);
-eq('复活按钮接doRevive', /label: '复活继续', action: doRevive/.test(SRC), true);
+// ---- v387 复活改走广告门控（覆盖 v328 的无广告直接复活）----
+eq('复活按钮接广告门控', /看广告复活/.test(SRC), true);
+eq('复活按钮接requestRevive', /label: '看广告复活', action: requestRevive/.test(SRC), true);
 eq('doRevive直接复活', /function doRevive\(\) \{[\s\S]*?state = 'play';/.test(SRC), true);
 eq('doRevive清缓冲计时', /dangerAlert = 0; dangerRemain = 0;/.test(SRC), true);
 eq('runBuffered死变量已移除', /runBuffered/.test(SRC), false);
@@ -631,7 +632,7 @@ var CFG = src('js/config.js');
 eq('重压深潜+80%(config)', /id: 'heavy', name: '重压深潜', desc: '重力 \+80%',\s*grav: 1\.8/.test(CFG), true);
 eq('重压深潜+80%(DCHAL)', /id: 'heavy',\s*name: '重压深潜', desc: '重力 \+80%',\s*grav: 1\.8/.test(SRC), true);
 eq('深渊试炼真减益(DCHAL)', /id: 'abyss',\s*name: '深渊试炼',\s*desc: '重力 \+40% · 潮汐更频且潮期涌动加剧',\s*grav: 1\.4, tideInt: 0\.35, tideToss: 1\.9/.test(SRC), true);
-console.log('⑧ v327/v328 漩涡/特殊滴豁免+降闪+涨潮持续+广告移除+复活恢复+词缀加重断言: ' + pass + ' pass, ' + fail + ' fail');
+console.log('⑧ v327/v328/v387 漩涡/特殊滴豁免+降闪+涨潮持续+广告门控反转+复活恢复+词缀加重断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
 // ===== ⑨ v329：死亡缓冲倒计时1Hz + 提示分色(v331 改制 7 类) + 大宝箱提示跟随宝箱 + 宝箱不开未解锁道具 + 涌泉修复 + 漩涡风暴重绘 =====

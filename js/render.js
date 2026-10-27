@@ -3670,8 +3670,9 @@
     else if (achOpen || panelFxAlive('ach')) drawPanelFx('ach', achOpen, DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + DEX_PANEL.h / 2, 0.6, drawAchPanel);
     if (ngOpen || panelFxAlive('ng')) { var pnR = MG.layout.ngRect(); drawPanelFx('ng', ngOpen, pnR.x + pnR.w / 2, pnR.y + pnR.h / 2, 0.66, drawNgPick); }
     if (shareOpen || panelFxAlive('share')) { var pshR = MG.layout.shareRect(); drawPanelFx('share', shareOpen, pshR.x + pshR.w / 2, pshR.y + pshR.h / 2, 0.6, drawShare); }
-    // v327：广告演示层调用已移除（先不做广告）
+    // v387：微信原生广告同步（Banner 显隐跟随 state；不在 canvas 绘制，零干扰游戏操作）
     if (state === 'over') drawOver();
+    if (MG.ad && MG.ad.sync) MG.ad.sync(state);
 
     ctx.restore();
 
