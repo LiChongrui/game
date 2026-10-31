@@ -687,11 +687,10 @@
       if (!touching) continue;
       b.hp -= dt; // 持续接触才磨蚀，快速穿过不掉血
       if (b.hp > 0) continue;
-      var gain = Math.round(C.iron.erodeScore * cm(scoreMult));
-      score += gain; scoreBump = 0.25;
-      if (score > best) { best = score; saveNum('mg_best', best); }
+      // v387：磨碎不再给分（礁石是负资产，移除它本就是收益，不应再奖励→否则变刷分工具降难度）；
+      // 仍计入每日任务"消除礁石"，但不再加全局收益（best 不需更新）
       dailyProgress('iron'); // 计入"消除礁石"每日任务（与蒸发/涨潮相消口径统一）
-      addPopup(b.x, b.y - b.r - 8, '礁石磨碎 · +' + gain, false, 0, 1.4, 'todo');
+      addPopup(b.x, b.y - b.r - 8, '礁石磨碎', false, 0, 1.4, 'todo');
       for (var k = 0; k < 8; k++) {
         var ang = Math.random() * Math.PI * 2, sp = 40 + Math.random() * 90;
         parts.push({ type: 'dot', x: b.x, y: b.y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
@@ -701,45 +700,32 @@
       phys.remove(b);
     }
   }
-  // ③ 礁石主动博弈（v384）：点击礁石蓄力，再次点击同礁石引爆（满蓄力自动引爆）。
-  // 爆发清除范围内水滴并计分；冲击波把外侧水滴向上抛（可能顶过线——按 v352 不豁免，照常判负）。
-  // 蓄力越久：清除半径 / 冲击波越强，但把自身周边水滴顶过线的风险也越大，构成"主动博弈"。
+  // ③ 礁石主动博弈（v387 重做）：点礁石蓄力，再点同礁石引爆（满蓄力自动引爆）。
+  // 旧版（v384）引爆=清场+计分，等于免费清屏+刷分→降难度，已废。
+  // 新设计：引爆只移除礁石自身（唯一收益：清掉占位障碍），但把周围水滴猛烈上抛（风险：可能顶过线——按 v352 不豁免，照常判负）。
+  // 不清除水滴、不给分：礁石博弈是"解障换险"的博弈，不是免费清场。蓄力越久上抛力越强，误伤自身越线风险越大。
   function detonateReef(b) {
     var frac = Math.min(1, (b.charge || 0) / C.iron.blastMax);
-    var R = C.iron.blastR + C.iron.blastRAdd * frac;
-    var bs = phys.bodies, i, o, dx, dy, d;
-    var kill = [];
-    for (i = 0; i < bs.length; i++) {
-      o = bs[i];
+    var innerR = C.iron.blastR;                              // 内圈：满力
+    var shockR = C.iron.blastShockR;                         // 外圈：力衰减到 0
+    var shockF = C.iron.blastShockF * (0.6 + frac * 0.4);    // 满蓄力更强（v387：540→950 基准）
+    var launch = 0;
+    for (var i = 0; i < phys.bodies.length; i++) {
+      var o = phys.bodies[i];
       if (o === b || o.iron || o.chest) continue;
-      dx = o.x - b.x; dy = o.y - b.y; d = Math.sqrt(dx * dx + dy * dy);
-      if (d < R) kill.push(o);
+      var dx = o.x - b.x, dy = o.y - b.y, d = Math.sqrt(dx * dx + dy * dy);
+      if (d >= shockR) continue;
+      var f = shockF * (d < innerR ? 1 : 1 - (d - innerR) / (shockR - innerR));
+      o.vx += (d > 0 ? dx / d : 0) * f * 0.3;                // 轻微外扩
+      o.vy -= f;                                             // 猛烈上抛（风险：顶过线）
+      launch++;
     }
-    var gain = 0;
-    for (i = 0; i < kill.length; i++) {
-      burst(kill[i].x, kill[i].y, kill[i].tier, false);
-      gain += Math.round(C.iron.blastScore * cm(scoreMult));
-    }
-    phys.removeMany(kill);
-    score += gain; scoreBump = 0.3;
-    if (score > best) { best = score; saveNum('mg_best', best); }
-    // 冲击波：向外 + 向上推（不豁免越线判负）
-    var shockR = C.iron.blastShockR, shockF = C.iron.blastShockF * (0.5 + frac * 0.5);
-    for (i = 0; i < phys.bodies.length; i++) {
-      o = phys.bodies[i];
-      if (o === b || o.iron || o.chest) continue;
-      dx = o.x - b.x; dy = o.y - b.y; d = Math.sqrt(dx * dx + dy * dy);
-      if (d >= R && d < shockR) {
-        var f = shockF * (1 - (d - R) / (shockR - R));
-        o.vx += (d > 0 ? dx / d : 0) * f * 0.5;
-        o.vy -= f; // 向上冲击（风险：可能顶过线）
-      }
-    }
-    addPopup(b.x, b.y - b.r - 10, '礁石引爆 · 清 ' + kill.length + ' 滴 +' + gain, true, 0, 1.6, 'burst');
-    addShake(4 + frac * 3, 0.3);
-    parts.push({ type: 'ring', x: b.x, y: b.y, r: R * 0.6, life: 0.5, max: 0.5, color: '#FFB24A' });
-    parts.push({ type: 'ring', x: b.x, y: b.y, r: R, life: 0.6, max: 0.6, color: '#FFD27A' });
+    addPopup(b.x, b.y - b.r - 10, '礁石引爆 · 抛飞 ' + launch + ' 滴（当心越线！）', true, 0, 1.6, 'burst');
+    addShake(5 + frac * 4, 0.35);
+    parts.push({ type: 'ring', x: b.x, y: b.y, r: shockR * 0.6, life: 0.5, max: 0.5, color: '#FFB24A' });
+    parts.push({ type: 'ring', x: b.x, y: b.y, r: shockR, life: 0.6, max: 0.6, color: '#FFD27A' });
     audio.freeze();
+    b.charging = false; b.charge = 0;
     phys.remove(b); // 礁石自身引爆消失
   }
   // ===== ② 特殊滴组合技（v383）=====
