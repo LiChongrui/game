@@ -668,17 +668,6 @@
     ctx.restore(); // 内部裁剪
     // 可能被冰晶冻住
     if (b.frozen > 0) drawFrozenShell(b, r);
-    // ③ 礁石蓄力指示：脉冲外环 + 蓄力弧
-    if (b.charging) {
-      var cf = Math.min(1, (b.charge || 0) / (C.iron.blastMax || 1.6));
-      var pulse = 0.5 + 0.5 * Math.sin(time * 8);
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(255,' + Math.round(130 + 90 * cf) + ',50,' + (0.55 + 0.4 * pulse) + ')';
-      ctx.beginPath(); ctx.arc(0, 0, r + 8 + cf * 8, 0, Math.PI * 2); ctx.stroke();
-      ctx.lineWidth = 5;
-      ctx.strokeStyle = 'rgba(255,190,50,0.95)';
-      ctx.beginPath(); ctx.arc(0, 0, r + 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * cf); ctx.stroke();
-    }
     ctx.restore();
   }
 
@@ -1652,44 +1641,57 @@
     ctx.restore();
   }
 
-  // v375：礁石相邻(退潮)提示——两块礁石相触且处于退潮(tide.progress<tideNeed)时，
-  // 在每块相邻礁石外圈加一层虚线圆，并在礁石群上方标注「需涨潮相消」（替换原全局弹字）
+  // v375/v389：礁石簇提示——按相邻礁石簇大小分档（_cluster 由 systems.updateReefClusters 每帧打标）：
+  //  · 2 连 + 退潮：虚线圆 + 「需涨潮相消」
+  //  · 3+ 连：红色危险环 + 「⚠ 障碍·换险」（障碍不可相消；清掉换险）
   function drawReefCancelHint() {
-    if (tide.progress >= C.iron.tideNeed) return; // 涨潮可相消，无需提示
-    var bs = phys.bodies, i, j, k, n = bs.length, dx, dy, d2, rr;
-    var adj = [];
+    var bs = phys.bodies, i, k, n = bs.length;
+    var handled = {}, groups = [];
     for (i = 0; i < n; i++) {
-      if (!bs[i].iron || bs[i].chest) continue;
-      var linked = false;
-      for (j = 0; j < n; j++) {
-        if (j === i || !bs[j].iron || bs[j].chest) continue;
-        dx = bs[j].x - bs[i].x; dy = bs[j].y - bs[i].y;
-        rr = bs[i].r + bs[j].r + 8;
-        if (dx * dx + dy * dy <= rr * rr) { linked = true; break; }
+      var b = bs[i];
+      if (!b.iron || b.chest || handled[b.id]) continue;
+      if (!b._cluster || b._cluster < 2) continue; // 单块不提示
+      // flood fill 同簇
+      var cl = [], stack = [b]; handled[b.id] = 1;
+      while (stack.length) {
+        var cur = stack.pop(); cl.push(cur);
+        var dx, dy, d, j;
+        for (j = 0; j < n; j++) {
+          var o = bs[j];
+          if (o === cur || !o.iron || o.chest || handled[o.id]) continue;
+          dx = o.x - cur.x; dy = o.y - cur.y; d = Math.sqrt(dx * dx + dy * dy);
+          if (d < (cur.r + o.r) * 1.3) { handled[o.id] = 1; stack.push(o); }
+        }
       }
-      if (linked) adj.push(bs[i]);
+      groups.push(cl);
     }
-    if (adj.length < 2) return; // 至少两块相邻才提示
+    if (!groups.length) return;
     ctx.save();
     ctx.textAlign = 'center';
-    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 6]);
-    for (k = 0; k < adj.length; k++) {
-      ctx.beginPath();
-      ctx.arc(adj[k].x, adj[k].y, adj[k].r + 8, 0, Math.PI * 2);
-      ctx.stroke();
+    for (k = 0; k < groups.length; k++) {
+      var c = groups[k], sz = c.length, cx = 0, topY = 1e9, q;
+      for (q = 0; q < sz; q++) { cx += c[q].x; topY = Math.min(topY, c[q].y - c[q].r); }
+      cx /= sz;
+      if (sz === 2 && tide.progress < C.iron.tideNeed) {
+        // 需涨潮相消
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2; ctx.setLineDash([5, 6]);
+        for (q = 0; q < sz; q++) { ctx.beginPath(); ctx.arc(c[q].x, c[q].y, c[q].r + 8, 0, Math.PI * 2); ctx.stroke(); }
+        ctx.setLineDash([]);
+        ctx.font = 'bold 15px system-ui, sans-serif';
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3;
+        ctx.strokeText('需涨潮相消', cx, topY - 12);
+        ctx.fillStyle = '#FFD86B'; ctx.fillText('需涨潮相消', cx, topY - 12);
+      } else if (sz >= 3) {
+        // 障碍 + 换险
+        ctx.strokeStyle = 'rgba(255,90,70,0.95)'; ctx.lineWidth = 2.5; ctx.setLineDash([6, 5]);
+        for (q = 0; q < sz; q++) { ctx.beginPath(); ctx.arc(c[q].x, c[q].y, c[q].r + 10, 0, Math.PI * 2); ctx.stroke(); }
+        ctx.setLineDash([]);
+        ctx.font = 'bold 14px system-ui, sans-serif';
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 3;
+        ctx.strokeText('⚠ 障碍·换险', cx, topY - 12);
+        ctx.fillStyle = '#FF6B5A'; ctx.fillText('⚠ 障碍·换险', cx, topY - 12);
+      }
     }
-    ctx.setLineDash([]);
-    var cx = 0, topY = 1e9;
-    for (k = 0; k < adj.length; k++) { cx += adj[k].x; topY = Math.min(topY, adj[k].y - adj[k].r); }
-    cx /= adj.length;
-    ctx.font = 'bold 15px system-ui, sans-serif';
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-    ctx.lineWidth = 3;
-    ctx.strokeText('需涨潮相消', cx, topY - 12);
-    ctx.fillStyle = '#FFD86B';
-    ctx.fillText('需涨潮相消', cx, topY - 12);
     ctx.restore();
   }
   function drawDangerLine() {

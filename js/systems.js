@@ -697,6 +697,7 @@
           r: 1.5 + Math.random() * 2, life: 0.5, max: 0.5, color: '#9FB0BC' });
       }
       audio.freeze(); // 碎裂短音（复用冻结音，清脆不突兀）
+      if (b._cluster === 3) reefGambleBlast(b); // v389：清掉 3 连礁石 → 换险冲击波（附近水滴上抛，风险越线）
       phys.remove(b);
     }
   }
@@ -704,29 +705,90 @@
   // 旧版（v384）引爆=清场+计分，等于免费清屏+刷分→降难度，已废。
   // 新设计：引爆只移除礁石自身（唯一收益：清掉占位障碍），但把周围水滴猛烈上抛（风险：可能顶过线——按 v352 不豁免，照常判负）。
   // 不清除水滴、不给分：礁石博弈是"解障换险"的博弈，不是免费清场。蓄力越久上抛力越强，误伤自身越线风险越大。
-  function detonateReef(b) {
-    var frac = Math.min(1, (b.charge || 0) / C.iron.blastMax);
-    var innerR = C.iron.blastR;                              // 内圈：满力
-    var shockR = C.iron.blastShockR;                         // 外圈：力衰减到 0
-    var shockF = C.iron.blastShockF * (0.6 + frac * 0.4);    // 满蓄力更强（v387：540→950 基准）
+  // ③ 礁石分档（v389）：4 连=自动引爆。找到整簇礁石并全部移除，把周围水滴猛烈上抛
+  // （可能顶过线——按 v352 不豁免，照常判负）。不清除水滴、不给分：解障换险，不是免费清场。
+  function detonateReef(b, frac) {
+    frac = (frac == null) ? 1 : frac;
+    // 收集整簇（含 b 在内的相邻礁石）
+    var cluster = [], stack = [b], seen = {}; seen[b.id] = 1;
+    while (stack.length) {
+      var cur = stack.pop(); cluster.push(cur);
+      var nb = reefNeighbors(cur);
+      for (var k = 0; k < nb.length; k++) if (!seen[nb[k].id]) { seen[nb[k].id] = 1; stack.push(nb[k]); }
+    }
+    var cx = 0, cy = 0;
+    for (var c = 0; c < cluster.length; c++) { cx += cluster[c].x; cy += cluster[c].y; }
+    cx /= cluster.length; cy /= cluster.length;
+    var innerR = C.iron.blastR, shockR = C.iron.blastShockR;
+    var shockF = C.iron.blastShockF * (0.6 + frac * 0.4);
     var launch = 0;
     for (var i = 0; i < phys.bodies.length; i++) {
       var o = phys.bodies[i];
-      if (o === b || o.iron || o.chest) continue;
-      var dx = o.x - b.x, dy = o.y - b.y, d = Math.sqrt(dx * dx + dy * dy);
+      if (o.iron || o.chest) continue;
+      var dx = o.x - cx, dy = o.y - cy, d = Math.sqrt(dx * dx + dy * dy);
       if (d >= shockR) continue;
       var f = shockF * (d < innerR ? 1 : 1 - (d - innerR) / (shockR - innerR));
-      o.vx += (d > 0 ? dx / d : 0) * f * 0.3;                // 轻微外扩
-      o.vy -= f;                                             // 猛烈上抛（风险：顶过线）
+      o.vx += (d > 0 ? dx / d : 0) * f * 0.3;  // 轻微外扩
+      o.vy -= f;                                // 猛烈上抛（风险：顶过线）
       launch++;
     }
-    addPopup(b.x, b.y - b.r - 10, '礁石引爆 · 抛飞 ' + launch + ' 滴（当心越线！）', true, 0, 1.6, 'burst');
-    addShake(5 + frac * 4, 0.35);
-    parts.push({ type: 'ring', x: b.x, y: b.y, r: shockR * 0.6, life: 0.5, max: 0.5, color: '#FFB24A' });
-    parts.push({ type: 'ring', x: b.x, y: b.y, r: shockR, life: 0.6, max: 0.6, color: '#FFD27A' });
+    addPopup(cx, cy - 22, '礁石引爆 · 抛飞 ' + launch + ' 滴（当心越线！）', true, 0, 1.6, 'burst');
+    addShake(6, 0.4);
+    parts.push({ type: 'ring', x: cx, y: cy, r: shockR * 0.6, life: 0.5, max: 0.5, color: '#FFB24A' });
+    parts.push({ type: 'ring', x: cx, y: cy, r: shockR, life: 0.6, max: 0.6, color: '#FFD27A' });
     audio.freeze();
-    b.charging = false; b.charge = 0;
-    phys.remove(b); // 礁石自身引爆消失
+    for (var c2 = 0; c2 < cluster.length; c2++) phys.remove(cluster[c2]);
+  }
+  // 3 连=障碍+换险：用侵蚀/蒸发清掉 3 连中某块礁石时触发，把附近水滴上抛（风险：可能顶过线）
+  function reefGambleBlast(b) {
+    var shockR = C.iron.gambleShockR, shockF = C.iron.gambleShockF, launch = 0;
+    for (var i = 0; i < phys.bodies.length; i++) {
+      var o = phys.bodies[i];
+      if (o.iron || o.chest) continue;
+      var dx = o.x - b.x, dy = o.y - b.y, d = Math.sqrt(dx * dx + dy * dy);
+      if (d >= shockR) continue;
+      var f = shockF * (1 - d / shockR);
+      o.vx += (d > 0 ? dx / d : 0) * f * 0.3;
+      o.vy -= f;
+      launch++;
+    }
+    addPopup(b.x, b.y - b.r - 10, '换险！抛飞 ' + launch + ' 滴（当心越线）', true, 0, 1.4, 'burst');
+    addShake(4, 0.3);
+    parts.push({ type: 'ring', x: b.x, y: b.y, r: shockR * 0.7, life: 0.4, max: 0.4, color: '#FF8A50' });
+    audio.freeze();
+  }
+  // 礁石簇（相邻礁石连通块）检测：邻接 = 圆心距 < 两半径和 × 1.3（相切略含间隙）
+  function reefNeighbors(b) {
+    var bs = phys.bodies, res = [], i, o, dx, dy, d;
+    for (i = 0; i < bs.length; i++) {
+      o = bs[i];
+      if (o === b || !o.iron || o.chest) continue;
+      dx = o.x - b.x; dy = o.y - b.y; d = Math.sqrt(dx * dx + dy * dy);
+      if (d < (b.r + o.r) * 1.3) res.push(o);
+    }
+    return res;
+  }
+  // 每帧计算礁石簇大小并打标：3+ 标为障碍、4+ 自动引爆（全自动化，无点按）
+  function updateReefClusters() {
+    var bs = phys.bodies, i, b;
+    for (i = 0; i < bs.length; i++) { if (bs[i].iron) { bs[i]._cluster = 0; bs[i].obstacle = false; } }
+    var seen = {}, clusters = [];
+    for (i = 0; i < bs.length; i++) {
+      b = bs[i];
+      if (!b.iron || b.chest || seen[b.id]) continue;
+      var cl = [], stack = [b]; seen[b.id] = 1;
+      while (stack.length) {
+        var cur = stack.pop(); cl.push(cur);
+        var nb = reefNeighbors(cur);
+        for (var m = 0; m < nb.length; m++) if (!seen[nb[m].id]) { seen[nb[m].id] = 1; stack.push(nb[m]); }
+      }
+      if (cl.length >= 2) { for (var c = 0; c < cl.length; c++) cl[c]._cluster = cl.length; clusters.push(cl); }
+    }
+    for (i = 0; i < clusters.length; i++) {
+      var sz = clusters[i].length;
+      if (sz >= 4) detonateReef(clusters[i][0], 1);          // 满力自动引爆整簇
+      else if (sz >= 3) for (var o2 = 0; o2 < sz; o2++) clusters[i][o2].obstacle = true; // 障碍
+    }
   }
   // ===== ② 特殊滴组合技（v383）=====
   // 两种特殊滴同时在场即触发协同效果（"组合技"）。磁石+漩涡=定向虹吸通道（把附近水滴
@@ -736,7 +798,6 @@
     { key: 'siphon', a: 'magnet', b: 'vortex', name: '定向虹吸', on: false },
     { key: 'icefount', a: 'ice', b: 'geyser', name: '冰泉支架', on: false }
   ];
-  var reefGambleTaught = false; // ③ 首次蓄力教学提示（会话内一次）
   function findSpecial(t) {
     var bs = phys.bodies;
     for (var i = 0; i < bs.length; i++) if (bs[i].special === t) return bs[i];
@@ -1272,8 +1333,10 @@
         var idx = ib.x - ia.x, idy = ib.y - ia.y;
         var iminD = ia.r + ib.r + 0.5;
         if (idx * idx + idy * idy <= iminD * iminD) {
-          used[ia.id] = used[ib.id] = 1;
-          ironPairMerge(ia, ib);
+          if (ia._cluster < 3 && ib._cluster < 3) { // v389：仅 2 连（簇<3）相消；3+ 连礁石为障碍，不两两相消
+            used[ia.id] = used[ib.id] = 1;
+            ironPairMerge(ia, ib);
+          }
           break;
         }
       }
@@ -1977,16 +2040,6 @@
     }
     return null;
   }
-  function ironAt(p) {
-    var bs = phys.bodies;
-    for (var i = bs.length - 1; i >= 0; i--) {
-      var b = bs[i];
-      if (!b.iron) continue;
-      var dx = p.x - b.x, dy = p.y - b.y, rr = b.r + 12;
-      if (dx * dx + dy * dy <= rr * rr) return b;
-    }
-    return null;
-  }
   function evaporate(b) {
     var gain;
     // ★ v366：只有涨潮才能消除礁石（用户要求；水滴无此限制）——退潮时点礁石直接拒绝且不扣充能
@@ -2006,6 +2059,7 @@
     score += gain;
     scoreBump = 0.25;
     addPopup(b.x, b.y - b.r - 8, b.iron ? ('礁石移除 · 充能 −' + cost) : ('+' + gain), false, 0);
+    if (b.iron && b._cluster === 3) reefGambleBlast(b); // v389：蒸发清掉 3 连礁石 → 换险冲击波
     phys.remove(b);
     skillCharge.evap -= cost; // v338：扣一次费用而非清零（v357：礁石扣 evapCost 倍）
     evapMode = false;
@@ -2868,19 +2922,7 @@
         var cdx = p.x - chest.b.x, cdy = p.y - chest.b.y;
         if (cdx * cdx + cdy * cdy <= (chest.b.r + 14) * (chest.b.r + 14)) { openChest(); return; }
       }
-      // ③ 礁石主动博弈：点礁石蓄力，再次点同礁石引爆（满蓄力自动引爆）
-      if (!evapMode && !flowMode && !rippleMode) {
-        var tapIron = ironAt(p);
-        if (tapIron) {
-          if (tapIron.charging) detonateReef(tapIron);
-          else {
-            tapIron.charging = true; tapIron.charge = 0;
-            if (!reefGambleTaught) { reefGambleTaught = true; addPopup(tapIron.x, tapIron.y - tapIron.r - 14, '蓄力中 · 再点礁石引爆（蓄越久威力越大）', false, 0, 1.8, 'todo'); }
-            else addPopup(tapIron.x, tapIron.y - tapIron.r - 12, '蓄力中…', false, 0, 1.0, 'todo');
-          }
-          return;
-        }
-      }
+      // v389：已移除点礁石蓄力/引爆（改为按相邻礁石簇自动分档：2 连相消 / 3 连障碍+换险 / 4 连自动引爆）
     }
     if (state === 'over') {
       var b = hitButton(p);
@@ -2963,6 +3005,7 @@
     if (state !== 'play') { time += dt; updateFx(dt); return; } // 结算页：背景保持流动（仅物理冻结）
 
     ironN = ironCount(); // v369：每帧重算在场礁石数缓存（reefTax/updateReefHint 读此值）
+    updateReefClusters(); // v389：计算礁石簇大小，标记 3+ 障碍、4+ 自动引爆（须先于相消/侵蚀）
     time += dt;
     if (rainHint > 0) rainHint -= dt;
     cooldown = Math.max(0, cooldown - dt);
@@ -2987,19 +3030,9 @@
     updateTide(dt);
     phys.step(dt);
     applyBuoyancy(dt);
-    updateReefErode(dt); // v372：礁石接触磨蚀（玩家可控出口）
+    updateReefErode(dt); // v372：礁石接触磨蚀（玩家可控出口）；3 连礁石被磨碎时触发换险冲击波
     updateSpecials(dt);
     updateCombos(dt);
-    // ③ 礁石蓄力推进（满蓄力自动引爆）
-    var blastList = [];
-    for (var bi = 0; bi < phys.bodies.length; bi++) {
-      var rb2 = phys.bodies[bi];
-      if (rb2.iron && rb2.charging) {
-        rb2.charge += dt;
-        if (rb2.charge >= C.iron.blastMax) blastList.push(rb2);
-      }
-    }
-    for (var bi2 = 0; bi2 < blastList.length; bi2++) detonateReef(blastList[bi2]);
 
     var i, b;
     // 变形平滑：维护"变形矢量"（方向×幅度整体插值）——
