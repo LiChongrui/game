@@ -601,8 +601,10 @@
     if (seaStage() < ((C.specialStage && C.specialStage.iron != null) ? C.specialStage.iron : 0)) return false; // 珊瑚浅海起才落礁石（注意 0 是合法门槛，不能写 || 兜底）
     if (seaEvent && seaEvent.type === 'storm') return false; // 保底：风暴期间不再落礁石，避免双重失控
     if (ironCount() >= C.iron.maxActive) return false; // 场上已满员：预览不再出礁石，避免落下时被迫转成水滴
+    if (reefCooldown > 0) { reefCooldown--; return false; } // v390：冷却期内强制不出礁石（反聚堆）。随每滴 rollNextDrop 递减
     var ch = C.iron.chance + (C.ramp.ironChanceMax - C.iron.chance) * endlessRamp();
     if (ng && ng.active && ng.active.ironX) ch *= ng.active.ironX; // 二周目「暗礁密布」
+    ch *= (1 - ironCount() / C.iron.maxActive); // v390：密度衰减（反雪球）——场上礁石越多，新礁石概率越低；第一颗之后概率反而下降
     return Math.random() < ch;
   } // 礁石概率随渐进加压提升
   // 符文：普通水滴随机附带的道具属性，合成时为对应技能充能
@@ -660,6 +662,7 @@
   // 且 1 块不报（太平凡）。v365：生长机制移除后，这个计数提示独立成函数仍在主循环调用。
   var reefCountPrev = 0;       // 上一帧在场礁石数（只在数量变化时提示，避免刷屏）
   var ironGateHintT = -9;      // v366：礁石潮汐闸门提示的上次时刻（5 秒节流，防刷屏）
+  var reefCooldown = 0;        // v390：落地礁石后的冷却计数器（按"滴"递减；>0 时 rollIron 强制不出礁石）
   function updateReefHint() {
     var n = ironN;
     if (n === reefCountPrev) return;
@@ -2589,6 +2592,7 @@
     dangerAlert = 0; dangerRemain = 0; // v369：新局顺手清（每帧由 checkDanger 重算，避免跨局首帧残留）
     skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
     reefCountPrev = 0; // v357：礁石税提示计数随局重置
+    reefCooldown = 0; // v390：礁石冷却随局重置
     seaCount = 0; scoreMult = 1;
     // v371：新局清深海事件（风暴/祝福/涌泉…），避免上局残留事件跨局继承（上局死在事件进行中时尤甚）
     seaEvent.type = null; seaEvent.data = null; seaEvent.t = 0; seaEvent.t0 = 6; seaEvent.nextForced = null; seaEvent.timer = (C.seaEvent ? C.seaEvent.interval : 26) - 8 + Math.random() * 8;
@@ -2732,6 +2736,7 @@
     if (nextIron && ironCount() < C.iron.maxActive) {
       createIron(clampAim(aimX), C.spawnY);
       addShake(2, 0.15);
+      reefCooldown = C.iron.cooldownDrops; // v390：落地礁石→启动冷却（接下来 N 滴不出礁石，打断聚堆）
     } else {
       nb = phys.create(clampAim(aimX), C.spawnY, useTier, 0, 0);
       if (nextSpecial) { nb.special = nextSpecial; nb.specialT = 0; discoverSpecial(nextSpecial); }
