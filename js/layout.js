@@ -146,13 +146,13 @@ MG.layout = {
       ng: { w: 330, h: 350 },         // 深渊潜航词缀三选一（底部锚定，y = 245+dy）
       dex: { x: 20, w: 380, h: 600 }, // 图鉴/成就（局内 y 由 dexY 派生；菜单态按全屏 VH 居中）
       dexY: 120 + dy,                 // 图鉴局内 y（9:18 定版 120 = (840-600)/2，随底部锚定链平移）
-      // ★ v197 设置弹窗（音效/音乐/震动三开关 + v317 清空存档一行；用户："游戏内这个地方改成设置按钮，
-      //   用来弹出设置音效、音乐和震动"）：300×326 块内居中（x=(W-300)/2=60，y=(840-326)/2+dy=257+dy），
-      //   随底部锚定链平移；底部按用户要求不放说明文本。v317 加第 4 行「清空存档」：面板 260→326
+      // ★ v197 设置弹窗（音效/音乐两开关 + v317 清空存档一行；v390 震动开关隐藏——用户"目前不需要"，
+      //   故两开关 + 清空存档共 3 行）：300×260 块内居中（x=(W-300)/2=60，y=(840-260)/2+dy=290+dy），
+      //   随底部锚定链平移；底部按用户要求不放说明文本。v317 起清空存档占一行：
       //   （行几何不动：rowDy=50 标题区 / rowGap=66（行距 56+10）/ rowW=260 左右各留 20，
-      //    四行排满 50+3×66+56=304，余 22 与旧版三行对称）。
+      //    三行排满 50+2×66+56=238，余 22）。
       //   v317 清空存档二级确认（危险操作，与设置面板同语言）：300×180 块内居中，两钮横排。
-      set: { w: 300, h: 326, rowDy: 50, rowGap: 66, rowH: 56, rowW: 260 }, // v200：rowDy 60→50 让三行让出通用页头（标题 y+30）
+      set: { w: 300, h: 260, rowDy: 50, rowGap: 66, rowH: 56, rowW: 260 }, // v200：rowDy 60→50 让三行让出通用页头（标题 y+30）；v390 面板 326→260（震动行隐藏后 3 行够用）
       setClear: { w: 300, h: 180, btnH: 42, btnGap: 12, btnTop: 108 }
     };
 
@@ -231,24 +231,6 @@ MG.layout = {
   ngRect: function () {
     var p = this.panel.ng, W = MG.config.W;
     return { x: (W - p.w) / 2, y: (840 - p.h) / 2 + this.dy, w: p.w, h: p.h };
-  },
-  // v382 手感微调面板（设置弹窗内「手感微调 ▸」入口打开）：块内居中，随 dy 平移
-  handfeelRect: function () {
-    var w = 300, h = 360, W = MG.config.W;
-    return { x: (W - w) / 2, y: (840 - h) / 2 + this.dy, w: w, h: h };
-  },
-  handfeelRowRect: function (i) {
-    var r = this.handfeelRect();
-    return { x: r.x + 20, y: r.y + 64 + i * 64, w: r.w - 40, h: 52 };
-  },
-  handfeelCloseRect: function () {
-    var r = this.handfeelRect();
-    return { x: r.x + r.w - 40, y: r.y + 8, w: 30, h: 30 };
-  },
-  // 设置弹窗底部「手感微调 ▸」入口热区（setClear 行下方 22px 空隙内，不新增行）
-  handfeelEntRect: function () {
-    var r = this.setRect();
-    return { x: r.x + 20, y: r.y + r.h - 20, w: r.w - 40, h: 18 };
   },
 };
 MG.layout.build();

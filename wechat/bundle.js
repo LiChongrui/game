@@ -422,15 +422,6 @@ MG.config = {
   }
 };
 
-// 手感微调（v382）：乘子，1.0 = 默认；经设置→手感面板滑块调节，存 localStorage(mg_tuning)。
-// 仅在物理/合成/浮力等少数锚点读取，便于玩家快速试手感而不改逻辑。
-MG.tuning = {
-  dropSpeed: 1.0,   // 下落速度（×重力）
-  mergeR: 1.0,      // 合并判定半径（附加容差 ×）
-  friction: 1.0,    // 堆叠摩擦（×切向摩擦）
-  buoy: 1.0         // 浮力强度（×潮汐浮力）
-};
-
 ;
 // ===== js/layout.js =====
 // 水滴合成深海 - layout：布局几何唯一真源
@@ -581,13 +572,13 @@ MG.layout = {
       ng: { w: 330, h: 350 },         // 深渊潜航词缀三选一（底部锚定，y = 245+dy）
       dex: { x: 20, w: 380, h: 600 }, // 图鉴/成就（局内 y 由 dexY 派生；菜单态按全屏 VH 居中）
       dexY: 120 + dy,                 // 图鉴局内 y（9:18 定版 120 = (840-600)/2，随底部锚定链平移）
-      // ★ v197 设置弹窗（音效/音乐/震动三开关 + v317 清空存档一行；用户："游戏内这个地方改成设置按钮，
-      //   用来弹出设置音效、音乐和震动"）：300×326 块内居中（x=(W-300)/2=60，y=(840-326)/2+dy=257+dy），
-      //   随底部锚定链平移；底部按用户要求不放说明文本。v317 加第 4 行「清空存档」：面板 260→326
+      // ★ v197 设置弹窗（音效/音乐两开关 + v317 清空存档一行；v390 震动开关隐藏——用户"目前不需要"，
+      //   故两开关 + 清空存档共 3 行）：300×260 块内居中（x=(W-300)/2=60，y=(840-260)/2+dy=290+dy），
+      //   随底部锚定链平移；底部按用户要求不放说明文本。v317 起清空存档占一行：
       //   （行几何不动：rowDy=50 标题区 / rowGap=66（行距 56+10）/ rowW=260 左右各留 20，
-      //    四行排满 50+3×66+56=304，余 22 与旧版三行对称）。
+      //    三行排满 50+2×66+56=238，余 22）。
       //   v317 清空存档二级确认（危险操作，与设置面板同语言）：300×180 块内居中，两钮横排。
-      set: { w: 300, h: 326, rowDy: 50, rowGap: 66, rowH: 56, rowW: 260 }, // v200：rowDy 60→50 让三行让出通用页头（标题 y+30）
+      set: { w: 300, h: 260, rowDy: 50, rowGap: 66, rowH: 56, rowW: 260 }, // v200：rowDy 60→50 让三行让出通用页头（标题 y+30）；v390 面板 326→260（震动行隐藏后 3 行够用）
       setClear: { w: 300, h: 180, btnH: 42, btnGap: 12, btnTop: 108 }
     };
 
@@ -667,24 +658,6 @@ MG.layout = {
     var p = this.panel.ng, W = MG.config.W;
     return { x: (W - p.w) / 2, y: (840 - p.h) / 2 + this.dy, w: p.w, h: p.h };
   },
-  // v382 手感微调面板（设置弹窗内「手感微调 ▸」入口打开）：块内居中，随 dy 平移
-  handfeelRect: function () {
-    var w = 300, h = 360, W = MG.config.W;
-    return { x: (W - w) / 2, y: (840 - h) / 2 + this.dy, w: w, h: h };
-  },
-  handfeelRowRect: function (i) {
-    var r = this.handfeelRect();
-    return { x: r.x + 20, y: r.y + 64 + i * 64, w: r.w - 40, h: 52 };
-  },
-  handfeelCloseRect: function () {
-    var r = this.handfeelRect();
-    return { x: r.x + r.w - 40, y: r.y + 8, w: 30, h: 30 };
-  },
-  // 设置弹窗底部「手感微调 ▸」入口热区（setClear 行下方 22px 空隙内，不新增行）
-  handfeelEntRect: function () {
-    var r = this.setRect();
-    return { x: r.x + 20, y: r.y + r.h - 20, w: r.w - 40, h: 18 };
-  },
 };
 MG.layout.build();
 
@@ -746,7 +719,7 @@ MG.layout.build();
       // --- 积分 + 边界 ---
       for (k = 0; k < bs.length; k++) {
         b = bs[k];
-        b.vy += g * (MG.tuning.dropSpeed || 1) * h;
+        b.vy += g * h;
         b.vx *= C.dampPerStep;
         b.vy *= C.dampPerStep;
         var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
@@ -802,7 +775,7 @@ MG.layout.build();
             // 切向摩擦
             var tx = -ny, ty = nx;
             var vt = rvx * tx + rvy * ty;
-            var jt = -vt * C.friction * (MG.tuning.friction || 1) / invSum;
+            var jt = -vt * C.friction / invSum;
             a.vx -= jt * tx * invA; a.vy -= jt * ty * invA;
             o.vx += jt * tx * invO; o.vy += jt * ty * invO;
           }
@@ -1019,7 +992,7 @@ MG.layout.build();
   //   vibrateLong），全程不碰画布变换；画面摇晃（addShake → render translate 微抖）
   //   是另一套独立视觉特效，与震动开关无任何关联。
   // 音效/音乐/震动三开关相互独立：震动只认 vibOn，与静音状态无关。
-  function hap(ms) { if (audio.vibOn) MG.platform.vibrate(ms || 20); }
+  function hap(ms) {} // v390：震动功能已隐藏（用户"目前不需要"）——占位 no-op，调用点全部保留，将来恢复只需改回 vibrate
 
   // ---------- 背景音乐（深海氛围：母线低通呼吸 + 双振荡器暖垫 + 五声琶音 + 水底涌动噪声 + 水滴点缀） ----------
   audio.bgm = {
@@ -2586,7 +2559,7 @@ MG.layout.build();
         if (used[b.id] || b.special || b.frozen > 0 || b.iron || b.tier !== a.tier || b.popT > 0) continue;
         var dx = b.x - a.x, dy = b.y - a.y;
         // 合成阈值：接触即合（+0.5 容差覆盖物理 slop 允许的静置重叠）
-        var minD = a.r + b.r + 0.5 * (MG.tuning.mergeR || 1);
+        var minD = a.r + b.r + 0.5;
         if (dx * dx + dy * dy <= minD * minD) {
           used[a.id] = used[b.id] = 1;
           merges.push([a, b]);
@@ -3184,7 +3157,7 @@ MG.layout.build();
       var subm = (b.y + b.r - wy) / (2 * b.r);
       if (subm <= 0) continue;
       var f = Math.min(1, subm); // 浸没比：浮力、水的阻力、横向涌动三者共用（浸得越浅浮力越弱、受阻越小）
-      var buoy = C.tide.buoyancy * (MG.tuning.buoy || 1) * ((ng.active && ng.active.tideToss && tide.phase === 'active') ? ng.active.tideToss : 1); // v339：深渊试炼潮期浮力×tideToss，涌动更猛、更难落位
+      var buoy = C.tide.buoyancy * ((ng.active && ng.active.tideToss && tide.phase === 'active') ? ng.active.tideToss : 1); // v339：深渊试炼潮期浮力×tideToss，涌动更猛、更难落位
       // ★ v353：浮力**保留**随浸没比衰减（用户："潮汐的衰减还是保留吧"）。
       // 但严禁再由它推导出两条错误结论（用户已明令删除）：①"平衡位置恒在警戒线下方"
       // ②"不会把水滴托过线"。事实是：完全浸没时浮力 4000 > 重力 1500、净上托 2500，水滴会
@@ -3948,23 +3921,13 @@ MG.layout.build();
   // v317 清空存档：设置面板第 4 行 → 二级确认（drawSetClear）→ clearSaveData。
   // setClearOpen 只在 setOpen 为真时打开，所有按 setOpen 门禁的输入/更新天然覆盖它
   var setClearOpen = false;
-  // v382 手感微调面板：覆盖在设置面板之上（与 setClear 同级），关闭时保留设置面板
-  var handfeelOpen = false;
-  function saveTuning() {
-    try { MG.platform.setJSON('mg_tuning', MG.tuning); } catch (e) {}
-  }
-  function loadTuning() {
-    try {
-      var t = MG.platform.getJSON('mg_tuning', null);
-      if (t && typeof t === 'object') for (var k in MG.tuning) if (k in t) MG.tuning[k] = Number(t[k]) || MG.tuning[k];
-    } catch (e) {}
-  }
   function toggleSet(i) {
     if (i === 0) { audio.sfxOn = !audio.sfxOn; saveFlag('mg_mute', !audio.sfxOn); }
     else if (i === 1) {
       audio.musicOn = !audio.musicOn; saveFlag('mg_music', audio.musicOn);
       if (audio.musicOn) audio.bgm.start(); else audio.bgm.stop();
-    } else { audio.vibOn = !audio.vibOn; saveFlag('mg_vib', audio.vibOn); if (audio.vibOn) hap(20); }
+    }
+    // v390：震动开关已隐藏（用户"目前不需要"）；vibOn/hap 保留为占位，将来恢复时加回此分支即可
     audio.blip(660, 0.08, 'sine', 0.06, 0.3); // 开关反馈（音效刚开启时即听到，符合直觉）
   }
   // 全部存档键（与 core.js/systems.js 各保存点一一对应；mg_ver 一并清，重启时 migrateSave 重打）
@@ -4066,34 +4029,16 @@ MG.layout.build();
       setClearOpen = false;
       return;
     }
-    if (handfeelOpen) {
-      if (inRect(p, MG.layout.handfeelCloseRect())) { handfeelOpen = false; return; }
-      var hfKeys = ['dropSpeed', 'mergeR', 'friction', 'buoy'];
-      var hfMin = [0.5, 0.5, 0.5, 0.3], hfMax = [1.8, 2.0, 2.0, 2.0];
-      for (var hf = 0; hf < 4; hf++) {
-        var hr = MG.layout.handfeelRowRect(hf);
-        if (inRect(p, hr)) {
-          var hx = hr.x + 16, hw = hr.w - 32;
-          var frac = Math.max(0, Math.min(1, (p.x - hx) / hw));
-          MG.tuning[hfKeys[hf]] = +(hfMin[hf] + frac * (hfMax[hf] - hfMin[hf])).toFixed(2);
-          saveTuning();
-          audio.blip(640, 0.06, 'sine', 0.06, 0.4);
-          return;
-        }
-      }
-      handfeelOpen = false; return; // 点面板外关闭手感面板，保留设置面板
-    }
     if (setOpen) {
-      // v197 设置弹窗：点三个开关行切换，点 ✕ 或面板外关闭（与重开确认同门禁）；
-      // v317 第 4 行「清空存档」点行开二级确认（setClearOpen），不直接执行
-      if (inRect(p, MG.layout.setCloseRect())) { setOpen = false; handfeelOpen = false; return; }
-      for (var si = 0; si < 4; si++) {
+      // v197 设置弹窗：点开关行切换，点 ✕ 或面板外关闭（与重开确认同门禁）；
+      // v317 第 3 行「清空存档」（震动行隐藏后上移）点行开二级确认（setClearOpen），不直接执行
+      if (inRect(p, MG.layout.setCloseRect())) { setOpen = false; return; }
+      for (var si = 0; si < 3; si++) {
         if (inRect(p, MG.layout.setRowRect(si))) {
-          if (si === 3) { setClearOpen = true; audio.blip(520, 0.1, 'sine', 0.08, 0.7); return; }
+          if (si === 2) { setClearOpen = true; audio.blip(520, 0.1, 'sine', 0.08, 0.7); return; }
           toggleSet(si); return;
         }
       }
-      if (inRect(p, MG.layout.handfeelEntRect())) { handfeelOpen = true; audio.blip(600, 0.08, 'sine', 0.07, 0.5); return; }
       setOpen = false;
       return;
     }
@@ -4121,7 +4066,7 @@ MG.layout.build();
         }
       }
       // 设置入口（未开局即可调音效/音乐/震动）；命中区与绘制一致 +hudInset
-      if (inCircle(p, { cx: setBtn.cx, cy: setBtn.cy + hudInset, r: setBtn.r })) { setBtn.pressT = 0.16; setOpen = true; loadTuning(); return; }
+      if (inCircle(p, { cx: setBtn.cx, cy: setBtn.cy + hudInset, r: setBtn.r })) { setBtn.pressT = 0.16; setOpen = true; return; }
       if (inRect(p, menuStartBtn)) {
         menuStartBtn.pressT = 0.2;
         audio.blip(660, 0.12, 'sine', 0.1, 0.4);
@@ -4173,7 +4118,7 @@ MG.layout.build();
       return;
     }
     // v197：左上角设置钮（音效/音乐/震动弹窗；原静音/奖杯位）——命中区 +hudInset 与 HUD 平移一致
-    if (inCircle(p, { cx: setBtn.cx, cy: setBtn.cy + hudInset, r: setBtn.r })) { setBtn.pressT = 0.16; setOpen = true; loadTuning(); return; }
+    if (inCircle(p, { cx: setBtn.cx, cy: setBtn.cy + hudInset, r: setBtn.r })) { setBtn.pressT = 0.16; setOpen = true; return; }
     if (inCircle(p, bookBtn)) {
       bookBtn.pressT = 0.16; dexOpen = true; achOpen = false;
       // 默认选中与分节匹配的条目（说明区开局即有内容，不显"未发现"空态）
@@ -7581,10 +7526,10 @@ MG.layout.build();
     drawPanelHeader('设置', SET_PANEL, setCloseBtn, function () {
       ctx.save(); ctx.scale(0.667, 0.667); setIconCog(ctx, true); ctx.restore();
     }, '#2E7DA8');
-    // 三行开关（点整行即切换；systems.js toggleSet）
-    var names = ['音效', '音乐', '震动'];
-    var descs = ['水滴合成与技能音效', '深海氛围背景音乐', '震动反馈']; // v287：去"（马达）"措辞（用户：不用突出是马达震动）
-    for (var si = 0; si < 3; si++) {
+    // 两行开关（音效/音乐；震动功能已隐藏，目前不需要——v390）；点整行即切换（systems.js toggleSet）
+    var names = ['音效', '音乐'];
+    var descs = ['水滴合成与技能音效', '深海氛围背景音乐']; // v287：去"（马达）"措辞（用户：不用突出是马达震动）
+    for (var si = 0; si < 2; si++) {
       var row = MG.layout.setRowRect(si);
       ctx.fillStyle = 'rgba(46,134,180,0.07)';
       roundRect(row.x, row.y, row.w, row.h, 10); ctx.fill();
@@ -7598,16 +7543,16 @@ MG.layout.build();
       ctx.font = '12px system-ui, sans-serif';
       ctx.fillText(descs[si], row.x + 18, row.y + 42);
       // 滑块开关（52×30 右侧垂直居中；on 态蓝底白钮右置）
-      var on = si === 0 ? audio.sfxOn : (si === 1 ? audio.musicOn : audio.vibOn);
+      var on = si === 0 ? audio.sfxOn : audio.musicOn;
       var sx = row.x + row.w - 18 - 52, sy = row.y + 13;
       ctx.fillStyle = on ? '#2E86B4' : 'rgba(120,150,175,0.35)';
       roundRect(sx, sy, 52, 30, 15); ctx.fill();
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath(); ctx.arc(on ? sx + 52 - 15 : sx + 15, sy + 15, 11, 0, Math.PI * 2); ctx.fill();
     }
-    // v317 第 4 行：清空存档（独立功能；危险样式与三开关区分——红 accents + 右侧「清空」小钮）。
+    // v317 第 3 行（震动行隐藏后上移）：清空存档（独立功能；危险样式与两开关区分——红 accents + 右侧「清空」小钮）。
     // 点整行即开二级确认（systems.js setClearOpen），不直接执行
-    var clr = MG.layout.setRowRect(3);
+    var clr = MG.layout.setRowRect(2);
     ctx.fillStyle = 'rgba(176,88,74,0.08)';
     roundRect(clr.x, clr.y, clr.w, clr.h, 10); ctx.fill();
     ctx.strokeStyle = 'rgba(176,88,74,0.35)'; ctx.lineWidth = 1;
@@ -7632,50 +7577,6 @@ MG.layout.build();
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('清空', bx + 32, by + 16);
     ctx.textBaseline = 'alphabetic';
-    // v382：设置底部「手感微调 ▸」入口（不新增行；落在清空行与面板底之间 22px 空隙）
-    var he = MG.layout.handfeelEntRect();
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#2E86B4';
-    ctx.font = 'bold 14px system-ui, sans-serif';
-    ctx.fillText('手感微调 ▸', he.x + he.w / 2, he.y + he.h - 5);
-    ctx.textAlign = 'left';
-  }
-  // v382 手感微调面板：4 条滑块（下落速度/合并判定半径/堆叠摩擦/浮力强度），点轨道即设值
-  function drawHandfeel() {
-    var r = MG.layout.handfeelRect();
-    panel(r.x, r.y, r.w, r.h, 14, 0.97);
-    drawPanelHeader('手感微调', r, MG.layout.handfeelCloseRect(), function () {
-      ctx.save(); ctx.scale(0.667, 0.667); setIconSliders(ctx); ctx.restore();
-    }, '#2E7DA8');
-    var keys = ['dropSpeed', 'mergeR', 'friction', 'buoy'];
-    var names = ['下落速度', '合并半径', '堆叠摩擦', '浮力强度'];
-    var mins = [0.5, 0.5, 0.5, 0.3], maxs = [1.8, 2.0, 2.0, 2.0];
-    for (var i = 0; i < 4; i++) {
-      var row = MG.layout.handfeelRowRect(i);
-      ctx.fillStyle = 'rgba(46,134,180,0.06)';
-      roundRect(row.x, row.y, row.w, row.h, 10); ctx.fill();
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#155A8A'; ctx.font = 'bold 15px system-ui, sans-serif';
-      ctx.fillText(names[i], row.x + 16, row.y + 22);
-      var v = MG.tuning[keys[i]] || 1;
-      var lo = mins[i], hi = maxs[i], frac = (v - lo) / (hi - lo);
-      frac = Math.max(0, Math.min(1, frac));
-      var tx = row.x + 16, tw = row.w - 32, ty = row.y + 40;
-      ctx.fillStyle = 'rgba(46,134,180,0.18)';
-      roundRect(tx, ty - 3, tw, 6, 3); ctx.fill();
-      ctx.fillStyle = '#2E86B4';
-      roundRect(tx, ty - 3, Math.max(6, tw * frac), 6, 3); ctx.fill();
-      var kx = tx + tw * frac;
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath(); ctx.arc(kx, ty, 9, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#2E86B4'; ctx.lineWidth = 2; ctx.stroke();
-      ctx.fillStyle = '#4A7FA0'; ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'right';
-      ctx.fillText('×' + v.toFixed(2), row.x + row.w - 14, row.y + 22);
-      ctx.textAlign = 'left';
-    }
-    ctx.fillStyle = '#8AA5B8'; ctx.font = '11px system-ui, sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('点击滑块轨道即可调节，自动保存', r.x + r.w / 2, r.y + r.h - 14);
-    ctx.textAlign = 'left';
   }
   // v317 清空存档二级确认（危险操作）：设置面板之上再叠一层，几何走 layout.setClearRect 系
   function drawSetClear() {
@@ -9149,7 +9050,6 @@ MG.layout.build();
       if (setOpen || panelFxAlive('set')) { var msR = MG.layout.setRect(); drawPanelFx('set', setOpen, msR.x + msR.w / 2, msR.y + msR.h / 2, 0.55, drawSettings); }
       // v317：清空存档二级确认叠在设置面板之上（同层后画即在上）
       if (setClearOpen || panelFxAlive('setclr')) { var mcR = MG.layout.setClearRect(); drawPanelFx('setclr', setClearOpen, mcR.x + mcR.w / 2, mcR.y + mcR.h / 2, 0.6, drawSetClear); }
-      if (handfeelOpen || panelFxAlive('handfeel')) { var hfR = MG.layout.handfeelRect(); drawPanelFx('handfeel', handfeelOpen, hfR.x + hfR.w / 2, hfR.y + hfR.h / 2, 0.6, drawHandfeel); }
       if (achOpen || panelFxAlive('ach')) drawPanelFx('ach', achOpen, DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + DEX_PANEL.h / 2, 0.6, drawAchPanel);
       ctx.restore(); return;
     } // 开始界面：背景之上画菜单 + 设置入口 + 设置弹窗 + 成就殿堂面板
@@ -9271,7 +9171,6 @@ MG.layout.build();
     if (confirmOpen || panelFxAlive('confirm')) { var pcR = MG.layout.confirmRect(); drawPanelFx('confirm', confirmOpen, pcR.x + pcR.w / 2, pcR.y + pcR.h / 2, 0.55, drawConfirm); }
     if (setOpen || panelFxAlive('set')) { var psR = MG.layout.setRect(); drawPanelFx('set', setOpen, psR.x + psR.w / 2, psR.y + psR.h / 2, 0.55, drawSettings); }
     if (setClearOpen || panelFxAlive('setclr')) { var pc2R = MG.layout.setClearRect(); drawPanelFx('setclr', setClearOpen, pc2R.x + pc2R.w / 2, pc2R.y + pc2R.h / 2, 0.6, drawSetClear); }
-    if (handfeelOpen || panelFxAlive('handfeel')) { var hf2R = MG.layout.handfeelRect(); drawPanelFx('handfeel', handfeelOpen, hf2R.x + hf2R.w / 2, hf2R.y + hf2R.h / 2, 0.6, drawHandfeel); }
 
     if (dexOpen || panelFxAlive('dex')) drawPanelFx('dex', dexOpen, DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + DEX_PANEL.h / 2, 0.6, drawDex);
     else if (achOpen || panelFxAlive('ach')) drawPanelFx('ach', achOpen, DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + DEX_PANEL.h / 2, 0.6, drawAchPanel);

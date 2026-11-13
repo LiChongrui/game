@@ -97,14 +97,14 @@ eq('confirmRect.x', L.confirmRect().x, 60);
 // ★ v197 设置弹窗（用户："游戏内这个地方改成设置按钮，用来弹出设置音效、音乐和震动"）：
 //   v317 加第 4 行「清空存档」→ 面板 260→326 块内居中（行几何不变：rowDy50/rowGap66/rowH56）；
 //   四行排满 50+3×66+56=304，余 22。v317 另有清档二级确认 setClear（300×180，两钮横排）
-eq('setRect.x/y', L.setRect().x + '/' + L.setRect().y, '60/257');     // (420-300)/2；(840-326)/2
-eq('setRect.w/h', L.setRect().w + '/' + L.setRect().h, '300/326');
-eq('setRowRect(0).y', L.setRowRect(0).y, 307);                        // 257+50（标题区）
-eq('setRowRect(2).y', L.setRowRect(2).y, 439);                        // 257+50+2×66
-eq('setRowRect(3).y', L.setRowRect(3).y, 505);                        // v317 清空存档行：257+50+3×66
-eq('setRowRect(3)底≤面板底', L.setRowRect(3).y + L.setRowRect(3).h <= L.setRect().y + L.setRect().h, true); // 561≤583，余 22
+eq('setRect.x/y', L.setRect().x + '/' + L.setRect().y, '60/290');     // (420-300)/2；(840-260)/2
+eq('setRect.w/h', L.setRect().w + '/' + L.setRect().h, '300/260');
+eq('setRowRect(0).y', L.setRowRect(0).y, 340);                        // 290+50（标题区）
+eq('setRowRect(2).y', L.setRowRect(2).y, 472);                        // 290+50+2×66（清空存档行，震动行隐藏后上移）
+eq('清空存档行=setRowRect(2).y', L.setRowRect(2).y, 472);             // v390 清空存档即第 3 行（索引2）
+eq('setRowRect(2)底≤面板底', L.setRowRect(2).y + L.setRowRect(2).h <= L.setRect().y + L.setRect().h, true); // 528≤550，余 22
 eq('setRowRect.w/h', L.setRowRect(0).w + '/' + L.setRowRect(0).h, '260/56');
-eq('setCloseRect.x/y', L.setCloseRect().x + '/' + L.setCloseRect().y, '320/265'); // 60+300-40；257+8（v197 起 ✕ 热区改 -40，门曾按旧 -42 记 318）
+eq('setCloseRect.x/y', L.setCloseRect().x + '/' + L.setCloseRect().y, '320/298'); // 60+300-40；290+8（v390 面板 326→260，y 257→290）
 // v317 清档二级确认：300×180 块内居中；取消/确认清空横排等宽（120，左右各 24、间距 12）
 eq('setClearRect.x/y/w/h', L.setClearRect().x + '/' + L.setClearRect().y + '/' + L.setClearRect().w + '/' + L.setClearRect().h, '60/330/300/180');
 eq('setClearBtnRect(0)', L.setClearBtnRect(0).x + '/' + L.setClearBtnRect(0).y + '/' + L.setClearBtnRect(0).w + '/' + L.setClearBtnRect(0).h, '84/438/120/42');
@@ -167,11 +167,11 @@ function checkRatio(H, label) {
   eq('shareRect.y(' + label + ')', L.shareRect().y, 255 + D);
   eq('confirmRect.y(' + label + ')', L.confirmRect().y, 308 + D); // v300 恢复标题行：面板 224 高块内居中
   // v197 设置弹窗：块内居中，随 dy 平移（行区/✕ 热区同步）；v317 面板 326、第 4 行清档
-  eq('setRect.y(' + label + ')', L.setRect().y, 257 + D);
-  eq('setRowRect(0).y(' + label + ')', L.setRowRect(0).y, 307 + D);
-  eq('setRowRect(2).y(' + label + ')', L.setRowRect(2).y, 439 + D);
-  eq('setRowRect(3).y(' + label + ')', L.setRowRect(3).y, 505 + D); // v317 清空存档行
-  eq('setCloseRect.y(' + label + ')', L.setCloseRect().y, 265 + D);
+  eq('setRect.y(' + label + ')', L.setRect().y, 290 + D);
+  eq('setRowRect(0).y(' + label + ')', L.setRowRect(0).y, 340 + D);
+  eq('setRowRect(2).y(' + label + ')', L.setRowRect(2).y, 472 + D);
+  eq('清空存档行.y(' + label + ')', L.setRowRect(2).y, 472 + D); // v390 清空存档（震动行隐藏后上移）
+  eq('setCloseRect.y(' + label + ')', L.setCloseRect().y, 298 + D);
   // v317 清档二级确认：块内居中随 dy 平移，两钮/✕ 同步
   eq('setClearRect.y(' + label + ')', L.setClearRect().y, 330 + D);
   eq('setClearBtnRect(1).x(' + label + ')', L.setClearBtnRect(1).x, 216);
@@ -218,7 +218,7 @@ eq('交付 btnCx', L.band.btnCx.join('/'), '35/105/175/245/315/385');
 eq('交付 btnR', L.band.btnR, 20);
 eq('交付 rowBtnR', L.hud.rowBtnR, 18);                 // v196：第一排圆钮统一半径
 eq('交付 setCx', L.hud.setCx, 25);                     // v197：设置钮 x（占原奖杯位）
-eq('交付 setRect', L.setRect().x + '/' + L.setRect().y + '/' + L.setRect().w + '/' + L.setRect().h, '60/257/300/326'); // v317 设置弹窗（+清空存档行）
+eq('交付 setRect', L.setRect().x + '/' + L.setRect().y + '/' + L.setRect().w + '/' + L.setRect().h, '60/290/300/260'); // v390 设置弹窗（两开关+清空存档，震动行隐藏）
 eq('交付 setClearRect', L.setClearRect().x + '/' + L.setClearRect().y + '/' + L.setClearRect().w + '/' + L.setClearRect().h, '60/330/300/180'); // v317 清档二级确认
 console.log('③ 交付比例回归断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail; // 修复：③ 段失败此前被 ④ 段重置、不进退出码
@@ -493,7 +493,7 @@ eq('setOpen门禁', /if \(setOpen\) \{/.test(SRC), true);
 eq('toggleSet定义', /function toggleSet\(i\)/.test(SRC), true);
 eq('音效存旧键mg_mute', /saveFlag\('mg_mute', !audio\.sfxOn\)/.test(SRC), true);
 eq('音乐存mg_music', /saveFlag\('mg_music', audio\.musicOn\)/.test(SRC), true);
-eq('震动存mg_vib', /saveFlag\('mg_vib', audio\.vibOn\)/.test(SRC), true);
+eq('不再存mg_vib(震动已隐藏)', SRC.indexOf("saveFlag('mg_vib'") < 0, true); // v390：震动开关移除，负向断言防回潮
 eq('restart关闭setOpen', /confirmOpen = false;\n    setOpen = false;/.test(SRC), true);
 eq('drawSetBtn定义', /function drawSetBtn\(\) \{/.test(RSRC), true);
 // v279：设置钮改 drawCircleBtn（渐变蓝底+白细内环+左上高光弧，"白边+蓝底"，与技能栏
@@ -510,7 +510,7 @@ eq('旧drawMuteBtn已删除', /function drawMuteBtn/.test(RSRC), false);
 eq('render无trophyBtn.cy烤入', /trophyBtn\.cy = MG\.layout\.hud\.trophyCy/.test(RSRC), false);
 // 设置弹窗：三行开关（v317 起 + 第 4 行清空存档，行循环仍在 systems.js 输入侧扩到 4；
 // 渲染侧第 4 行单独绘制，故本循环保持 si<3）+ 无底部说明文本
-eq('设置弹窗三行循环', /for \(var si = 0; si < 3; si\+\+\) \{[\s\S]*?setRowRect\(si\)/.test(RSRC), true);
+eq('设置弹窗两行循环', RSRC.indexOf('for (var si = 0; si < 2; si++)') >= 0 && RSRC.indexOf('setRowRect(si)') >= 0, true); // v390 震动行隐藏，仅音效/音乐两开关
 eq('设置弹窗无说明区文本', /ctx\.fillText\([^)]*py \+ 2[4-9]\d/.test(RSRC), false);
 // core.js：audio 拆三开关 + hap 震动（旧单键 muted 拆除）
 eq('三开关定义', /sfxOn: /.test(CSRC) && /musicOn: /.test(CSRC) && /vibOn: /.test(CSRC), true);
@@ -524,11 +524,12 @@ eq('fit无trophy/MUTE烤入', /trophyBtn\.cy = MG\.layout\.hud\.trophyCy/.test(C
 // ---- v198 震动语义纠正（用户："震动不是震动窗口，是手机设备的震动反馈！！！"）----
 // hap 只走 MG.platform.vibrate（navigator.vibrate / 微信 wx 桥）= 设备马达；
 // 画面摇晃（addShake → render translate 微抖）是独立视觉特效，与震动开关无关
-eq('hap只走platform.vibrate', /function hap\(ms\) \{ if \(audio\.vibOn\) MG\.platform\.vibrate\(ms \|\| 20\); \}/.test(CSRC), true);
+eq('hap为no-op(震动隐藏)', CSRC.indexOf('function hap(ms) {}') >= 0, true); // v390：震动功能关闭，hap 占位空实现
+eq('hap不再接vibrate(负向)', CSRC.indexOf('if (audio.vibOn) MG.platform.vibrate') < 0, true); // 防未来误接回设备震动
 // platform.js：navigator.vibrate 是真身（v198 起；旧断言误测 CSRC——core.js 只有注释提及）
 eq('platform.vibrate走navigator', /if \(navigator && navigator\.vibrate\)/.test(PLATSRC), true);
 // v287：震动行说明去"（马达）"措辞（用户：不用突出是马达震动）——desc 只留"震动反馈"
-eq('震动行说明去马达措辞', /var descs = \['水滴合成与技能音效', '深海氛围背景音乐', '震动反馈'\];/.test(RSRC), true);
+eq('设置两开关说明', RSRC.indexOf("var descs = ['水滴合成与技能音效', '深海氛围背景音乐'];") >= 0, true); // v390 去掉震动行
 eq('震动旧歧义说明已改', /合成与事件震动反馈/.test(RSRC), false);
 // 微信垫片：navigator.vibrate 桥 wx.vibrateShort/vibrateLong（ms→强度），是设备震动非画面抖动
 var WSHIM = src('wechat/wx-shim.js');
@@ -555,6 +556,14 @@ eq('齿轮线描格白粗线', /ctx\.strokeStyle = '#FFFFFF'; ctx\.lineWidth = 2
 eq('旧细短线齿已移除', /ctx\.moveTo\(0, -10\); ctx\.lineTo\(0, -6\.5\);/.test(RSRC), false);
 eq('旧齿圈r6.5已移除', /ctx\.arc\(0, 0, 6\.5, 0, Math\.PI \* 2\); ctx\.stroke\(\);/.test(RSRC), false);
 eq('齿轮旧蓝灰色已移除', /ctx\.strokeStyle = '#3E6E90';\n    ctx\.lineWidth = 1\.6;/.test(RSRC), false);
+// ---- v391 手感微调整体移除（用户："把手感微调删掉，加这个干什么？"）----
+// 负向回归守卫：入口/面板/状态/存档/物理乘子一律不得再回来（v382 曾整套引入后被否决）
+var CFGSRC = src('js/config.js'), LSRC3 = src('js/layout.js'), PHYSRC = src('js/physics.js');
+eq('无MG.tuning定义', /MG\.tuning\s*=/.test(CFGSRC), false);
+eq('无handfeel几何真源', /handfeelRect|handfeelEntRect|handfeelRowRect|handfeelCloseRect/.test(LSRC3), false);
+eq('无手感面板绘制与入口文案', /drawHandfeel|手感微调/.test(RSRC), false);
+eq('无handfeel状态/存档读写', /handfeelOpen|saveTuning|loadTuning|mg_tuning/.test(SRC), false);
+eq('物理/合成/浮力无tuning乘子', /MG\.tuning/.test(PHYSRC) || /MG\.tuning/.test(SRC), false);
 console.log('⑥ v195六钮真源+HUD卡度量+v196第一排+v197设置+v199/v200/v279设置图标与弹窗+v322/v323潮汐判负+v326叠罗汉判负/弹字禁入道具带/警示文字置顶断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
@@ -571,8 +580,8 @@ eq('setClearOpen定义', /var setClearOpen = false;/.test(SRC), true);
 eq('SAVE_KEYS 15键', /var SAVE_KEYS = \['mg_rune', 'mg_peak', 'mg_seen', 'mg_best', 'mg_life', 'mg_dex', 'mg_ver',\s*'mg_mute', 'mg_music', 'mg_vib', 'mg_tut', 'mg_ng', 'mg_daily', 'mg_dchal', 'mg_friends'\];/.test(SRC), true);
 eq('clearSaveData定义', /function clearSaveData\(\) \{/.test(SRC), true);
 eq('清档删全部键后重载', /for \(var i = 0; i < SAVE_KEYS\.length; i\+\+\) MG\.platform\.remove\(SAVE_KEYS\[i\]\);[\s\S]*?MG\.platform\.reload\(\);/.test(SRC), true);
-eq('设置行循环扩到4行', /for \(var si = 0; si < 4; si\+\+\) \{[\s\S]*?setRowRect\(si\)/.test(SRC), true);
-eq('第4行开二级确认', /if \(si === 3\) \{ setClearOpen = true;/.test(SRC), true);
+eq('设置行循环3行', SRC.indexOf('for (var si = 0; si < 3; si++)') >= 0 && SRC.indexOf('setRowRect(si)') >= 0, true); // v390 两开关+清空存档共 3 行
+eq('第3行(清空存档)开二级确认', SRC.indexOf('if (si === 2) { setClearOpen = true;') >= 0, true); // v390 震动行隐藏，清空存档上移到索引2
 eq('清档确认优先于setOpen分支', /if \(setClearOpen\) \{[\s\S]*?setClearCloseRect\(\)[\s\S]*?setClearBtnRect\(0\)[\s\S]*?setClearBtnRect\(1\)/.test(SRC), true);
 eq('restart关闭setClearOpen', /setOpen = false; setClearOpen = false;/.test(SRC), true);
 eq('drawSetClear定义', /function drawSetClear\(\) \{/.test(RSRC), true);

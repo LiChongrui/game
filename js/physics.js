@@ -54,7 +54,7 @@
       // --- 积分 + 边界 ---
       for (k = 0; k < bs.length; k++) {
         b = bs[k];
-        b.vy += g * (MG.tuning.dropSpeed || 1) * h;
+        b.vy += g * h;
         b.vx *= C.dampPerStep;
         b.vy *= C.dampPerStep;
         var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
@@ -110,7 +110,7 @@
             // 切向摩擦
             var tx = -ny, ty = nx;
             var vt = rvx * tx + rvy * ty;
-            var jt = -vt * C.friction * (MG.tuning.friction || 1) / invSum;
+            var jt = -vt * C.friction / invSum;
             a.vx -= jt * tx * invA; a.vy -= jt * ty * invA;
             o.vx += jt * tx * invO; o.vy += jt * ty * invO;
           }

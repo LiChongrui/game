@@ -201,7 +201,7 @@
   //   vibrateLong），全程不碰画布变换；画面摇晃（addShake → render translate 微抖）
   //   是另一套独立视觉特效，与震动开关无任何关联。
   // 音效/音乐/震动三开关相互独立：震动只认 vibOn，与静音状态无关。
-  function hap(ms) { if (audio.vibOn) MG.platform.vibrate(ms || 20); }
+  function hap(ms) {} // v390：震动功能已隐藏（用户"目前不需要"）——占位 no-op，调用点全部保留，将来恢复只需改回 vibrate
 
   // ---------- 背景音乐（深海氛围：母线低通呼吸 + 双振荡器暖垫 + 五声琶音 + 水底涌动噪声 + 水滴点缀） ----------
   audio.bgm = {

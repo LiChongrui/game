@@ -1976,10 +1976,10 @@
     drawPanelHeader('设置', SET_PANEL, setCloseBtn, function () {
       ctx.save(); ctx.scale(0.667, 0.667); setIconCog(ctx, true); ctx.restore();
     }, '#2E7DA8');
-    // 三行开关（点整行即切换；systems.js toggleSet）
-    var names = ['音效', '音乐', '震动'];
-    var descs = ['水滴合成与技能音效', '深海氛围背景音乐', '震动反馈']; // v287：去"（马达）"措辞（用户：不用突出是马达震动）
-    for (var si = 0; si < 3; si++) {
+    // 两行开关（音效/音乐；震动功能已隐藏，目前不需要——v390）；点整行即切换（systems.js toggleSet）
+    var names = ['音效', '音乐'];
+    var descs = ['水滴合成与技能音效', '深海氛围背景音乐']; // v287：去"（马达）"措辞（用户：不用突出是马达震动）
+    for (var si = 0; si < 2; si++) {
       var row = MG.layout.setRowRect(si);
       ctx.fillStyle = 'rgba(46,134,180,0.07)';
       roundRect(row.x, row.y, row.w, row.h, 10); ctx.fill();
@@ -1993,16 +1993,16 @@
       ctx.font = '12px system-ui, sans-serif';
       ctx.fillText(descs[si], row.x + 18, row.y + 42);
       // 滑块开关（52×30 右侧垂直居中；on 态蓝底白钮右置）
-      var on = si === 0 ? audio.sfxOn : (si === 1 ? audio.musicOn : audio.vibOn);
+      var on = si === 0 ? audio.sfxOn : audio.musicOn;
       var sx = row.x + row.w - 18 - 52, sy = row.y + 13;
       ctx.fillStyle = on ? '#2E86B4' : 'rgba(120,150,175,0.35)';
       roundRect(sx, sy, 52, 30, 15); ctx.fill();
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath(); ctx.arc(on ? sx + 52 - 15 : sx + 15, sy + 15, 11, 0, Math.PI * 2); ctx.fill();
     }
-    // v317 第 4 行：清空存档（独立功能；危险样式与三开关区分——红 accents + 右侧「清空」小钮）。
+    // v317 第 3 行（震动行隐藏后上移）：清空存档（独立功能；危险样式与两开关区分——红 accents + 右侧「清空」小钮）。
     // 点整行即开二级确认（systems.js setClearOpen），不直接执行
-    var clr = MG.layout.setRowRect(3);
+    var clr = MG.layout.setRowRect(2);
     ctx.fillStyle = 'rgba(176,88,74,0.08)';
     roundRect(clr.x, clr.y, clr.w, clr.h, 10); ctx.fill();
     ctx.strokeStyle = 'rgba(176,88,74,0.35)'; ctx.lineWidth = 1;
@@ -2027,50 +2027,6 @@
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('清空', bx + 32, by + 16);
     ctx.textBaseline = 'alphabetic';
-    // v382：设置底部「手感微调 ▸」入口（不新增行；落在清空行与面板底之间 22px 空隙）
-    var he = MG.layout.handfeelEntRect();
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#2E86B4';
-    ctx.font = 'bold 14px system-ui, sans-serif';
-    ctx.fillText('手感微调 ▸', he.x + he.w / 2, he.y + he.h - 5);
-    ctx.textAlign = 'left';
-  }
-  // v382 手感微调面板：4 条滑块（下落速度/合并判定半径/堆叠摩擦/浮力强度），点轨道即设值
-  function drawHandfeel() {
-    var r = MG.layout.handfeelRect();
-    panel(r.x, r.y, r.w, r.h, 14, 0.97);
-    drawPanelHeader('手感微调', r, MG.layout.handfeelCloseRect(), function () {
-      ctx.save(); ctx.scale(0.667, 0.667); setIconSliders(ctx); ctx.restore();
-    }, '#2E7DA8');
-    var keys = ['dropSpeed', 'mergeR', 'friction', 'buoy'];
-    var names = ['下落速度', '合并半径', '堆叠摩擦', '浮力强度'];
-    var mins = [0.5, 0.5, 0.5, 0.3], maxs = [1.8, 2.0, 2.0, 2.0];
-    for (var i = 0; i < 4; i++) {
-      var row = MG.layout.handfeelRowRect(i);
-      ctx.fillStyle = 'rgba(46,134,180,0.06)';
-      roundRect(row.x, row.y, row.w, row.h, 10); ctx.fill();
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#155A8A'; ctx.font = 'bold 15px system-ui, sans-serif';
-      ctx.fillText(names[i], row.x + 16, row.y + 22);
-      var v = MG.tuning[keys[i]] || 1;
-      var lo = mins[i], hi = maxs[i], frac = (v - lo) / (hi - lo);
-      frac = Math.max(0, Math.min(1, frac));
-      var tx = row.x + 16, tw = row.w - 32, ty = row.y + 40;
-      ctx.fillStyle = 'rgba(46,134,180,0.18)';
-      roundRect(tx, ty - 3, tw, 6, 3); ctx.fill();
-      ctx.fillStyle = '#2E86B4';
-      roundRect(tx, ty - 3, Math.max(6, tw * frac), 6, 3); ctx.fill();
-      var kx = tx + tw * frac;
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath(); ctx.arc(kx, ty, 9, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#2E86B4'; ctx.lineWidth = 2; ctx.stroke();
-      ctx.fillStyle = '#4A7FA0'; ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'right';
-      ctx.fillText('×' + v.toFixed(2), row.x + row.w - 14, row.y + 22);
-      ctx.textAlign = 'left';
-    }
-    ctx.fillStyle = '#8AA5B8'; ctx.font = '11px system-ui, sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('点击滑块轨道即可调节，自动保存', r.x + r.w / 2, r.y + r.h - 14);
-    ctx.textAlign = 'left';
   }
   // v317 清空存档二级确认（危险操作）：设置面板之上再叠一层，几何走 layout.setClearRect 系
   function drawSetClear() {
@@ -3544,7 +3500,6 @@
       if (setOpen || panelFxAlive('set')) { var msR = MG.layout.setRect(); drawPanelFx('set', setOpen, msR.x + msR.w / 2, msR.y + msR.h / 2, 0.55, drawSettings); }
       // v317：清空存档二级确认叠在设置面板之上（同层后画即在上）
       if (setClearOpen || panelFxAlive('setclr')) { var mcR = MG.layout.setClearRect(); drawPanelFx('setclr', setClearOpen, mcR.x + mcR.w / 2, mcR.y + mcR.h / 2, 0.6, drawSetClear); }
-      if (handfeelOpen || panelFxAlive('handfeel')) { var hfR = MG.layout.handfeelRect(); drawPanelFx('handfeel', handfeelOpen, hfR.x + hfR.w / 2, hfR.y + hfR.h / 2, 0.6, drawHandfeel); }
       if (achOpen || panelFxAlive('ach')) drawPanelFx('ach', achOpen, DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + DEX_PANEL.h / 2, 0.6, drawAchPanel);
       ctx.restore(); return;
     } // 开始界面：背景之上画菜单 + 设置入口 + 设置弹窗 + 成就殿堂面板
@@ -3666,7 +3621,6 @@
     if (confirmOpen || panelFxAlive('confirm')) { var pcR = MG.layout.confirmRect(); drawPanelFx('confirm', confirmOpen, pcR.x + pcR.w / 2, pcR.y + pcR.h / 2, 0.55, drawConfirm); }
     if (setOpen || panelFxAlive('set')) { var psR = MG.layout.setRect(); drawPanelFx('set', setOpen, psR.x + psR.w / 2, psR.y + psR.h / 2, 0.55, drawSettings); }
     if (setClearOpen || panelFxAlive('setclr')) { var pc2R = MG.layout.setClearRect(); drawPanelFx('setclr', setClearOpen, pc2R.x + pc2R.w / 2, pc2R.y + pc2R.h / 2, 0.6, drawSetClear); }
-    if (handfeelOpen || panelFxAlive('handfeel')) { var hf2R = MG.layout.handfeelRect(); drawPanelFx('handfeel', handfeelOpen, hf2R.x + hf2R.w / 2, hf2R.y + hf2R.h / 2, 0.6, drawHandfeel); }
 
     if (dexOpen || panelFxAlive('dex')) drawPanelFx('dex', dexOpen, DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + DEX_PANEL.h / 2, 0.6, drawDex);
     else if (achOpen || panelFxAlive('ach')) drawPanelFx('ach', achOpen, DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + DEX_PANEL.h / 2, 0.6, drawAchPanel);

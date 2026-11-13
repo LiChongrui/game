@@ -1309,7 +1309,7 @@
         if (used[b.id] || b.special || b.frozen > 0 || b.iron || b.tier !== a.tier || b.popT > 0) continue;
         var dx = b.x - a.x, dy = b.y - a.y;
         // 合成阈值：接触即合（+0.5 容差覆盖物理 slop 允许的静置重叠）
-        var minD = a.r + b.r + 0.5 * (MG.tuning.mergeR || 1);
+        var minD = a.r + b.r + 0.5;
         if (dx * dx + dy * dy <= minD * minD) {
           used[a.id] = used[b.id] = 1;
           merges.push([a, b]);
@@ -1907,7 +1907,7 @@
       var subm = (b.y + b.r - wy) / (2 * b.r);
       if (subm <= 0) continue;
       var f = Math.min(1, subm); // 浸没比：浮力、水的阻力、横向涌动三者共用（浸得越浅浮力越弱、受阻越小）
-      var buoy = C.tide.buoyancy * (MG.tuning.buoy || 1) * ((ng.active && ng.active.tideToss && tide.phase === 'active') ? ng.active.tideToss : 1); // v339：深渊试炼潮期浮力×tideToss，涌动更猛、更难落位
+      var buoy = C.tide.buoyancy * ((ng.active && ng.active.tideToss && tide.phase === 'active') ? ng.active.tideToss : 1); // v339：深渊试炼潮期浮力×tideToss，涌动更猛、更难落位
       // ★ v353：浮力**保留**随浸没比衰减（用户："潮汐的衰减还是保留吧"）。
       // 但严禁再由它推导出两条错误结论（用户已明令删除）：①"平衡位置恒在警戒线下方"
       // ②"不会把水滴托过线"。事实是：完全浸没时浮力 4000 > 重力 1500、净上托 2500，水滴会
@@ -2671,23 +2671,13 @@
   // v317 清空存档：设置面板第 4 行 → 二级确认（drawSetClear）→ clearSaveData。
   // setClearOpen 只在 setOpen 为真时打开，所有按 setOpen 门禁的输入/更新天然覆盖它
   var setClearOpen = false;
-  // v382 手感微调面板：覆盖在设置面板之上（与 setClear 同级），关闭时保留设置面板
-  var handfeelOpen = false;
-  function saveTuning() {
-    try { MG.platform.setJSON('mg_tuning', MG.tuning); } catch (e) {}
-  }
-  function loadTuning() {
-    try {
-      var t = MG.platform.getJSON('mg_tuning', null);
-      if (t && typeof t === 'object') for (var k in MG.tuning) if (k in t) MG.tuning[k] = Number(t[k]) || MG.tuning[k];
-    } catch (e) {}
-  }
   function toggleSet(i) {
     if (i === 0) { audio.sfxOn = !audio.sfxOn; saveFlag('mg_mute', !audio.sfxOn); }
     else if (i === 1) {
       audio.musicOn = !audio.musicOn; saveFlag('mg_music', audio.musicOn);
       if (audio.musicOn) audio.bgm.start(); else audio.bgm.stop();
-    } else { audio.vibOn = !audio.vibOn; saveFlag('mg_vib', audio.vibOn); if (audio.vibOn) hap(20); }
+    }
+    // v390：震动开关已隐藏（用户"目前不需要"）；vibOn/hap 保留为占位，将来恢复时加回此分支即可
     audio.blip(660, 0.08, 'sine', 0.06, 0.3); // 开关反馈（音效刚开启时即听到，符合直觉）
   }
   // 全部存档键（与 core.js/systems.js 各保存点一一对应；mg_ver 一并清，重启时 migrateSave 重打）
@@ -2789,34 +2779,16 @@
       setClearOpen = false;
       return;
     }
-    if (handfeelOpen) {
-      if (inRect(p, MG.layout.handfeelCloseRect())) { handfeelOpen = false; return; }
-      var hfKeys = ['dropSpeed', 'mergeR', 'friction', 'buoy'];
-      var hfMin = [0.5, 0.5, 0.5, 0.3], hfMax = [1.8, 2.0, 2.0, 2.0];
-      for (var hf = 0; hf < 4; hf++) {
-        var hr = MG.layout.handfeelRowRect(hf);
-        if (inRect(p, hr)) {
-          var hx = hr.x + 16, hw = hr.w - 32;
-          var frac = Math.max(0, Math.min(1, (p.x - hx) / hw));
-          MG.tuning[hfKeys[hf]] = +(hfMin[hf] + frac * (hfMax[hf] - hfMin[hf])).toFixed(2);
-          saveTuning();
-          audio.blip(640, 0.06, 'sine', 0.06, 0.4);
-          return;
-        }
-      }
-      handfeelOpen = false; return; // 点面板外关闭手感面板，保留设置面板
-    }
     if (setOpen) {
-      // v197 设置弹窗：点三个开关行切换，点 ✕ 或面板外关闭（与重开确认同门禁）；
-      // v317 第 4 行「清空存档」点行开二级确认（setClearOpen），不直接执行
-      if (inRect(p, MG.layout.setCloseRect())) { setOpen = false; handfeelOpen = false; return; }
-      for (var si = 0; si < 4; si++) {
+      // v197 设置弹窗：点开关行切换，点 ✕ 或面板外关闭（与重开确认同门禁）；
+      // v317 第 3 行「清空存档」（震动行隐藏后上移）点行开二级确认（setClearOpen），不直接执行
+      if (inRect(p, MG.layout.setCloseRect())) { setOpen = false; return; }
+      for (var si = 0; si < 3; si++) {
         if (inRect(p, MG.layout.setRowRect(si))) {
-          if (si === 3) { setClearOpen = true; audio.blip(520, 0.1, 'sine', 0.08, 0.7); return; }
+          if (si === 2) { setClearOpen = true; audio.blip(520, 0.1, 'sine', 0.08, 0.7); return; }
           toggleSet(si); return;
         }
       }
-      if (inRect(p, MG.layout.handfeelEntRect())) { handfeelOpen = true; audio.blip(600, 0.08, 'sine', 0.07, 0.5); return; }
       setOpen = false;
       return;
     }
@@ -2844,7 +2816,7 @@
         }
       }
       // 设置入口（未开局即可调音效/音乐/震动）；命中区与绘制一致 +hudInset
-      if (inCircle(p, { cx: setBtn.cx, cy: setBtn.cy + hudInset, r: setBtn.r })) { setBtn.pressT = 0.16; setOpen = true; loadTuning(); return; }
+      if (inCircle(p, { cx: setBtn.cx, cy: setBtn.cy + hudInset, r: setBtn.r })) { setBtn.pressT = 0.16; setOpen = true; return; }
       if (inRect(p, menuStartBtn)) {
         menuStartBtn.pressT = 0.2;
         audio.blip(660, 0.12, 'sine', 0.1, 0.4);
@@ -2896,7 +2868,7 @@
       return;
     }
     // v197：左上角设置钮（音效/音乐/震动弹窗；原静音/奖杯位）——命中区 +hudInset 与 HUD 平移一致
-    if (inCircle(p, { cx: setBtn.cx, cy: setBtn.cy + hudInset, r: setBtn.r })) { setBtn.pressT = 0.16; setOpen = true; loadTuning(); return; }
+    if (inCircle(p, { cx: setBtn.cx, cy: setBtn.cy + hudInset, r: setBtn.r })) { setBtn.pressT = 0.16; setOpen = true; return; }
     if (inCircle(p, bookBtn)) {
       bookBtn.pressT = 0.16; dexOpen = true; achOpen = false;
       // 默认选中与分节匹配的条目（说明区开局即有内容，不显"未发现"空态）
