@@ -226,7 +226,7 @@ eq('合成链：108×112/横距122/纵距126', /x: DEX_PANEL\.x \+ 14 \+ \(t % 3
 eq('图鉴说明区贴新面板底+518', /DEX_PANEL\.y \+ 518, DEX_PANEL\.w - 24, 68/.test(PSRC), true);
 eq('成就卡：单列行高64/距8', /var ACH_ROW_H = 64, ACH_ROW_GAP = 8;/.test(PSRC), true);
 eq('每日任务行：高62/距72', /var base = fy \+ fh \+ 12, rowH = 62, step = 72;/.test(PSRC), true);
-eq('榜单行：4名起距70', /ry = DEX_PANEL\.y \+ 262 \+ \(i - 3\) \* 70/.test(PSRC), true);
+eq('榜单行：4名起距70', /ry = DEX_PANEL\.y \+ 196 \+ \(i - 3\) \* 70/.test(PSRC), true);
 eq('榜单行：高54', /roundRect\(DEX_PANEL\.x \+ 14, ry, DEX_PANEL\.w - 28, 54, 9\); ctx\.fill\(\);/.test(PSRC), true);
 console.log('⑤ v194 图鉴/成就面板度量断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
@@ -458,8 +458,11 @@ eq('config无广告配置(负向)', /bannerId|rewardId|interstitialId|MG\.config
 eq('core无MG.ad模块(负向)', /MG\.ad/.test(CSRC), false);
 eq('render无广告同步(负向)', /MG\.ad/.test(RSRC), false);
 eq('榜单改最近局排名', /var recent = MG\.platform\.getJSON\('mg_recent', \[\]\) \|\| \[\];/.test(SRC), true);
-eq('每次死亡都记录一条', /recent\.push\(\{ score: score, sea: seaStage\(\), ts: Date\.now\(\) \}\);/.test(SRC), true);
-eq('runRecorded已移除(负向)', /runRecorded/.test(SRC), false);
+eq('recordRun统一记录函数', /function recordRun\(\)/.test(SRC), true);
+eq('死亡/退出/重开三路都记录', (SRC.match(/recordRun\(\);/g) || []).length, 3);
+eq('复活续玩再记新条', /reviveCount\+\+;\s*runRecorded = false;/.test(SRC), true);
+eq('秒退不计入', /if \(runRecorded \|\| levelElapsed < 0\.5\) return;/.test(SRC), true);
+eq('runRecorded防双记', /var runRecorded = false;/.test(SRC), true);
 eq('doRevive不回滚记录(负向)', /recent\.slice\(0, -1\)/.test(SRC), false);
 eq('假好友榜已移除(负向)', /mg_friends|friendBoard/.test(SRC) || /超越 |friendBoard/.test(PSRC), false);
 eq('榜单面板用recentBoard', /var rows = recentBoard\(\);/.test(PSRC), true);

@@ -1201,7 +1201,15 @@ MG.layout.build();
 
   var RECENT_MAX = 10;
   var recent = MG.platform.getJSON('mg_recent', []) || [];
+  var runRecorded = false;
   function saveRecent() { try { MG.platform.setJSON('mg_recent', recent); } catch (e) {} }
+  function recordRun() {
+    if (runRecorded || levelElapsed < 0.5) return;
+    recent.push({ score: score, sea: seaStage(), ts: Date.now() });
+    if (recent.length > RECENT_MAX) recent = recent.slice(-RECENT_MAX);
+    saveRecent();
+    runRecorded = true;
+  }
   function recentBoard() {
     var rows = [];
     for (var i = 0; i < recent.length; i++) {
@@ -2693,9 +2701,7 @@ MG.layout.build();
     saveNum('mg_peak', careerPeak);
     saveNum('mg_life', lifeScore);
     saveNum('mg_best', best);
-    recent.push({ score: score, sea: seaStage(), ts: Date.now() });
-    if (recent.length > RECENT_MAX) recent = recent.slice(-RECENT_MAX);
-    saveRecent();
+    recordRun();
     checkAchievements();
     saveDex();
     audio.over();
@@ -3044,10 +3050,12 @@ MG.layout.build();
     }
     for (i = 0; i < bs.length; i++) { bs[i].dangerT = 0; bs[i].grace = 1.5; }
     reviveCount++;
+    runRecorded = false;
     addPopup(C.W / 2, 300, removed > 0 ? '复活！清走 ' + removed + ' 滴 · 继续深潜' : '复活！继续深潜', true, 0);
     audio.blip(660, 0.22, 'sine', 0.12, 1.2);
   }
   function goHome() {
+    recordRun();
     state = 'menu';
     aiming = false;
     confirmOpen = false;
@@ -3057,6 +3065,7 @@ MG.layout.build();
   }
 
   function restart() {
+    recordRun();
     ngEndRun();
     phys.bodies.length = 0;
     chest = null;
@@ -3077,6 +3086,7 @@ MG.layout.build();
     combo = 0; comboTimer = 0; cooldown = 0; maxCombo = 0;
     doubled = false;
     reviveCount = 0;
+    runRecorded = false;
     dangerAlert = 0; dangerRemain = 0;
     skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
     reefCountPrev = 0;
@@ -4386,35 +4396,7 @@ MG.layout.build();
 
   function drawRankTab() {
     var rows = recentBoard();
-    var bx = DEX_PANEL.x + 14, by = DEX_PANEL.y + 54, bw = DEX_PANEL.w - 28, bh = 60;
-    var bgd = ctx.createLinearGradient(0, by, 0, by + bh);
-    bgd.addColorStop(0, '#3B97C9'); bgd.addColorStop(1, '#1E6B9E');
-    ctx.fillStyle = bgd;
-    roundRect(bx, by, bw, bh, 12); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.2;
-    roundRect(bx + 0.5, by + 0.5, bw - 1, bh - 1, 12); ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,0.10)';
-    ctx.beginPath(); ctx.arc(bx + bw - 24, by + 16, 14, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(bx + bw - 46, by + 44, 6, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.22)';
-    ctx.beginPath(); ctx.arc(bx + 30, by + 30, 18, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.2; ctx.stroke();
-    ctx.textAlign = 'center';
-    ctx.font = 'bold 15px system-ui, sans-serif';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText('★', bx + 30, by + 35);
-    ctx.textAlign = 'left';
-    ctx.font = '10.5px system-ui, sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.75)';
-    ctx.fillText('我的最佳成绩', bx + 58, by + 25);
-    ctx.font = 'bold 18px system-ui, sans-serif';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText(fmtScore(best), bx + 58, by + 47);
-    ctx.textAlign = 'right';
-    ctx.font = '11px system-ui, sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.fillText('共 ' + recent.length + ' 局记录', bx + bw - 16, by + 35);
-    var colW = 108, gap = 14, yBase = DEX_PANEL.y + 236;
+    var colW = 108, gap = 14, yBase = DEX_PANEL.y + 170;
     var tops = [rows[1] || null, rows[0] || null, rows[2] || null];
     var hts = [84, 108, 72], medals = ['#C9D4DC', '#F5C542', '#E0B58A'];
     var grads = [['#DDE6EC', '#AEBEC9'], ['#FFE08A', '#D9A93F'], ['#EFCAA2', '#C29263']];
@@ -4451,7 +4433,7 @@ MG.layout.build();
     ctx.fillStyle = 'rgba(46,134,180,0.10)';
     roundRect(DEX_PANEL.x + 14, yBase, DEX_PANEL.w - 28, 8, 4); ctx.fill();
     for (var i = 3; i < rows.length; i++) {
-      var r = rows[i], ry = DEX_PANEL.y + 262 + (i - 3) * 70;
+      var r = rows[i], ry = DEX_PANEL.y + 196 + (i - 3) * 70;
       ctx.fillStyle = r.me ? 'rgba(245,197,66,0.16)' : 'rgba(46,134,180,0.06)';
       roundRect(DEX_PANEL.x + 14, ry, DEX_PANEL.w - 28, 54, 9); ctx.fill();
       ctx.strokeStyle = r.me ? 'rgba(217,169,63,0.5)' : 'rgba(46,110,150,0.10)';
@@ -4474,7 +4456,7 @@ MG.layout.build();
       ctx.textAlign = 'center';
       ctx.font = '13px system-ui, sans-serif';
       ctx.fillStyle = '#8AA5B8';
-      ctx.fillText('完成一局后，这里会记录你的成绩排名', DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + 300);
+      ctx.fillText('完成一局后，这里会记录你的成绩排名', DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + 230);
     }
     ctx.textAlign = 'center';
   }

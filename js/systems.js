@@ -351,7 +351,15 @@
 
   var RECENT_MAX = 10;
   var recent = MG.platform.getJSON('mg_recent', []) || [];
+  var runRecorded = false;
   function saveRecent() { try { MG.platform.setJSON('mg_recent', recent); } catch (e) {} }
+  function recordRun() {
+    if (runRecorded || levelElapsed < 0.5) return;
+    recent.push({ score: score, sea: seaStage(), ts: Date.now() });
+    if (recent.length > RECENT_MAX) recent = recent.slice(-RECENT_MAX);
+    saveRecent();
+    runRecorded = true;
+  }
   function recentBoard() {
     var rows = [];
     for (var i = 0; i < recent.length; i++) {
@@ -1843,9 +1851,7 @@
     saveNum('mg_peak', careerPeak);
     saveNum('mg_life', lifeScore);
     saveNum('mg_best', best);
-    recent.push({ score: score, sea: seaStage(), ts: Date.now() });
-    if (recent.length > RECENT_MAX) recent = recent.slice(-RECENT_MAX);
-    saveRecent();
+    recordRun();
     checkAchievements();
     saveDex();
     audio.over();
@@ -2194,10 +2200,12 @@
     }
     for (i = 0; i < bs.length; i++) { bs[i].dangerT = 0; bs[i].grace = 1.5; }
     reviveCount++;
+    runRecorded = false;
     addPopup(C.W / 2, 300, removed > 0 ? '复活！清走 ' + removed + ' 滴 · 继续深潜' : '复活！继续深潜', true, 0);
     audio.blip(660, 0.22, 'sine', 0.12, 1.2);
   }
   function goHome() {
+    recordRun();
     state = 'menu';
     aiming = false;
     confirmOpen = false;
@@ -2207,6 +2215,7 @@
   }
 
   function restart() {
+    recordRun();
     ngEndRun();
     phys.bodies.length = 0;
     chest = null;
@@ -2227,6 +2236,7 @@
     combo = 0; comboTimer = 0; cooldown = 0; maxCombo = 0;
     doubled = false;
     reviveCount = 0;
+    runRecorded = false;
     dangerAlert = 0; dangerRemain = 0;
     skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
     reefCountPrev = 0;
