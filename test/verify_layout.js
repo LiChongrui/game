@@ -757,4 +757,19 @@ eq('临界心跳边缘红光带', /rgba\(220,55,45,/.test(RSRC), true);
 console.log('⑬ v380 临界心跳断言: ' + pass + ' pass, ' + fail + ' fail');
 f2 += fail;
 
+// ===== ⑭ v392：重新开始 = 全新一局，从第 1 海域起 =====
+// 用户报 bug："玩了一半点击重新开始游戏，没有从第一个海域开始"。
+// 根因：restart() 只清本局 score/runCounted，lifeScore（跨局累计分）没清 →
+// totalScore() 仍等于上局累计分 → seaStage() 停在深海；stageSeen/seaFade 也跨局残留，
+// 让换色渐变与「海域演进」里程碑提示错乱。生涯峰值 careerPeak 不清（图鉴"已抵达"用）。
+pass = 0; fail = 0;
+eq('总积分定义', /function totalScore\(\) \{ return lifeScore \+ \(score - runCounted\); \}/.test(SRC), true);
+eq('海域由总积分决定', /var s = 0, ts = totalScore\(\);/.test(SRC), true);
+eq('restart归零累计分', /score = 0; displayScore = 0; scoreBump = 0;[\s\S]{0,500}lifeScore = 0;/.test(SRC), true);
+eq('restart重置海域演进态', /stageSeen = -1; seaFade = null;/.test(SRC), true);
+eq('gameOver仍按增量累加累计分', /lifeScore \+= score - runCounted; runCounted = score;/.test(SRC), true);
+eq('生涯峰值不随重开清零(负向)', /careerPeak = 0/.test(SRC), false);
+console.log('⑭ v392 重新开始从第一海域断言: ' + pass + ' pass, ' + fail + ' fail');
+f2 += fail;
+
 process.exit(f2 ? 1 : 0);

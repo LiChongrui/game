@@ -3828,6 +3828,11 @@ MG.layout.build();
     // 旧面板会原样带进新对局；三选一残留还会让 ngStartRun 用过期词缀开第二局
     dexOpen = false; achOpen = false; ngOpen = false; shareOpen = false;
     score = 0; displayScore = 0; scoreBump = 0;
+    // v392：重新开始 = 全新一局，累计分与海域演进态一并归零（用户报："玩了一半点重新开始，
+    // 没有从第一个海域开始"）。此前 lifeScore 跨局保留 → totalScore() 仍等于上局累计分 →
+    // seaStage() 停在深海；stageSeen/seaFade 残留还会让换色渐变与里程碑提示错乱。
+    lifeScore = 0;
+    stageSeen = -1; seaFade = null;
     if (offlineGain) { // 离线收益：开局自动入账
       score += offlineGain.gain; displayScore = score;
       var om = offlineGain.mins;
