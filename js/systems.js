@@ -351,7 +351,6 @@
 
   var RECENT_MAX = 10;
   var recent = MG.platform.getJSON('mg_recent', []) || [];
-  var runRecorded = false;
   function saveRecent() { try { MG.platform.setJSON('mg_recent', recent); } catch (e) {} }
   function recentBoard() {
     var rows = [];
@@ -1844,13 +1843,8 @@
     saveNum('mg_peak', careerPeak);
     saveNum('mg_life', lifeScore);
     saveNum('mg_best', best);
-    if (runRecorded && recent.length) {
-      recent[recent.length - 1] = { score: score, sea: seaStage(), ts: Date.now() };
-    } else {
-      recent.push({ score: score, sea: seaStage(), ts: Date.now() });
-      if (recent.length > RECENT_MAX) recent = recent.slice(-RECENT_MAX);
-    }
-    runRecorded = true;
+    recent.push({ score: score, sea: seaStage(), ts: Date.now() });
+    if (recent.length > RECENT_MAX) recent = recent.slice(-RECENT_MAX);
     saveRecent();
     checkAchievements();
     saveDex();
@@ -2233,7 +2227,6 @@
     combo = 0; comboTimer = 0; cooldown = 0; maxCombo = 0;
     doubled = false;
     reviveCount = 0;
-    runRecorded = false;
     dangerAlert = 0; dangerRemain = 0;
     skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
     reefCountPrev = 0;

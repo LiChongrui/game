@@ -458,7 +458,8 @@ eq('config无广告配置(负向)', /bannerId|rewardId|interstitialId|MG\.config
 eq('core无MG.ad模块(负向)', /MG\.ad/.test(CSRC), false);
 eq('render无广告同步(负向)', /MG\.ad/.test(RSRC), false);
 eq('榜单改最近局排名', /var recent = MG\.platform\.getJSON\('mg_recent', \[\]\) \|\| \[\];/.test(SRC), true);
-eq('gameOver更新或新增最近局', /if \(runRecorded && recent\.length\) \{\s*recent\[recent\.length - 1\] = \{ score: score, sea: seaStage\(\), ts: Date\.now\(\) \};\s*\} else \{\s*recent\.push\(\{ score: score, sea: seaStage\(\), ts: Date\.now\(\) \}\);/.test(SRC), true);
+eq('每次死亡都记录一条', /recent\.push\(\{ score: score, sea: seaStage\(\), ts: Date\.now\(\) \}\);/.test(SRC), true);
+eq('runRecorded已移除(负向)', /runRecorded/.test(SRC), false);
 eq('doRevive不回滚记录(负向)', /recent\.slice\(0, -1\)/.test(SRC), false);
 eq('假好友榜已移除(负向)', /mg_friends|friendBoard/.test(SRC) || /超越 |friendBoard/.test(PSRC), false);
 eq('榜单面板用recentBoard', /var rows = recentBoard\(\);/.test(PSRC), true);
