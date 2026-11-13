@@ -1,10 +1,8 @@
-// 公众号封面生成：用游戏真实图标素材合成 900×383 首图 + 200×200 次图
 const { chromium } = require('playwright-core');
 const path = require('path');
 
 const tiers = ['tier0', 'tier1', 'tier2', 'tier3', 'tier4', 'tier5', 'tier6', 'tier7', 'tier8'];
 
-// 首图 900×383：左侧标题文案，右侧水滴合成链拱形排列
 const coverHTML = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><style>
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -53,7 +51,6 @@ const coverHTML = `<!DOCTYPE html>
   </div>
 </body></html>`;
 
-// 次图 200×200：大水滴 + 标题
 const squareHTML = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><style>
   * { margin:0; padding:0; box-sizing:border-box; }

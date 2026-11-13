@@ -51,7 +51,6 @@ function sky(c, H){
   var g = c.createLinearGradient(0,0,0,H);
   g.addColorStop(0,'#C9EAF9'); g.addColorStop(1,'#7FC0E6');
   c.fillStyle = g; c.fillRect(0,0,c.canvas.width,H);
-  // 远处淡云
   c.fillStyle = 'rgba(255,255,255,0.35)';
   for(var k=0;k<4;k++){
     var cx = 90 + k*210, cy = 30 + (k%2)*22;
@@ -62,7 +61,6 @@ function sky(c, H){
 }
 function x0(W){ return (W - (TXT.length-1)*ADV)/2; }
 
-// 通用逐字绘制：白字+深海描边+顶部高光带
 function letter(c, ch, x, y, rot, sx, sy, o){
   c.save();
   c.translate(x,y); c.rotate(rot||0); c.scale(sx||1, sy||1);
@@ -90,10 +88,8 @@ function drop(c, x, y, r, a, col){
   c.restore();
 }
 
-/* ---------- E 果冻弹跳字 ---------- */
 function drawE(c,t){
   var W=c.canvas.width,H=c.canvas.height, groundY=138, X0=x0(W);
-  // 地面涟漪底色
   c.fillStyle='rgba(255,255,255,0.25)'; c.fillRect(0,groundY+16,W,H-groundY-16);
   for(var i=0;i<TXT.length;i++){
     var cph = t*2.1 + i*0.62;
@@ -108,7 +104,6 @@ function drawE(c,t){
     var g = c.createLinearGradient(0,y-FS*0.8,0,y+4);
     g.addColorStop(0,'#FFFFFF'); g.addColorStop(1,'#BDE5F8');
     letter(c, TXT[i], x, y, rot, sx, sy, {stroke:'#0F4C73', lw:11, fill:g, hi:FS*0.3, hiA:0.3});
-    // 落地水珠 + 涟漪
     var u = (cph % Math.PI)/Math.PI;
     if(u < 0.32){
       var k = u/0.32;
@@ -122,14 +117,12 @@ function drawE(c,t){
   }
 }
 
-/* ---------- F 流光水色字 ---------- */
 function drawF(c,t){
   var W=c.canvas.width, X0=x0(W);
   for(var i=0;i<TXT.length;i++){
     var x = X0+i*ADV;
     var y = 128 + Math.sin(t*1.8+i*0.9)*5;
     var rot = Math.sin(t*1.5+i*1.3)*0.045;
-    // 移动高亮带（整体从左向右扫）
     var hp = ((t*0.55)%2.0) - 0.3 - i*0.10;
     var g = c.createLinearGradient(x-ADV/2,0,x+ADV/2,0);
     g.addColorStop(0,'#D8F1FF');
@@ -144,7 +137,6 @@ function drawF(c,t){
       stroke:'#0F4C73', lw:11, fill:g, hi:FS*0.26, hiA:0.4,
       glow:'rgba(130,205,255,'+(0.35+pulse*0.4)+')', blur:10+pulse*10
     });
-    // 星光闪烁
     var tw = Math.sin(t*3.1 + i*1.9);
     if(tw>0.4){
       var a=(tw-0.4)/0.6, sxp=x+(i%2?26:-24), syp=y-30-(i%3)*10;
@@ -158,17 +150,14 @@ function drawF(c,t){
   }
 }
 
-/* ---------- G 跃浪水花字 ---------- */
 function drawG(c,t){
   var W=c.canvas.width,H=c.canvas.height, yW=150, X0=x0(W);
-  // 水体（波浪上缘）
   c.beginPath(); c.moveTo(0,yW);
   for(var wx=0;wx<=W;wx+=8) c.lineTo(wx, yW + Math.sin(wx*0.03+t*2.4)*4);
   c.lineTo(W,H); c.lineTo(0,H); c.closePath();
   var wg=c.createLinearGradient(0,yW,0,H);
   wg.addColorStop(0,'rgba(95,178,230,0.55)'); wg.addColorStop(1,'rgba(21,90,138,0.8)');
   c.fillStyle=wg; c.fill();
-  // 水面高光丝
   c.strokeStyle='rgba(255,255,255,0.5)'; c.lineWidth=1.5;
   c.beginPath();
   for(var wx2=0;wx2<=W;wx2+=8){
@@ -178,7 +167,6 @@ function drawG(c,t){
   c.stroke();
 
   function splash(x, y, k, dir){
-    // k:0→1 爆开进度, dir:-1 起跳 / 1 落水
     for(var p=0;p<5;p++){
       var ang = -Math.PI/2 + (p-2)*0.45 + dir*0.25;
       var rr = k*38;
@@ -201,7 +189,6 @@ function drawG(c,t){
       if(u<0.16) splash(jx, yW, u/0.16, -1);
       if(u>0.84) splash(jx, yW, (1-u)/0.16, 1);
     } else {
-      // 待在水中：只在水面荡涟漪
       var bob=(p-0.58)/0.42;
       c.save(); c.globalAlpha=0.35*(1-Math.abs(bob-0.5)*2)+0.1;
       c.strokeStyle='#FFFFFF'; c.lineWidth=2;
@@ -212,10 +199,8 @@ function drawG(c,t){
   }
 }
 
-/* ---------- H 游动拖影字 ---------- */
 function drawH(c,t){
   var W=c.canvas.width,H=c.canvas.height, X0=x0(W);
-  // 上升气泡
   for(var b=0;b<9;b++){
     var bx = 40 + (b*97)%720;
     var by = H - ((t*34 + b*53) % (H+30)) + 10;
@@ -227,7 +212,6 @@ function drawH(c,t){
     var x = X0+i*ADV + Math.sin(t*1.3+i*0.8)*7;
     var y = 120 + Math.sin(ph)*11;
     var rot = Math.sin(ph+0.6)*0.13;
-    // 两道残影（反方向拖尾）
     var vx = Math.cos(t*1.3+i*0.8), vy=Math.cos(ph);
     var g3=c.createLinearGradient(0,y-FS*0.8,0,y+4);
     g3.addColorStop(0,'#E8FAFF'); g3.addColorStop(1,'#63C3F0');
@@ -240,7 +224,6 @@ function drawH(c,t){
       c.restore();
     }
     letter(c, TXT[i], x, y, rot, 1.04, 1.04, {stroke:'#0F4C73', lw:10, fill:g3, hi:FS*0.3, hiA:0.34});
-    // 游过的小水痕
     c.save(); c.globalAlpha=0.35; c.strokeStyle='#FFFFFF'; c.lineWidth=1.6; c.lineCap='round';
     c.beginPath();
     c.moveTo(x - vx*16 - 8, y - vy*10 + 14);
@@ -249,7 +232,6 @@ function drawH(c,t){
   }
 }
 
-/* ---------- 循环 ---------- */
 var scenes = [
   ['cE', drawE], ['cF', drawF], ['cG', drawG], ['cH', drawH]
 ].map(function(s){

@@ -1,12 +1,3 @@
-// 叠罗汉越线无警示诊断（headless 快进，无渲染）
-// 用户反馈（截图）："开始游戏时直接叠罗汉超过警戒线也没有提示？"
-// 三案测量：
-//  G. 生长过程复现（对齐截图）：大海(7)打底 + 11 枚小滴同 x 依次投放（0.55s 冷却，走真实
-//     tryDrop 下落冲击），逐投放记录 pileTop/越线滴数；投完后静置 8s，逐帧记录越线滴的
-//     速度 / dangerT / 警示条等价量（maxDangerT/fuse）/ 缓冲与判负时点 / 边缘滴越线穿越
-//  H. 静置隔离：同终局直接用 phys.create 堆好（无下落冲击），跑 8s——分离"新滴持续扰动"因素
-//  J. 回归保护：非潮汐高速横穿（线上方 120px 自由落体）不应计时判负（sim_danger.js D 案）
-// 用法：node sim_column.js
 const path = require('path');
 let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) { console.error('需要 playwright-core'); process.exit(1); }
@@ -26,8 +17,7 @@ try { chromium = require('playwright-core').chromium; } catch (e) { console.erro
 
   const res = await page.evaluate(() => {
     const DT = 1 / 60;
-    const X = 210; // 截图：所有滴同一 x
-    // 逐帧观测器：返回该帧的快照统计（越线滴速度普查 + dangerT + 警示等价量 + 边缘滴）
+    const X = 210;
     function watch(pr, dangerY) {
       let overN = 0, spSum = 0, spMax = 0, blocked = 0, maxDangerT = 0, edgeTop = null;
       for (const b of pr.bodies) {
@@ -38,34 +28,31 @@ try { chromium = require('playwright-core').chromium; } catch (e) { console.erro
           spSum += sp; if (sp > spMax) spMax = sp;
           if (sp >= 120) blocked++;
           if (b.dangerT > maxDangerT) maxDangerT = b.dangerT;
-          if (edgeTop == null || top > edgeTop) edgeTop = top; // 距线最近的越线滴（top 最大）
+          if (edgeTop == null || top > edgeTop) edgeTop = top;
         }
       }
       return { overN: overN, spAvg: overN ? spSum / overN : 0, spMax: spMax, blocked: blocked, maxDangerT: maxDangerT, edgeTop: edgeTop };
     }
 
-    // G：真实投放生长（大海打底 + 11 枚小滴，档位循环避开相邻同档合并）
     function growCase(quietSeconds) {
       MG.debug.reset();
       const pr0 = MG.probe();
       const dangerY = pr0.dangerY;
       const log = [];
-      // 打底：大海 tier7
       MG.debug.setNext({ tier: 7 });
       MG.debug.drop(X);
-      for (let k = 0; k < 90; k++) MG.debug.step(DT); // 1.5s 落底
+      for (let k = 0; k < 90; k++) MG.debug.step(DT);
       const smalls = [0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1];
       for (let i = 0; i < smalls.length; i++) {
         MG.debug.setNext({ tier: smalls[i] });
         MG.debug.drop(X);
-        for (let k = 0; k < 36; k++) MG.debug.step(DT); // 0.6s > 冷却 0.55s
+        for (let k = 0; k < 36; k++) MG.debug.step(DT);
         const pr = MG.probe();
         let pileTop = 1e9;
         for (const b of pr.bodies) pileTop = Math.min(pileTop, b.y - b.r);
         const w = watch(pr, dangerY);
         log.push({ i: i + 1, tier: smalls[i], n: pr.bodies.length, pileTop: Math.round(pileTop), overN: w.overN, edgeTop: w.edgeTop == null ? null : Math.round(w.edgeTop) });
       }
-      // 静置观测
       const st = { overFrames: 0, blockedFrames: 0, maxDangerT: 0, bufferedAt: null, overAt: null, firstOverAt: null, edgeResets: 0, edgeTrace: [], frames: 0 };
       let prevEdge = null;
       const steps = Math.round(quietSeconds / DT);
@@ -78,11 +65,9 @@ try { chromium = require('playwright-core').chromium; } catch (e) { console.erro
         if (w.overN > 0) { st.overFrames++; if (st.firstOverAt == null) st.firstOverAt = (k + 1) * DT; }
         if (w.blocked > 0) st.blockedFrames++;
         if (w.maxDangerT > st.maxDangerT) st.maxDangerT = w.maxDangerT;
-        // 深流缓冲：全体 grace 被置 3
         let anyGrace = false;
         for (const b of pr.bodies) if (b.grace > 2.9) anyGrace = true;
         if (anyGrace && st.bufferedAt == null) st.bufferedAt = (k + 1) * DT;
-        // 边缘滴穿越线下方 = dangerT 被清零的事件
         if (w.edgeTop != null) {
           if (prevEdge != null && w.edgeTop > prevEdge + 1 && w.edgeTop >= dangerY) st.edgeResets++;
           prevEdge = w.edgeTop;
@@ -92,20 +77,18 @@ try { chromium = require('playwright-core').chromium; } catch (e) { console.erro
       return { dangerY: dangerY, log: log, st: st, fuse: 3 };
     }
 
-    // H：静态构造同终局（不经下落），跑 8s
     function staticCase(seconds) {
       MG.debug.reset();
       const pr0 = MG.probe();
       const dangerY = pr0.dangerY;
       const floorY = pr0.floorY;
-      // 自底向上：大海(78) + 小滴 21/15/28/21/15/28/21/15/28/21/15（同 G 终局档位）
       const rs = [78, 21, 15, 28, 21, 15, 28, 21, 15, 28, 21, 15];
       let y = floorY;
       for (let i = 0; i < rs.length; i++) {
         const r = rs[i];
-        y -= r; // 圆心
+        y -= r;
         MG.debug.spawn(i === 0 ? 7 : (r === 21 ? 1 : (r === 28 ? 2 : 0)), X, y);
-        y -= r; // 顶
+        y -= r;
       }
       const st = { overFrames: 0, blockedFrames: 0, maxDangerT: 0, bufferedAt: null, overAt: null, firstOverAt: null, spAtRest: 0, edgeTrace: [] };
       const steps = Math.round(seconds / DT);
@@ -127,7 +110,6 @@ try { chromium = require('playwright-core').chromium; } catch (e) { console.erro
           if (k % 60 === 0) st.edgeTrace.push([Math.round((k + 1) * DT * 10) / 10, Math.round(w.edgeTop)]);
         } else prevEdge = null;
       }
-      // 静置后的速度普查（越线滴）
       const pr = MG.probe();
       const w = watch(pr, dangerY);
       st.spAtRest = Math.round(w.spAvg);
@@ -135,7 +117,6 @@ try { chromium = require('playwright-core').chromium; } catch (e) { console.erro
       return { dangerY: dangerY, st: st };
     }
 
-    // J：回归保护——非潮汐高速横穿
     function transitCase() {
       MG.debug.reset();
       const pr0 = MG.probe();

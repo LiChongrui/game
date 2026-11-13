@@ -1,4 +1,3 @@
-// v167 多分辨率底部检查：确认道具区下方无色块
 const { chromium } = require('playwright-core');
 
 (async () => {
@@ -6,7 +5,6 @@ const { chromium } = require('playwright-core');
   const base = 'file://' + require('path').resolve(__dirname, '../index.html');
   const browser = await chromium.launch({ executablePath: exe });
 
-  // [标签, safeTop, 宽, 高]
   const cases = [
     ['A_420x780', null, 420, 780],
     ['B_407x885_capsule', 88, 407, 885],

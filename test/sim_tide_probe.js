@@ -1,14 +1,9 @@
-// 潮汐判负链路诊断（headless）——v327 反馈1"潮水水位高度似乎还不对，请分析每个海域潮水的高度"
-// sim_tide.js 实测：满潮水面线性 574→280，sea3 起大滴峰值越线、sea7 全档位峰值越线 +132~+216px，
-// 但"单滴判负发生: 无"——与"潮汐本身即威胁"矛盾。本脚本逐 sea×tier 记录 dangerT 时间线，
-// 定位峰值越线却不判负的环节（漂浮平衡点 / 引信 / 出水清零），并对 4 个代表案出 1s 分辨率时间线。
-// 用法：node sim_tide_probe.js
 const path = require('path');
 let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) { console.error('需要 playwright-core'); process.exit(1); }
 const SEA_AT = [0, 3000, 10000, 25000, 50000, 100000, 180000, 300000];
 const TIER_NAMES = ['雾泡', '水滴', '露珠', '浪花', '溪流', '湖泊', '江河', '大海', '沧海'];
-const TRACE = [ // 代表案：[sea, tier]
+const TRACE = [
   [3, 8], [4, 5], [5, 2], [7, 0]
 ];
 
@@ -27,9 +22,9 @@ const TRACE = [ // 代表案：[sea, tier]
 
   const rows = await page.evaluate(({ SEA_AT, TIER_NAMES, TRACE }) => {
     const out = [];
-    const settle = 150;    // 2.5s 静置落底
-    const tideSteps = 480; // 8s 满潮
-    const postSteps = 360; // 6s 退潮（progress 1→0 需 1.6s，留足观察判负）
+    const settle = 150;
+    const tideSteps = 480;
+    const postSteps = 360;
     for (let s = 0; s < SEA_AT.length; s++) {
       const tiers = [];
       for (let t = 0; t < 9; t++) {
@@ -42,7 +37,7 @@ const TRACE = [ // 代表案：[sea, tier]
         const tide = pr0.tideRef;
         tide.phase = 'active'; tide.timer = 8; tide.progress = 0;
         let minTop = restTop, maxDangerT = 0, over = false, overAt = null;
-        let aboveRun = 0, maxAboveRun = 0; // 连续在线上方时长（帧）
+        let aboveRun = 0, maxAboveRun = 0;
         let wantTrace = TRACE.some(tr => tr[0] === s && tr[1] === t);
         let trace = [];
         for (let k = 0; k < tideSteps + postSteps; k++) {
@@ -75,7 +70,6 @@ const TRACE = [ // 代表案：[sea, tier]
     return out;
   }, { SEA_AT, TIER_NAMES, TRACE });
 
-  // 满潮水面（progress=1）
   const wyRows = await page.evaluate((SEA_AT) => {
     const out = [];
     for (let s = 0; s < SEA_AT.length; s++) {

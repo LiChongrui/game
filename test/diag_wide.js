@@ -1,4 +1,3 @@
-// 诊断：宽屏下点击开始按钮为何无效
 const { chromium } = require('playwright-core');
 
 (async () => {
@@ -26,7 +25,6 @@ const { chromium } = require('playwright-core');
   });
   console.log(JSON.stringify(info, null, 1));
 
-  // 点击按钮中心
   const b = info.menuBtn;
   const s = Math.min(info.iw / 420, info.ih / 747);
   const cx = (b.x + b.w / 2) * s, cy = (b.y + b.h / 2) * s;
@@ -35,7 +33,6 @@ const { chromium } = require('playwright-core');
   await page.waitForTimeout(500);
   console.log('state after click:', await page.evaluate(() => window.MG.probe().state));
 
-  // 再试：直接派发 pointerdown/up 到 canvas
   const r2 = await page.evaluate(() => {
     var c = document.getElementById('game');
     var rect = c.getBoundingClientRect();

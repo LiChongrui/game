@@ -40,7 +40,6 @@ function waveFill(g, x0, x1, yl, amp, k, sp, t, fill, yTop, yEnd) {
   g.fillStyle = fill; g.fill();
 }
 
-// —— A 海浪填充字 ——
 function artA(c, W, H, t) {
   var totalW = ADV * TXT.length, x0 = (W - totalW) / 2 + ADV / 2, base = 80;
   c.textAlign = 'center'; c.font = FONT; c.lineJoin = 'round'; c.miterLimit = 2;
@@ -68,7 +67,6 @@ function artA(c, W, H, t) {
   c.drawImage(o, 0, 0);
 }
 
-// —— B 立体挤出字 ——
 function artB(c, W, H, t) {
   var totalW = ADV * TXT.length, x0 = (W - totalW) / 2 + ADV / 2, base = 74;
   c.textAlign = 'center'; c.font = FONT; c.lineJoin = 'round'; c.miterLimit = 2;
@@ -92,7 +90,6 @@ function artB(c, W, H, t) {
   }
 }
 
-// —— C 滴落变形字 ——
 function artC(c, W, H, t) {
   var totalW = ADV * TXT.length, x0 = (W - totalW) / 2 + ADV / 2, base = 76;
   c.textAlign = 'center'; c.font = FONT; c.lineJoin = 'round'; c.miterLimit = 2;
@@ -104,7 +101,6 @@ function artC(c, W, H, t) {
   tg.addColorStop(0, '#FFFFFF'); tg.addColorStop(0.55, '#CFEBFF'); tg.addColorStop(1, '#8FC9EE');
   c.fillStyle = tg;
   for (i = 0; i < TXT.length; i++) c.fillText(TXT[i], x0 + i * ADV, base);
-  // 滴字(1)与海字(5)笔画末端挂水珠：拉长→坠落→循环
   var spots = [1, 5];
   for (var s = 0; s < spots.length; s++) {
     var idx = spots[s], dx = x0 + idx * ADV + 10, dy = base + 6;
@@ -122,7 +118,6 @@ function artC(c, W, H, t) {
       c.globalAlpha = 1;
     }
   }
-  // 浪沫弧线托底
   c.strokeStyle = 'rgba(159,224,255,0.7)'; c.lineWidth = 3; c.lineCap = 'round';
   c.beginPath();
   for (var wx = 0; wx <= totalW + 20; wx += 5) {
@@ -133,7 +128,6 @@ function artC(c, W, H, t) {
   c.stroke(); c.lineCap = 'butt';
 }
 
-// —— D 泡泡胖圆字 ——
 function artD(c, W, H, t) {
   var totalW = ADV * TXT.length, x0 = (W - totalW) / 2 + ADV / 2, base = 76;
   c.textAlign = 'center'; c.font = FONT; c.lineJoin = 'round'; c.lineCap = 'round'; c.miterLimit = 2;

@@ -1,4 +1,3 @@
-// 小程序头像生成 v3：满版海底叙事——戴冠大水滴 + 小水滴螺旋汇入 + 光柱/海草/宝箱
 const { chromium } = require('playwright-core');
 const path = require('path');
 const fs = require('fs');
@@ -75,7 +74,6 @@ const html = `<!DOCTYPE html>
   await page.waitForTimeout(600);
   await page.screenshot({ path: path.join(__dirname, '..', '头像_小程序840.png') });
 
-  // 144 方形 + 圆形裁切预览
   const src = path.join(__dirname, '..', '头像_小程序840.png');
   const p2 = await browser.newPage({ viewport: { width: 300, height: 300 } });
   await p2.goto('file:///' + src.replace(/\\/g, '/'));

@@ -1,5 +1,3 @@
-// v134 验证：游戏块 420×736（HUD 132 与容器分离），出生点 182 下移——
-// 顶部元素（任务条/海域进度条）不再遮挡水滴坠落区，最大档虚影(r=45)完整可见
 const { chromium } = require('playwright-core');
 const path = require('path');
 
@@ -8,7 +6,6 @@ const path = require('path');
   let fails = 0;
   const ok = (cond, msg) => { console.log((cond ? 'PASS' : 'FAIL') + ' ' + msg); if (!cond) fails++; };
 
-  // ---- 屏型 1：420×780（iPhone 类比例） ----
   let page = await browser.newPage({ viewport: { width: 420, height: 780 } });
   let errs = [];
   page.on('pageerror', e => errs.push(e.message));
@@ -16,9 +13,7 @@ const path = require('path');
   await page.waitForTimeout(1500);
   await page.screenshot({ path: path.join(__dirname, 'v134_menu_780.png') });
 
-  // 几何断言：块内常量 + 居中偏移
   let g = await page.evaluate(() => {
-    // 进局：直接调 restart（绕过菜单点击的坐标换算）
     restart();
     return new Promise(res => setTimeout(() => res(MG.probe()), 400));
   });
@@ -28,12 +23,10 @@ const path = require('path');
   ok(g.oy === 22, 'oy=22（(780-736)/2，实际 ' + g.oy + '）');
   ok(g.VH === 780, 'VH=780 (实际 ' + g.VH + ')');
 
-  // 最大档虚影（r=45）停在出生点：必须完整位于容器内、不与顶部元素重叠
   await page.evaluate(() => { MG.debug.setNext({ tier: 5 }); });
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(__dirname, 'v134_ghost45_780.png') });
 
-  // 投下大滴，坠落过程不应被 HUD 盖住（截图肉眼复核 + 球心已入容器）
   await page.evaluate(() => { MG.debug.drop(210); });
   await page.waitForTimeout(350);
   let mid = await page.evaluate(() => {
@@ -45,7 +38,6 @@ const path = require('path');
   ok(errs.length === 0, '420×780 零页面报错' + (errs.length ? '：' + errs.join(' | ') : ''));
   await page.close();
 
-  // ---- 屏型 2：320×880（窄长屏，宽度受限缩放） ----
   page = await browser.newPage({ viewport: { width: 320, height: 880 } });
   errs = [];
   page.on('pageerror', e => errs.push(e.message));

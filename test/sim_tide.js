@@ -1,7 +1,3 @@
-// 潮汐越线仿真（headless，无渲染快进）——用户："水滴还是无法浮起到警戒线上面，请认真测试一下"
-// 逐海域 × 逐档位：单滴静置落底 → 强制满潮 8s → 记录该滴浮到的最高点(top y)与警戒线的关系
-// 另测每海域一个 12 滴混合堆：整堆作为筏子能抬多高、是否会被潮汐判负
-// 用法：node sim_tide.js
 const path = require('path');
 let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) { console.error('需要 playwright-core'); process.exit(1); }
@@ -23,10 +19,9 @@ const TIER_NAMES = ['雾泡', '水滴', '露珠', '浪花', '溪流', '湖泊', 
 
   const rows = await page.evaluate(({ SEA_AT, TIER_NAMES }) => {
     const out = [];
-    const settle = 150;   // 2.5s 静置
-    const tideSteps = 480; // 8s 满潮
+    const settle = 150;
+    const tideSteps = 480;
     for (let s = 0; s < SEA_AT.length; s++) {
-      // ---- 单滴逐档位 ----
       const tiers = [];
       for (let t = 0; t < 9; t++) {
         MG.debug.reset();
@@ -50,11 +45,10 @@ const TIER_NAMES = ['雾泡', '水滴', '露珠', '浪花', '溪流', '湖泊', 
         tiers.push({
           tier: t, name: TIER_NAMES[t], r: b.r,
           restTop: Math.round(restTop), minTop: Math.round(minTop),
-          clear: Math.round(pr0.dangerY - minTop), // >0 = 顶部越过警戒线
+          clear: Math.round(pr0.dangerY - minTop),
           over: over, overAt: overAt
         });
       }
-      // ---- 12 滴混合堆（筏子效应）----
       MG.debug.reset();
       MG.debug.setLife(SEA_AT[s]);
       const pileTiers = [0, 1, 2, 0, 1, 2, 3, 1, 2, 0, 3, 2];
@@ -81,8 +75,6 @@ const TIER_NAMES = ['雾泡', '水滴', '露珠', '浪花', '溪流', '湖泊', 
     return out;
   }, { SEA_AT, TIER_NAMES });
 
-  // wyPeak 修正：probe 里拿不到，直接用 tier0 记录值回填（每海域同水位）
-  // （上面 evaluate 内 wyPeak 计算有占位，重新跑一遍轻量取水位）
   const wyRows = await page.evaluate((SEA_AT) => {
     const out = [];
     for (let s = 0; s < SEA_AT.length; s++) {
@@ -91,14 +83,13 @@ const TIER_NAMES = ['雾泡', '水滴', '露珠', '浪花', '溪流', '湖泊', 
       const pr0 = MG.probe();
       const tide = pr0.tideRef;
       tide.phase = 'active'; tide.timer = 8; tide.progress = 0;
-      for (let k = 0; k < 120; k++) MG.debug.step(1 / 60); // 2s 到 progress=1
+      for (let k = 0; k < 120; k++) MG.debug.step(1 / 60);
       out.push({ sea: s, wyPeak: Math.round(MG.debug.tideY()), stage: MG.debug.stage().name, dangerY: pr0.dangerY });
     }
     return out;
   }, SEA_AT);
   await browser.close();
 
-  // ---- 输出 ----
   console.log('海域门槛: ' + SEA_AT.join(' / ') + '（共 ' + SEA_AT.length + ' 档）');
   console.log('警戒线 dangerY=315，出生点 spawnY=260，容器底 floorY=765');
   console.log('');

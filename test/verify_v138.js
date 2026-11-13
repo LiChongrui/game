@@ -1,6 +1,3 @@
-// v138 验证：容器区域恢复 528px 恒定不变（核心约束）——
-// 块 420×747 (9:16)：顶部 HUD 0~100 + 出生空隙带 + 容器 145~673=528 + 底部 74；
-// 坠落高度 spawnY=120 恒定；双屏型几何一致 + 零报错
 const { chromium } = require('playwright-core');
 const path = require('path');
 
@@ -9,7 +6,6 @@ const path = require('path');
   let fails = 0;
   const ok = (cond, msg) => { console.log((cond ? 'PASS' : 'FAIL') + ' ' + msg); if (!cond) fails++; };
 
-  // ---- 屏型 1：420×780 ----
   let page = await browser.newPage({ viewport: { width: 420, height: 780 } });
   let errs = [];
   page.on('pageerror', e => errs.push(e.message));
@@ -39,7 +35,6 @@ const path = require('path');
   ok(errs.length === 0, '420×780 零页面报错' + (errs.length ? '：' + errs.join(' | ') : ''));
   await page.close();
 
-  // ---- 屏型 2：320×880（窄长屏） ----
   page = await browser.newPage({ viewport: { width: 320, height: 880 } });
   errs = [];
   page.on('pageerror', e => errs.push(e.message));

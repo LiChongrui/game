@@ -1,4 +1,3 @@
-// v164 定位断言：游戏态顶部铺满（renderOy=0），胶囊偏移仅下挪 HUD（oy>0 但块顶仍贴屏顶）
 const { chromium } = require('playwright-core');
 
 (async () => {
@@ -18,7 +17,6 @@ const { chromium } = require('playwright-core');
     }
     await page.goto(base);
     await page.waitForFunction(() => window.MG && window.MG.probe, null, { timeout: 8000 });
-    // 进入游戏：菜单态点「开始游戏」（块坐标 210,426 → 屏坐标，renderOy=0）
     const vb = await page.evaluate(() => ({ iw: innerWidth, ih: innerHeight }));
     const s = Math.min(vb.iw / 420, vb.ih / 747);
     await page.mouse.click(210 * s, 426 * s);

@@ -1,4 +1,3 @@
-// v161 验证：顶部按钮与底部圆钮同径(r20) + 结算海报排版放松 + 结算双倍不再看广告
 const { chromium } = require('playwright-core');
 const path = require('path');
 
@@ -12,7 +11,6 @@ const path = require('path');
   await page.goto('file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/'));
   await page.waitForTimeout(1600);
 
-  // ① 半径一致且与底部圆钮同径
   const radii = await page.evaluate(() => ({
     trophy: window.trophyBtn.r, menuTrophy: window.menuTrophy.r, mute: window.MUTE.r,
     bottom: window.SKILL_BTNS[0].r, restart: window.restartBtn.r
@@ -21,13 +19,12 @@ const path = require('path');
     '顶部三按钮半径一致 trophy=' + radii.trophy + ' menuTrophy=' + radii.menuTrophy + ' mute=' + radii.mute);
   ok(radii.trophy >= radii.bottom, '顶部按钮不小于底部道具钮（' + radii.trophy + ' ≥ ' + radii.bottom + '）');
 
-  // 像素实测：扫描按钮中心行，测「奖杯金色圆」与「静音白色圆」的水平直径（换算回逻辑坐标）
   const measure = () => page.evaluate(() => {
     var c2 = document.getElementById('game').getContext('2d');
     var t = c2.getTransform(), k = t.a, ox = t.e, oyT = t.f;
     function scanAt(logicalCx, logicalCy, isGold) {
       var px = Math.round(k * logicalCx + ox), py = Math.round(k * logicalCy + oyT);
-      var half = Math.round(k * 24); // 只扫按钮附近，避开旁边的文字描边
+      var half = Math.round(k * 24);
       var d = c2.getImageData(px - half, py, half * 2, 1).data;
       var first = -1, last = -1;
       for (var i = 0; i < half * 2; i++) {
@@ -37,7 +34,7 @@ const path = require('path');
         if (hit) { if (first < 0) first = i; last = i; }
       }
       if (first < 0) return -1;
-      return (last - first + 1) / k; // 逻辑直径
+      return (last - first + 1) / k;
     }
     var oy = window.oy || 0;
     var ty = window.trophyBtn.cy, my = window.MUTE.cy;
@@ -54,8 +51,7 @@ const path = require('path');
   ok(Math.abs(m1.trophyD - m1.muteD) <= 2.5, '菜单态奖杯与静音直径一致（差 ' + Math.abs(m1.trophyD - m1.muteD).toFixed(1) + 'px ≤ 2.5）');
   await page.screenshot({ path: path.join(__dirname, 'v161_menu.png') });
 
-  // 进入局内复查
-  await page.mouse.click(210, 442); // 「开始游戏」主按钮（块内 210,396 + oy16.5）
+  await page.mouse.click(210, 442);
   await page.waitForTimeout(900);
   const st = await page.evaluate(() => window.state);
   ok(st === 'play', '已进入局内 (state=' + st + ')');
@@ -64,7 +60,6 @@ const path = require('path');
   ok(Math.abs(m2.trophyD - m2.muteD) <= 2.5, '局内奖杯与静音直径一致（差 ' + Math.abs(m2.trophyD - m2.muteD).toFixed(1) + 'px ≤ 2.5）');
   await page.screenshot({ path: path.join(__dirname, 'v161_play.png') });
 
-  // 不越界
   const bounds = await page.evaluate(() => ({
     trophyLeft: window.trophyBtn.cx - window.trophyBtn.r,
     muteRight: window.MUTE.cx + window.MUTE.r,
@@ -74,7 +69,6 @@ const path = require('path');
   ok(bounds.trophyLeft >= 4, '奖杯未越左边界（左缘 ' + bounds.trophyLeft + ' ≥ 4）');
   ok(bounds.muteRight <= bounds.W - 4, '静音未越右边界（右缘 ' + bounds.muteRight + ' ≤ ' + (bounds.W - 4) + '）');
 
-  // ② 结算海报：排版放松 + 双倍不再看广告
   const over = await page.evaluate(() => {
     window.score = 120; window.maxCombo = 3; window.state = 'over';
     return true;
@@ -100,7 +94,6 @@ const path = require('path');
   ok(lay.panelBottom <= 620, '面板未超出屏内（底部 ' + lay.panelBottom + ' ≤ 620）');
   await page.screenshot({ path: path.join(__dirname, 'v161_over.png') });
 
-  // 点击「结算双倍」：直接翻倍、无广告遮罩（按钮组垂直居中于 320~584，第 2 颗中心块内 y≈400 → 屏 +oy16.5）
   await page.mouse.click(210, 400 + 16.5);
   await page.waitForTimeout(400);
   const res = await page.evaluate(() => ({

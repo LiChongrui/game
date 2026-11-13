@@ -1,5 +1,3 @@
-// v155 验证：①礁石与普通滴严格分离（零容差全量修正）——不重合、不压扁
-// ②进度条两端徽章骑端点并遮挡（沿用 v154 断言）
 const { chromium } = require('playwright-core');
 const path = require('path');
 
@@ -13,11 +11,9 @@ const path = require('path');
   await page.goto('file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/'));
   await page.waitForTimeout(1500);
 
-  // ---- ①拥挤场景：底部水滴堆 + 多块礁石落下，检查铁球与普通滴无重合 ----
   await page.evaluate(() => { restart(); });
   await page.waitForTimeout(700);
   await page.evaluate(() => {
-    // 底部铺一排普通滴（不同档），再落 3 块礁石压在上面
     phys.create(120, 640, 1, 0, 0);
     phys.create(180, 645, 2, 0, 0);
     phys.create(240, 640, 1, 0, 0);
@@ -32,9 +28,9 @@ const path = require('path');
     for (var i = 0; i < bs.length; i++) {
       for (var j = i + 1; j < bs.length; j++) {
         var a = bs[i], b = bs[j];
-        if ((a.iron && !a.chest) === (b.iron && !b.chest)) continue; // 只查 礁石↔普通滴
+        if ((a.iron && !a.chest) === (b.iron && !b.chest)) continue;
         var d = Math.hypot(a.x - b.x, a.y - b.y), minD = a.r + b.r;
-        var pen = minD - d;                                          // >0 表示重叠
+        var pen = minD - d;
         if (pen > worst) { worst = pen; worstPair = [Math.round(a.x), Math.round(a.y), Math.round(b.x), Math.round(b.y)]; }
         moved++;
       }
@@ -46,7 +42,6 @@ const path = require('path');
   ok(ov.pressS.every(v => v === 0), '无压扁形变（pressS 全为 0）');
   await page.screenshot({ path: path.join(__dirname, 'v155_iron_sep.png') });
 
-  // ---- ②进度条端点徽章 ----
   const ends = await page.evaluate(() => {
     var c2 = document.getElementById('game').getContext('2d');
     var t = c2.getTransform();

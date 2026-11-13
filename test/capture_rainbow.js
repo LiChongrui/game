@@ -1,4 +1,3 @@
-// 仅用于观察渲染现象：生成彩虹滴后连续抓取若干帧（不量像素，仅导出图片供肉眼看）
 const { chromium } = require('playwright-core');
 const fs = require('fs');
 
@@ -14,12 +13,10 @@ const fs = require('fs');
   await page.mouse.click(210 * s, 426 * s);
   await page.waitForTimeout(400);
 
-  // 反复投放彩虹滴，让它落在堆里持续可见
   for (let i = 0; i < 6; i++) {
     await page.evaluate((x) => { window.MG.debug.setNext({ special: 'rainbow' }); window.MG.debug.drop(x); }, 150 + i * 30);
     await page.waitForTimeout(120);
   }
-  // 再强制放一颗悬空的，便于看清标记
   await page.evaluate(() => { var b = window.MG.debug.spawn(3, 210, 300); b.special = 'rainbow'; b.frozen = 0; window.__rb = b; });
   await page.waitForTimeout(200);
 

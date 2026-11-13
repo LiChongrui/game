@@ -1,4 +1,3 @@
-// 定位诊断：强制生成彩虹滴，逐帧读内部状态，判断 special/time 是否跳变导致"闪"
 const { chromium } = require('playwright-core');
 
 (async () => {
@@ -16,7 +15,6 @@ const { chromium } = require('playwright-core');
   await page.mouse.click(210 * s, 426 * s);
   await page.waitForTimeout(400);
 
-  // 强制生成一颗孤立彩虹滴（落点上方，避免立刻合并）
   await page.evaluate(() => {
     var b = window.MG.debug.spawn(0, 210, 250);
     b.special = 'rainbow';

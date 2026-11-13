@@ -1,4 +1,3 @@
-// 性能探针 v2：维持满场压力 + CDP CPU 降速（6x 模拟中端安卓机）
 const { chromium } = require('playwright-core');
 const path = require('path');
 (async () => {
@@ -8,9 +7,8 @@ const path = require('path');
   await page.waitForTimeout(1500);
   await page.evaluate(() => { MG.debug.forceEndless(); });
   const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 }); // 中端安卓近似
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
 
-  // 维持约 55 枚：每 800ms 补一次货
   const topup = setInterval(() => {
     page.evaluate(() => {
       const cur = MG.probe().n;

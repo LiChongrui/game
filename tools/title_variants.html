@@ -45,7 +45,6 @@ function drawVar(id, opt) {
     c.rotate(ch.rot);
     c.scale(ch.s, ch.s);
     c.font = '900 ' + FS + 'px system-ui, sans-serif';
-    // 1) 硬投影：实色深蓝，向下偏移
     c.save();
     c.translate(0, 4.5);
     c.strokeStyle = opt.shadowC; c.lineWidth = 12;
@@ -53,7 +52,6 @@ function drawVar(id, opt) {
     c.fillStyle = opt.shadowC;
     c.fillText(TXT[i], 0, 0);
     c.restore();
-    // 2) 白描边（可纵向渐变）
     if (opt.strokeGrad) {
       var sg = c.createLinearGradient(0, -FS * 0.85, 0, 4);
       sg.addColorStop(0, '#FFFFFF');
@@ -64,20 +62,17 @@ function drawVar(id, opt) {
     }
     c.lineWidth = 12;
     c.strokeText(TXT[i], 0, 0);
-    // 2.5) 单淡蓝内环（可选）
     if (opt.innerRing) {
       c.strokeStyle = opt.innerRing;
       c.lineWidth = 10;
       c.strokeText(TXT[i], 0, 0);
     }
-    // 3) 字面
     var fg = c.createLinearGradient(0, -FS * 0.78, 0, 4);
     fg.addColorStop(0, opt.faceTop);
     fg.addColorStop(0.55, opt.faceMid);
     fg.addColorStop(1, opt.faceBot);
     c.fillStyle = fg;
     c.fillText(TXT[i], 0, 0);
-    // 4) 顶部高光带
     c.save();
     c.globalAlpha = opt.hl;
     c.beginPath(); c.rect(-ADV / 2 - 6, -FS * 0.85, ADV + 12, FS * 0.28); c.clip();

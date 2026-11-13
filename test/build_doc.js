@@ -1,10 +1,3 @@
-// 生成《水滴合成深海》游戏说明文档（单文件 HTML，图标 base64 内嵌；图标由 doc_icons.js 预先导出到 test/icons/）
-// v341：游戏说明整体重构（用户："目前不好看、内容不足；要写基础玩法（消除/清除等），不要本地运行这类，只要游戏相关"）
-//   ——① 新增「基础玩法」五步卡（投放/合成消除/清除/潮汐浮力/判负复活），补足基础玩法叙述；
-//      ② 视觉重构：深海底色 + 卡片化分区 + 步骤卡 + 表格美化，告别纯清单观感；
-//      ③ 删除「本地运行 / 在线试玩」等非游戏内容（仅保留页眉一处进入入口）；
-//      ④ 修正 深渊潜航「累计 5 万分解锁」描述（v341 已移除该门槛，改经「每日挑战」直接可玩）。
-//   其余数值段落（合成链 / 海域 / 特殊滴 / 技能 / 潮汐 / 判负 / 词缀局 / 界面 / 分色）与游戏说明.md 同步。
 const fs = require('fs');
 const path = require('path');
 
@@ -50,19 +43,15 @@ const css = `
   footer { text-align:center; color:#9CC2D6; font-size:12.5px; margin-top:34px; line-height:1.9; }
 `;
 
-// 通用：把 [项, 值] 数组渲染成两列表格
 const kvTable = (rows, w) => `<table><tr><th style="width:${w || '150px'}">项目</th><th>值</th></tr>` +
   rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('') + '</table>';
 
-// 合成链 9 档
 const TIERS = [['tier0', '雾泡', 1], ['tier1', '水滴', 3], ['tier2', '露珠', 6], ['tier3', '浪花', 10], ['tier4', '溪流', 15], ['tier5', '湖泊', 21], ['tier6', '江河', 29], ['tier7', '大海', 38], ['tier8', '沧海', 50]];
 const tiersHtml = TIERS.map((t, i) => `<tr><td class="num">${i + 1}</td><td><img class="ic" src="${ico(t[0])}" alt="">${t[1]}</td><td class="num">${t[2]}</td></tr>`).join('');
 
-// 海域 8 枚
 const SEAS = [['sea0', '潮汐池', '0'], ['sea1', '珊瑚浅海', '3,000'], ['sea2', '蔚蓝深海', '10,000'], ['sea3', '午夜深渊', '25,000'], ['sea4', '月光环礁', '50,000'], ['sea5', '海沟之眼', '100,000'], ['sea6', '热泉裂谷', '180,000'], ['sea7', '深渊王座', '300,000']];
 const seasHtml = SEAS.map((s, i) => `<tr><td class="num">${i + 1}</td><td><img class="ic" src="${ico(s[0])}" alt="">${s[1]}</td><td class="num">${s[2]}</td></tr>`).join('');
 
-// 特殊水滴 15 种
 const SPS = [
   ['sp_rune', '符文滴', '潮汐池', '合成时为对应技能 +1 充能（技能随其首次出现解锁）'],
   ['sp_cloud', '雨云滴', '珊瑚浅海', '落地随机分裂 2~3 颗水滴（档位随机，不大于当前等级）'],
@@ -82,7 +71,6 @@ const SPS = [
 ];
 const spHtml = SPS.map(s => `<tr><td><img class="ic" src="${ico(s[0])}" alt="">${s[1]}</td><td>${s[2]}</td><td>${s[3]}</td></tr>`).join('');
 
-// 消除途径总览（v356：用户"游戏说明应当体现如何消除水滴，否则给人的感觉就是一直在合成"）
 const CLEARS = [
   ['合成升级', '2 → 1', '两颗同档相触合并为高一档，常态减压：投放 1 颗 +1，合成一次 −1'],
   ['<b>顶级「沧海」汇入海域</b>', '2 → 0', '两颗最高档「沧海」相触即<b>双双消失</b>，得分 ×4 再 +300，此后全局倍率 +25%/次'],
@@ -97,7 +85,6 @@ const CLEARS = [
 ];
 const clearHtml = CLEARS.map(c => `<tr><td>${c[0]}</td><td>${c[1]}</td><td>${c[2]}</td></tr>`).join('');
 
-// 技能 4 个
 const SKILLS = [
   ['skill_swap', '换滴', '1 充能', '换滴符文首次出现', '把待投水滴换成下一颗'],
   ['skill_ripple', '涟漪', '1 充能', '涟漪符文首次出现', '以水堆重心炸开双重波纹推挤重排'],
@@ -106,7 +93,6 @@ const SKILLS = [
 ];
 const skillHtml = SKILLS.map(s => `<tr><td><img class="ic" src="${ico(s[0])}" alt="">${s[1]}</td><td class="num">${s[2]}</td><td>${s[3]}</td><td>${s[4]}</td></tr>`).join('');
 
-// 深海事件与宝箱
 const EVENTS = [
   [`<img class="ic" src="${ico('chest')}" alt="">大宝箱`, '潮汐池起出现；限时 14 秒点击开启；开出已解锁技能的充能 / 已出现的特殊滴，未解锁时改发积分'],
   ['深海涌泉', '托起底部水滴（涌泉水柱向上延展，视觉与抬升一致）'],
@@ -115,7 +101,6 @@ const EVENTS = [
 ];
 const eventsHtml = EVENTS.map(e => `<tr><td style="width:140px">${e[0]}</td><td>${e[1]}</td></tr>`).join('');
 
-// 词缀局（深渊潜航 / 每日挑战 合并一张表，「适用」列区分）
 const AFFIX = [
   ['重压深潜', '重力 +80%', '深渊潜航 / 每日挑战'],
   ['疾风骤雨', '潮汐间隔 -65%', '深渊潜航 / 每日挑战'],
@@ -126,7 +111,6 @@ const AFFIX = [
 ];
 const affixHtml = AFFIX.map(a => `<tr><td style="width:110px">${a[0]}</td><td>${a[1]}</td><td style="width:170px">${a[2]}</td></tr>`).join('');
 
-// 提示语分色 7 类
 const PCOL = [
   ['#D4A017', '得分', '+N、连击后缀'],
   ['#8E5AC8', '生效高光', '特殊滴、大招、稀有合成'],

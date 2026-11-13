@@ -60,7 +60,6 @@
 </div>
 
 <script>
-// ---- 与 render.js 完全一致的几何（v200）----
 function btn(ctx, r){
   ctx.fillStyle='#2E7DA8';
   ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();
@@ -105,36 +104,31 @@ function dial(ctx){
 function draw(canvas, iconFn, big, small){
   var ctx=canvas.getContext('2d');
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  if(big){ // 放大样：居中画大圆
+  if(big){
     ctx.save();ctx.translate(canvas.width/2,canvas.height/2-10);
     var R=54;btn(ctx,R);ctx.scale(R/18,R/18);iconFn(ctx);ctx.restore();
-    if(small){ // 真实小样
+    if(small){
       ctx.save();ctx.translate(canvas.width/2,canvas.height-26);
       btn(ctx,18);iconFn(ctx);ctx.restore();
     }
   }
 }
 
-// 大样 + 真实小样
 draw(document.getElementById('A'),function(c){cog(c,true)},true,true);
 draw(document.getElementById('B'),function(c){cog(c,false)},true,true);
 draw(document.getElementById('C'),sliders,true,true);
 draw(document.getElementById('D'),dial,true,true);
 
-// HUD 模拟条
 (function(){
   var cv=document.getElementById('mock'),ctx=cv.getContext('2d');
-  // 背景条（模拟 HUD 区域浅色）
   var g=ctx.createLinearGradient(0,0,0,cv.height);
   g.addColorStop(0,'rgba(255,255,255,0.10)');g.addColorStop(1,'rgba(255,255,255,0.02)');
   ctx.fillStyle=g;ctx.fillRect(0,0,cv.width,cv.height);
-  // 实际大小设置钮（左）
   ctx.save();ctx.translate(25+0,35);btn(ctx,18);cog(ctx,true);ctx.restore();
   ctx.fillStyle='#EAF3F8';ctx.font='12px system-ui';ctx.textAlign='left';
   ctx.fillText('设置',55,30);
   ctx.fillStyle='#9FC2D8';ctx.font='11px system-ui';
   ctx.fillText('（真实 r=18）',55,46);
-  // 放大 3× 对照（右）
   ctx.save();ctx.translate(300,60);btn(ctx,54);ctx.scale(3,3);cog(ctx,true);ctx.restore();
   ctx.fillStyle='#9FC2D8';ctx.font='11px system-ui';ctx.textAlign='center';
   ctx.fillText('放大 3×',300,108);

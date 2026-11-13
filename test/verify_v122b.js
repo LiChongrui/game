@@ -1,4 +1,3 @@
-// v122 补充：干净档图鉴收集度徽条初始态（0/25 空条+白色刻度）
 const { chromium } = require('playwright-core');
 const path = require('path');
 (async () => {
@@ -9,7 +8,7 @@ const path = require('path');
   await p.addInitScript(() => { localStorage.clear(); });
   await p.goto('file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/'));
   await p.waitForTimeout(1500);
-  await p.mouse.click(210, 426); // 开始进入局内
+  await p.mouse.click(210, 426);
   await p.waitForTimeout(600);
   await p.evaluate(() => { MG.debug.openDex(); });
   await p.waitForTimeout(400);

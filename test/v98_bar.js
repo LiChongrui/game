@@ -1,4 +1,3 @@
-// v98 验证：海域进度条配色（填充=当前海域深水色，右端圆点=下一海域色）多海域截图
 const { chromium } = require('playwright-core');
 const path = require('path');
 
@@ -17,7 +16,6 @@ const path = require('path');
   await page.waitForTimeout(500);
   console.log('状态:', await page.evaluate(() => MG.probe().state), '(期望 play)');
 
-  // 海域 0（潮汐池）中段 + 邻近下一海域
   for (const [name, score] of [['s0_mid', 1500], ['s1_mid', 6500], ['s3_mid', 37000], ['s6_mid', 240000]]) {
     await page.evaluate(sc => { MG.debug.setLife(sc); }, score);
     await page.waitForTimeout(900);

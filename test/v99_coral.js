@@ -1,4 +1,3 @@
-// v99 验证：珊瑚浅海徽章改绿后的和谐度（进度条左端徽章 + 图鉴海域行）
 const { chromium } = require('playwright-core');
 const path = require('path');
 
@@ -16,12 +15,10 @@ const path = require('path');
   await page.mouse.click(btn.x, btn.y);
   await page.waitForTimeout(500);
 
-  // 珊瑚浅海中段：进度条左端徽章应显绿色
   await page.evaluate(() => MG.debug.setLife(6500));
   await page.waitForTimeout(900);
   await page.screenshot({ path: path.join(__dirname, 'v99_bar.png'), clip: { x: 0, y: 60, width: 420, height: 90 } });
 
-  // 图鉴海域演进分节：点分节控件右半（dexSecRect(1) 中心）
   await page.evaluate(() => MG.debug.openDex());
   await page.waitForTimeout(400);
   const seg = await page.evaluate(() => MG.debug.dexSecTab(1));

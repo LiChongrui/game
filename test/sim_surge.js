@@ -1,8 +1,3 @@
-// 深海涌泉抬升高度仿真（headless 快进，无渲染）——用户："深海涌泉力太大了，吹起的水滴太高了，可以减少一半的高度"
-// 测量：混合堆 + 单滴落底两种局面下，涌泉事件（6s）中每滴的抬升峰值（静止顶部 → 最高顶部）
-// 另记录堆顶抬升、是否越警戒线、是否判负。
-// 能量模型参考：抬升高度 ≈ 作用区 ×(1+净上托/重力)；当前 作用区210 × (1+400/1500) ≈ 266px
-// 用法：node sim_surge.js
 const path = require('path');
 let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) { console.error('需要 playwright-core'); process.exit(1); }
@@ -24,9 +19,9 @@ try { chromium = require('playwright-core').chromium; } catch (e) { console.erro
     const DT = 1 / 60;
     function surgeCase(spawnFn, seconds) {
       MG.debug.reset();
-      MG.debug.setLife(25000); // 午夜深渊（事件与海域无关，取中段海域即可）
+      MG.debug.setLife(25000);
       spawnFn();
-      for (let k = 0; k < 150; k++) MG.debug.step(DT); // 2.5s 静置成堆
+      for (let k = 0; k < 150; k++) MG.debug.step(DT);
       const pr0 = MG.probe();
       const dangerY = pr0.dangerY;
       const rest = pr0.bodies.map(b => b.y - b.r);
@@ -39,7 +34,6 @@ try { chromium = require('playwright-core').chromium; } catch (e) { console.erro
         MG.debug.step(DT);
         const pr = MG.probe();
         if (pr.state === 'over' && !over) { over = true; overAt = (k + 1) * DT; }
-        // 按 x 距离匹配回同一滴（堆内基本不换位；取最近的静止位置）
         pr.bodies.forEach((b, i) => {
           if (i < minTops.length) {
             const top = b.y - b.r;
@@ -59,12 +53,10 @@ try { chromium = require('playwright-core').chromium; } catch (e) { console.erro
       };
     }
     return {
-      single: surgeCase(() => { MG.debug.spawn(3, 210, 700); }, 7), // 浪花单滴落底（r≈36）
-      // 异档堆（0~7 各一滴，无同档合并干扰——合并反冲会额外甩高，污染高度测量）
+      single: surgeCase(() => { MG.debug.spawn(3, 210, 700); }, 7),
       pile: surgeCase(() => {
         for (let t = 0; t < 8; t++) MG.debug.spawn(t, 60 + (t * 45) % 300, 480 + (t % 4) * 40);
       }, 7),
-      // 混合堆（含同档位，合成反冲会额外抬升——真实对局参考）
       pileMix: surgeCase(() => {
         const tiers = [0, 1, 2, 0, 1, 2, 3, 1, 2, 0, 3, 2];
         for (let i = 0; i < tiers.length; i++) MG.debug.spawn(tiers[i], 60 + (i * 53) % 300, 500 + (i % 4) * 40);

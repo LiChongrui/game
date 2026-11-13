@@ -1,6 +1,3 @@
-// v139 验证：修复小程序菜单「开始游戏」文字异常——
-// 根因：drawOfflineCard 末尾 ctx.textAlign='left' 泄漏给开始按钮（离线卡显示时文字左对齐从 C.W/2 画起，向右溢出）
-// 验证：模拟离线收益（mg_seen 设 2 小时前）→ 菜单显示离线卡 → 像素探针断言按钮行文字水平居中
 const { chromium } = require('playwright-core');
 const path = require('path');
 
@@ -9,7 +6,6 @@ const path = require('path');
   let fails = 0;
   const ok = (cond, msg) => { console.log((cond ? 'PASS' : 'FAIL') + ' ' + msg); if (!cond) fails++; };
 
-  // ---- 场景 1：有离线收益（离线卡显示，原 bug 触发路径）----
   let page = await browser.newPage({ viewport: { width: 420, height: 780 } });
   let errs = [];
   page.on('pageerror', e => errs.push(e.message));
@@ -20,18 +16,16 @@ const path = require('path');
   await page.screenshot({ path: path.join(__dirname, 'v139_menu_offline.png') });
 
   const hasCard = await page.evaluate(() => {
-    // 离线卡金色标题像素存在性：扫描 y≈338（块内 316+22）附近金色文字
     var cv = document.getElementById('game');
     var c2 = cv.getContext('2d');
     var d = c2.getImageData(0, 330, 420, 14).data;
     for (var i = 0; i < d.length; i += 4) {
-      if (d[i] > 200 && d[i + 1] > 160 && d[i + 2] < 120) return true; // 金色 #F5C542 系
+      if (d[i] > 200 && d[i + 1] > 160 && d[i + 2] < 120) return true;
     }
     return false;
   });
   ok(hasCard, '离线收益卡已显示（bug 触发前提成立）');
 
-  // 按钮文字水平居中：按钮 100~320 / y 中心 426，检测白色文字像素段
   const span = await page.evaluate(() => {
     var c2 = document.getElementById('game').getContext('2d');
     var d = c2.getImageData(0, 424, 420, 5).data;
@@ -55,7 +49,6 @@ const path = require('path');
   ok(errs.length === 0, '有离线收益场景零报错' + (errs.length ? '：' + errs.join(' | ') : ''));
   await page.close();
 
-  // ---- 场景 2：无离线收益（常规回归：按钮 + 局内几何不回归）----
   page = await browser.newPage({ viewport: { width: 420, height: 780 } });
   errs = [];
   page.on('pageerror', e => errs.push(e.message));

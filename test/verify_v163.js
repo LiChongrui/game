@@ -1,4 +1,3 @@
-// v163 验证：底部按钮回到块内底部带（cy=701，容器底 673~块底 747 的 74 带内），顶部仍贴顶
 const { chromium } = require('playwright-core');
 const path = require('path');
 
@@ -7,7 +6,6 @@ const path = require('path');
   let fails = 0;
   const ok = (cond, msg) => { console.log((cond ? 'PASS' : 'FAIL') + ' ' + msg); if (!cond) fails++; };
 
-  // —— 页 1：标准 420×780 ——
   const page = await browser.newPage({ viewport: { width: 420, height: 780 } });
   const errs = [];
   page.on('pageerror', e => errs.push(e.message));
@@ -33,7 +31,6 @@ const path = require('path');
   await page.waitForTimeout(900);
   await page.screenshot({ path: path.join(__dirname, 'v163_play_780.png') });
 
-  // —— 页 2：长屏 420×980 + 模拟微信胶囊 safeTop=100 ——
   const page2 = await browser.newPage({ viewport: { width: 420, height: 980 } });
   page2.on('pageerror', e => errs.push(e.message));
   await page2.goto('file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/'));
@@ -50,7 +47,6 @@ const path = require('path');
   ok(Math.abs((r2.rCy - r2.floorY) - 28) < 0.5, '长屏下与容器底距离仍是 28px');
   ok(r2.muteTop >= 100 / r2.s - 0.5, '静音圆顶缘不低于胶囊下缘');
 
-  // 底部带下方到屏底由海床/渐变延伸填充（无缝）：屏底像素应为深水色而非背景断裂
   const bot = await page2.evaluate(() => {
     var c2 = document.getElementById('game').getContext('2d');
     var t = c2.getTransform(), k = t.a, oyT = t.f;
@@ -70,9 +66,8 @@ const path = require('path');
   const st2 = await page2.evaluate(() => window.state);
   ok(st2 === 'play', '长屏+胶囊可正常开局（state=' + st2 + '）');
 
-  // 底部按钮点击链路（重开右下角，长屏+胶囊下仍在块内 701 位置）
   const hit = await page2.evaluate(() => {
-    var sy = (701 + window.oy) * window.view.s; // 块内 701 → 屏幕逻辑 → 设备 px
+    var sy = (701 + window.oy) * window.view.s;
     return { sy: sy, expected: 701 + window.oy };
   });
   await page2.mouse.click(396, hit.sy);

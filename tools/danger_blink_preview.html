@@ -47,7 +47,6 @@
 
 <script>
 (function () {
-  // ---------- 各闪烁方案：输入 time(秒) 与 near(0~1 危险度)，输出 blink(0~1 明灭系数) ----------
   var schemes = [
     {
       id: '当前', name: '当前 v221', desc: '≈2.3Hz 方波 · 亮短灭长 · 灭态留 12% 底光',
@@ -63,7 +62,7 @@
         var period = 1.15, ph = (t % period) / period;
         function pulse(ph, s, d) {
           if (ph < s || ph >= s + d) return 0;
-          return Math.sin(((ph - s) / d) * Math.PI); // 半正弦脉冲：快起快落像闪光灯
+          return Math.sin(((ph - s) / d) * Math.PI);
         }
         var b = Math.max(pulse(ph, 0.02, 0.11), pulse(ph, 0.20, 0.11));
         return Math.pow(Math.max(0, b), 0.8);
@@ -101,16 +100,14 @@
     }
   ];
 
-  var NEAR = 0.85;   // 演示用危险度：堆顶贴近警戒线
+  var NEAR = 0.85;
   var DPR = Math.min(2, window.devicePixelRatio || 1);
   var CW = 316, CH = 210, LINE_Y = 96;
 
-  // ---------- 与游戏 drawDangerLine 一致的绘制（参数化 near / blink） ----------
   function drawScene(ctx, blink, time) {
     var W = CW, H = CH, y = LINE_Y, near = NEAR;
     ctx.clearRect(0, 0, W, H);
 
-    // 静止水滴堆（3 颗，顶滴贴近线）
     function drop(x, cy, r) {
       var g = ctx.createRadialGradient(x - r * 0.35, cy - r * 0.4, r * 0.15, x, cy, r);
       g.addColorStop(0, 'rgba(190,230,255,0.95)');
@@ -124,7 +121,6 @@
     drop(W * 0.5 - 22, y + 42 + 68, 22);
     drop(W * 0.5 + 23, y + 42 + 70, 21);
 
-    // 危险渐晕
     var dz = ctx.createLinearGradient(0, y, 0, y + 42);
     dz.addColorStop(0, 'rgba(38,78,108,' + (0.12 + near * 0.06) + ')');
     dz.addColorStop(1, 'rgba(38,78,108,0)');
@@ -136,7 +132,6 @@
       ctx.fillStyle = wz; ctx.fillRect(0, y, W, 42);
     }
 
-    // 光带
     var lr = Math.round(96 + near * 130), lgn = Math.round(150 - near * 60), lb = Math.round(196 - near * 122);
     var cCore = 'rgba(' + lr + ',' + lgn + ',' + lb + ',';
     var a = (0.3 + near * 0.6) * blink;
@@ -150,7 +145,6 @@
     ctx.lineWidth = 2 + near * 1.4;
     ctx.beginPath(); ctx.moveTo(2, y); ctx.lineTo(W - 2, y); ctx.stroke();
 
-    // 流动刻度
     ctx.save();
     ctx.strokeStyle = 'rgba(255,255,255,' + ((0.35 + near * 0.5) * blink) + ')';
     ctx.lineWidth = 1.6 + near;
@@ -160,7 +154,6 @@
     ctx.beginPath(); ctx.moveTo(2, y); ctx.lineTo(W - 2, y); ctx.stroke();
     ctx.restore();
 
-    // 端点光珠
     if (near > 0.05) {
       var pa = (0.35 + near * 0.55) * blink;
       for (var side = 0; side < 2; side++) {
@@ -175,7 +168,6 @@
     }
   }
 
-  // ---------- 构建卡片 ----------
   var grid = document.getElementById('grid');
   var canvases = [];
   schemes.forEach(function (s) {
@@ -189,7 +181,6 @@
     canvases.push({ ctx: cv.getContext('2d'), scheme: s });
   });
 
-  // ---------- 动画循环 ----------
   var t0 = performance.now();
   function frame(now) {
     var t = (now - t0) / 1000;

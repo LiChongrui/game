@@ -1,4 +1,3 @@
-// 现状截图：成就页(3页签) + 图鉴页
 const { chromium } = require('playwright-core');
 const path = require('path');
 
@@ -13,18 +12,16 @@ const path = require('path');
   await page.mouse.click(210, 426);
   await page.waitForTimeout(400);
 
-  // 成就页 → 3 页签
   await page.mouse.click(24, 36);
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(__dirname, 'chk_ach0.png') });
-  await page.mouse.click(72, 120); // 中间页签（每日）
+  await page.mouse.click(72, 120);
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(__dirname, 'chk_ach1.png') });
-  await page.mouse.click(298, 120); // 榜单
+  await page.mouse.click(298, 120);
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(__dirname, 'chk_ach2.png') });
 
-  // 图鉴
   await page.evaluate(() => MG.debug.openDex());
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(__dirname, 'chk_dex0.png') });

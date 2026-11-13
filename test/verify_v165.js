@@ -1,4 +1,3 @@
-// v165 定位断言：游戏态 HUD 统一下移（drawQuest 纳入 translate(0,oy)）消除叠压；彩虹滴改用 rgba
 const { chromium } = require('playwright-core');
 
 (async () => {
@@ -32,7 +31,6 @@ const { chromium } = require('playwright-core');
     await browser.close();
   }
 
-  // HSL→RGBA 工具正确性
   {
     const browser = await chromium.launch({ executablePath: exe });
     const page = await browser.newPage({ viewport: { width: 375, height: 812 } });

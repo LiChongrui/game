@@ -1,4 +1,3 @@
-// v167 截图：确认道具区下方蓝色方块背景已去除（底部为海床渐变，无色块）
 const { chromium } = require('playwright-core');
 
 (async () => {
@@ -15,7 +14,7 @@ const { chromium } = require('playwright-core');
     await page.waitForFunction(() => window.MG && window.MG.probe, null, { timeout: 8000 });
     const vb = await page.evaluate(() => ({ iw: innerWidth, ih: innerHeight, oy: window.MG.probe().oy }));
     const s = Math.min(vb.iw / 420, vb.ih / 747);
-    await page.mouse.click(210 * s, (426 + vb.oy) * s); // 开始按钮（块内 210,426 + 居中偏移 oy）
+    await page.mouse.click(210 * s, (426 + vb.oy) * s);
     await page.waitForTimeout(700);
     await page.screenshot({ path: require('path').resolve(__dirname, filename) });
     console.log(filename, 'errors:', errors.length);

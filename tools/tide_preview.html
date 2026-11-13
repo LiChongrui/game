@@ -41,7 +41,6 @@
 </div>
 
 <script>
-// ---- 与 render.js drawTideTimer 完全一致的几何（v204 右锚定·透明未填充·文本叠水波）----
 function roundRect(ctx,x,y,w,h,r){
   ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);
   ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
@@ -60,20 +59,19 @@ function drawTideTimer(ctx, tide, time, rect, seaC){
   function hexA(hex,a){var n=parseInt(hex.slice(1),16);return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';}
 
   var label = active?'涨潮':'潮汐';
-  var ns = Math.ceil(tide.timer)+'s';    // 文本直接居中，不补空格
+  var ns = Math.ceil(tide.timer)+'s';
   ctx.textBaseline='middle'; ctx.textAlign='left';
   ctx.font='bold 15px system-ui,sans-serif'; var lw=ctx.measureText(label).width;
   ctx.font='bold 22px system-ui,sans-serif';
-  var nw=ctx.measureText(ns).width;      // 当前数字宽（仅用于卡内居中定位）
+  var nw=ctx.measureText(ns).width;
   var gap=5;
-  var maxNumW=ctx.measureText('99s').width;   // 2 位数最大宽，固定基准
+  var maxNumW=ctx.measureText('99s').width;
   var textW=lw+gap+nw;
   var fixedTextW=lw+gap+maxNumW;
   var padX=16, cw=fixedTextW+padX*2, tx=rect.canvasW-rect.margin-cw, midY=ty+th/2;
 
   var wTop=ty+6, wBot=ty+th;
 
-  // 卡体：白描边（与游戏内同族；未填充区透明）
   if(warn||active){ ctx.save();
     ctx.shadowColor = warn?'rgba(214,96,40,0.5)':'rgba(120,170,210,0.6)';
     ctx.shadowBlur = 9+pulse*8; }
@@ -82,7 +80,6 @@ function drawTideTimer(ctx, tide, time, rect, seaC){
   roundRect(ctx,tx+0.9,ty+0.9,cw-1.8,th-1.8,14); ctx.stroke();
   if(warn||active) ctx.restore();
 
-  // 水波：直接用游戏自身海域水色 seaC（即“潮水”本色），水波与潮水同色，不另造颜色
   var backC=seaC, frontC=seaC;
   var frontA=warn?0.55:(active?0.62:0.46);
   var backA=warn?0.32:(active?0.34:0.26);
@@ -114,7 +111,6 @@ function drawTideTimer(ctx, tide, time, rect, seaC){
   }
   ctx.restore();
 
-  // 文本：白描边 + 深海蓝填充；「标签+秒数」整体居中，不补空格
   var sx=tx+(cw-textW)/2;
   ctx.lineJoin='round'; ctx.lineWidth=3;
   ctx.strokeStyle='rgba(255,255,255,0.9)';
@@ -131,14 +127,12 @@ function drawTideTimer(ctx, tide, time, rect, seaC){
   ctx.textBaseline='alphabetic';
 }
 
-// ---- 模拟潮汐循环：待潮(12s) → 预警(<5s) → 涨潮(8s) → 待潮 ----
 var cv=document.getElementById('c'), ctx=cv.getContext('2d');
-var rect={y:30, h:44, canvasW:440, margin:30};   // v208：高度 52→44
+var rect={y:30, h:44, canvasW:440, margin:30};
 var tide={phase:'idle', timer:12, progress:0.1, warnTime:5, duration:8};
 var t0=performance.now();
 function step(now){
   var time=(now-t0)/1000;
-  // 推进模拟
   if(tide.phase==='idle'){
     tide.timer-=0.016;
     tide.progress=Math.max(0.05, tide.progress-0.0016);
@@ -149,11 +143,9 @@ function step(now){
     if(tide.timer<=0){ tide.phase='idle'; tide.timer=12; }
   }
   ctx.clearRect(0,0,cv.width,cv.height);
-  // 绘制代表游戏深海背景，便于直观看到“未填充区透明”
   var g=ctx.createLinearGradient(0,0,0,cv.height);
   g.addColorStop(0,'#0E3A5C'); g.addColorStop(1,'#0A2A45');
   ctx.fillStyle=g; ctx.fillRect(0,0,cv.width,cv.height);
-  // 上行：普通海域（蔚蓝深海 bg[3]=#3D82BE）；下行：最深海域（海沟之眼 bg[3]=#1B2D66，验证涨潮不发黑）
   drawTideTimer(ctx,tide,time,rect,'#3D82BE');
   var rect2={y:90, h:44, canvasW:440, margin:30};
   drawTideTimer(ctx,tide,time,rect2,'#1B2D66');

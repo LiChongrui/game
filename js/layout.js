@@ -1,182 +1,91 @@
-// 水滴合成深海 - layout：布局几何唯一真源
-// 模块加载顺序 1.5/4（config 之后、physics 之前）。经典 script 共享全局作用域，
-// 本文件只依赖 MG.config；core/systems/panels/render 运行期经全局作用域解析引用。
-//
-// ★ 设计目标（v175）：改屏幕比例只改 config 的 C.H 一处，全游戏元素位置自动重排。
-// 一切坐标从「基础几何」经公式派生，分四层：
-//   ① hud   顶部信息区（0~hudBottom）：★ 按顶部定位——钉块顶，绝对定版，块高变化不动（v183）
-//   ② body  容器区（containerTop~floorY）：★ 按底部定位——= 9:18 定版基准 + dy（v183）
-//   ③ band  底部带（floorY~H）：高度恒 75 贴块底；内部（按钮/装饰）钉 floorY 相对位
-//   ④ panel 全屏面板：同样按底部定位（= 9:18 定版基准 + dy），不漂流
-// 菜单（开始界面）：按底部定位（= 9:18 定版基准 + dy）
-//
-// ★ 定位语义（v183 用户定版，覆盖 v175~v182 的 EXTRA 分配方案）：
-//   "HUD 部分按照顶部定位，其他的按照底部定位，弹性空间不需要设置，有多少是多少。"
-//   HUD 钉块顶（0~hudBottom）；其余一切 = 9:18 定版基准值 + dy，随块底整体平移；
-//   HUD 底与容器顶之间的空隙 = 自然残余，不再显式分配。
-// ★★ 容器顶不设置（v184 用户定版："容器到HUD顶部，直接到窗口最大位置即可，
-//   相当于不设置容器顶；堆叠空间没必要，堆叠区从堆叠底部开始，高度上限不需要设置"）：
-//   containerTop = 0——容器从块顶开始长；失败线 dangerY 直接钉绝对基准
-//   （315+dy，含 v178/v181 两次+40 与 v188 单独下移 10），
-//   "堆叠空间"退为派生量（floorY-dangerY 自动守恒），不再是反推参数。
-// ★★★ 出生点独立基准（v190）：spawnY = 260+dy 与警戒线解耦（"单独移警戒线"语义：
-//   警戒线动、出生点不动、两者间距必变）；出生通道 = dangerY-spawnY = 55；
-//   弹出提示锚 mirrorCy = dangerY + 出生通道 = 370+dy（出生区相对警戒线的镜像对称位）。
-// ★ v194 堆叠空间中点 stackCy = (dangerY+floorY)/2 = 540+dy：深海事件"漩涡风暴"锚点
-//   （旧公式 containerTop+(floorY-containerTop)*0.45 的语义"从容器顶往下 45%"在 v184
-//    容器顶改 0 后静默漂移到 344，漩涡盘顶压过警戒线 31px；改锚堆叠区中心永不再压线）。
-// ★ v195 HUD 下探 + 底部六钮均匀化（用户："HUD信息区可以设置更大的范围（例如占用部分伸缩区），
-//   请重新调整这部分的样式，尤其是任务元素（太丑了，请重新设计）"；"底部按钮/道具应当均匀
-//   分布，且左侧按钮（图鉴）与右侧按钮（重开）距离左右边界的距离应该是一定的"）：
-//   · hudBottom 165→190：占用伸缩区 25，余 70 = 特殊滴虚影标签空间（r≤36 不碰 HUD）；
-//   · 任务条 205×35 → 任务卡 285×60（靶心图标+标题+星级+金色进度条）；潮汐胶囊 90×35
-//     → 潮汐卡 95×60（同高同款，左右边距各 15、卡间 10，全部 5 的倍数，守 v191 规范）；
-//   · 底部六钮：band.btnCx = 35+i×(W−70)/5 公式派生、band.btnR=20 统一半径
-//     （旧写死 45/115/…/395 左右缘距 25≠10、重开 r15 偏小）。
-// ★ v197 第一排重排（用户："图标也太丑了，成就按钮先隐藏掉吧。游戏内这个地方改成设置按钮，
-//   用来弹出设置音效、音乐和震动，右侧的音量按钮移除掉"；设置弹窗底部不放说明文本）：
-//   · 成就按钮（奖杯）整套隐藏；右上角音量钮整套移除；左上角原位新增设置钮（setCx=25
-//   占原奖杯位，半径引 rowBtnR=18，样式沿用 v196 drawRowBtn 白底圆+蓝灰环+齿轮图标）；
-//   · 新增设置弹窗 panel.set（v317 起 300×326 块内居中，随 dy 平移）：标题 + ✕ + 四行
-//     （音效/音乐/震动三开关，每行 260×56：名称+小字说明+右侧 52×30 滑块，点整行即切换；
-//      v317 第 4 行 = 清空存档，危险样式，点行开二级确认 panel.setClear）；
-//     弹窗打开时屏蔽瞄准/掉落（与重开确认弹窗同门禁）；底部按用户要求不放说明文本。
-//     v317 高度 260→326：四行排满 50+3×66+56=304，余 22（与旧版三行的 12 对称留白）。
-// ★ 数值规范（v191 用户要求"值要求是 0 或者 5 结尾"）：本文件所有基准值统一为
-//   5 的倍数（坐标/尺寸/偏移全部整齐，便于目测核对与微调）。
-//   dy = C.H - 840（9:18 定版基准块高）：H=840 → 0（= 当前交付逐像素一致）；
-//   改比例只改 C.H，HUD 不动、其余全部 +dy。
-//   约束：H ≥ 765 + 75 = 840（当前交付比例即下限）。
-// 适配策略（view.s / oy / renderOy / hudInset）由 core.fit() 每帧重算，见其注释。
-//
-// ★ 使用规范：绘制与命中热区一律引用 MG.layout.xxx，禁止再写死坐标数字；
-//   config 改 C.H 后无需改任何其他文件（fit() 每次 resize 会调 build() 重算）。
 window.MG = window.MG || {};
 MG.layout = {
   hud: null, body: null, band: null, panel: null, menu: null,
-  dy: 0,        // 当前块高相对 9:18 定版基准的底部平移量（= C.H - 840），供探针/调试输出
+  dy: 0,
 
-  // 由基础几何重建全部派生坐标（幂等；config 被外部改动后调用即可同步）
   build: function () {
     var C = MG.config, W = C.W, H = C.H;
-    // ★★ 容器顶不设置（v184 用户定版）：containerTop = 0，容器从块顶开始长；
-    //   失败线 dangerY 直接钉绝对基准（315+dy，v191 数值规范：317→315），
-    //   "堆叠空间"不再作为反推参数——它只是派生量 floorY - dangerY，自动守恒。
-    var dy = H - 840;                  // 9:18 定版基准块高 840；H=840 → 0
+    var dy = H - 840;
     this.dy = dy;
-    C.floorY = H - 75;                 // 765（9:18）：容器底 = 块底 - 底部带 75
-    C.containerTop = 0;                // 容器顶不设置（v184）：容器从块顶（窗口最大位置）开始长
-    C.dangerY = 315 + dy;              // 315（9:18）：失败线绝对基准（254+两次+40-同步上移+单独下移10，v191 取整）
-    // 坠落高度 = 出生点绝对基准（260+dy，v190 定版，与警戒线解耦）。
-    // v188 曾按"公式跟随"让 spawnY 随警戒线联动，用户反馈"单独给警戒线往下移10 好像
-    // 没有生效，因为警戒线和出生区的间距没有变化"——"单独移"语义 = 警戒线动、出生点不动。
-    C.spawnY = 260 + dy;               // 260（9:18）：出生点独立基准，不随警戒线漂移
+    C.floorY = H - 75;
+    C.containerTop = 0;
+    C.dangerY = 315 + dy;
+    C.spawnY = 260 + dy;
 
-    // ---- ① 顶部 HUD 区（v149/v161 定版行位；★ 钉块顶，块高变化时本区不动）----
     this.hud = {
-      row1Y: 40,               // 统计最佳结果 / 计时 baseline（与设置钮 cy35 垂直居中对齐同排）
-      trophyCy: 35,            // 设置按钮圆心（+hudInset 避让胶囊）
-      setCx: 25,               // v197：设置钮 x（占原奖杯位；右上角音量钮已移除）
-      rowBtnR: 18,              // v196：第一排圆钮统一半径（设置钮，15→18 变大）
-      scoreY: 85,              // 当前得分 baseline（translate 锚点；v234b：80→85，按设置钮底(53)~进度条顶(98)中点≈75 居中）
-      seaBar: { sx: 25, sy: 98, sw: W - 50, sh: 24 }, // 海域进度条（v151 定版 100~120；v223 高 20→24、上移 2 补偿：上让出分数行间隙、下仍留潮汐 ty=125 前 3px）
-      // ★ v195 HUD 下探 + 任务元素重设计（用户："HUD信息区可以设置更大的范围（例如占用部分
-      //   伸缩区），请重新调整这部分的样式，尤其是任务元素（太丑了，请重新设计）"）：
-      //   hudBottom 165→190：占用"HUD底→出生点260"伸缩区 25，余 70 = 特殊滴虚影标签空间
-      //   （标签 17px 贴球顶；r≤36 不碰 HUD；刘海 hudInset≤25 时视觉底 215，距出生点仍 45）；
-      //   任务条 205×35 两行挤压 → 任务卡 285×60（靶心图标+标题+星级+金色进度条）；
-      //   潮汐胶囊 90×35 → 潮汐卡 95×60（与任务卡同高同款白底，左右边距各 15、卡间 10）。
-      quest: { qx: 15, qy: 125, qw: 285, qh: 60 },     // 任务卡（v195 重设计，15~300 × 125~185）
-      tidePill: { side: 'right', margin: 25, ty: 135, th: 44 }, // v274：ty 142→135（用户"降到135"）；v273 曾 127→142 下移拉开与海域进度条(底122)的间距；右锚定紧凑液态计时器；未填充区透明（仅描边）；v208 压低高度 52→44；v213 卡宽固定（按 2 位数 '99s' 封顶），文字缩短只影响文本本身、不再改变卡宽/位置
-      hudBottom: 190           // HUD 区底沿（v195：任务卡底+5）；容器顶=0（v184），HUD 直接浮在容器上
+      row1Y: 40,
+      trophyCy: 35,
+      setCx: 25,
+      rowBtnR: 18,
+      scoreY: 85,
+      seaBar: { sx: 25, sy: 98, sw: W - 50, sh: 24 },
+      quest: { qx: 15, qy: 125, qw: 285, qh: 60 },
+      tidePill: { side: 'right', margin: 25, ty: 135, th: 44 },
+      hudBottom: 190
     };
 
-    // ---- ② 容器区（核心游戏几何：底部锚定，随 dy 整体平移；容器顶不设置=0，v184）----
     this.body = {
-      containerTop: C.containerTop,     // 0：容器顶不设置（容器从块顶开始长，v184 用户定版）
-      dangerY: C.dangerY,               // 315+dy 警戒线（绝对基准，v191 取整）
-      floorY: C.floorY,                 // 765+dy 容器底
-      spawnY: C.spawnY,                 // 260+dy 出生点（独立基准，v190 起与警戒线解耦）
-      // 出生通道（坠落区）高度 = dangerY - spawnY = 55（9:18）——"单独移警戒线"的显式体现
+      containerTop: C.containerTop,
+      dangerY: C.dangerY,
+      floorY: C.floorY,
+      spawnY: C.spawnY,
       spawnGap: C.dangerY - C.spawnY,
-      // ★ 弹出提示（公告弹字 + 涨潮横幅）默认锚点：出生区相对警戒线在堆叠区中的
-      //   镜像对称位置 = dangerY + spawnGap = 370+dy（出生通道 55 镜像到警戒线下方）
       mirrorCy: C.dangerY + (C.dangerY - C.spawnY),
-      // ★ v194 堆叠空间中点 = (dangerY+floorY)/2 = 540+dy：深海事件"漩涡风暴"锚点
-      //   （旧 0.45 公式随 v184 容器顶=0 静默漂移到 344、盘顶压警戒线 31px，用户报
-      //    "漩涡风暴每次都接近警戒线"；堆叠空间恒 450，中点距警戒线 225，永不再压线）
       stackCy: (C.dangerY + C.floorY) / 2,
-      tutY: 535 + dy                    // 首局引导胶囊锚点（v231：575→535 上移 40，堆叠区中部；随底部锚定链平移）
+      tutY: 535 + dy
     };
 
-    // ---- ③ 底部带（floorY~H：高度恒 75 贴块底，内部钉 floorY 相对位，绝不打散）----
-    // 底部六钮圆心 x（v195 用户："底部按钮/道具应当均匀分布，且左侧按钮（图鉴）与右侧
-    // 按钮（重开）距离左右边界的距离应该是一定的"）：旧 systems.js 写死 45/115/185/255/
-    // 325/395 + restart r15 → 左缘距 25≠右缘距 10、重开钮偏小、整排视觉重心偏右。
-    // 现由 W 公式派生：边距 35、间距 (W-70)/5（9:18=70），六钮统一 r=20 → 左右缘距各 15，
-    // 完全均匀对称；systems.js 的 bookBtn/SKILL_BTNS/restartBtn 改引本真源（禁写死坐标）。
     var btnCx = [], bi;
     for (bi = 0; bi < 6; bi++) btnCx.push(35 + bi * (W - 70) / 5);
     this.band = {
       top: C.floorY,
-      h: H - C.floorY,                  // 恒 75（底部带固定不变，v177 用户定版）
-      btnCy: C.floorY + 30,             // 795+dy：底部一排按钮圆心（v163 铁律：与容器底恒距 30）
-      btnCx: btnCx,                     // v195 六钮圆心 x：[图鉴,交换,涟漪,蒸发,水流,重开]（公式派生）
-      btnR: 20,                         // v195 六钮统一半径（重开 15→20，消除大小不一）
-      labelDy: 10,                      // 按钮名称标签：圆心 + r + 10
-      decorBase: C.floorY + 20,         // 785+dy：底部装饰基准线（床面玻璃横条底 FH12 + 8）
-      dunes: [                          // 三块沙丘（径向渐变柔边）：相对容器底固定，随 dy 平移不重排
+      h: H - C.floorY,
+      btnCy: C.floorY + 30,
+      btnCx: btnCx,
+      btnR: 20,
+      labelDy: 10,
+      decorBase: C.floorY + 20,
+      dunes: [
         { x: 85,  dy: 10, rx: 95,  ry: 15, c: 'rgba(238,246,240,0.7)', c0: 'rgba(238,246,240,0)' },
         { x: 315, dy: 15, rx: 115, ry: 15, c: 'rgba(238,246,240,0.7)', c0: 'rgba(238,246,240,0)' },
         { x: 195, dy: 20, rx: 85,  ry: 10, c: 'rgba(228,240,234,0.55)', c0: 'rgba(228,240,234,0)' }
       ],
-      pebbleYOff: (C.floorY + 20) - 665, // 卵石/海星/扇贝基准随 dy 平移（旧版 FLOORY=646 定版位）
+      pebbleYOff: (C.floorY + 20) - 665,
       pebbles: [[25, 685, 2.5], [65, 700, 2.5], [110, 685, 2.5], [170, 700, 2.5],
                 [245, 690, 2.5], [305, 700, 2.5], [350, 685, 2.5], [405, 695, 2.5]],
       starfish: { x: 90, y: 700, s: 10 },
       shell: { x: 330, y: 700, s: 10 }
     };
 
-    // ---- ④ 全屏面板（底部锚定：= 9:18 定版基准 + dy，随块底平移不漂流）----
     this.panel = {
-      focusCy: 465 + dy,              // 游戏区焦点中心（9:18 定版 465：结算海报 py230/h470 与分享卡 py255/h420 的共同中心）
-      over: { w: 320, h: 470 },       // 结算海报（v161 排版放松定版；py = focusCy - 235 = 230+dy）
-      share: { w: 300, h: 420 },      // 战报分享卡（py = focusCy - 210 = 255+dy）
-      confirm: { w: 300, h: 224, btnH: 42, btnGap: 12, btnTop: 54 }, // v299 曾去标题行，v300 按用户要求恢复（页头标题+✕）；按钮维持放大后 42 高不变
-      ng: { w: 330, h: 350 },         // 深渊潜航词缀三选一（底部锚定，y = 245+dy）
-      dex: { x: 20, w: 380, h: 600 }, // 图鉴/成就（局内 y 由 dexY 派生；菜单态按全屏 VH 居中）
-      dexY: 120 + dy,                 // 图鉴局内 y（9:18 定版 120 = (840-600)/2，随底部锚定链平移）
-      // ★ v197 设置弹窗（音效/音乐两开关 + v317 清空存档一行；v390 震动开关隐藏——用户"目前不需要"，
-      //   故两开关 + 清空存档共 3 行）：300×260 块内居中（x=(W-300)/2=60，y=(840-260)/2+dy=290+dy），
-      //   随底部锚定链平移；底部按用户要求不放说明文本。v317 起清空存档占一行：
-      //   （行几何不动：rowDy=50 标题区 / rowGap=66（行距 56+10）/ rowW=260 左右各留 20，
-      //    三行排满 50+2×66+56=238，余 22）。
-      //   v317 清空存档二级确认（危险操作，与设置面板同语言）：300×180 块内居中，两钮横排。
-      set: { w: 300, h: 260, rowDy: 50, rowGap: 66, rowH: 56, rowW: 260 }, // v200：rowDy 60→50 让三行让出通用页头（标题 y+30）；v390 面板 326→260（震动行隐藏后 3 行够用）
+      focusCy: 465 + dy,
+      over: { w: 320, h: 470 },
+      share: { w: 300, h: 420 },
+      confirm: { w: 300, h: 224, btnH: 42, btnGap: 12, btnTop: 54 },
+      ng: { w: 330, h: 350 },
+      dex: { x: 20, w: 380, h: 600 },
+      dexY: 120 + dy,
+      set: { w: 300, h: 260, rowDy: 50, rowGap: 66, rowH: 56, rowW: 260 },
       setClear: { w: 300, h: 180, btnH: 42, btnGap: 12, btnTop: 108 }
     };
 
-    // ---- 菜单（开始界面：顶部艺术字标题、左右功能磁贴列、中央水滴吉祥物、深海蓝胶囊开始钮；
-    //      v237 撤：海域牌/历史最佳牌/底部玩法一句话；全部 = 定版基准 + dy）----
     this.menu = {
-      titleY: 130 + dy, subY: 148 + dy,  // v287 下移 20（用户"有点靠上"）→ v289 回上 10（用户：主页标题上移 10）
-      tileW: 64, tileH: 64,            // 功能磁贴（深海玻璃牌：图标+标签收在块内，不外溢遮挡）
-      tileLX: 55, tileRX: 365,         // 左右列中心 x（左右缘距 25）
-      tileTop: 246 + dy, tileGap: 78,  // 行 y = tileTop + i*tileGap（246/324，块底 388 不压吉祥物 430）
-      mascotCy: 430 + dy,              // 中央水滴吉祥物（两列之间）
-      offlineY: 565 + dy, offlineW: 300, offlineH: 80, // v288：60→80（三行文字原挤在 60 内、末行贴底溢出）
-      startY: 690 + dy, startW: 260, startH: 65   // 深海蓝大胶囊（圆角全半径）
+      titleY: 130 + dy, subY: 148 + dy,
+      tileW: 64, tileH: 64,
+      tileLX: 55, tileRX: 365,
+      tileTop: 246 + dy, tileGap: 78,
+      mascotCy: 430 + dy,
+      offlineY: 565 + dy, offlineW: 300, offlineH: 80,
+      startY: 690 + dy, startW: 260, startH: 65
     };
   },
 
-  // ---- 菜单功能磁贴矩形（渲染与命中共用）：side 'L'/'R'，行号 i ----
   menuTileRect: function (side, i) {
     var m = this.menu;
     var cx = side === 'L' ? m.tileLX : m.tileRX;
     return { x: cx - m.tileW / 2, y: m.tileTop + i * m.tileGap, w: m.tileW, h: m.tileH };
   },
 
-  // ---- 面板矩形（渲染与命中共用，一处定义）----
   overRect: function () {
     var p = this.panel.over, W = MG.config.W;
     return { x: (W - p.w) / 2, y: this.panel.focusCy - p.h / 2, w: p.w, h: p.h };
@@ -186,21 +95,17 @@ MG.layout = {
     return { x: (W - p.w) / 2, y: this.panel.focusCy - p.h / 2, w: p.w, h: p.h };
   },
   confirmRect: function () {
-    // v234：重开确认与设置弹窗同款居中——面板块内垂直居中（此前 dy:395 偏上不居中）
     var p = this.panel.confirm, W = MG.config.W;
     return { x: (W - p.w) / 2, y: (840 - p.h) / 2 + this.dy, w: p.w, h: p.h };
   },
-  // v234 重开确认三按钮矩形（渲染与命中共用）：0=返回主页 1=重新开始 2=返回游戏
   confirmBtnRect: function (i) {
     var r = this.confirmRect(), p = this.panel.confirm;
     return { x: r.x + 24, y: r.y + p.btnTop + i * (p.btnH + p.btnGap), w: r.w - 48, h: p.btnH };
   },
-  // v236 重开确认右上 ✕（同 setCloseBtn/dexCloseBtn 惯例：右内缩 40、顶 8、30×30）
   confirmCloseRect: function () {
     var r = this.confirmRect();
     return { x: r.x + r.w - 40, y: r.y + 8, w: 30, h: 30 };
   },
-  // v197 设置弹窗矩形（渲染与命中共用）：面板块内居中，随 dy 平移
   setRect: function () {
     var p = this.panel.set, W = MG.config.W;
     return { x: (W - p.w) / 2, y: (840 - p.h) / 2 + this.dy, w: p.w, h: p.h };
@@ -211,14 +116,12 @@ MG.layout = {
   },
   setCloseRect: function () {
     var r = this.setRect();
-    return { x: r.x + r.w - 40, y: r.y + 8, w: 30, h: 30 }; // ✕ 热区 30×30（右上角，与图鉴 dexCloseBtn 同款）
+    return { x: r.x + r.w - 40, y: r.y + 8, w: 30, h: 30 };
   },
-  // v317 清空存档二级确认（渲染与命中共用）：面板块内居中，随 dy 平移
   setClearRect: function () {
     var p = this.panel.setClear, W = MG.config.W;
     return { x: (W - p.w) / 2, y: (840 - p.h) / 2 + this.dy, w: p.w, h: p.h };
   },
-  // 0=取消 1=确认清空（横排等宽，左右各留 24）
   setClearBtnRect: function (i) {
     var r = this.setClearRect(), p = this.panel.setClear;
     var bw = (r.w - 48 - p.btnGap) / 2;

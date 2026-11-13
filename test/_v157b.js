@@ -1,4 +1,3 @@
-// 单独跑一次：清档进局截图（看条内当前海域文字），并验证后期长海域名不溢出
 const { chromium } = require('playwright-core');
 const path = require('path');
 (async () => {
@@ -12,7 +11,6 @@ const path = require('path');
   await page.evaluate(() => { restart(); });
   await page.waitForTimeout(700);
   await page.screenshot({ path: path.join(__dirname, 'v157_bar_text.png') });
-  // 后期：把累计分顶到较深海域，检查条内文字缩字号后不超出徽章之间
   const w = await page.evaluate(() => {
     var c2 = document.getElementById('game').getContext('2d');
     var samples = [['潮汐池','珊瑚浅海',2650],['深渊王座','热泉裂谷',120000],['海沟之眼','深渊王座',300000]];

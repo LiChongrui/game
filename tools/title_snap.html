@@ -7,7 +7,6 @@
 <body>
 <canvas id="cv" width="840" height="420" style="width:840px;height:420px;"></canvas>
 <script>
-// 1:1 复刻游戏 drawTitleArt 当前状态（v261），2x 分辨率
 var cv = document.getElementById('cv');
 var ctx = cv.getContext('2d');
 ctx.scale(2, 2);
@@ -47,7 +46,6 @@ function drawStarfish(x, y, s) {
   ctx.beginPath(); ctx.arc(s * 0.12, s * 0.06, s * 0.07, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
-// drawBall 极简复刻（tier1 水滴：径向渐变 + 表情 + 高光）
 function drawFace(r) {
   var ex = r * 0.32, ey = -r * 0.05;
   ctx.fillStyle = '#173A54';
@@ -89,7 +87,6 @@ function drawBall(b) {
   ctx.restore();
 }
 
-// —— drawTitleArt 1:1 ——
 function drawTitleArt(ty) {
   var txt = '水滴合成深海';
   var adv = 52, baseFs = 54;
@@ -156,7 +153,6 @@ function drawTitleArt(ty) {
   ctx.restore();
 }
 
-// 天空底
 var sky = ctx.createLinearGradient(0, 0, 0, 210);
 sky.addColorStop(0, '#C9EAF9'); sky.addColorStop(1, '#7FC0E6');
 ctx.fillStyle = sky; ctx.fillRect(0, 0, 420, 210);

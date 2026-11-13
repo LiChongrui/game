@@ -1,9 +1,5 @@
-// 水滴合成深海 - core：画布与自适应 / 平台存储封装 / 音效 / 广告占位
-// 模块加载顺序 1/4（无内部依赖）。四个模块共享全局作用域（经典 script），
-// 函数与状态互相可见；加载顺序只约束"顶层初始化语句"的执行先后。
   var C = MG.config;
   var T = C.tiers;
-  // 跨模块工具：微信 Canvas 对 hsl/hsla 支持不稳定，提供 rgba 兜底
   MG.util = MG.util || {};
   MG.util.hslToRgba = function (h, s, l, a) {
     h = ((h % 360) + 360) % 360 / 360; s = Math.max(0, Math.min(1, s / 100)); l = Math.max(0, Math.min(1, l / 100));
@@ -19,89 +15,53 @@
     return 'rgba(' + Math.round((r + m) * 255) + ',' + Math.round((g + m) * 255) + ',' + Math.round((b + m) * 255) + ',' + (a == null ? 1 : a) + ')';
   };
 
-  // ---------- 画布 ----------
-  // 逻辑高度动态（VH ≥ C.H）：HUD 三组行位钉块顶（layout.hud，0~164），
-  // 其余一切按底部定位（layout.body/band/panel/menu = 9:18 定版基准 + dy，随块底平移），
-  // 中间水域随窗口高度自适应；画布 CSS 高度恒等于窗口高度，CSS 宽度=游戏区宽度（两侧为页面深海背景）
   var canvas = document.getElementById('game');
-  // v295：诊断开关 —— URL 带 ?cpu=1 时强制 CPU（软件光栅）画布：
-  // Chrome/Edge/Electron 下 willReadFrequently:true 会让该 canvas 完全走 CPU 光栅、不再分配
-  // GPU 表面，可彻底排除"GPU 表面损坏导致的花屏"。用来确认花屏是否来自宿主 GPU 合成层。
   var _qs = '';
   try { _qs = (window.location && window.location.search) || ''; } catch (e) { _qs = ''; }
   var forceCpu = /(\?|&)cpu=1(\b|&)/.test(_qs);
-  var ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: forceCpu }); // v294：不透明画布——背景全程自绘不透明，
-                                                       // 杜绝"表面清空后透出宿主棋盘噪声"的花屏形态
+  var ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: forceCpu });
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
-  var VH = C.H;           // 当前逻辑高度（全屏：h/view.s，≥C.H）
-  var LW = C.W;           // 当前逻辑宽度（≥ C.W，宽窗口下两侧为延伸海水）
-  var BX = 0;             // 游戏区（420 逻辑宽）水平居中偏移
-  var FLOORY = C.floorY;  // 容器底 y（= layout.body.floorY，随 dy 平移）
+  var VH = C.H;
+  var LW = C.W;
+  var BX = 0;
+  var FLOORY = C.floorY;
   var view = { s: 1 };
-  // 游戏块 = 420×C.H 逻辑区（当前交付 9:18=840）。★ 定位语义（v183 用户定版）：
-  // HUD 按顶部定位（钉块顶 0~164，绝对定版）；其余一切按底部定位
-  // （= 9:18 定版基准 + dy，dy=C.H-840，随块底整体平移）；底部带恒 74 贴块底；
-  // HUD 底与容器顶之间空隙 = 79+dy，有多少是多少、不显式分配。
-  // 坠落高度 = 最大可投放滴底触警戒线时的球心（dangerY - 45）；高屏多余的高度上下均分
-  // （oy 为块居中偏移），块外由背景渐变延伸填充。
-  // ★ 改比例只改 config 的 C.H 一处：layout.build() 自动重算全部游戏内坐标
-  //   （dy=C.H-840，HUD 不动、其余全部随块底平移）；本 fit() 只负责
-  //   「块 → 窗口」适配（view.s / oy / hudInset），不再写死任何游戏内坐标。
-  var oy = 0;             // 游戏块顶部偏移（逻辑 px，≥0）
-  var renderOy = 0;       // 渲染/点击实际使用的偏移（全态 = oy，垂直居中）
-  var hudInset = 0;       // HUD 顶行避让胶囊的实际下挪量（= 居中后残余量，高屏→0，矮屏≤24）
+  var oy = 0;
+  var renderOy = 0;
+  var hudInset = 0;
 
   function fit() {
     var w = window.innerWidth, h = window.innerHeight;
-    MG.layout.build();                    // 几何真源重建（config 改 H 后全量自动重排）
-    // 全屏铺满：刘海/挖孔、手势条区域都按正常区域对待，不做任何安全区缩进
-    view.s = Math.min(w / C.W, h / C.H);   // 等比缩放，不变形
+    MG.layout.build();
+    view.s = Math.min(w / C.W, h / C.H);
     VH = h / view.s;
-    LW = w / view.s;                       // 逻辑宽度（≥420）
-    BX = (LW - C.W) / 2;                   // 游戏区水平居中
-    // 垂直居中：高屏多余的高度上下均分，游戏块（420×C.H）居中成为视觉焦点；
-    // 块顶上方/块底下方由全屏背景渐变（水色）自然延展填充，无留白、无接缝。
-    // （__safeTop 由 wx-shim 用 getMenuButtonBoundingClientRect 计算，单位=窗口 CSS px）
+    LW = w / view.s;
+    BX = (LW - C.W) / 2;
     oy = Math.max(0, (VH - C.H) / 2);
-    // 胶囊残余避让：居中后 HUD 顶行（块内 trophyCy35/r16 → 顶缘 19）若仍在胶囊下缘之上才需额外下挪；
-    // 高屏居中量已远大于胶囊高度 → hudInset=0（无需再避让）；矮屏(≈块高)才给 ≤25 的残余量。
     var capBottom = window.__safeTop ? (window.__safeTop - 10) / view.s : 0;
     hudInset = Math.max(0, Math.min(capBottom - oy - (MG.layout.hud.trophyCy - 16), 25));
-    // 容器区（layout.body 单一真源）：容器底/容器顶/警戒线/出生点按底部锚定
-    // （floorY = H-75，随块底整体平移）
-    FLOORY = MG.layout.body.floorY;        // 765+dy（9:18=765；dy=C.H-840）
-    // v294：仅尺寸真变化才重设——对 canvas.width/height 赋值（即使值相同）也会清空画布并
-    // 重新分配显存表面；窗口拖拽/预览容器连续缩放时 fit() 高频触发，表面反复重建在部分
-    // GPU/合成器上呈现花屏（用户截图：全屏 1px 棋盘噪声、内容半透明）
+    FLOORY = MG.layout.body.floorY;
     var nw = Math.round(w * dpr), nh = Math.round(h * dpr);
     if (canvas.width !== nw) canvas.width = nw;
     if (canvas.height !== nh) canvas.height = nh;
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    // 微信广告（v387）：首次 fit 惰性初始化；每帧重算方块下方留白带（Banner 停靠死区）
     if (MG.ad) {
       if (!MG.ad._inited) { MG.ad.init(); MG.ad._inited = true; }
       MG.ad.layout();
     }
-    // 按钮恒贴在容器底下方（cy=layout.band.btnCy=FLOORY+28，与容器底恒距 28，v163 定版）——
-    // 块高/比例变化时容器整体下移，按钮随容器走（不钉屏幕、不贴块底，v172 贴底事故的根治）
     var cy = MG.layout.band.btnCy;
-    // 注意：模块化后 bookBtn 等声明在 systems.js（后加载），早期触发时用 typeof 守卫
     if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {
       bookBtn.cy = cy; restartBtn.cy = cy;
       for (var i = 0; i < SKILL_BTNS.length; i++) SKILL_BTNS[i].cy = cy;
     }
-    // v197：成就/音量按钮已移除，设置钮（setBtn）画在 HUD 平移块内（drawHUD），
-    // cy 恒为 layout.hud.trophyCy、命中侧 +hudInset，无需在此烤入坐标。
   }
   window.addEventListener('resize', fit);
   window.addEventListener('orientationchange', fit);
   if (window.ResizeObserver) {
-    // 兜底：预览面板/嵌入容器改变尺寸时不一定触发 resize 事件
     new ResizeObserver(fit).observe(document.documentElement);
   }
 
-  // ---------- 存储（走平台适配层 MG.platform，Web 实现指向 localStorage） ----------
   function saveNum(key, v) { MG.platform.set(key, String(v)); }
   function loadFlag(key) { return MG.platform.get(key) === '1'; }
   function saveFlag(key, v) { MG.platform.set(key, v ? '1' : '0'); }
@@ -113,29 +73,15 @@
     MG.platform.setJSON('mg_dex', { u: dexUnlocked, c: dexCounts, sp: dexSpecial, stats: lifeStats, ach: achDone, col: colClaimed });
   }
 
-  // ---------- 存档版本（迁移机制） ----------
-  // 每次发布含破坏性存档改动的版本，SAVE_VERSION +1 并在迁移链里追加一步变换；
-  // 读取端（loadNum/loadFlag/loadDex）全部带默认值，因此未知字段天然兼容。
   var SAVE_VERSION = 1;
   function migrateSave() {
     var ver = parseInt(MG.platform.get('mg_ver'), 10);
     if (isNaN(ver)) ver = 0;
-    if (ver > SAVE_VERSION) return; // 更高版本存档（回滚到旧客户端）：原样保留，只读不写降级字段
-    // ---- 迁移链（从 ver 逐级升到 SAVE_VERSION） ----
-    // v0 → v1：v0 时代键名与当前一致（mg_best/mg_peak/mg_life/mg_dex/mg_mute/mg_tut/mg_ng…），
-    //          无字段变换，仅补打版本标记，legacy 存档天然兼容。
-    // if (ver < 2) { ...未来变换... }
+    if (ver > SAVE_VERSION) return;
     MG.platform.set('mg_ver', String(SAVE_VERSION));
   }
-  migrateSave(); // 必须先于 systems.js 的任何读档执行（core 在 systems 之前加载）
+  migrateSave();
 
-
-  // ---------- 音效（WebAudio 合成，无素材文件） ----------
-  // ★ v197 音频拆三开关（用户："游戏内这个地方改成设置按钮，用来弹出设置音效、音乐和震动"）：
-  //   sfxOn   音效（复用旧静音键 mg_mute：旧值 1=静音 → sfxOn = 旧值反读，向后兼容老存档）
-  //   musicOn 音乐（新键 mg_music；存档缺失时继承旧 mute 的反值——曾全局静音的用户
-  //            升级后不会突然开唱）
-  //   vibOn   震动（新键 mg_vib 默认开；经 hap() 走 MG.platform.vibrate，不支持时静默）
   var audio = {
     ctx: null,
     sfxOn: !loadFlag('mg_mute'),
@@ -148,7 +94,6 @@
       }
       if (this.ctx && this.ctx.state === 'suspended') {
         try { this.ctx.resume(); } catch (e) {}
-        // 部分内嵌 WebView 需要手势结束后再恢复一次
         if (!this._retry) {
           this._retry = true;
           setTimeout(function () {
@@ -188,37 +133,28 @@
     },
     tide: function () {
       if (!this.sfxOn || !this.ctx) return;
-      // 涨潮：低频上滑长音
       this.blip(110, 0.9, 'sine', 0.14, 2.2);
       this.blip(165, 0.7, 'triangle', 0.07, 2.0);
       hap(40);
     }
   };
 
-  // ---------- 震动反馈（v197 设置弹窗"震动"开关；v198 用户纠正语义） ----------
-  // ★ v198 用户："震动不是震动窗口，是手机设备的震动反馈！！！"——本函数只走
-  //   MG.platform.vibrate（H5: navigator.vibrate；微信: wx-shim 桥 wx.vibrateShort/
-  //   vibrateLong），全程不碰画布变换；画面摇晃（addShake → render translate 微抖）
-  //   是另一套独立视觉特效，与震动开关无任何关联。
-  // 音效/音乐/震动三开关相互独立：震动只认 vibOn，与静音状态无关。
-  function hap(ms) {} // v390：震动功能已隐藏（用户"目前不需要"）——占位 no-op，调用点全部保留，将来恢复只需改回 vibrate
+  function hap(ms) {}
 
-  // ---------- 背景音乐（深海氛围：母线低通呼吸 + 双振荡器暖垫 + 五声琶音 + 水底涌动噪声 + 水滴点缀） ----------
   audio.bgm = {
     on: false, iv: null, step: 0, _live: [], _flt: null, _masterGain: null, _lfo: null, _amb: null,
     chords: [
-      [261.63, 329.63, 392.00, 493.88], // Cmaj7
-      [220.00, 261.63, 329.63, 392.00], // Am7
-      [174.61, 220.00, 261.63, 349.23], // Fmaj7
-      [196.00, 246.94, 293.66, 392.00]  // G7
+      [261.63, 329.63, 392.00, 493.88],
+      [220.00, 261.63, 329.63, 392.00],
+      [174.61, 220.00, 261.63, 349.23],
+      [196.00, 246.94, 293.66, 392.00]
     ],
-    arps: [ // 各和弦的琶音点缀音池（高八度五声/和弦音）
+    arps: [
       [523.25, 659.25, 783.99, 1046.50],
       [440.00, 523.25, 659.25, 880.00],
       [523.25, 698.46, 880.00],
       [587.33, 783.99, 987.77]
     ],
-    // 母线：低通(缓慢呼吸扫频) + 总增益，所有 BGM 声部都汇入这里，音色整体"水下感"
     master: function () {
       var c = audio.ctx;
       if (this._flt) return this._flt;
@@ -232,7 +168,6 @@
       this._flt = f; this._masterGain = g; this._lfo = lfo;
       return f;
     },
-    // 水底涌动：布朗噪声循环 + 低通 + 慢速 swell（一次性创建，stop 时整体停掉）
     ambience: function () {
       var c = audio.ctx;
       if (this._amb) return;
@@ -265,7 +200,6 @@
           var ch = self.chords[self.step % self.chords.length];
           var arp = self.arps[self.step % self.arps.length];
           var i, k;
-          // 暖垫：每个和弦音两个微失谐正弦（合唱质感），尾音与下小节头交叉淡化 → 无缝循环
           for (i = 0; i < ch.length; i++) {
             for (k = 0; k < 2; k++) {
               var o = c.createOscillator(), g = c.createGain();
@@ -279,7 +213,6 @@
               self._live.push({ o: o, g: g });
             }
           }
-          // 低音铺底
           var b = c.createOscillator(), bg = c.createGain();
           b.type = 'triangle'; b.frequency.value = ch[0] / 2;
           bg.gain.setValueAtTime(0.0001, t0);
@@ -289,8 +222,6 @@
           b.connect(bg); bg.connect(dst);
           b.start(t0); b.stop(t0 + 4.1);
           self._live.push({ o: b, g: bg });
-          // 五声琶音点缀（随机 3~5 个短音，落在小节内随机位置）
-          // 声音反馈：连击越高琶音整体升调（每连击约 +60 音分，上限 6 连击）
           var lift = Math.pow(2, Math.min(combo, 6) / 20);
           var n = 3 + (Math.random() * 3 | 0);
           for (i = 0; i < n; i++) {
@@ -305,7 +236,6 @@
             a.start(at); a.stop(at + 1.15);
             self._live.push({ o: a, g: ag });
           }
-          // 水滴滑音（低概率，柔和）
           if (Math.random() < 0.4) {
             var dl = 0.8 + Math.random() * 2.2, f0 = 900 + Math.random() * 700;
             var p = c.createOscillator(), pg = c.createGain();
@@ -326,12 +256,10 @@
       playBar();
       this.iv = setInterval(playBar, 4000);
     },
-    // 声音预警①：危险度 0~1 → 母线低通收紧（水堆越贴近警戒线，音色越闷越紧）
     setDanger: function (x) {
       if (!audio.ctx || !this._flt || !audio.musicOn) return;
       try { this._flt.frequency.setTargetAtTime(1150 - x * 480, audio.ctx.currentTime, 0.5); } catch (e) {}
     },
-    // 声音预警②：潮汐低频隆隆（progress 渐入，预警期脉冲）
     setTide: function (progress, warn) {
       if (!audio.ctx || !audio.musicOn) return;
       try {
@@ -352,7 +280,6 @@
     stop: function () {
       if (this.iv) clearInterval(this.iv);
       this.iv = null; this.on = false;
-      // 立即静音所有已排程音符（否则最后一个小节还会余音最多 4 秒）
       try {
         var t = audio.ctx ? audio.ctx.currentTime : 0;
         for (var i = 0; i < this._live.length; i++) {
@@ -365,24 +292,18 @@
         }
       } catch (e) {}
       this._live = [];
-      // 涌动噪声一并停掉（下次 start 重建）
       try { if (this._amb) { this._amb.src.stop(); this._amb.lfo.stop(); } } catch (e) {}
       this._amb = null;
-      // 潮汐低频隆隆一并停掉（下次 setTide 重建）
       try { if (this._drone) { this._drone.o.stop(); this._drone = null; } } catch (e) {}
     }
   };
 
-  // ---------- 微信广告（v387）：原生 Banner（游戏中/菜单/结算常驻）+ 复活激励视频 + 局间插屏 ----------
-  // 原则：wx.createBannerAd 是系统级原生广告，不在 canvas 绘制；停靠在 fit() 算出的
-  // 「方块下方留白带死区」（由 (oy+C.H)*view.s 起算），方块内部 HUD/警戒线/六按钮/floor 一条不碰 →
-  // layout.js 零改动、门禁零触碰。复活改走 30s 激励视频（看完才复活，覆盖 v327/v328 的"无广告直接复活"）。
   MG.ad = {
     banner: null, reward: null, interstitial: null,
     adH: 96, bandTop: 0, bandH: 0, inGameOk: false,
     lastState: null, lastShow: false, _overN: 0,
     init: function () {
-      if (!MG.platform || !MG.platform.isWx || typeof wx === 'undefined') return; // Web/非微信：全降级为空操作（复活直接放行）
+      if (!MG.platform || !MG.platform.isWx || typeof wx === 'undefined') return;
       var cfg = MG.config.ad, self = this;
       try {
         if (cfg.bannerId) {
@@ -401,16 +322,16 @@
       } catch (e) {}
       this.layout();
     },
-    layout: function () { // 由 core.fit() 每帧尺寸变化时调用：算方块下方留白带
+    layout: function () {
       var h = window.innerHeight || 0;
-      this.bandTop = (oy + C.H) * view.s;       // 方块底边（屏幕 css px）
+      this.bandTop = (oy + C.H) * view.s;
       this.bandH = Math.max(0, h - this.bandTop);
       this.inGameOk = this.bandH >= (MG.config.ad.minBandPx || 90);
     },
-    reposition: function () { // 底部对齐钉死在留白带，绝不侵入方块
+    reposition: function () {
       if (!this.banner) return;
       var w = window.innerWidth || 0, h = window.innerHeight || 0;
-      var top = Math.max(this.bandTop, h - this.adH); // 底部对齐；留白带够高则顶到方块下沿
+      var top = Math.max(this.bandTop, h - this.adH);
       if (top + this.adH > h) top = h - this.adH;
       var width = Math.min(w - 12, 400);
       try { this.banner.style = { left: (w - width) / 2, top: top, width: width }; } catch (e) {}
@@ -422,20 +343,20 @@
       try { this.banner.show(); this.lastShow = true; } catch (e) {}
     },
     hideBanner: function () { if (this.banner) { try { this.banner.hide(); } catch (e) {} } this.lastShow = false; },
-    sync: function (st) { // 每帧由 render 调用：Banner 显隐跟随 state
+    sync: function (st) {
       if (!this.banner) { this.lastState = st; return; }
       if (st === this.lastState) return;
       this.lastState = st;
       if (st === 'play' || st === 'menu' || st === 'over') this.showBanner();
       else this.hideBanner();
     },
-    showReward: function (cb) { // 复活 30s 激励视频：看完才复活，中途关闭则不复活
-      if (!this.reward) { try { cb(true); } catch (e) {} return; } // Web/无广告位：直接放行
+    showReward: function (cb) {
+      if (!this.reward) { try { cb(true); } catch (e) {} return; }
       var self = this, done = false;
       var onClose = function (res) {
         try { self.reward.offClose(onClose); } catch (e) {}
         var ended = !res || res.isEnded;
-        if (!ended) { try { self.showBanner(); } catch (e) {} } // 中途关闭：不复活，恢复结算页 Banner
+        if (!ended) { try { self.showBanner(); } catch (e) {} }
         if (!done) { done = true; try { cb(ended); } catch (e) {} }
       };
       try { this.reward.onClose(onClose); } catch (e) {}
@@ -444,7 +365,7 @@
         this.reward.show().catch(function () { try { self.reward.load().then(showIt); } catch (e) { try { cb(true); } catch (e2) {} } });
       } catch (e) { try { cb(true); } catch (e2) {} }
     },
-    maybeInterstitial: function () { // 局间插屏（每 N 次结算，config.ad.interstitialEvery）
+    maybeInterstitial: function () {
       if (!this.interstitial) return;
       if (!MG.config.ad.interstitialEvery) return;
       this._overN++;
@@ -453,4 +374,3 @@
       try { this.interstitial.show().catch(function () { try { self.interstitial.load().then(function () { self.interstitial.show(); }); } catch (e) {} }); } catch (e) {}
     }
   };
-

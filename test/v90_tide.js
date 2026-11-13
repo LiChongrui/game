@@ -1,5 +1,3 @@
-// v91 验证：①潮位 1/4 设计（最矮距容器底 1/4、最高距警戒线 1/4 容器高，永不漫线）；
-// ②潮期照常判负（堆高越线 + 潮期引信链路仍然致死）
 const { chromium } = require('playwright-core');
 const path = require('path');
 (async () => {
@@ -10,39 +8,36 @@ const path = require('path');
   await page.addInitScript(() => { if (localStorage.getItem('__init') !== '1') { localStorage.clear(); localStorage.setItem('__init', '1'); } });
   await page.goto('file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/'));
   await page.waitForTimeout(1200);
-  await page.evaluate(() => MG.debug.forceEndless()); // 潮汐仅无尽模式
+  await page.evaluate(() => MG.debug.forceEndless());
 
-  // ---- ① 潮位 1/4 设计：两端由几何决定，8 海域线性推进 ----
   await page.evaluate(() => {
     const t = MG.probe().tideRef;
-    t.phase = 'active'; t.timer = 9999; t.progress = 1; t.banner = 0; // 满潮钉住
+    t.phase = 'active'; t.timer = 9999; t.progress = 1; t.banner = 0;
   });
   const geo = await page.evaluate(() => ({ floorY: MG.probe().floorY, dangerY: MG.probe().dangerY }));
-  const H = geo.floorY - 118; // 容器高（containerTop=floorY-528 设计恒定）
-  await page.evaluate(() => MG.debug.setLife(100)); // 潮汐池
+  const H = geo.floorY - 118;
+  await page.evaluate(() => MG.debug.setLife(100));
   await page.waitForTimeout(300);
   const y0 = await page.evaluate(() => MG.debug.tideY());
-  await page.evaluate(() => MG.debug.setLife(300100)); // 深渊王座
+  await page.evaluate(() => MG.debug.setLife(300100));
   await page.waitForTimeout(300);
   const y7 = await page.evaluate(() => MG.debug.tideY());
   console.log('潮面 y：潮汐池', y0.toFixed(1), '（期望', (geo.floorY - H / 4).toFixed(0) + '）',
     '→ 深渊王座', y7.toFixed(1), '（期望', (geo.dangerY + H / 4).toFixed(0) + '，警戒线', geo.dangerY + '）');
   const t1 = Math.abs(y0 - (geo.floorY - H / 4)) < 3 &&
              Math.abs(y7 - (geo.dangerY + H / 4)) < 3 &&
-             y7 > geo.dangerY + 100; // 水面永远远低于警戒线
+             y7 > geo.dangerY + 100;
 
-  // ---- ② 潮期判负链路存活：旧豁免代码会在潮期强制 dangerAlert=0；
-  //      现在潮期堆出越线堆时 dangerAlert 必须能 >0（判负判定在潮期照常运行）----
   const kill = await page.evaluate(() => {
-    MG.debug.headless = true; // 关闭 rAF 双跑，用 step 快进
+    MG.debug.headless = true;
     for (let i = 0; i < 40; i++) MG.debug.spawn(i % 4, 130 + (i % 2) * 80, 600 - i * 24);
     let t = 0, sawAlert = -1, trace = [];
     while (MG.probe().state === 'play' && t < 30) {
-      for (let s = 0; s < 15; s++) MG.debug.step(1 / 60); // 每 0.25s 一批
+      for (let s = 0; s < 15; s++) MG.debug.step(1 / 60);
       t += 0.25;
       const p = MG.probe();
       if (p.tideRef.progress > 0.15 && p.dangerAlert > 0 && sawAlert < 0) {
-        sawAlert = t; // 潮期首次出现越线判负累积
+        sawAlert = t;
       }
       if (Math.round(t * 4) % 4 === 0) {
         const top = p.bodies.length ? Math.min(...p.bodies.map(b => b.y - b.r)) : 999;

@@ -1,5 +1,3 @@
-// 数值蒙特卡洛模拟器：headless 快进模拟 N 局（无渲染、rAF 空转），输出分布统计
-// 用法：node simulate.js [局数，默认 50]
 const { chromium } = require('playwright-core');
 const path = require('path');
 const N = parseInt(process.argv[2] || '50', 10);
@@ -16,7 +14,7 @@ const N = parseInt(process.argv[2] || '50', 10);
       MG.debug.reset();
       let t = 0, maxTier = 0, dropTick = 0;
       while (MG.probe().state === 'play' && t < 600) {
-        for (let s = 0; s < 30; s++) MG.debug.step(1 / 60); // 每 0.5s 模拟时间一批
+        for (let s = 0; s < 30; s++) MG.debug.step(1 / 60);
         t += 0.5;
         if (++dropTick >= 2) { dropTick = 0; MG.debug.drop(20 + Math.random() * 380); }
         const pr = MG.probe();

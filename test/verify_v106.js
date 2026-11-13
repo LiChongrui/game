@@ -1,4 +1,3 @@
-// v106 验证：①无礁石来袭弹字 ②宝箱新配色（对局+图鉴） ③成就页无重复标题+饰条 ④每日/榜单无独立文本+序号居中
 const { chromium } = require('playwright-core');
 const path = require('path');
 (async () => {
@@ -12,7 +11,6 @@ const path = require('path');
   await page.mouse.click(210, 426);
   await page.waitForTimeout(400);
 
-  // ② 对局中掉一个宝箱看新配色（潮汐池里礁石也在）
   await page.evaluate(() => { MG.debug.setNext({ tier: 1, iron: true }); MG.debug.drop(130); });
   await page.waitForTimeout(700);
   await page.evaluate(() => { MG.debug.setNext({ tier: 2, iron: true }); MG.debug.drop(290); });
@@ -21,7 +19,6 @@ const path = require('path');
   await page.waitForTimeout(1300);
   await page.screenshot({ path: path.join(__dirname, 'v106_play.png') });
 
-  // ③④ 成就三页签
   await page.mouse.click(24, 36);
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(__dirname, 'v106_ach.png') });
@@ -32,12 +29,11 @@ const path = require('path');
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(__dirname, 'v106_rank.png') });
 
-  // 图鉴里宝箱图标
   await page.evaluate(() => MG.debug.closeDex());
   await page.waitForTimeout(200);
   await page.evaluate(() => MG.debug.openDex());
   await page.waitForTimeout(300);
-  await page.mouse.click(298, 120); // 海域演进
+  await page.mouse.click(298, 120);
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(__dirname, 'v106_dex.png') });
 

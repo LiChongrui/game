@@ -1,5 +1,3 @@
-// v135 验证：顶部 HUD 压缩上移（0~88），出生点/坠落高度还原 120 不动——
-// 前三档虚影完整落在「HUD 底沿 88」与容器开口 100 之间的空隙及容器内，坠落区不再被顶部元素挤压
 const { chromium } = require('playwright-core');
 const path = require('path');
 
@@ -8,7 +6,6 @@ const path = require('path');
   let fails = 0;
   const ok = (cond, msg) => { console.log((cond ? 'PASS' : 'FAIL') + ' ' + msg); if (!cond) fails++; };
 
-  // ---- 屏型 1：420×780（iPhone 类比例） ----
   let page = await browser.newPage({ viewport: { width: 420, height: 780 } });
   let errs = [];
   page.on('pageerror', e => errs.push(e.message));
@@ -26,7 +23,6 @@ const path = require('path');
   ok(g.oy === 30, 'oy=30（(780-720)/2，实际 ' + g.oy + '）');
   ok(g.VH === 780, 'VH=780 (实际 ' + g.VH + ')');
 
-  // 坠落高度不变：出生点回到 120；常用前 3 档虚影球顶 ≥92 > HUD 底沿 88（不重叠）
   ok(g.spawnY === 120, 'spawnY=120 坠落高度未动');
   ok(120 - 21 === 99 && 99 > 88, '水滴档(r21)虚影球顶 99 > HUD 底沿 88');
   ok(120 - 28 === 92 && 92 > 88, '露珠档(r28)虚影球顶 92 > HUD 底沿 88');
@@ -41,7 +37,6 @@ const path = require('path');
   ok(errs.length === 0, '420×780 零页面报错' + (errs.length ? '：' + errs.join(' | ') : ''));
   await page.close();
 
-  // ---- 屏型 2：320×880（窄长屏，宽度受限缩放） ----
   page = await browser.newPage({ viewport: { width: 320, height: 880 } });
   errs = [];
   page.on('pageerror', e => errs.push(e.message));

@@ -1,6 +1,3 @@
-// 水滴合成深海 - 极简圆形物理引擎
-// 纯 JS 实现（无依赖），后续可整体移植到微信小游戏（wx.createCanvas 同为 2D context）
-// 策略：固定子步进积分 + 位置修正（含 slop 防抖） + 冲量解算（弹性/切向摩擦）
 (function () {
   var C = MG.config;
 
@@ -16,8 +13,8 @@
       vx: vx || 0, vy: vy || 0,
       r: C.tiers[tier].r,
       tier: tier,
-      dangerT: 0,     // 越线静止累计时间
-      grace: C.graceTime // 出生宽限
+      dangerT: 0,
+      grace: C.graceTime
     };
     this.bodies.push(b);
     return b;
@@ -28,9 +25,6 @@
     if (i >= 0) this.bodies.splice(i, 1);
   };
 
-  // v351：批量删除——一趟遍历搞定（调用方原先是循环逐个 remove，每次都是
-  // indexOf(O(n)) + splice(O(n))，删 k 个即 O(k*n)）。count 可选：只删 list 前
-  // count 个（虚空吞噬只吞前 N 个 victim，传 count 可免 slice 分配）。
   Physics.prototype.removeMany = function (list, count) {
     if (!list || !list.length) return;
     var n = (count == null) ? list.length : Math.min(count, list.length);
@@ -51,7 +45,6 @@
     var k, s, i, j, b, o;
 
     for (s = 0; s < n; s++) {
-      // --- 积分 + 边界 ---
       for (k = 0; k < bs.length; k++) {
         b = bs[k];
         b.vy += g * h;
@@ -70,7 +63,6 @@
         if (b.y + b.r > floorY) { b.y = floorY - b.r; if (b.vy > 0) b.vy = -b.vy * e; b.vx *= 0.985; }
       }
 
-      // --- 圆-圆碰撞（O(n^2)，球数 <= 60，足够快）---
       for (i = 0; i < bs.length; i++) {
         var a = bs[i];
         for (j = i + 1; j < bs.length; j++) {
@@ -84,22 +76,17 @@
           if (dist < 0.0001) { nx = 0; ny = -1; dist = 0.0001; }
           else { nx = dx / dist; ny = dy / dist; }
 
-          // 礁石（iron）参与的接触：零容差 + 全量位置修正——礁石与普通滴严格分离，
-          // 既不重叠（视觉穿模）也不压扁水滴（水滴-水滴仍保留 slop 让堆叠柔软自然）
           var ironPair = !!(a.iron || o.iron);
           var overlap = minD - dist - (ironPair ? 0 : C.slop);
           if (overlap <= 0) continue;
 
-          // 质量 ∝ 面积（b.m 为自定义质量，铁块等障碍用）
           var ma = a.m || a.r * a.r, mo = o.m || o.r * o.r;
           var invA = 1 / ma, invO = 1 / mo, invSum = invA + invO;
 
-          // 位置修正（按反质量分配）；礁石对全量修正，杜绝残余重叠
           var corr = overlap / invSum * (ironPair ? 1.0 : 0.8);
           a.x -= nx * corr * invA; a.y -= ny * corr * invA;
           o.x += nx * corr * invO; o.y += ny * corr * invO;
 
-          // 法向冲量
           var rvx = o.vx - a.vx, rvy = o.vy - a.vy;
           var vn = rvx * nx + rvy * ny;
           if (vn < 0) {
@@ -107,7 +94,6 @@
             a.vx -= jn * nx * invA; a.vy -= jn * ny * invA;
             o.vx += jn * nx * invO; o.vy += jn * ny * invO;
 
-            // 切向摩擦
             var tx = -ny, ty = nx;
             var vt = rvx * tx + rvy * ty;
             var jt = -vt * C.friction / invSum;

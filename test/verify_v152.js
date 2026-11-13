@@ -1,5 +1,3 @@
-// v140 验证：恢复海域进度条（y106~122 空隙带）——
-// 断言：进度条像素存在（经 getTransform 换算内容层偏移后采样）、核心几何不回归（容器 528、spawnY 距底 526）、双屏零报错
 const { chromium } = require('playwright-core');
 const path = require('path');
 
@@ -8,7 +6,6 @@ const path = require('path');
   let fails = 0;
   const ok = (cond, msg) => { console.log((cond ? 'PASS' : 'FAIL') + ' ' + msg); if (!cond) fails++; };
 
-  // 进度条像素采样：用 ctx.getTransform 把逻辑坐标 (y106~122) 换算到物理像素（含 renderOy/dpr/view.s）
   function probeBar(page) {
     return page.evaluate(() => {
       var c2 = document.getElementById('game').getContext('2d');
@@ -24,11 +21,10 @@ const path = require('path');
         for (var x = 0; x < W; x++) {
           var i = (y * W + x) * 4;
           var r = img[i], g = img[i + 1], b = img[i + 2];
-          if (x >= x0 && x <= x1 && r < 160 && b > 150) fill++;            // 最左端 0.02 填充（潮汐池 #80BFE2 系）
-          if (x >= xm0 && x <= xm1 && r > 200 && g > 225 && b > 235) base++; // 条底半透明白
+          if (x >= x0 && x <= x1 && r < 160 && b > 150) fill++;
+          if (x >= xm0 && x <= xm1 && r > 200 && g > 225 && b > 235) base++;
         }
       }
-      // 右端下一海域徽章（未抵达灰化态）：灰图标 #8AA5B8=(138,165,184)
       var ex = Math.round(k * (12 + 396 - 16) + ox), ey = Math.round(k * 110 + oyT);
       var di = c2.getImageData(ex - 6, ey - 6, 12, 12).data;
       for (var j = 0; j < di.length; j += 4) {
@@ -38,7 +34,6 @@ const path = require('path');
     });
   }
 
-  // ---- 屏型 1：420×780 ----
   let page = await browser.newPage({ viewport: { width: 420, height: 780 } });
   let errs = [];
   page.on('pageerror', e => errs.push(e.message));
@@ -54,7 +49,6 @@ const path = require('path');
   ok(bar.base > 60, '进度条条底像素存在（base=' + bar.base + '）');
   ok(bar.dot > 3, '右端下一海域灰化徽章存在（dot=' + bar.dot + '）');
 
-  // 底部按钮均匀排列：图鉴 + 4 道具 + 重开 = 6 个，中心等距 70
   const bxs = await page.evaluate(() => {
     return [window.bookBtn.cx].concat(window.SKILL_BTNS.map(function (b) { return b.cx; })).concat([window.restartBtn.cx]);
   });
@@ -68,7 +62,6 @@ const path = require('path');
   ok(errs.length === 0, '420×780 零报错' + (errs.length ? '：' + errs.join(' | ') : ''));
   await page.close();
 
-  // ---- 屏型 2：320×880 ----
   page = await browser.newPage({ viewport: { width: 320, height: 880 } });
   errs = [];
   page.on('pageerror', e => errs.push(e.message));

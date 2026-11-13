@@ -1,59 +1,34 @@
-// 水滴合成深海 - 全局配置
-// 9 级合成链：雾泡 → 水滴 → 露珠 → 浪花 → 溪流 → 湖泊 → 江河 → 大海 → 沧海
 window.MG = window.MG || {};
 MG.config = {
-  // 逻辑分辨率（画布固定，CSS 等比缩放）
   W: 420,
-  H: 840,              // 9:18（420×18/9=840；比例 2.0 < 常见手机≈2.16，view.s 按宽适配不变）
-  // ★ 比例旋钮：改屏幕比例只改 H 这一处，其余元素位置由 js/layout.js 全部自动派生。
-  //   定位语义（v183 定版）：HUD 按顶部定位（钉块顶 0~165）；其余一切按底部定位
-  //   （= 9:18 定版基准 + dy，dy=H-840，随块底整体平移）；底部带恒 75 贴块底；
-  //   容器顶不设置（v184：容器从块顶长到容器底）；HUD 底与容器顶之间空隙 = 自然残余。
-  //   数值规范（v191）：layout 内全部基准值为 5 的倍数。约束：H ≥ 840。
-  floorY: 675,         // 容器底 y 初始值（build() 回写为 H-75；9:18=765）
+  H: 840,
+  floorY: 675,
 
-  // 容器（顶部 HUD 区 0~165 三组（统计/得分+进度条/任务+潮汐）行距舒适；
-  // 容器顶不设置=0：容器从块顶长到容器底，堆叠空间只作派生量）
-  wall: 0,             // 侧墙厚（0 = 无边框，水滴铺满画布全宽）
-  containerTop: 0,     // 容器顶部开口 y 初始值（build() 回写为 0：容器顶不设置，v184）
-  dangerY: 315,        // 危险线 y 初始值（build() 回写为 315+dy；9:18=315。堆积超过此线且静止即失败）
+  wall: 0,
+  containerTop: 0,
+  dangerY: 315,
 
-  // 投放
-  // 投放：坠落高度初始值（build() 回写为 260+dy 独立基准，与警戒线解耦，v190）
   spawnY: 260,
-  dropCooldown: 0.55,  // 两次投放最小间隔（秒）
+  dropCooldown: 0.55,
 
-  // 物理
-  gravity: 1500,       // 重力加速度 px/s^2
-  restitution: 0.12,   // 弹性
-  friction: 0.10,      // 切向摩擦
-  dampPerStep: 0.9995, // 速度阻尼（每子步）
-  maxSpeed: 1500,      // 限速
-  substeps: 8,         // 每帧物理子步数
-  slop: 0.5,           // 允许重叠量（防抖）
+  gravity: 1500,
+  restitution: 0.12,
+  friction: 0.10,
+  dampPerStep: 0.9995,
+  maxSpeed: 1500,
+  substeps: 8,
+  slop: 0.5,
 
-  // 失败判定
-  dangerTime: 3,       // v368：堆高越线缓冲期（统一 3s，不再分潮汐 ×2 / 首次 ×3 / 容器顶 ×0.55）
-  dangerSpeed: 80,     // 低于此速度视为"静止"
-  graceTime: 0.6,      // 新球出生宽限（不参与危险判定）
-  // v352：外力位移豁免时长（秒）——被磁石/漩涡滴拽拉而越过警戒线的水滴，在外力停止后仍有
-  // 这么久落回，期间不参与堆高判负（用户："磁石滴带走的水滴不应该触发越线"）。
-  // ★ 范围严格限定「特殊滴外力」：深海涌泉(1800)/风暴向心力(2400)/间歇泉(geyserF)/潮汐浮力
-  //   造成的越线属正常游戏机制，一律不豁免（用户 v352 明确）——那些抬升若顶过线，该判就判。
-  // 旧值 0.2s 不够：磁石吸力 6200 远大于重力 1500，水滴被拽到磁石位置后磁石一消散吸力即断，
-  // 落回往往不止 0.2s，于是"在落回途中"就开始攒引信——这正是误判负的成因。
+  dangerTime: 3,
+  dangerSpeed: 80,
+  graceTime: 0.6,
   extGrace: 1.2,
-  dangerWarnH: 120,    // 警戒线「开始闪烁」的触发高度：水滴顶距警戒线 ≤ 此值（从下方逼近）才进入闪烁警示；更远时线条安静（v215 用户要求）
+  dangerWarnH: 120,
 
-  // 连击
-  comboWindow: 1.1,    // 连击窗口（秒）
-  comboMaxMult: 4,     // 连击倍率上限
-  rainCombo: 3,        // 甘霖触发：连击达到该次数时馈赠下一滴
+  comboWindow: 1.1,
+  comboMaxMult: 4,
+  rainCombo: 3,
 
-  // 技能（每消除一个对应符文滴 +1 充能 = 可用 1 次，可连放；顺序对应底部按钮）
-  // v316：解锁条件改为「对应符文滴首次出现即解锁」（跨刷新持久，见 systems.js runeSeen/seeRune）——
-  // 旧版按累计分解锁（skillUnlock 分数门槛）已删除：未出现符文的技能保持锁定。
-  // v342：cost 改为 1（原 4/6/10/6 的"攒满才激活"设计作废——消除一个符文滴即获 1 次使用）
   skills: [
     { key: 'swap',   name: '换滴', cost: 1 },
     { key: 'ripple', name: '涟漪', cost: 1 },
@@ -61,211 +36,158 @@ MG.config = {
     { key: 'flow',   name: '水流', cost: 1 }
   ],
 
-  // 二周目「深渊潜航」：免门槛直接可玩，菜单选一条海况词缀开高危高收益的无尽局
   ng: {
-    unlockScore: 0,                     // v341：移除 5 万分解锁门槛，直接进入（入口在菜单「每日挑战」）
+    unlockScore: 0,
     affixes: [
-      { id: 'heavy', name: '重压深潜', desc: '重力 +80%',        grav: 1.8 },    // v285：词缀再加重（用户：难度还是太低）；v328：+60%→+80%（用户："重压深潜（重力 +80%）"）
+      { id: 'heavy', name: '重压深潜', desc: '重力 +80%',        grav: 1.8 },
       { id: 'storm', name: '疾风骤雨', desc: '潮汐间隔 -65%',    tideInt: 0.35 },
       { id: 'reef',  name: '暗礁密布', desc: '礁石概率 ×4',    ironX: 4 },
       { id: 'frost', name: '寒冰速冻', desc: '水滴 35% 落水即冻', ice: 0.35 }
     ]
   },
 
-  // 每日挑战：每天一局全服同规则的词缀挑战局（词缀按日期种子固定），达到目标分即完成
   dailyChal: {
-    goalBestRatio: 0.35,  // 目标分 = 生涯最高分 × 35%（向上取整到百；无生涯分时按 3000 保底）
-    goalMin: 3000,        // 目标分保底
-    rewardBase: 1800,     // 首通奖励基数
-    rewardStep: 200,      // 连续完成天数每 +1 天的奖励增量
-    rewardMax: 3200,      // 奖励封顶（乘区前）
-    charge: 1             // 完成时随机技能充能（v350：2→1，道具获取整体降低）
+    goalBestRatio: 0.35,
+    goalMin: 3000,
+    rewardBase: 1800,
+    rewardStep: 200,
+    rewardMax: 3200,
+    charge: 1
   },
 
-  // 离线收益：按离开时长结算积分（生涯最佳分定速率），开局自动入账
   offline: {
-    minMins: 3,           // 离开不足此分钟数不触发（防刷新页面反复白嫖）
-    capMins: 480,         // 结算时长封顶（8 小时，过夜一觉正好吃满）
-    perMinBase: 30,       // 每分钟保底产出
-    bestRatio: 0.0004     // 每分钟额外产出 = 生涯最佳分 × 此系数（5.3 万 → 51/分）
+    minMins: 3,
+    capMins: 480,
+    perMinBase: 30,
+    bestRatio: 0.0004
   },
 
-  // 涟漪：以水堆重心为中心的双重波纹推挤
   ripple: {
-    power: 300,        // 首波推力
-    secondPower: 190,  // 次波推力
-    radius: 460,       // 有效半径
-    delay: 0.28,       // 次波延迟（秒）
-    lift: 90           // 额外向上抬升
+    power: 300,
+    secondPower: 190,
+    radius: 460,
+    delay: 0.28,
+    lift: 90
   },
 
-  // 特殊水滴（随机混入投放队列）
-  specialChance: 0.15,           // 每次投放出现特殊滴的概率（潮汐池基准；v354 起随海域线性升至 specialChanceMax）
-  specialChanceMax: 0.34,        // v354：最后一档海域（深渊王座）的特殊滴概率——海域越靠后，特殊滴整体越频繁
-  specialStageBoost: 0.5,        // v354：海域对应加成——特殊滴的解锁海域每深一档，权重 ×(1+boost×stage)，
-                                 // 使"当前海域所属"的特殊滴出现概率更大（浅海不受影响：可选项本来就少）
-  // 符文水滴（随机附带道具属性）：合成带符文的水滴为对应技能 +1 充能（特殊滴/礁石不带符文）
-  // v316：符文池不再按"已解锁技能"过滤——未解锁技能的符文正是解锁来源（滚出即解锁，见 systems.js rollRune/seeRune）
+  specialChance: 0.15,
+  specialChanceMax: 0.34,
+  specialStageBoost: 0.5,
   rune: {
-    chance: 0.05,                                      // 普通投放带符文的概率（v343：0.15→0.08；v350：0.08→0.05——道具获取整体降低，符文滴更稀缺）
-    weights: { swap: 0.28, ripple: 0.24, evap: 0.20, flow: 0.28 } // 四种符文的分布权重
+    chance: 0.05,
+    weights: { swap: 0.28, ripple: 0.24, evap: 0.20, flow: 0.28 }
   },
-  skillMaxQ: 5,              // v342：cost=1 后此值=单技能可储备的可用次数上限（最多连放 5 次，超额截断）
-  guideLen: 170,             // 掉落辅助线固定长度（世界像素，v338：改为固定长度，参考主流落子指示）
-  vortex: {                      // 漩涡滴：吸附周围水滴后消散
+  skillMaxQ: 5,
+  guideLen: 170,
+  vortex: {
     pullR: 190,
     pullF: 430,
     delay: 0.35,
     life: 1.6,
     score: 8
   },
-  cloud: {                       // 雨云滴：落地后随机分裂为 2~3 颗不大于当前等级的水滴（补充低级滴）
+  cloud: {
     splitDelay: 0.55,
-    minSplit: 2,                  // 最少分裂数
-    maxSplit: 3,                  // 最多分裂数
-    maxTier: 2,                   // 分裂水滴档位上限（不大于当前等级——保持"补充低级滴"定位）
+    minSplit: 2,
+    maxSplit: 3,
+    maxTier: 2,
     score: 2
   },
-  ice: {                         // 冰晶滴：落定后冻结自己与周围水滴（临时平台）
-    freezeTime: 4.5,             // 冻结时长（秒）
-    radiusFactor: 2.4,           // 冻结半径 = 自身半径 × 该系数
+  ice: {
+    freezeTime: 4.5,
+    radiusFactor: 2.4,
     score: 5
   },
-  // 礁石：障碍物（砸穿水滴堆落底、不浮起、两两相消或蒸发移除）
-  // ★ v357 重设计（用户："礁石的游戏设计有些弱了，毕竟是期望他能增加游戏难度"）：
-  //   ① r 26→34（原半径小于第 4 档水滴，占位毫无存在感）② 蒸发 1 充能 +5 分 → **2 充能、不给分**
-  //   （清除从"不亏反赚"变成止损）③ 新增**礁石税**：每块在场 −6% 全局收益（上限 −30%），
-  //   拖着不管就持续吃亏。清除途径：两两相消（15 分）/ 蒸发（2 充能）/ 熔岩范围烧。
-  // ★ v365：应用户要求**移除两项**——① "撞击才碎"（impactSpeed）移除，恢复**接触即相消**；
-  //   ② "在场生长"（growRate/growMax）移除，半径恒定 34。礁石税与蒸发涨价保留。
-  // ★ v366：应用户要求**只有涨潮才能消除礁石**（其他水滴无此限制）——相消与蒸发两条主动
-  //   清除途径都要求 tide.progress ≥ tideNeed；v367 起「江河→大海」潮汐闸门已移除，礁石是
-  //   场上唯一仍受潮汐限制的清除途径。熔岩范围烧是特殊滴的被动清除，不限潮汐（保留一个不挑
-  //   时机的出口，避免死局）。
   iron: {
-    chance: 0.05,                // v390：每次投放是礁石的概率（0.08→0.05，整体降频 ~38%）
-    maxActive: 5,                // 场上同时最多几个（v389：放开到 5，允许 4 连引爆 / 3 连障碍成形；v375 曾限 3）
-    cooldownDrops: 5,            // v390：落地一颗礁石后，强制接下来 N 滴内不再出礁石（反聚堆，最对症"第一颗之后马上又来"）
-    r: 34,                       // v357：26→34（原半径小于第 4 档水滴，占位毫无存在感）；v365：恒定，不再生长
-    massMult: 16,                // 质量倍率（远重于水滴，下落时把水滴挤开）
-    evaporateScore: 0,           // v357：蒸发移除不再给分（原 5）
-    evapCost: 2,                 // v357：蒸发一块礁石耗 2 次充能（水滴仍 1 次）
-    hp: 4.0,                     // v372：礁石被水滴接触磨蚀的总时长（秒），磨穿即碎裂移除（玩家正向出口）
-    erodeScore: 0,               // v387：磨碎不再给分（礁石是负资产，移除它本就是收益，不应再奖励→否则变刷分工具降难度）
-    pairScore: 15,               // 两块礁石相消的奖励（v357 曾因"撞击才碎"提到 30，v365 恢复接触即消后回到 15）
-    tideNeed: 0.15,              // v366：涨潮进度 ≥ 此值才允许消除礁石（相消 / 蒸发）
-    taxPer: 0.06,                // v357：每块在场礁石让全局得分倍率 −6%
-    taxMax: 0.30,                // v357：扣分上限 30%（5 块封顶）
-    // ③ 礁石分档（v389）：相邻礁石连成簇，按簇大小分档——2 连正常消(涨潮相消)、3 连障碍+换险、4 连自动引爆；
-    // 全自动化，无点按。引爆/换险都把周围水滴上抛(可能顶过线，按 v352 不豁免)。
-    blastR: 90,                     // 4 连引爆：内圈满力半径（d<此值满力，向外衰减到 blastShockR=0）
-    blastShockR: 230,               // 4 连引爆：冲击波作用半径
-    blastShockF: 950,               // 4 连引爆：向上冲量（重力1500下≈300px上抛，近线水滴必越线=真风险）
-    gambleShockR: 180,             // 3 连换险：清掉 3 连中礁石时冲击波半径（较弱）
-    gambleShockF: 620              // 3 连换险：向上冲量（≈128px上抛，近线有风险但可控）
+    chance: 0.05,
+    maxActive: 5,
+    cooldownDrops: 5,
+    r: 34,
+    massMult: 16,
+    evaporateScore: 0,
+    evapCost: 2,
+    hp: 4.0,
+    erodeScore: 0,
+    pairScore: 15,
+    tideNeed: 0.15,
+    taxPer: 0.06,
+    taxMax: 0.30,
+    blastR: 90,
+    blastShockR: 230,
+    blastShockF: 950,
+    gambleShockR: 180,
+    gambleShockF: 620
   },
 
-  // 特殊滴组合技（v383）：两种特殊滴同时在场触发的协同效果
   combo: {
-    siphonR: 160,                   // 定向虹吸：收束半径
-    siphonF: 25,                    // 定向虹吸：横向收束力
-    iceR: 95                       // 冰泉支架：冻结成柱半径
+    siphonR: 160,
+    siphonF: 25,
+    iceR: 95
   },
 
-  // 图鉴积分门槛：累计得分（跨局）达到后才解锁该级图鉴（0 = 无门槛，前 5 级免费）
   dexGate: [0, 0, 0, 0, 0, 500, 3000, 10000, 30000],
-  // 投放门槛：直接投放的水滴档位/特殊滴需累计分达标才会刷出（图鉴不显示门槛数值）
   spawnGate: [0, 0, 0, 800, 2500],
-  // 特殊滴与海域绑定：抵达该海域后才会刷出（图鉴里未到达海域的特殊滴不显示）
   specialStage: {
-    rune: 0, chest: 0,            // 潮汐池（v317：符文滴提前到潮汐池——技能解锁随首个符文出现，开局即可解锁）
-    iron: 1, cloud: 1,            // 珊瑚浅海（v317：礁石改到珊瑚浅海）
-    ice: 2, vortex: 2,            // 蔚蓝深海（v317：漩涡滴改到蔚蓝深海）
-    rainbow: 3, gale: 3,          // 午夜深渊
-    magnet: 4, spring: 4,         // 月光环礁
-    thunder: 5, pearl: 5,         // 海沟之眼
-    magma: 6, geyser: 6,          // 热泉裂谷
-    void: 7, aurora: 7            // 深渊王座
+    rune: 0, chest: 0,
+    iron: 1, cloud: 1,
+    ice: 2, vortex: 2,
+    rainbow: 3, gale: 3,
+    magnet: 4, spring: 4,
+    thunder: 5, pearl: 5,
+    magma: 6, geyser: 6,
+    void: 7, aurora: 7
   },
-  // 新特殊滴行为参数
-  magnet:   { delay: 0.4, life: 1.8, pullR: 250, pullF: 620, score: 150 }, // 磁石滴：吸附范围/力度须强于漩涡滴（pullF 430），否则"聚拢大范围"名不副实
-  magmaR: 95, magmaScore: 70,   // 熔岩滴：烧毁半径 / 每个目标折算分
-  geyserW: 120, geyserF: 400,   // 间歇泉：水柱半宽 / 上冲力
-  voidN: 5, voidScore: 90,      // 虚空滴：吞噬数量上限 / 每颗折算分
-  auroraMult: 3,                // 极光滴：下一次合成得分倍数
+  magnet:   { delay: 0.4, life: 1.8, pullR: 250, pullF: 620, score: 150 },
+  magmaR: 95, magmaScore: 70,
+  geyserW: 120, geyserF: 400,
+  voidN: 5, voidScore: 90,
+  auroraMult: 3,
 
-  // 潮汐系统（周期性涨潮：水滴受浮力上浮重排；浮起越线同样判负）
-  // 潮位设计：满潮水面随海域线性逼近/没入警戒线（v322 纯线性，最后一个海域最高）——
-  // v308 曾封顶"警戒线下 40px"（水面永远碰不到警戒线，水滴因此永远越不过线）；v319 移除
-  // 封顶但把越线量挂在线性渐变端点，仿真实测 sea5 之前任何档位都浮不过线（sea3 仅沧海
-  // 勉强 +14px、sea0-2 全负）；v321 改逐海域显式曲线又出现 sea2 凸节、sea4 后走平
-  // （用户："涨潮的高度不合理，按理说应当线性增高，最后一个海域达到最高"）；v322 定为
-  // overMin→overMax 纯线性：每个海域等量抬升 42px，深海满潮全档位浮起越线
     tide: {
-      // v315：首潮倒计时不再单独设值，直接用 cycleInterval（用户："首次涨潮倒计时也用潮汐间隔的时间"）
-    cycleInterval: 42,   // 两次涨潮间隔（v313：32→42，用户"初始增加到 40 以上"；随海域推进线性压到 tideIntervalMin）
-    duration: 7,         // 涨潮持续（sea0 值；v327：随海域线性拉长至 durationMax——见 updateTide）
-    durationMax: 9,      // v327：最后一个海域的涨潮持续。实测（test/sim_tide_probe.js）：深海引信链
-                        // 2.2s(引信)+3s(深流缓冲)+2.2s(二段)=7.4s > 满潮保持 7s，退潮 1.6s 内水滴
-                        // 随水面落回线下，二段引信永远差 ~0.3~1s 攒不满 ⇒ sea5~7 首个潮汐周期 72 个
-                        // sea×tier 用例实测"判负: 无"，全部被缓冲+退潮救走（虚晃一枪）。拉长至 9s 后
-                        // 引信链在退潮前兑现，深海潮汐首个周期即可判负
-    buoyancy: 4000,      // 浮力加速度（v341：2900→4000，净上托 2500）。v353：衰减保留（用户"潮汐的衰减还是保留吧"），但完全浸没的水滴可被顶过警戒线（正常机制，按 v352 裁定不豁免）
-    // v328：潮位规格（用户："潮汐最低是警戒线至底部的 1/4，最高值是 3/4！完全是不超过警戒线的"）
-    // ——满潮水面 = 警戒线→底部(=floorY-dangerY=450px)的"填充比例"：浅海最低填 1/4、深海最高填 3/4，
-    // 整条曲线线性、且恒在警戒线下方（最满 fill=3/4 时水面 = floorY-450×0.75 = 427.5，仍比警戒线 315 低 112.5px）。
-    // fill(sea) = lowFrac + (highFrac-lowFrac)×sea/(海域数-1)；满潮水面 y = floorY - (floorY-dangerY)×fill。
-    // 取代 v322 的 overMin/overMax（原会让深海满潮没过警戒线上 35px，违反"不超过警戒线"）。
-    lowFrac: 0.25,       // 最低潮位填充比例（浅海；水面 = floorY-450×0.25 = 652.5，最靠近底部）
-    highFrac: 0.75,      // 最高潮位填充比例（深海；水面 = floorY-450×0.75 = 427.5，最靠近警戒线但仍在线下 112.5px）
-    warnTime: 3          // 涨潮前预警秒数
+    cycleInterval: 42,
+    duration: 7,
+    durationMax: 9,
+    buoyancy: 4000,
+    lowFrac: 0.25,
+    highFrac: 0.75,
+    warnTime: 3
   },
 
-  // 潮汐组合技：退潮余波有概率引来海神恩泽，全场普通水滴集体升 1 级
   tideBless: {
-    chance: 0.4,         // 每次退潮触发概率（防连发：连续两次至多出一次）
-    minDrops: 4          // 场上普通水滴少于此数不触发
+    chance: 0.4,
+    minDrops: 4
   },
 
-  // 深海事件节律（v380 节奏张力）：危机(风暴/涌泉)后必接奖励(甘霖)，形成「危机→奖励」情绪曲线；
-  // 间隔收窄为可预期节拍（±jitter 小抖动，取代原 30~50s 离散），让玩家能预判事件窗
   seaEvent: {
-    interval: 26,          // 事件间基准间隔（秒）
-    jitter: 4,             // 间隔抖动（±秒），保持可预期又不机械
-    blessAfterCrisis: true  // 危机事件(风暴/涌泉)结束后，下一个事件强制为奖励(甘霖)
+    interval: 26,
+    jitter: 4,
+    blessAfterCrisis: true
   },
 
-  // 无尽模式渐进加压（进入无尽后随时长线性到满，坡度平缓）
   ramp: {
-    minutes: 14,         // 达到满强度所需分钟数（收紧：压力更早到位）
-    tideIntervalMin: 16, // 潮汐间隔下限（秒）
-    ironChanceMax: 0.11, // v390：礁石概率上限（0.16→0.11，与 chance 同步降频）
-    spawnWeightsMax: [22, 24, 22, 16, 16] // 投放权重演进终点（向高级倾斜）
+    minutes: 14,
+    tideIntervalMin: 16,
+    ironChanceMax: 0.11,
+    spawnWeightsMax: [22, 24, 22, 16, 16]
   },
 
-  // 高潮时刻：无尽模式每累计 +1500 分，场上最高档的可合成对自发相聚（v354：500→1500——原值后期触发过密）
   climaxEvery: 1500,
 
-  // 里程碑任务链
   questScoreBase: 35,
   questScoreStep: 22,
 
-  // 海域图鉴 & 汇入海域
   dexBonusMult: 10,
   seaBonus: 300,
   seaMultStep: 0.25,
 
-  // 数值封顶：所有得分乘区（海域加成×成就加成×连击等）叠乘后的总上限，防后期分数膨胀失真
   multCap: 8,
 
-  // 每日任务（每天按日期种子生成 3 个，跨局累计；全完成涨连续天数）
   daily: {
-    rewardScore: 150,     // 单个任务完成奖励
-    streakBase: 100,      // 全完成基础奖励
-    streakStep: 50        // 连续天数每 +1 的额外奖励
+    rewardScore: 150,
+    streakBase: 100,
+    streakStep: 50
   },
 
-  // 海域演进：累计得分（跨局）里程碑改变世界（背景色调随阶段加深，色相与图鉴徽章一致）
   seaStages: [
     { at: 0,     name: '潮汐池', bg: ['#DFF4FC', '#BDE9F7', '#9BD4EC', '#80BFE2'], shade: 'rgba(16,56,96,0.26)' },
     { at: 3000,  name: '珊瑚浅海', bg: ['#E0F4EA', '#BAE9D6', '#8ED1C0', '#62AB9A'], shade: 'rgba(20,70,64,0.26)' },
@@ -277,10 +199,8 @@ MG.config = {
     { at: 300000, name: '深渊王座', bg: ['#B49BD6', '#8A67BE', '#5A3FA2', '#36256E'], shade: 'rgba(20,10,44,0.44)' }
   ],
 
-  // 随机出生池（只出前 5 级，权重）
   spawnWeights: [30, 26, 22, 14, 8],
 
-  // 合成链（每档一个可辨识色相：雾白→青→青绿→天蓝→宝蓝→靛蓝→紫→海军蓝→深渊墨蓝，明度同步递进）
   tiers: [
     { name: '雾泡', r: 15, color: '#E8F5FC', dark: '#A8CFE2', score: 1 },
     { name: '水滴', r: 21, color: '#8FDCE9', dark: '#3E9FBC', score: 3 },
@@ -293,12 +213,11 @@ MG.config = {
     { name: '沧海', r: 92, color: '#122A5E', dark: '#060F2E', score: 50 }
   ],
 
-  // 微信广告（v387）：原生 Banner / 激励视频 / 插屏 配置（adUnitId 占位，真机需在微信公众平台·流量主申请）
   ad: {
-    bannerId: '',          // 常驻 Banner 广告位 ID（游戏中/菜单/结算页共用同一实例）；留空 → 不创建 Banner
-    rewardId: '',          // 复活 30s 激励视频广告位 ID（看完才复活）
-    interstitialId: '',    // 局间插屏广告位 ID（可选）
-    minBandPx: 90,         // 下方留白带 ≥ 此高度(屏幕 px)才显示游戏内常驻 Banner；过矮机型自动隐藏，绝不遮挡
-    interstitialEvery: 3   // 每 N 次结算展示一次插屏（0 = 不展示）
+    bannerId: '',
+    rewardId: '',
+    interstitialId: '',
+    minBandPx: 90,
+    interstitialEvery: 3
   }
 };

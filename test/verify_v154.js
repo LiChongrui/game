@@ -1,5 +1,3 @@
-// v154 验证：①礁石压住普通滴 → 被压滴压扁（pressS>0 且渲染形变生效）
-// ②进度条两端徽章骑在端点并遮挡条端（左端实色徽章 / 右端不透明浅底）
 const { chromium } = require('playwright-core');
 const path = require('path');
 
@@ -13,12 +11,11 @@ const path = require('path');
   await page.goto('file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/'));
   await page.waitForTimeout(1500);
 
-  // ---- ①礁石压顶压扁 ----
   await page.evaluate(() => { restart(); });
   await page.waitForTimeout(700);
   await page.evaluate(() => {
-    phys.create(210, 645, 2, 0, 0);   // 底部放一个露珠（r28）
-    createIron(210, 520);                  // 正上方落一块礁石压住它
+    phys.create(210, 645, 2, 0, 0);
+    createIron(210, 520);
   });
   await page.waitForTimeout(2600);
   const press = await page.evaluate(() => {
@@ -37,7 +34,6 @@ const path = require('path');
   ok(press.pressS > 0.02, '被压滴压扁量生效 pressS=' + (press.pressS || 0).toFixed(3));
   await page.screenshot({ path: path.join(__dirname, 'v154_press.png') });
 
-  // ---- ②进度条两端徽章骑端点并遮挡 ----
   const ends = await page.evaluate(() => {
     var c2 = document.getElementById('game').getContext('2d');
     var t = c2.getTransform();
@@ -51,9 +47,7 @@ const path = require('path');
       for (var j = 0; j < d.length; j += 4) { sr += d[j]; sg += d[j + 1]; sb += d[j + 2]; n++; }
       return [Math.round(sr / n), Math.round(sg / n), Math.round(sb / n)];
     }
-    // 左端徽章：潮汐池 #3BB8D8(59,184,216) —— 蓝青，g/b 明显高于 r
     var l = px(sx);
-    // 右端徽章：不透明浅底 #EFF5FA(239,245,250) —— 近白且高于条底半透明白
     var r = px(sx + sw);
     return { left: l, right: r, sx: sx, rightX: sx + sw };
   });

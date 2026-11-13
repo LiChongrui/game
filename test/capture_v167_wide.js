@@ -1,4 +1,3 @@
-// 宽屏（横屏显示器/浏览器窗口）专项：复现“道具区下方蓝色方块”
 const { chromium } = require('playwright-core');
 
 (async () => {
@@ -15,7 +14,6 @@ const { chromium } = require('playwright-core');
     const vb = await page.evaluate(() => ({ iw: innerWidth, ih: innerHeight, oy: window.MG.probe().oy, VH: window.MG.probe().VH }));
     const s = Math.min(vb.iw / 420, vb.ih / 747);
     const LW = vb.iw / s, BX = (LW - 420) / 2;
-    // 用菜单按钮真实几何换算屏幕坐标点击（块坐标 + BX/renderOy 居中偏移），带重试
     for (let t = 0; t < 6; t++) {
       const st = await page.evaluate(() => window.MG.probe().state);
       if (st === 'play') break;

@@ -1,4 +1,3 @@
-// v168 验证：宽屏/矮屏/高屏下道具区下方均无蓝色方块（海床两段式）
 const { chromium } = require('playwright-core');
 
 (async () => {
@@ -6,7 +5,6 @@ const { chromium } = require('playwright-core');
   const base = 'file://' + require('path').resolve(__dirname, '../index.html');
   const browser = await chromium.launch({ executablePath: exe });
 
-  // [标签, safeTop, 宽, 高]
   const cases = [
     ['宽屏_1920x1080', null, 1920, 1080],
     ['宽屏_1280x800', null, 1280, 800],

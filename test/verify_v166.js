@@ -1,6 +1,3 @@
-// v166 定位断言：垂直居中（renderOy=(VH-C.H)/2）+ transform 修正（dpr*view.s*renderOy）
-// 验证：① renderOy 居中量正确；② hudInset 胶囊残余量正确（高屏=0，矮屏=24）；
-//       ③ 菜单态实点静音键（按公式换算屏幕坐标）验证命中回环未被居中/单位修正破坏。只读状态+实点，不截图。
 const { chromium } = require('playwright-core');
 
 (async () => {
@@ -29,7 +26,6 @@ const { chromium } = require('playwright-core');
     ok(Math.abs(st.renderOy - expOy) < 0.5, `${label}: renderOy=居中量 (VH-747)/2`);
     ok(Math.abs(st.hudInset - expInset) < 0.5, `${label}: hudInset=胶囊残余量 ${expInset.toFixed(1)}`);
 
-    // 菜单态实点静音键：block(396, 36+hudInset) → 屏幕坐标（含居中 renderOy 与 BX）
     const rect = await page.evaluate(() => { const r = document.getElementById('game').getBoundingClientRect(); return { left: r.left, top: r.top }; });
     const LW = vb.iw / s, BX = (LW - 420) / 2;
     const mx = rect.left + s * (396 + BX);
@@ -39,7 +35,6 @@ const { chromium } = require('playwright-core');
     await page.waitForTimeout(120);
     const after = await page.evaluate(() => window.audio.muted);
     ok(before !== after, `${label}: 实点静音键命中翻转 (${before}→${after}) @(${mx.toFixed(0)},${my.toFixed(0)})`);
-    // 点回来复位，避免影响后续
     await page.mouse.click(mx, my);
     await page.waitForTimeout(80);
     ok(errs.length === 0, `${label}: 无控制台错误${errs.length ? ' -> ' + errs.join(' | ') : ''}`);

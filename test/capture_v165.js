@@ -1,4 +1,3 @@
-// v165 截图：验证 HUD 无叠压 + 彩虹滴显示正常
 const { chromium } = require('playwright-core');
 
 (async () => {
@@ -15,7 +14,6 @@ const { chromium } = require('playwright-core');
     const s = Math.min(vb.iw / 420, vb.ih / 747);
     await page.mouse.click(210 * s, 426 * s);
     await page.waitForTimeout(600);
-    // 生成一颗彩虹滴供观察（通过调试接口直接设 special）
     await page.evaluate(() => {
       var b = window.MG.debug.spawn(0, 210, 250);
       if (b) { b.special = 'rainbow'; window.__rb = b; }

@@ -1,12 +1,3 @@
-// 潮汐越线判负诊断（headless 快进，无渲染）——用户："涨潮引起的越线好像很难死亡，是判定不对吗？"
-// 四案测量：
-//  A. sea7 单滴雾泡 满潮 15s：越线期间速度分布（高速采样占比，v326 起速度门已移除、
-//     此处仅存速度普查）、dangerT 峰值、深流缓冲消耗时点、最终是否判负
-//  B. sea7 12 滴混合堆 满潮 15s：同 A（筏子效应）
-//  C. sea6 单滴沧海（最大滴）满潮 15s：同 A（漂幅最大）
-//  D. 非潮汐高速坠落横穿警戒线（回归保护）：滴从线上方 120px 自由落体穿线，
-//     速度门应阻止计时——验证"快速横穿不误伤"的保护在修改后仍然有效
-// 用法：node sim_danger.js
 const path = require('path');
 let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) { console.error('需要 playwright-core'); process.exit(1); }
@@ -29,12 +20,11 @@ const SEA_AT = [0, 3000, 10000, 25000, 50000, 100000, 180000, 300000];
     const DT = 1 / 60;
     function pin(tide) { tide.phase = 'active'; tide.timer = 8; tide.progress = 1; }
 
-    // 满潮场景：返回越线速度普查 + dangerT 峰值 + 缓冲/判负时点
     function tideCase(sea, spawnFn, seconds) {
       MG.debug.reset();
       MG.debug.setLife(SEA_AT[sea]);
       const bodies0 = spawnFn();
-      for (let k = 0; k < 150; k++) MG.debug.step(DT); // 2.5s 静置落底
+      for (let k = 0; k < 150; k++) MG.debug.step(DT);
       const pr0 = MG.probe();
       const dangerY = pr0.dangerY;
       const tide = pr0.tideRef;
@@ -64,7 +54,6 @@ const SEA_AT = [0, 3000, 10000, 25000, 50000, 100000, 180000, 300000];
       return { n0: bodies0, st: st };
     }
 
-    // D：非潮汐高速横穿——线上方 120px 自由落体（雾泡 r=15，top = dangerY-120）
     function transitCase() {
       MG.debug.reset();
       MG.debug.setLife(SEA_AT[7]);
@@ -72,7 +61,7 @@ const SEA_AT = [0, 3000, 10000, 25000, 50000, 100000, 180000, 300000];
       const dangerY = pr0.dangerY;
       MG.debug.spawn(0, 210, dangerY - 105);
       let maxDangerT = 0, maxSpOver = 0, over = false, overAt = null, overN = 0;
-      for (let k = 0; k < 180; k++) { // 3s
+      for (let k = 0; k < 180; k++) {
         MG.debug.step(DT);
         const pr = MG.probe();
         if (pr.state === 'over') { over = true; overAt = (k + 1) * DT; break; }
@@ -95,10 +84,9 @@ const SEA_AT = [0, 3000, 10000, 25000, 50000, 100000, 180000, 300000];
       for (let i = 0; i < pileTiers.length; i++) rs.push(MG.debug.spawn(pileTiers[i], 60 + (i * 53) % 300, 500 + (i % 4) * 40).r);
       return rs;
     }, 15);
-    const C = tideCase(6, () => { const b = MG.debug.spawn(8, 210, 640); return [b.r]; }, 15); // 沧海 tier8
+    const C = tideCase(6, () => { const b = MG.debug.spawn(8, 210, 640); return [b.r]; }, 15);
     const D = transitCase();
 
-    // E：漂浮滴 top(t) 轨迹——量浮漾摆动幅度（决定判负保持边距）
     const E = (function () {
       MG.debug.reset();
       MG.debug.setLife(SEA_AT[7]);
@@ -110,7 +98,7 @@ const SEA_AT = [0, 3000, 10000, 25000, 50000, 100000, 180000, 300000];
       tide.phase = 'active'; tide.timer = 8; tide.progress = 0;
       const trace = [];
       let minTop = 1e9, maxTopAfterFloat = -1e9, floatStarted = false;
-      for (let k = 0; k < 900; k++) { // 15s
+      for (let k = 0; k < 900; k++) {
         MG.debug.step(DT);
         pin(tide);
         const pr = MG.probe();
@@ -122,8 +110,6 @@ const SEA_AT = [0, 3000, 10000, 25000, 50000, 100000, 180000, 300000];
       }
       return { dangerY: dangerY, minTop: Math.round(minTop), maxTopAfterFloat: Math.round(maxTopAfterFloat), trace: trace };
     })();
-    // F：自然潮周期（不钉潮位）——sea7 单滴 + 十二滴堆各跑 50s（覆盖首潮+次潮），
-    //    验证真实涨潮全长（8s）内是否致死、缓冲消耗后的次潮是否可靠判负
     const F = (function () {
       function natural(sea, spawnFn, seconds) {
         MG.debug.reset();
@@ -133,7 +119,7 @@ const SEA_AT = [0, 3000, 10000, 25000, 50000, 100000, 180000, 300000];
         const pr0 = MG.probe();
         const dangerY = pr0.dangerY;
         const tide = pr0.tideRef;
-        tide.phase = 'active'; tide.timer = 8; tide.progress = 0; // 立即开潮，之后完全自然演进
+        tide.phase = 'active'; tide.timer = 8; tide.progress = 0;
         let overAt = null, bufferedAt = null, firstOverAt = null, tideStarts = 1, prevPhase = 'active';
         const steps = Math.round(seconds / DT);
         for (let k = 0; k < steps; k++) {

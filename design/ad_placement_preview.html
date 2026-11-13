@@ -82,12 +82,11 @@
 </div>
 
 <div class="stage">
-  <!-- ============ 手机框 ============ -->
+
   <div class="frame" id="frame">
-    <!-- 留白带会在 JS 里按机型计算高度并放置 Banner -->
+
     <div class="band-top" id="bandTop">▲ 上方留白带（同尺寸，亦可选放 Banner）</div>
 
-    <!-- 游戏方块（绝对不碰内部坐标） -->
     <div class="block" id="block">
       <div class="hud"><span>分数 1280</span><span>海域 深海</span><span>⚙</span></div>
       <div class="danger" id="danger" style="top:130px"></div>
@@ -103,14 +102,12 @@
 
     <div class="band-bottom" id="bandBottom">▼ 下方留白带（Banner 停靠处）</div>
 
-    <!-- 原生 Banner：JS 动态放进底部留白带 -->
     <div class="banner" id="banner" style="display:none">
       <span>🎮 深海合成 · 同款休闲推荐</span>
       <span class="tag">广告</span>
       <span class="cta">下载</span>
     </div>
 
-    <!-- 复活 30s 模态 -->
     <div class="modal" id="reviveModal">
       <div class="m-card">
         <h3>即将沉没…</h3>
@@ -122,41 +119,33 @@
       </div>
     </div>
 
-    <!-- 主菜单 / 结算的常驻 Banner 模态（仅作示意，渲染在屏幕底） -->
     <div class="banner" id="menuBanner" style="display:none;position:absolute;left:6px;right:6px;bottom:8px">
       <span>🐟 更多海洋小游戏</span><span class="tag">广告</span><span class="cta">免费玩</span>
     </div>
   </div>
 
-  <!-- ============ 说明 ============ -->
   <div class="note" id="note"></div>
 </div>
 
 <script>
-  // ---- 机型留白带模拟 ----
-  // 方块 9:18 = 1:2。frame 300×620。
-  // 普通手机：屏比 > 1:2 → 按宽适配 → 上下留白带
-  // 老机型 18:9：屏比=1:2 → 无缝留白 → 不放游戏内常驻 Banner（走菜单/结算/插屏）
   function layout(ratio){
-    var W=300, H=620, blockW=300; // 宽撑满
+    var W=300, H=620, blockW=300;
     var blockH, bandT, bandB;
-    if(ratio==='tall'){ // 19.5:9 ≈ 1:2.16 → 方块高 = W*2 = 600，上下各 10px（演示放大到 40）
-      blockH = 540; bandT = (H-blockH)/2; bandB = bandT; // 各 40px
-    } else { // 18:9 → 方块撑满 620，无缝
+    if(ratio==='tall'){
+      blockH = 540; bandT = (H-blockH)/2; bandB = bandT;
+    } else {
       blockH = H; bandT = 0; bandB = 0;
     }
     var block = document.getElementById('block');
     block.style.top = bandT+'px';
     block.style.height = blockH+'px';
     block.style.width = blockW+'px';
-    // 警戒线按比例落位（方块内 ~24%）
     document.getElementById('danger').style.top = Math.round(blockH*0.24)+'px';
 
     var banner = document.getElementById('banner');
     var bandBottom = document.getElementById('bandBottom');
     var menuBanner = document.getElementById('menuBanner');
     if(bandB>0){
-      // 游戏内常驻 Banner 停进底部留白带
       banner.style.display='flex';
       banner.style.bottom = '6px';
       banner.style.height = Math.max(20, bandB-8)+'px';
@@ -178,7 +167,6 @@
   function setTab(t){
     TAB=t;
     document.querySelectorAll('.tab').forEach(function(e){e.classList.toggle('active', e.dataset.t===t)});
-    // 切换可见元素
     var play = (t==='play');
     document.getElementById('reviveModal').classList.toggle('show', t==='revive');
     document.getElementById('menuBanner').style.display = (t==='menu'||t==='settle') ? 'flex' : 'none';
@@ -226,7 +214,6 @@
     }
   }
 
-  // init
   layout('tall');
   setTab('play');
 </script>

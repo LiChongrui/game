@@ -1,4 +1,3 @@
-// 文档专用截图：开始界面 / 对局 / 图鉴 / 满潮 / 结算
 const { chromium } = require('playwright-core');
 const path = require('path');
 
@@ -11,10 +10,8 @@ const path = require('path');
   await page.waitForTimeout(1600);
   const shot = n => page.screenshot({ path: path.join(__dirname, 'doc_' + n + '.png') });
 
-  // ① 开始界面
   await shot('menu');
 
-  // ② 对局：交替投普通滴摆出合成现场（开局即无尽模式）
   await page.mouse.click(210, 426);
   await page.waitForTimeout(300);
   const drops = [[2, 120], [3, 200], [2, 300], [3, 150], [4, 260], [2, 350], [3, 110], [4, 240]];
@@ -25,10 +22,8 @@ const path = require('path');
   await page.waitForTimeout(1500);
   await shot('play');
 
-  // ③ 图鉴·海域演进
   await page.evaluate(() => { MG.debug.openDex(); });
   await page.waitForTimeout(200);
-  // 切到「海域演进」分节（右半段）
   const sec = await page.evaluate(() => {
     const r = { x: 20, y: 64, w: 380, h: 560 };
     return { x: r.x + 15 + (r.w - 30) / 2 + (r.w - 30) / 4, y: r.y + 44 + 12 };
@@ -38,12 +33,10 @@ const path = require('path');
   await shot('dex');
   await page.evaluate(() => MG.debug.closeDex());
 
-  // ④ 深渊王座满潮（海域主题色 + 潮面）
   await page.evaluate(() => { MG.debug.forceEndless(); const t = MG.probe().tideRef; t.phase = 'active'; t.timer = 5; t.progress = 1; t.banner = 0; MG.debug.setLife(300100); });
-  await page.waitForTimeout(2600); // 等海域换色渐变走完
+  await page.waitForTimeout(2600);
   await shot('tide');
 
-  // ⑤ 结算页（先把钉死的满潮恢复成正常倒计时，避免截图里出现 9997s）
   await page.evaluate(() => { const t = MG.probe().tideRef; t.phase = 'idle'; t.timer = 18; t.progress = 0; MG.debug.addScore(28600); MG.debug.over(); });
   await page.waitForTimeout(400);
   await shot('over');
