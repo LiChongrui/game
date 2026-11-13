@@ -887,9 +887,7 @@
   }
 
   function drawRankTab() {
-    var rows = friendBoard();
-    var meIdx = 0;
-    for (var m = 0; m < rows.length; m++) if (rows[m].me) { meIdx = m; break; }
+    var rows = recentBoard();
     var bx = DEX_PANEL.x + 14, by = DEX_PANEL.y + 54, bw = DEX_PANEL.w - 28, bh = 60;
     var bgd = ctx.createLinearGradient(0, by, 0, by + bh);
     bgd.addColorStop(0, '#3B97C9'); bgd.addColorStop(1, '#1E6B9E');
@@ -906,20 +904,20 @@
     ctx.textAlign = 'center';
     ctx.font = 'bold 15px system-ui, sans-serif';
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillText('#' + (meIdx + 1), bx + 30, by + 35);
+    ctx.fillText('★', bx + 30, by + 35);
     ctx.textAlign = 'left';
     ctx.font = '10.5px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.75)';
     ctx.fillText('我的最佳成绩', bx + 58, by + 25);
     ctx.font = 'bold 18px system-ui, sans-serif';
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillText(fmtScore(rows[meIdx].score), bx + 58, by + 47);
+    ctx.fillText(fmtScore(best), bx + 58, by + 47);
     ctx.textAlign = 'right';
     ctx.font = '11px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.fillText('超越 ' + (rows.length - 1 - meIdx) + ' 位好友', bx + bw - 16, by + 35);
+    ctx.fillText('共 ' + recent.length + ' 局记录', bx + bw - 16, by + 35);
     var colW = 108, gap = 14, yBase = DEX_PANEL.y + 236;
-    var tops = [rows[1], rows[0], rows[2]];
+    var tops = [rows[1] || null, rows[0] || null, rows[2] || null];
     var hts = [84, 108, 72], medals = ['#C9D4DC', '#F5C542', '#E0B58A'];
     var grads = [['#DDE6EC', '#AEBEC9'], ['#FFE08A', '#D9A93F'], ['#EFCAA2', '#C29263']];
     for (var p = 0; p < 3; p++) {
@@ -947,10 +945,10 @@
       ctx.fillText(String([2, 1, 3][p]), mx, my + 4.5);
       ctx.font = '11.5px system-ui, sans-serif';
       ctx.fillStyle = p === 1 ? '#7A5608' : '#3E647E';
-      ctx.fillText(truncText(tops[p].name, colW - 12), mx, py0 + 48);
+      ctx.fillText(tops[p] ? truncText(tops[p].name, colW - 12) : '—', mx, py0 + 48);
       ctx.font = 'bold 13.5px system-ui, sans-serif';
       ctx.fillStyle = p === 1 ? '#7A5608' : '#155A8A';
-      ctx.fillText(fmtScore(tops[p].score), mx, py0 + 66);
+      ctx.fillText(tops[p] ? fmtScore(tops[p].score) : '', mx, py0 + 66);
     }
     ctx.fillStyle = 'rgba(46,134,180,0.10)';
     roundRect(DEX_PANEL.x + 14, yBase, DEX_PANEL.w - 28, 8, 4); ctx.fill();
@@ -968,11 +966,17 @@
       ctx.textAlign = 'left';
       ctx.font = (r.me ? 'bold ' : '') + '13px system-ui, sans-serif';
       ctx.fillStyle = r.me ? '#B8860B' : '#155A8A';
-      ctx.fillText(r.me ? r.name + '（你）' : r.name, DEX_PANEL.x + 58, ry + 33);
+      ctx.fillText(r.name + ' · ' + (C.seaStages[r.sea] ? C.seaStages[r.sea].name : ''), DEX_PANEL.x + 58, ry + 33);
       ctx.textAlign = 'right';
       ctx.font = 'bold 13px system-ui, sans-serif';
       ctx.fillStyle = r.me ? '#B8860B' : '#3E6E90';
       ctx.fillText(fmtScore(r.score), DEX_PANEL.x + DEX_PANEL.w - 26, ry + 33);
+    }
+    if (!rows.length) {
+      ctx.textAlign = 'center';
+      ctx.font = '13px system-ui, sans-serif';
+      ctx.fillStyle = '#8AA5B8';
+      ctx.fillText('完成一局后，这里会记录你的成绩排名', DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + 300);
     }
     ctx.textAlign = 'center';
   }

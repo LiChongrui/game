@@ -211,13 +211,5 @@ MG.config = {
     { name: '江河', r: 66, color: '#7A55BE', dark: '#3B2A6E', score: 29 },
     { name: '大海', r: 78, color: '#27479C', dark: '#101F56', score: 38 },
     { name: '沧海', r: 92, color: '#122A5E', dark: '#060F2E', score: 50 }
-  ],
-
-  ad: {
-    bannerId: '',
-    rewardId: '',
-    interstitialId: '',
-    minBandPx: 90,
-    interstitialEvery: 3
-  }
+  ]
 };

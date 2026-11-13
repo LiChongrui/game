@@ -295,15 +295,7 @@ MG.config = {
     { name: '江河', r: 66, color: '#7A55BE', dark: '#3B2A6E', score: 29 },
     { name: '大海', r: 78, color: '#27479C', dark: '#101F56', score: 38 },
     { name: '沧海', r: 92, color: '#122A5E', dark: '#060F2E', score: 50 }
-  ],
-
-  ad: {
-    bannerId: '',
-    rewardId: '',
-    interstitialId: '',
-    minBandPx: 90,
-    interstitialEvery: 3
-  }
+  ]
 };
 
 ;
@@ -607,10 +599,6 @@ MG.layout.build();
     if (canvas.height !== nh) canvas.height = nh;
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    if (MG.ad) {
-      if (!MG.ad._inited) { MG.ad.init(); MG.ad._inited = true; }
-      MG.ad.layout();
-    }
     var cy = MG.layout.band.btnCy;
     if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {
       bookBtn.cy = cy; restartBtn.cy = cy;
@@ -856,83 +844,6 @@ MG.layout.build();
       try { if (this._amb) { this._amb.src.stop(); this._amb.lfo.stop(); } } catch (e) {}
       this._amb = null;
       try { if (this._drone) { this._drone.o.stop(); this._drone = null; } } catch (e) {}
-    }
-  };
-
-  MG.ad = {
-    banner: null, reward: null, interstitial: null,
-    adH: 96, bandTop: 0, bandH: 0, inGameOk: false,
-    lastState: null, lastShow: false, _overN: 0,
-    init: function () {
-      if (!MG.platform || !MG.platform.isWx || typeof wx === 'undefined') return;
-      var cfg = MG.config.ad, self = this;
-      try {
-        if (cfg.bannerId) {
-          this.banner = wx.createBannerAd({ adUnitId: cfg.bannerId, style: { left: 0, top: 0, width: 320 } });
-          this.banner.onResize(function (r) { if (r && r.height) { self.adH = r.height; self.layout(); if (self.lastShow) self.reposition(); } });
-          this.banner.onError(function () {});
-        }
-        if (cfg.rewardId) {
-          this.reward = wx.createRewardedVideoAd({ adUnitId: cfg.rewardId });
-          this.reward.onError(function () {});
-        }
-        if (cfg.interstitialId) {
-          this.interstitial = wx.createInterstitialAd({ adUnitId: cfg.interstitialId });
-          this.interstitial.onError(function () {});
-        }
-      } catch (e) {}
-      this.layout();
-    },
-    layout: function () {
-      var h = window.innerHeight || 0;
-      this.bandTop = (oy + C.H) * view.s;
-      this.bandH = Math.max(0, h - this.bandTop);
-      this.inGameOk = this.bandH >= (MG.config.ad.minBandPx || 90);
-    },
-    reposition: function () {
-      if (!this.banner) return;
-      var w = window.innerWidth || 0, h = window.innerHeight || 0;
-      var top = Math.max(this.bandTop, h - this.adH);
-      if (top + this.adH > h) top = h - this.adH;
-      var width = Math.min(w - 12, 400);
-      try { this.banner.style = { left: (w - width) / 2, top: top, width: width }; } catch (e) {}
-    },
-    showBanner: function () {
-      if (!this.banner) return;
-      if (!this.inGameOk) { try { this.banner.hide(); } catch (e) {} this.lastShow = false; return; }
-      this.reposition();
-      try { this.banner.show(); this.lastShow = true; } catch (e) {}
-    },
-    hideBanner: function () { if (this.banner) { try { this.banner.hide(); } catch (e) {} } this.lastShow = false; },
-    sync: function (st) {
-      if (!this.banner) { this.lastState = st; return; }
-      if (st === this.lastState) return;
-      this.lastState = st;
-      if (st === 'play' || st === 'menu' || st === 'over') this.showBanner();
-      else this.hideBanner();
-    },
-    showReward: function (cb) {
-      if (!this.reward) { try { cb(true); } catch (e) {} return; }
-      var self = this, done = false;
-      var onClose = function (res) {
-        try { self.reward.offClose(onClose); } catch (e) {}
-        var ended = !res || res.isEnded;
-        if (!ended) { try { self.showBanner(); } catch (e) {} }
-        if (!done) { done = true; try { cb(ended); } catch (e) {} }
-      };
-      try { this.reward.onClose(onClose); } catch (e) {}
-      var showIt = function () { try { self.reward.show(); } catch (e) { try { cb(true); } catch (e2) {} } };
-      try {
-        this.reward.show().catch(function () { try { self.reward.load().then(showIt); } catch (e) { try { cb(true); } catch (e2) {} } });
-      } catch (e) { try { cb(true); } catch (e2) {} }
-    },
-    maybeInterstitial: function () {
-      if (!this.interstitial) return;
-      if (!MG.config.ad.interstitialEvery) return;
-      this._overN++;
-      if (this._overN % MG.config.ad.interstitialEvery !== 0) return;
-      var self = this;
-      try { this.interstitial.show().catch(function () { try { self.interstitial.load().then(function () { self.interstitial.show(); }); } catch (e) {} }); } catch (e) {}
     }
   };
 
@@ -1288,24 +1199,16 @@ MG.layout.build();
     saveChal();
   }
 
-  var friends = (function () {
-    var list = MG.platform.getJSON('mg_friends', null);
-    if (!list) {
-      var names = ['海风酱', '泡泡鱼', '深蓝船长', '浪里格', '珊瑚酱', '夜航星'];
-      var rnd = mulberry(dateSeed('friends-v1'));
-      list = [];
-      for (var i = 0; i < names.length; i++) list.push({ name: names[i], base: Math.floor(300 + rnd() * 4200) });
-      MG.platform.setJSON('mg_friends', list);
-    }
-    return list;
-  })();
-  function friendBoard() {
-    var rnd = mulberry(dateSeed(todayStr()) ^ 0x5f5f);
+  var RECENT_MAX = 10;
+  var recent = MG.platform.getJSON('mg_recent', []) || [];
+  var runRecorded = false;
+  function saveRecent() { try { MG.platform.setJSON('mg_recent', recent); } catch (e) {} }
+  function recentBoard() {
     var rows = [];
-    for (var i = 0; i < friends.length; i++) {
-      rows.push({ name: friends[i].name, score: Math.max(0, Math.round(friends[i].base * (0.9 + rnd() * 0.25))), me: false });
+    for (var i = 0; i < recent.length; i++) {
+      var d = new Date(recent[i].ts);
+      rows.push({ name: (d.getMonth() + 1) + '.' + d.getDate() + ' 局', score: recent[i].score, sea: recent[i].sea || 0, ts: recent[i].ts, me: false });
     }
-    rows.push({ name: '我', score: best, me: true });
     rows.sort(function (a, b) { return b.score - a.score; });
     return rows;
   }
@@ -2791,10 +2694,15 @@ MG.layout.build();
     saveNum('mg_peak', careerPeak);
     saveNum('mg_life', lifeScore);
     saveNum('mg_best', best);
+    if (!runRecorded) {
+      runRecorded = true;
+      recent.push({ score: score, sea: seaStage(), ts: Date.now() });
+      if (recent.length > RECENT_MAX) recent = recent.slice(-RECENT_MAX);
+      saveRecent();
+    }
     checkAchievements();
     saveDex();
     audio.over();
-    if (MG.ad) MG.ad.maybeInterstitial();
   }
 
   MG.probe = function () {
@@ -2854,7 +2762,7 @@ MG.layout.build();
     spawn: function (tier, x, y) { return phys.create(x || C.W / 2, y || C.spawnY, tier, 0, 0); },
     dailyProg: dailyProgress,
     dailyState: function () { return daily; },
-    board: friendBoard,
+    board: recentBoard,
     share: function () { openShare(); return shareText; },
     shareCopy: copyShareText,
     setDrops: function (n) { dropCount = n; },
@@ -3139,12 +3047,9 @@ MG.layout.build();
     }
     for (i = 0; i < bs.length; i++) { bs[i].dangerT = 0; bs[i].grace = 1.5; }
     reviveCount++;
+    if (runRecorded) { runRecorded = false; recent = recent.slice(0, -1); saveRecent(); }
     addPopup(C.W / 2, 300, removed > 0 ? '复活！清走 ' + removed + ' 滴 · 继续深潜' : '复活！继续深潜', true, 0);
     audio.blip(660, 0.22, 'sine', 0.12, 1.2);
-  }
-  function requestRevive() {
-    if (MG.ad && MG.ad.showReward) { MG.ad.showReward(function (ok) { if (ok) doRevive(); }); }
-    else { doRevive(); }
   }
   function goHome() {
     state = 'menu';
@@ -3176,6 +3081,7 @@ MG.layout.build();
     combo = 0; comboTimer = 0; cooldown = 0; maxCombo = 0;
     doubled = false;
     reviveCount = 0;
+    runRecorded = false;
     dangerAlert = 0; dangerRemain = 0;
     skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
     reefCountPrev = 0;
@@ -3213,7 +3119,7 @@ MG.layout.build();
       overButtons.push({ x: x, y: y, w: bw, h: bh, label: '结算双倍', action: doDouble });
       y += bh + gap;
     }
-    overButtons.push({ x: x, y: y, w: bw, h: bh, label: '看广告复活', action: requestRevive });
+    overButtons.push({ x: x, y: y, w: bw, h: bh, label: '复活继续', action: doRevive });
     y += bh + gap;
     overButtons.push({ x: x, y: y, w: bw, h: bh, label: '分享战报', action: openShare });
     y += bh + gap;
@@ -3244,7 +3150,7 @@ MG.layout.build();
     audio.blip(660, 0.08, 'sine', 0.06, 0.3);
   }
   var SAVE_KEYS = ['mg_rune', 'mg_peak', 'mg_seen', 'mg_best', 'mg_life', 'mg_dex', 'mg_ver',
-    'mg_mute', 'mg_music', 'mg_vib', 'mg_tut', 'mg_ng', 'mg_daily', 'mg_dchal', 'mg_friends'];
+    'mg_mute', 'mg_music', 'mg_vib', 'mg_tut', 'mg_ng', 'mg_daily', 'mg_dchal', 'mg_recent'];
   function clearSaveData() {
     for (var i = 0; i < SAVE_KEYS.length; i++) MG.platform.remove(SAVE_KEYS[i]);
     setClearOpen = false; setOpen = false;
@@ -4484,9 +4390,7 @@ MG.layout.build();
   }
 
   function drawRankTab() {
-    var rows = friendBoard();
-    var meIdx = 0;
-    for (var m = 0; m < rows.length; m++) if (rows[m].me) { meIdx = m; break; }
+    var rows = recentBoard();
     var bx = DEX_PANEL.x + 14, by = DEX_PANEL.y + 54, bw = DEX_PANEL.w - 28, bh = 60;
     var bgd = ctx.createLinearGradient(0, by, 0, by + bh);
     bgd.addColorStop(0, '#3B97C9'); bgd.addColorStop(1, '#1E6B9E');
@@ -4503,20 +4407,20 @@ MG.layout.build();
     ctx.textAlign = 'center';
     ctx.font = 'bold 15px system-ui, sans-serif';
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillText('#' + (meIdx + 1), bx + 30, by + 35);
+    ctx.fillText('★', bx + 30, by + 35);
     ctx.textAlign = 'left';
     ctx.font = '10.5px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.75)';
     ctx.fillText('我的最佳成绩', bx + 58, by + 25);
     ctx.font = 'bold 18px system-ui, sans-serif';
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillText(fmtScore(rows[meIdx].score), bx + 58, by + 47);
+    ctx.fillText(fmtScore(best), bx + 58, by + 47);
     ctx.textAlign = 'right';
     ctx.font = '11px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.fillText('超越 ' + (rows.length - 1 - meIdx) + ' 位好友', bx + bw - 16, by + 35);
+    ctx.fillText('共 ' + recent.length + ' 局记录', bx + bw - 16, by + 35);
     var colW = 108, gap = 14, yBase = DEX_PANEL.y + 236;
-    var tops = [rows[1], rows[0], rows[2]];
+    var tops = [rows[1] || null, rows[0] || null, rows[2] || null];
     var hts = [84, 108, 72], medals = ['#C9D4DC', '#F5C542', '#E0B58A'];
     var grads = [['#DDE6EC', '#AEBEC9'], ['#FFE08A', '#D9A93F'], ['#EFCAA2', '#C29263']];
     for (var p = 0; p < 3; p++) {
@@ -4544,10 +4448,10 @@ MG.layout.build();
       ctx.fillText(String([2, 1, 3][p]), mx, my + 4.5);
       ctx.font = '11.5px system-ui, sans-serif';
       ctx.fillStyle = p === 1 ? '#7A5608' : '#3E647E';
-      ctx.fillText(truncText(tops[p].name, colW - 12), mx, py0 + 48);
+      ctx.fillText(tops[p] ? truncText(tops[p].name, colW - 12) : '—', mx, py0 + 48);
       ctx.font = 'bold 13.5px system-ui, sans-serif';
       ctx.fillStyle = p === 1 ? '#7A5608' : '#155A8A';
-      ctx.fillText(fmtScore(tops[p].score), mx, py0 + 66);
+      ctx.fillText(tops[p] ? fmtScore(tops[p].score) : '', mx, py0 + 66);
     }
     ctx.fillStyle = 'rgba(46,134,180,0.10)';
     roundRect(DEX_PANEL.x + 14, yBase, DEX_PANEL.w - 28, 8, 4); ctx.fill();
@@ -4565,11 +4469,17 @@ MG.layout.build();
       ctx.textAlign = 'left';
       ctx.font = (r.me ? 'bold ' : '') + '13px system-ui, sans-serif';
       ctx.fillStyle = r.me ? '#B8860B' : '#155A8A';
-      ctx.fillText(r.me ? r.name + '（你）' : r.name, DEX_PANEL.x + 58, ry + 33);
+      ctx.fillText(r.name + ' · ' + (C.seaStages[r.sea] ? C.seaStages[r.sea].name : ''), DEX_PANEL.x + 58, ry + 33);
       ctx.textAlign = 'right';
       ctx.font = 'bold 13px system-ui, sans-serif';
       ctx.fillStyle = r.me ? '#B8860B' : '#3E6E90';
       ctx.fillText(fmtScore(r.score), DEX_PANEL.x + DEX_PANEL.w - 26, ry + 33);
+    }
+    if (!rows.length) {
+      ctx.textAlign = 'center';
+      ctx.font = '13px system-ui, sans-serif';
+      ctx.fillStyle = '#8AA5B8';
+      ctx.fillText('完成一局后，这里会记录你的成绩排名', DEX_PANEL.x + DEX_PANEL.w / 2, DEX_PANEL.y + 300);
     }
     ctx.textAlign = 'center';
   }
@@ -7770,7 +7680,6 @@ MG.layout.build();
     if (ngOpen || panelFxAlive('ng')) { var pnR = MG.layout.ngRect(); drawPanelFx('ng', ngOpen, pnR.x + pnR.w / 2, pnR.y + pnR.h / 2, 0.66, drawNgPick); }
     if (shareOpen || panelFxAlive('share')) { var pshR = MG.layout.shareRect(); drawPanelFx('share', shareOpen, pshR.x + pshR.w / 2, pshR.y + pshR.h / 2, 0.6, drawShare); }
     if (state === 'over') drawOver();
-    if (MG.ad && MG.ad.sync) MG.ad.sync(state);
 
     ctx.restore();
 

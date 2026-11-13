@@ -46,10 +46,6 @@
     if (canvas.height !== nh) canvas.height = nh;
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    if (MG.ad) {
-      if (!MG.ad._inited) { MG.ad.init(); MG.ad._inited = true; }
-      MG.ad.layout();
-    }
     var cy = MG.layout.band.btnCy;
     if (typeof bookBtn !== 'undefined' && typeof restartBtn !== 'undefined' && typeof SKILL_BTNS !== 'undefined') {
       bookBtn.cy = cy; restartBtn.cy = cy;
@@ -295,82 +291,5 @@
       try { if (this._amb) { this._amb.src.stop(); this._amb.lfo.stop(); } } catch (e) {}
       this._amb = null;
       try { if (this._drone) { this._drone.o.stop(); this._drone = null; } } catch (e) {}
-    }
-  };
-
-  MG.ad = {
-    banner: null, reward: null, interstitial: null,
-    adH: 96, bandTop: 0, bandH: 0, inGameOk: false,
-    lastState: null, lastShow: false, _overN: 0,
-    init: function () {
-      if (!MG.platform || !MG.platform.isWx || typeof wx === 'undefined') return;
-      var cfg = MG.config.ad, self = this;
-      try {
-        if (cfg.bannerId) {
-          this.banner = wx.createBannerAd({ adUnitId: cfg.bannerId, style: { left: 0, top: 0, width: 320 } });
-          this.banner.onResize(function (r) { if (r && r.height) { self.adH = r.height; self.layout(); if (self.lastShow) self.reposition(); } });
-          this.banner.onError(function () {});
-        }
-        if (cfg.rewardId) {
-          this.reward = wx.createRewardedVideoAd({ adUnitId: cfg.rewardId });
-          this.reward.onError(function () {});
-        }
-        if (cfg.interstitialId) {
-          this.interstitial = wx.createInterstitialAd({ adUnitId: cfg.interstitialId });
-          this.interstitial.onError(function () {});
-        }
-      } catch (e) {}
-      this.layout();
-    },
-    layout: function () {
-      var h = window.innerHeight || 0;
-      this.bandTop = (oy + C.H) * view.s;
-      this.bandH = Math.max(0, h - this.bandTop);
-      this.inGameOk = this.bandH >= (MG.config.ad.minBandPx || 90);
-    },
-    reposition: function () {
-      if (!this.banner) return;
-      var w = window.innerWidth || 0, h = window.innerHeight || 0;
-      var top = Math.max(this.bandTop, h - this.adH);
-      if (top + this.adH > h) top = h - this.adH;
-      var width = Math.min(w - 12, 400);
-      try { this.banner.style = { left: (w - width) / 2, top: top, width: width }; } catch (e) {}
-    },
-    showBanner: function () {
-      if (!this.banner) return;
-      if (!this.inGameOk) { try { this.banner.hide(); } catch (e) {} this.lastShow = false; return; }
-      this.reposition();
-      try { this.banner.show(); this.lastShow = true; } catch (e) {}
-    },
-    hideBanner: function () { if (this.banner) { try { this.banner.hide(); } catch (e) {} } this.lastShow = false; },
-    sync: function (st) {
-      if (!this.banner) { this.lastState = st; return; }
-      if (st === this.lastState) return;
-      this.lastState = st;
-      if (st === 'play' || st === 'menu' || st === 'over') this.showBanner();
-      else this.hideBanner();
-    },
-    showReward: function (cb) {
-      if (!this.reward) { try { cb(true); } catch (e) {} return; }
-      var self = this, done = false;
-      var onClose = function (res) {
-        try { self.reward.offClose(onClose); } catch (e) {}
-        var ended = !res || res.isEnded;
-        if (!ended) { try { self.showBanner(); } catch (e) {} }
-        if (!done) { done = true; try { cb(ended); } catch (e) {} }
-      };
-      try { this.reward.onClose(onClose); } catch (e) {}
-      var showIt = function () { try { self.reward.show(); } catch (e) { try { cb(true); } catch (e2) {} } };
-      try {
-        this.reward.show().catch(function () { try { self.reward.load().then(showIt); } catch (e) { try { cb(true); } catch (e2) {} } });
-      } catch (e) { try { cb(true); } catch (e2) {} }
-    },
-    maybeInterstitial: function () {
-      if (!this.interstitial) return;
-      if (!MG.config.ad.interstitialEvery) return;
-      this._overN++;
-      if (this._overN % MG.config.ad.interstitialEvery !== 0) return;
-      var self = this;
-      try { this.interstitial.show().catch(function () { try { self.interstitial.load().then(function () { self.interstitial.show(); }); } catch (e) {} }); } catch (e) {}
     }
   };

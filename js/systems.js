@@ -349,24 +349,16 @@
     saveChal();
   }
 
-  var friends = (function () {
-    var list = MG.platform.getJSON('mg_friends', null);
-    if (!list) {
-      var names = ['海风酱', '泡泡鱼', '深蓝船长', '浪里格', '珊瑚酱', '夜航星'];
-      var rnd = mulberry(dateSeed('friends-v1'));
-      list = [];
-      for (var i = 0; i < names.length; i++) list.push({ name: names[i], base: Math.floor(300 + rnd() * 4200) });
-      MG.platform.setJSON('mg_friends', list);
-    }
-    return list;
-  })();
-  function friendBoard() {
-    var rnd = mulberry(dateSeed(todayStr()) ^ 0x5f5f);
+  var RECENT_MAX = 10;
+  var recent = MG.platform.getJSON('mg_recent', []) || [];
+  var runRecorded = false;
+  function saveRecent() { try { MG.platform.setJSON('mg_recent', recent); } catch (e) {} }
+  function recentBoard() {
     var rows = [];
-    for (var i = 0; i < friends.length; i++) {
-      rows.push({ name: friends[i].name, score: Math.max(0, Math.round(friends[i].base * (0.9 + rnd() * 0.25))), me: false });
+    for (var i = 0; i < recent.length; i++) {
+      var d = new Date(recent[i].ts);
+      rows.push({ name: (d.getMonth() + 1) + '.' + d.getDate() + ' 局', score: recent[i].score, sea: recent[i].sea || 0, ts: recent[i].ts, me: false });
     }
-    rows.push({ name: '我', score: best, me: true });
     rows.sort(function (a, b) { return b.score - a.score; });
     return rows;
   }
@@ -1852,10 +1844,15 @@
     saveNum('mg_peak', careerPeak);
     saveNum('mg_life', lifeScore);
     saveNum('mg_best', best);
+    if (!runRecorded) {
+      runRecorded = true;
+      recent.push({ score: score, sea: seaStage(), ts: Date.now() });
+      if (recent.length > RECENT_MAX) recent = recent.slice(-RECENT_MAX);
+      saveRecent();
+    }
     checkAchievements();
     saveDex();
     audio.over();
-    if (MG.ad) MG.ad.maybeInterstitial();
   }
 
   MG.probe = function () {
@@ -1915,7 +1912,7 @@
     spawn: function (tier, x, y) { return phys.create(x || C.W / 2, y || C.spawnY, tier, 0, 0); },
     dailyProg: dailyProgress,
     dailyState: function () { return daily; },
-    board: friendBoard,
+    board: recentBoard,
     share: function () { openShare(); return shareText; },
     shareCopy: copyShareText,
     setDrops: function (n) { dropCount = n; },
@@ -2200,12 +2197,9 @@
     }
     for (i = 0; i < bs.length; i++) { bs[i].dangerT = 0; bs[i].grace = 1.5; }
     reviveCount++;
+    if (runRecorded) { runRecorded = false; recent = recent.slice(0, -1); saveRecent(); }
     addPopup(C.W / 2, 300, removed > 0 ? '复活！清走 ' + removed + ' 滴 · 继续深潜' : '复活！继续深潜', true, 0);
     audio.blip(660, 0.22, 'sine', 0.12, 1.2);
-  }
-  function requestRevive() {
-    if (MG.ad && MG.ad.showReward) { MG.ad.showReward(function (ok) { if (ok) doRevive(); }); }
-    else { doRevive(); }
   }
   function goHome() {
     state = 'menu';
@@ -2237,6 +2231,7 @@
     combo = 0; comboTimer = 0; cooldown = 0; maxCombo = 0;
     doubled = false;
     reviveCount = 0;
+    runRecorded = false;
     dangerAlert = 0; dangerRemain = 0;
     skillCharge = { swap: 0, ripple: 0, evap: 0, flow: 0 };
     reefCountPrev = 0;
@@ -2274,7 +2269,7 @@
       overButtons.push({ x: x, y: y, w: bw, h: bh, label: '结算双倍', action: doDouble });
       y += bh + gap;
     }
-    overButtons.push({ x: x, y: y, w: bw, h: bh, label: '看广告复活', action: requestRevive });
+    overButtons.push({ x: x, y: y, w: bw, h: bh, label: '复活继续', action: doRevive });
     y += bh + gap;
     overButtons.push({ x: x, y: y, w: bw, h: bh, label: '分享战报', action: openShare });
     y += bh + gap;
@@ -2305,7 +2300,7 @@
     audio.blip(660, 0.08, 'sine', 0.06, 0.3);
   }
   var SAVE_KEYS = ['mg_rune', 'mg_peak', 'mg_seen', 'mg_best', 'mg_life', 'mg_dex', 'mg_ver',
-    'mg_mute', 'mg_music', 'mg_vib', 'mg_tut', 'mg_ng', 'mg_daily', 'mg_dchal', 'mg_friends'];
+    'mg_mute', 'mg_music', 'mg_vib', 'mg_tut', 'mg_ng', 'mg_daily', 'mg_dchal', 'mg_recent'];
   function clearSaveData() {
     for (var i = 0; i < SAVE_KEYS.length; i++) MG.platform.remove(SAVE_KEYS[i]);
     setClearOpen = false; setOpen = false;
