@@ -445,7 +445,7 @@ eq('旧ads.show门控未回归', /ads\.show\(/.test(SRC), false);
 eq('广告模块未回归', /var ads = \{/.test(CSRC), false);
 eq('广告演示层未回归', /function drawAdOverlay\(/.test(RSRC), false);
 eq('结算双倍保留(非广告)', /label: '结算双倍', action: doDouble/.test(SRC) && /function doDouble\(\) \{\s*doubled = true;\s*score \*= 2;/.test(SRC), true);
-eq('结算双倍同步榜单', /if \(runRecorded && recent\.length\) \{ recent\[recent\.length - 1\]\.score = score; saveRecent\(\); \}/.test(SRC), true);
+eq('结算双倍同步榜单', /if \(recent\.length\) \{ recent\[recent\.length - 1\]\.score = score; saveRecent\(\); \}/.test(SRC), true);
 eq('越线冲走复活反馈已移除', /越线水滴被冲走/.test(SRC), false);
 eq('广告组件已移除(负向)', /看广告复活|MG\.ad|MG\.config\.ad|function requestRevive/.test(SRC), false);
 eq('复活按钮直接复活', /label: '复活继续', action: doRevive/.test(SRC), true);
