@@ -1844,12 +1844,14 @@
     saveNum('mg_peak', careerPeak);
     saveNum('mg_life', lifeScore);
     saveNum('mg_best', best);
-    if (!runRecorded) {
-      runRecorded = true;
+    if (runRecorded && recent.length) {
+      recent[recent.length - 1] = { score: score, sea: seaStage(), ts: Date.now() };
+    } else {
       recent.push({ score: score, sea: seaStage(), ts: Date.now() });
       if (recent.length > RECENT_MAX) recent = recent.slice(-RECENT_MAX);
-      saveRecent();
     }
+    runRecorded = true;
+    saveRecent();
     checkAchievements();
     saveDex();
     audio.over();
@@ -2171,6 +2173,7 @@
   function doDouble() {
     doubled = true;
     score *= 2;
+    if (runRecorded && recent.length) { recent[recent.length - 1].score = score; saveRecent(); }
     if (score > best) { best = score; saveNum('mg_best', best); }
   }
   function doRevive() {
@@ -2197,7 +2200,6 @@
     }
     for (i = 0; i < bs.length; i++) { bs[i].dangerT = 0; bs[i].grace = 1.5; }
     reviveCount++;
-    if (runRecorded) { runRecorded = false; recent = recent.slice(0, -1); saveRecent(); }
     addPopup(C.W / 2, 300, removed > 0 ? '复活！清走 ' + removed + ' 滴 · 继续深潜' : '复活！继续深潜', true, 0);
     audio.blip(660, 0.22, 'sine', 0.12, 1.2);
   }

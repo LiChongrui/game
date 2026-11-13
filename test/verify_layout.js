@@ -445,6 +445,7 @@ eq('旧ads.show门控未回归', /ads\.show\(/.test(SRC), false);
 eq('广告模块未回归', /var ads = \{/.test(CSRC), false);
 eq('广告演示层未回归', /function drawAdOverlay\(/.test(RSRC), false);
 eq('结算双倍保留(非广告)', /label: '结算双倍', action: doDouble/.test(SRC) && /function doDouble\(\) \{\s*doubled = true;\s*score \*= 2;/.test(SRC), true);
+eq('结算双倍同步榜单', /if \(runRecorded && recent\.length\) \{ recent\[recent\.length - 1\]\.score = score; saveRecent\(\); \}/.test(SRC), true);
 eq('越线冲走复活反馈已移除', /越线水滴被冲走/.test(SRC), false);
 eq('广告组件已移除(负向)', /看广告复活|MG\.ad|MG\.config\.ad|function requestRevive/.test(SRC), false);
 eq('复活按钮直接复活', /label: '复活继续', action: doRevive/.test(SRC), true);
@@ -457,8 +458,8 @@ eq('config无广告配置(负向)', /bannerId|rewardId|interstitialId|MG\.config
 eq('core无MG.ad模块(负向)', /MG\.ad/.test(CSRC), false);
 eq('render无广告同步(负向)', /MG\.ad/.test(RSRC), false);
 eq('榜单改最近局排名', /var recent = MG\.platform\.getJSON\('mg_recent', \[\]\) \|\| \[\];/.test(SRC), true);
-eq('gameOver记录最近局', /if \(!runRecorded\) \{[\s\S]*?recent\.push\(\{ score: score, sea: seaStage\(\), ts: Date\.now\(\) \}\);/.test(SRC), true);
-eq('doRevive回滚本局记录', /if \(runRecorded\) \{ runRecorded = false; recent = recent\.slice\(0, -1\); saveRecent\(\); \}/.test(SRC), true);
+eq('gameOver更新或新增最近局', /if \(runRecorded && recent\.length\) \{\s*recent\[recent\.length - 1\] = \{ score: score, sea: seaStage\(\), ts: Date\.now\(\) \};\s*\} else \{\s*recent\.push\(\{ score: score, sea: seaStage\(\), ts: Date\.now\(\) \}\);/.test(SRC), true);
+eq('doRevive不回滚记录(负向)', /recent\.slice\(0, -1\)/.test(SRC), false);
 eq('假好友榜已移除(负向)', /mg_friends|friendBoard/.test(SRC) || /超越 |friendBoard/.test(PSRC), false);
 eq('榜单面板用recentBoard', /var rows = recentBoard\(\);/.test(PSRC), true);
 eq('榜单空状态文案', /完成一局后，这里会记录你的成绩排名/.test(PSRC), true);
