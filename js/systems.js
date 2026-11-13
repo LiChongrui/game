@@ -2167,7 +2167,7 @@
   function doDouble() {
     doubled = true;
     score *= 2;
-    if (runRecorded && recent.length) { recent[recent.length - 1].score = score; saveRecent(); }
+    if (recent.length) { recent[recent.length - 1].score = score; saveRecent(); }
     if (score > best) { best = score; saveNum('mg_best', best); }
   }
   function doRevive() {
