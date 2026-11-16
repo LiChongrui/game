@@ -46,4 +46,8 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
 }
 
 makeQuest(0);
+if (MG.platform && MG.platform.isWx && typeof wx !== 'undefined') {
+  try { wx.showShareMenu({ withShareTicket: false, menus: ['shareAppMessage', 'shareTimeline'] }); } catch (e) {}
+  try { wx.onShareTimeline(function () { return { title: '水滴合成深海' }; }); } catch (e) {}
+}
 requestAnimationFrame(frame);

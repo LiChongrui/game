@@ -462,6 +462,8 @@ eq('recordRun统一记录函数', /function recordRun\(\)/.test(SRC), true);
 eq('死亡/退出/重开三路都记录', (SRC.match(/recordRun\(\);/g) || []).length, 3);
 eq('复活续玩再记新条', /reviveCount\+\+;\s*runRecorded = false;/.test(SRC), true);
 eq('秒退不计入', /if \(runRecorded \|\| levelElapsed < 0\.5\) return;/.test(SRC), true);
+var MMSRC = src('js/main.js');
+eq('右上角朋友圈转发注册', /showShareMenu\(\{ withShareTicket: false, menus: \['shareAppMessage', 'shareTimeline'\] \}\)/.test(MMSRC) && /onShareTimeline/.test(MMSRC), true);
 eq('runRecorded防双记', /var runRecorded = false;/.test(SRC), true);
 eq('doRevive不回滚记录(负向)', /recent\.slice\(0, -1\)/.test(SRC), false);
 eq('假好友榜已移除(负向)', /mg_friends|friendBoard/.test(SRC) || /超越 |friendBoard/.test(PSRC), false);
